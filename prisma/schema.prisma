@@ -1,0 +1,945 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Cities & Neighborhoods ───────────────────────────────────────────────────
+
+model City {
+  id            String         @id @default(cuid())
+  name          String         // "مكة المكرمة"
+  nameEn        String         // "Mecca"
+  neighborhoods Neighborhood[]
+  createdAt     DateTime       @default(now())
+}
+
+model Neighborhood {
+  id        String   @id @default(cuid())
+  name      String   // display name (Arabic)
+  nameEn    String   // display name (English)
+  lat       Float?   // center point (derived from polygon centroid)
+  lng       Float?
+  boundary  Json     // polygon [[lng,lat],...] — required, no longer optional
+  bbox      Json     // [minLng, minLat, maxLng, maxLat] — required
+  source    String   @default("balady") // "balady" | "community"
+  baladyId  String?  // Balady DISTRICT_ID (null for community neighborhoods)
+  hidden    Boolean  @default(false)   // hide non-residential (industrial, gov, plots)
+  city      City     @relation(fields: [cityId], references: [id])
+  cityId    String
+  users     User[]
+  posts     Post[]
+  compounds Compound[]
+  createdAt DateTime @default(now())
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+model User {
+  id               String        @id @default(cuid())
+  phone            String        @unique  // Saudi format: 05xxxxxxxx
+  lastSeenAt       DateTime?     // updated on every API request
+  showLastSeen     Boolean       @default(true)  // privacy: show online/last seen
+  showReadReceipts Boolean       @default(true)  // privacy: send read receipts
+  name             String?       // first name
+  lastName         String?       // last name / family name
+  avatarUrl        String?
+  coverUrl         String?
+  email              String?
+  emailVerified      Boolean  @default(false)
+  emailVerifyToken   String?
+  emailVerifyExpiry  DateTime?
+  gender           Gender        @default(MALE)
+  isVerified       Boolean       @default(false)  // phone OTP verified
+  addressVerified  Boolean       @default(false)  // address/neighborhood verified
+  addressProofUrl  String?       // uploaded lease/utility bill photo
+  reputation       Int           @default(0)
+  accountType      AccountType   @default(NORMAL)
+  role             UserRole      @default(RESIDENT)
+  status           UserStatus    @default(ACTIVE)
+  neighborhood     Neighborhood? @relation(fields: [neighborhoodId], references: [id])
+  neighborhoodId   String?
+  posts            Post[]
+  reports          Report[]      @relation("reporter")
+  reportedPosts    Report[]      @relation("reportedUser")
+  otpCodes         OtpCode[]
+  reactions        Reaction[]
+  bookmarks        Bookmark[]
+  comments         Comment[]
+  notifications    Notification[]
+  threads1         Thread[]      @relation("threadUser1")
+  threads2         Thread[]      @relation("threadUser2")
+  messages         Message[]
+  rideRequests     RideRequest[] @relation("rideRequests")
+  rideOffers       RideOffer[]   @relation("rideOffers")
+  supportTickets   SupportTicket[]
+  polls            Poll[]
+  driverRatingAvg    Float?
+  driverRatingCount  Int           @default(0)
+  driverTripsCount   Int           @default(0)
+  driverCancelCount  Int           @default(0)
+  plan             String        @default("FREE") // FREE | PREMIUM (internal only, never shown to users)
+  bio              String?       // free-text "about me" (max 300 chars)
+  modApprovedAt    DateTime?     // when user was promoted to mod (for probation tracking)
+  serviceDescription String?     // service providers: what they offer
+  serviceLat       Float?        // service location (optional)
+  serviceLng       Float?
+  serviceAddress   String?       // human-readable service address
+  notifyComments   Boolean       @default(true)
+  notifyReactions  Boolean       @default(true)
+  notifyReplies    Boolean       @default(true)
+  notifyLookingFor Boolean       @default(true)
+  notifyMessages   Boolean       @default(true)
+  notifyRides      Boolean       @default(true)
+  notifySystem     Boolean       @default(true)
+  serviceItems     ServiceItem[]
+  deletedAt        DateTime?     // soft delete — null = active, set = deleted
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+model ServiceItem {
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  title       String                // e.g. "كبسة دجاج"
+  description String?               // optional details
+  price       Int?                  // in SAR, null = "اتصل للسعر"
+  imageUrl    String?               // product/service photo
+  sortOrder   Int      @default(0)  // display order
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, active, sortOrder])
+}
+
+// ─── Usage Tracking (per user, per feature, per time window) ────────────────
+
+model UsageCounter {
+  id        String   @id @default(cuid())
+  userId    String
+  feature   String   // e.g. "posts", "rideOffers", "threads", "uploads", "catalogItems"
+  count     Int      @default(0)
+  windowStart DateTime // start of the counting window (midnight for daily)
+
+  @@unique([userId, feature, windowStart])
+  @@index([userId, feature])
+}
+
+// ─── Plan Change Audit Log ──────────────────────────────────────────────────
+
+model PlanChangeLog {
+  id           String   @id @default(cuid())
+  userId       String
+  previousPlan String
+  newPlan      String
+  changedBy    String   // admin userId or "SYSTEM"
+  reason       String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ─── User Blocks (peer-to-peer, App Store compliance) ───────────────────────
+
+model UserBlock {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+}
+
+enum AccountType {
+  NORMAL
+  SERVICE_PROVIDER
+  VERIFIED_PROVIDER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  UNSPECIFIED
+}
+
+enum UserRole {
+  RESIDENT
+  NEIGHBORHOOD_MOD
+  COMPOUND_ADMIN
+  PLATFORM_MOD
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  WARNED
+  BANNED_TEMP
+  BANNED_PERM
+  PENDING_REVIEW
+}
+
+// ─── OTP ──────────────────────────────────────────────────────────────────────
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  phone     String
+  code      String
+  verified  Boolean  @default(false)
+  expiresAt DateTime
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    String?
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+}
+
+// ─── Posts ────────────────────────────────────────────────────────────────────
+
+model Post {
+  id             String        @id @default(cuid())
+  title          String
+  body           String
+  category       PostCategory
+  status         PostStatus    @default(PENDING_AI)
+  isPaid         Boolean       @default(false)
+  isPinned       Boolean       @default(false)
+  isFeatured     Boolean       @default(false)
+  isSeed         Boolean       @default(false)
+  coordinationMode CoordinationMode @default(OPEN)
+  activeThreadId String?       // for exclusive mode: the one active thread
+  price          Float?        // for marketplace items
+  imageUrls      String[]      // array of image URLs
+  locationLat    Float?        // attached map location
+  locationLng    Float?
+  locationName   String?       // place name for display
+  author         User          @relation(fields: [authorId], references: [id])
+  authorId       String
+  neighborhood   Neighborhood  @relation(fields: [neighborhoodId], references: [id])
+  neighborhoodId String
+  expiresAt      DateTime?     // for paid ads
+  reportCount    Int           @default(0)
+  reports        Report[]
+  reactions      Reaction[]
+  bookmarks      Bookmark[]
+  comments       Comment[]
+  payment        Payment?
+  editedAt       DateTime?     // set when author edits
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([neighborhoodId, category, status])
+  @@index([authorId])
+}
+
+enum PostCategory {
+  ALERT              // تنبيهات
+  LOST_FOUND         // مفقودات ومصطبات
+  MARKETPLACE        // سوق الحي
+  FOOD_HOME          // أكل بيتي
+  REAL_ESTATE        // عقارات
+  SERVICES           // خدمات
+  LOOKING_FOR        // أبحث عن
+  RIDE_REQUEST       // طلب توصيل
+  NEIGHBORHOOD_ISSUE // مشكلة في الحي
+  MOSQUE             // إعلانات المسجد
+  GENERAL            // عام
+  WOMEN_ONLY         // للنساء فقط
+  EID_RAMADAN        // فعاليات ومناسبات
+  CONTESTS           // مسابقات وجوائز
+}
+
+enum CoordinationMode {
+  OPEN       // multiple threads allowed (services, marketplace)
+  EXCLUSIVE  // one active thread at a time (ride requests)
+}
+
+enum PostStatus {
+  PENDING_AI      // waiting for AI check
+  ACTIVE          // live and visible
+  IN_PROGRESS     // exclusive post claimed by a responder
+  HIDDEN          // hidden by reports, pending review
+  REMOVED         // removed by moderator
+  EXPIRED         // paid ad expired
+  ARCHIVED        // auto-archived after free duration ended
+}
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
+model Report {
+  id           String       @id @default(cuid())
+  reason       ReportReason
+  details      String?
+  reporter     User         @relation("reporter", fields: [reporterId], references: [id])
+  reporterId   String
+  post         Post         @relation(fields: [postId], references: [id])
+  postId       String
+  reportedUser User         @relation("reportedUser", fields: [reportedUserId], references: [id])
+  reportedUserId String
+  status       ReportStatus @default(PENDING)
+  createdAt    DateTime     @default(now())
+
+  @@unique([reporterId, postId])
+}
+
+enum ReportReason {
+  WRONG_CATEGORY
+  SPAM
+  INAPPROPRIATE
+  SCAM
+  NOT_NEIGHBORHOOD
+  OFFENSIVE
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  DISMISSED
+  ACTION_TAKEN
+}
+
+// ─── Reactions ────────────────────────────────────────────────────────────────
+
+model Reaction {
+  id        String   @id @default(cuid())
+  emoji     String   // any emoji character e.g. "❤️", "😂", "👍"
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId]) // one reaction per user per post
+  @@index([postId])
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+  @@index([userId, createdAt])
+}
+
+// ─── Comments ─────────────────────────────────────────────────────────────────
+
+model Comment {
+  id        String    @id @default(cuid())
+  body      String
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  author    User      @relation(fields: [authorId], references: [id])
+  authorId  String
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  parentId  String?
+  replies   Comment[] @relation("CommentReplies")
+  likes     CommentLike[]
+  createdAt DateTime  @default(now())
+  editedAt  DateTime?
+
+  @@index([postId])
+  @@index([parentId])
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, userId])
+  @@index([commentId])
+}
+
+// ─── Payments ─────────────────────────────────────────────────────────────────
+
+model Payment {
+  id            String        @id @default(cuid())
+  post          Post          @relation(fields: [postId], references: [id])
+  postId        String        @unique
+  amount        Float
+  currency      String        @default("SAR")
+  status        PaymentStatus @default(PENDING)
+  moyasarId     String?       // Moyasar payment ID
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+// ─── Compounds (B2B) ──────────────────────────────────────────────────────────
+
+model Compound {
+  id             String       @id @default(cuid())
+  name           String
+  neighborhood   Neighborhood @relation(fields: [neighborhoodId], references: [id])
+  neighborhoodId String
+  adminPhone     String
+  isActive       Boolean      @default(true)
+  subscriptionEndsAt DateTime?
+  announcements  Announcement[]
+  maintenanceRequests MaintenanceRequest[]
+  createdAt      DateTime     @default(now())
+}
+
+model Announcement {
+  id         String   @id @default(cuid())
+  compound   Compound @relation(fields: [compoundId], references: [id])
+  compoundId String
+  title      String
+  body       String
+  createdAt  DateTime @default(now())
+}
+
+model MaintenanceRequest {
+  id          String            @id @default(cuid())
+  compound    Compound          @relation(fields: [compoundId], references: [id])
+  compoundId  String
+  unitNumber  String
+  description String
+  status      MaintenanceStatus @default(OPEN)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+enum MaintenanceStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+enum NotificationType {
+  COMMENT_ON_POST
+  REACTION_ON_POST
+  REPLY_TO_COMMENT
+  LOOKING_FOR_POST
+  NEW_MESSAGE
+  RIDE_OFFER
+  RIDE_STATUS
+  RIDE_MESSAGE
+  RIDE_RATING
+  SYSTEM
+  REPORT
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  read      Boolean          @default(false)
+  user      User             @relation(fields: [userId], references: [id])
+  userId    String
+  actorId   String
+  actorName String?
+  postId    String?
+  postTitle String?
+  commentId String?
+  threadId       String?
+  rideRequestId  String?
+  title          String?
+  titleEn        String?
+  body           String?
+  bodyEn         String?
+  createdAt      DateTime         @default(now())
+
+  @@index([userId, read, createdAt])
+  @@index([userId, createdAt])
+}
+
+// ─── Reputation ──────────────────────────────────────────────────────────────
+
+model ReputationLog {
+  id         String   @id @default(cuid())
+  userId     String   // who receives the rep change
+  fromUserId String?  // who triggered it (null for system)
+  action     String   // reaction_received, comment_engaged, ride_completed, report_confirmed, etc.
+  points     Int      // positive or negative
+  postId     String?  // context
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, fromUserId, action]) // for anti-abuse pair checks
+}
+
+// ─── Verification Requests ───────────────────────────────────────────────────
+
+model VerificationRequest {
+  id          String   @id @default(cuid())
+  userId      String
+  businessName String?
+  description String
+  proofUrl    String?  // optional document/photo
+  status      String   @default("pending") // pending | approved | rejected
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+}
+
+// ─── Neighborhood Changes ────────────────────────────────────────────────────
+
+model NeighborhoodChangeLog {
+  id                  String   @id @default(cuid())
+  userId              String
+  fromNeighborhoodId  String
+  toNeighborhoodId    String
+  reason              String   // MOVED | TEMPORARY | OTHER
+  customReason        String?
+  changedBy           String   @default("user") // "user" | "admin"
+  createdAt           DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model NeighborhoodChangeRequest {
+  id                     String   @id @default(cuid())
+  userId                 String
+  currentNeighborhoodId  String
+  requestedNeighborhoodId String
+  reason                 String
+  customReason           String?
+  status                 String   @default("pending") // pending | approved | rejected
+  reviewedBy             String?
+  reviewedAt             DateTime?
+  createdAt              DateTime @default(now())
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+}
+
+// ─── Mod Role Requests ──────────────────────────────────────────────────────
+
+model ModRequest {
+  id              String   @id @default(cuid())
+  userId          String
+  neighborhoodId  String
+  reason          String
+  status          String   @default("pending") // pending | approved | rejected
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+}
+
+// ─── Polls / Voting ─────────────────────────────────────────────────────────
+
+model Poll {
+  id              String         @id @default(cuid())
+  question        String
+  options         String[]       // array of option texts
+  votes           PollVote[]
+  comments        PollComment[]
+  reactions       PollReaction[]
+  authorId        String
+  author          User           @relation(fields: [authorId], references: [id])
+  neighborhoodId  String
+  expiresAt       DateTime?      // optional deadline
+  status          String         @default("active") // "active" | "closed"
+  createdAt       DateTime       @default(now())
+
+  @@index([neighborhoodId, status, createdAt])
+  @@index([authorId])
+}
+
+model PollVote {
+  id          String   @id @default(cuid())
+  pollId      String
+  poll        Poll     @relation(fields: [pollId], references: [id])
+  userId      String
+  optionIndex Int      // which option (0-based)
+  createdAt   DateTime @default(now())
+
+  @@unique([pollId, userId]) // one vote per user per poll
+  @@index([pollId])
+}
+
+model PollComment {
+  id        String   @id @default(cuid())
+  pollId    String
+  poll      Poll     @relation(fields: [pollId], references: [id])
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([pollId, createdAt])
+}
+
+model PollReaction {
+  id      String @id @default(cuid())
+  pollId  String
+  poll    Poll   @relation(fields: [pollId], references: [id])
+  userId  String
+  emoji   String
+
+  @@unique([pollId, userId])
+  @@index([pollId])
+}
+
+// ─── Neighborhood Reports (to admin) ────────────────────────────────────────
+
+model NeighborhoodReport {
+  id              String   @id @default(cuid())
+  userId          String
+  neighborhoodId  String
+  type            String   // "complaint" | "suggestion" | "issue" | "other"
+  subject         String
+  body            String
+  imageUrls       String[]
+  status          String   @default("open") // "open" | "reviewed" | "resolved" | "closed"
+  reply           String?
+  repliedBy       String?
+  repliedAt       DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([neighborhoodId, status, createdAt])
+  @@index([userId, createdAt])
+}
+
+// ─── Support Tickets ────────────────────────────────────────────────────────
+
+model SupportTicket {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  type        String   // "bug" | "feature" | "complaint" | "other"
+  subject     String
+  body        String
+  imageUrls   String[] // screenshots
+  status      String   @default("open") // "open" | "in_progress" | "resolved" | "closed"
+  reply       String?  // admin reply
+  repliedBy   String?
+  repliedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+// ─── Moderation Logs ─────────────────────────────────────────────────────────
+
+model ModerationLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  adminName  String?
+  action     String   // hide_post, remove_post, ban_user, unban_user, change_role, approve_nbhd, reject_nbhd
+  targetType String   // post, user, request
+  targetId   String
+  reason     String?
+  details    String?
+  createdAt  DateTime @default(now())
+
+  @@index([adminId, createdAt])
+  @@index([targetId])
+}
+
+// ─── Private Threads ─────────────────────────────────────────────────────────
+
+model Thread {
+  id        String       @id @default(cuid())
+  user1     User         @relation("threadUser1", fields: [user1Id], references: [id])
+  user1Id   String
+  user2     User         @relation("threadUser2", fields: [user2Id], references: [id])
+  user2Id   String
+  postId    String?      // the post that started this thread
+  status    ThreadStatus @default(ACTIVE)
+  closedBy  String?      // userId of who closed it
+  messages  Message[]
+  updatedAt DateTime     @updatedAt
+  createdAt DateTime     @default(now())
+
+  @@unique([user1Id, user2Id, postId])
+  @@index([user1Id, status, updatedAt])
+  @@index([user2Id, status, updatedAt])
+  @@index([postId])
+}
+
+enum ThreadStatus {
+  ACTIVE
+  CLOSED
+  EXPIRED
+}
+
+model Message {
+  id          String      @id @default(cuid())
+  thread      Thread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  threadId    String
+  sender      User        @relation(fields: [senderId], references: [id])
+  senderId    String
+  type        MessageType @default(TEXT)
+  text        String?
+  lat         Float?
+  lng         Float?
+  imageUrl    String?
+  edited      Boolean     @default(false)
+  reactions   Json        @default("[]")  // [{emoji, userId}]
+  deliveredAt DateTime?   // set when recipient's client fetches messages
+  readAt      DateTime?   // set when recipient views the chat
+  createdAt   DateTime    @default(now())
+
+  @@index([threadId, createdAt])
+}
+
+enum MessageType {
+  TEXT
+  LOCATION
+  IMAGE
+  DELETED
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RIDES SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════════
+
+enum RideStatus {
+  RIDE_OPEN
+  RIDE_SELECTED
+  RIDE_CONFIRMED
+  RIDE_EN_ROUTE
+  RIDE_ARRIVED
+  RIDE_IN_PROGRESS
+  RIDE_PENDING_COMPLETION
+  RIDE_COMPLETED
+  RIDE_CANCELLED
+  RIDE_EXPIRED
+  RIDE_DISPUTED
+}
+
+enum OfferStatus {
+  OFFER_PENDING
+  OFFER_ACCEPTED
+  OFFER_PASSED
+  OFFER_WITHDRAWN
+}
+
+enum CompletionMode {
+  REQUESTER_CONFIRMED
+  AUTO_CLOSED
+}
+
+// ─── Ride Requests ──────────────────────────────────────────────────────────
+
+model RideRequest {
+  id                 String      @id @default(cuid())
+
+  requesterId        String
+  requester          User        @relation("rideRequests", fields: [requesterId], references: [id])
+
+  // Pickup — exact coords private, area public
+  pickupLat          Float
+  pickupLng          Float
+  pickupAddress      String      // exact — revealed only to confirmed driver
+  pickupArea         String      // district name — always public
+
+  // Dropoff — same privacy model
+  dropoffLat         Float
+  dropoffLng         Float
+  dropoffAddress     String
+  dropoffArea        String
+
+  // System-calculated at creation (immutable)
+  distanceKm         Float
+  durationMin        Int
+  estimatedMinPrice  Int
+  estimatedMaxPrice  Int
+
+  // Scheduling
+  isImmediate        Boolean     @default(true)
+  scheduledAt        DateTime?
+
+  notes              String?
+
+  // State
+  status             RideStatus  @default(RIDE_OPEN)
+  selectedOfferId    String?     @unique
+
+  // Deadlines
+  confirmDeadline    DateTime?
+  expiresAt          DateTime
+
+  // Lifecycle timestamp
+  selectedAt         DateTime?
+
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  neighborhoodId     String?
+
+  // Relations
+  offers             RideOffer[]
+  trip               Trip?
+  events             RideEvent[]
+  rideMessages       RideMessage[]
+
+  @@index([status, neighborhoodId, createdAt])
+  @@index([requesterId, status])
+  @@index([expiresAt])
+}
+
+// ─── Ride Offers ────────────────────────────────────────────────────────────
+
+model RideOffer {
+  id              String       @id @default(cuid())
+
+  rideRequestId   String
+  rideRequest     RideRequest  @relation(fields: [rideRequestId], references: [id])
+
+  driverId        String
+  driver          User         @relation("rideOffers", fields: [driverId], references: [id])
+
+  price           Int
+  arrivalMin      Int
+  message         String?
+
+  status          OfferStatus  @default(OFFER_PENDING)
+  editCount       Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([rideRequestId, driverId])
+  @@index([rideRequestId, status])
+  @@index([driverId])
+}
+
+// ─── Trips ──────────────────────────────────────────────────────────────────
+
+model Trip {
+  id                       String          @id @default(cuid())
+
+  rideRequestId            String          @unique
+  rideRequest              RideRequest     @relation(fields: [rideRequestId], references: [id])
+
+  requesterId              String
+  driverId                 String
+  agreedPrice              Int
+
+  // Lifecycle timestamps — each set exactly once, write-once
+  confirmedAt              DateTime        @default(now())
+  enRouteAt                DateTime?
+  arrivedAt                DateTime?
+  startedAt                DateTime?
+  driverMarkedDoneAt       DateTime?
+  requesterConfirmedDoneAt DateTime?
+  completedAt              DateTime?
+  cancelledAt              DateTime?
+
+  completionMode           CompletionMode?
+
+  cancelledBy              String?
+  cancelReason             String?
+
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+
+  // Relations
+  ratings                  RideRating[]
+  dispute                  RideDispute?
+
+  @@index([requesterId])
+  @@index([driverId])
+}
+
+// ─── Ride Ratings ───────────────────────────────────────────────────────────
+
+model RideRating {
+  id          String   @id @default(cuid())
+
+  tripId      String
+  trip        Trip     @relation(fields: [tripId], references: [id])
+
+  raterId     String   // who gave the rating
+  targetId    String   // who received the rating
+  role        String   // "requester_rates_driver" | "driver_rates_requester"
+
+  score       Int      // 1-5
+  comment     String?
+
+  createdAt   DateTime @default(now())
+
+  @@unique([tripId, raterId])
+  @@index([targetId])
+}
+
+// ─── Ride Disputes ──────────────────────────────────────────────────────────
+
+model RideDispute {
+  id             String    @id @default(cuid())
+
+  tripId         String    @unique
+  trip           Trip      @relation(fields: [tripId], references: [id])
+
+  openedBy       String
+  reason         String
+
+  status         String    @default("open") // "open" | "resolved_completed" | "resolved_cancelled"
+  resolvedBy     String?
+  resolution     String?
+  resolvedAt     DateTime?
+
+  createdAt      DateTime  @default(now())
+
+  @@index([status])
+}
+
+// ─── Ride Events (Audit Log) ────────────────────────────────────────────────
+
+model RideEvent {
+  id              String      @id @default(cuid())
+
+  rideRequestId   String
+  rideRequest     RideRequest @relation(fields: [rideRequestId], references: [id])
+
+  tripId          String?
+
+  eventType       String      // RideEventType values as string for flexibility
+  actorType       String      // "requester" | "driver" | "system" | "admin"
+  actorId         String?
+
+  metadata        Json?
+
+  createdAt       DateTime    @default(now())
+
+  @@index([rideRequestId, createdAt])
+  @@index([tripId, createdAt])
+}
+
+// ─── Ride Messages ──────────────────────────────────────────────────────────
+
+model RideMessage {
+  id              String      @id @default(cuid())
+
+  rideRequestId   String
+  rideRequest     RideRequest @relation(fields: [rideRequestId], references: [id])
+
+  senderId        String
+  body            String
+  type            String      @default("TEXT") // TEXT | LOCATION | IMAGE
+  lat             Float?
+  lng             Float?
+  imageUrl        String?
+
+  createdAt       DateTime    @default(now())
+
+  @@index([rideRequestId, createdAt])
+}
