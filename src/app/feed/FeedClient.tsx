@@ -647,11 +647,11 @@ export default function FeedClient({
               <button
                 onClick={() => browseNeighborhoodById(user.neighborhoodId)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl mb-3 transition-colors ${
-                  !isReadOnly ? 'bg-primary-50 border border-primary-200' : 'hover:bg-gray-50'
+                  !isReadOnly ? 'bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-700' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                 }`}
               >
-                <span className="text-xs text-primary-600 font-medium">{!isReadOnly ? t('feed_current_nbhd') : t('feed_return_nbhd')}</span>
-                <span className="text-sm font-medium text-gray-800">{dn(user.neighborhood, user.neighborhoodEn)}</span>
+                <span className="text-xs text-primary-600 dark:text-primary-400 font-medium">{!isReadOnly ? t('feed_current_nbhd') : t('feed_return_nbhd')}</span>
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{dn(user.neighborhood, user.neighborhoodEn)}</span>
               </button>
               <p className="text-xs text-gray-400 mb-2">{t('feed_other_nbhds')}</p>
             </div>
@@ -663,11 +663,11 @@ export default function FeedClient({
                     key={n.id}
                     onClick={() => browseNeighborhoodById(n.id)}
                     className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl mb-1 transition-colors ${
-                      browseNeighborhood?.id === n.id ? 'bg-amber-50 border border-amber-200' : 'hover:bg-gray-50'
+                      browseNeighborhood?.id === n.id ? 'bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                     }`}
                   >
                     <span className="text-xs text-gray-400">{dn(n.cityName, n.cityNameEn)}</span>
-                    <span className="text-sm text-gray-800">{dn(n.name, n.nameEn)}</span>
+                    <span className="text-sm text-gray-800 dark:text-gray-200">{dn(n.name, n.nameEn)}</span>
                   </button>
                 ))}
             </div>
