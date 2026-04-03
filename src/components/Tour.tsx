@@ -354,23 +354,27 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   // Auto-start global tour on first visit — wait for page to be fully rendered
   useEffect(() => {
     try {
-      const seen = localStorage.getItem('hai_tour_seen') || document.cookie.includes('hai_tour_seen=1')
-      if (!seen) {
-        // Wait for feed elements to render (cloud DB can be slow)
-        const waitAndStart = (attempt: number) => {
-          const el = document.querySelector('[data-tour="feed-title"]')
-          if (el) {
-            setTimeout(() => {
-              setActiveFlowId('global')
-              setCurrentStep(0)
-              setIsActive(true)
-            }, 500)
-          } else if (attempt < 20) {
-            setTimeout(() => waitAndStart(attempt + 1), 500)
-          }
-        }
-        setTimeout(() => waitAndStart(0), 1000)
+      const lsSeen = localStorage.getItem('hai_tour_seen')
+      const cookieSeen = document.cookie.includes('hai_tour_seen=1')
+      // Restore localStorage from cookie if it was cleared (Capacitor sleep/restart)
+      if (!lsSeen && cookieSeen) {
+        localStorage.setItem('hai_tour_seen', 'true')
       }
+      if (lsSeen || cookieSeen) return
+      // Wait for feed elements to render (cloud DB can be slow)
+      const waitAndStart = (attempt: number) => {
+        const el = document.querySelector('[data-tour="feed-title"]')
+        if (el) {
+          setTimeout(() => {
+            setActiveFlowId('global')
+            setCurrentStep(0)
+            setIsActive(true)
+          }, 500)
+        } else if (attempt < 20) {
+          setTimeout(() => waitAndStart(attempt + 1), 500)
+        }
+      }
+      setTimeout(() => waitAndStart(0), 1000)
     } catch {
       // localStorage not available (private browsing, etc.) — skip tour
     }
@@ -379,7 +383,12 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const hasSeenTour = useCallback((flowId: TourFlowId) => {
     try {
       const flow = TOUR_FLOWS[flowId]
-      return !!localStorage.getItem(flow.storageKey) || document.cookie.includes(flow.storageKey + '=1')
+      const lsSeen = !!localStorage.getItem(flow.storageKey)
+      const cookieSeen = document.cookie.includes(flow.storageKey + '=1')
+      if (!lsSeen && cookieSeen) {
+        localStorage.setItem(flow.storageKey, 'true')
+      }
+      return lsSeen || cookieSeen
     } catch {
       return true // Assume seen if localStorage fails
     }
@@ -399,8 +408,12 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     try {
       const flow = TOUR_FLOWS[flowId]
       if (!flow) return
-      const seen = localStorage.getItem(flow.storageKey)
-      if (seen) return
+      const lsSeen = localStorage.getItem(flow.storageKey)
+      const cookieSeen = document.cookie.includes(flow.storageKey + '=1')
+      if (!lsSeen && cookieSeen) {
+        localStorage.setItem(flow.storageKey, 'true')
+      }
+      if (lsSeen || cookieSeen) return
 
       // Wait for target element to exist before starting
       const waitAndStart = (attempt: number) => {
