@@ -7,8 +7,14 @@ const client = twilio(
 )
 const VERIFY_SID = process.env.TWILIO_VERIFY_SERVICE_SID!
 
+// Google Play review test account — skip real SMS
+const TEST_PHONE = '+966500000000'
+const TEST_OTP = '123456'
+
 /** Send OTP via Twilio Verify */
 export async function sendOTP(phone: string): Promise<boolean> {
+  if (phone === TEST_PHONE) return true
+
   if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
     console.log(`\n📱 DEV MODE — OTP sent to ${phone} (Twilio not configured)\n`)
     return true
@@ -29,6 +35,8 @@ export async function sendOTP(phone: string): Promise<boolean> {
 
 /** Verify OTP code via Twilio Verify */
 export async function verifyOTP(phone: string, code: string): Promise<boolean> {
+  if (phone === TEST_PHONE) return code === TEST_OTP
+
   if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
     // DEV MODE: accept "123456" as valid code
     console.log(`\n📱 DEV MODE — Verifying ${code} for ${phone}\n`)
