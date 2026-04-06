@@ -13,6 +13,7 @@ workflows:
         BUNDLE_ID: "net.hai-app.hai"
         XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
+        APPLE_TEAM_ID: "XD95FL293Z"
     scripts:
       - name: Install dependencies
         script: |
@@ -37,7 +38,8 @@ workflows:
         script: |
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME" \
+            --archive-xcargs "CODE_SIGN_IDENTITY=Apple\ Distribution DEVELOPMENT_TEAM=$APPLE_TEAM_ID CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER="
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
