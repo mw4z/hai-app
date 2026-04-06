@@ -9,9 +9,6 @@ workflows:
       node: 18
       xcode: latest
       cocoapods: default
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: net.hai-app.hai
       vars:
         BUNDLE_ID: "net.hai-app.hai"
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
@@ -26,6 +23,13 @@ workflows:
       - name: Sync Capacitor
         script: |
           npx cap sync ios
+      - name: Create certificate and profile
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
       - name: Set up code signing
         script: |
           xcode-project use-profiles
