@@ -6,7 +6,7 @@ workflows:
     integrations:
       app_store_connect: Hai
     environment:
-      node: 18
+      node: 20
       xcode: latest
       cocoapods: default
       vars:
