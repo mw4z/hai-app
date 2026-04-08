@@ -16,9 +16,8 @@ export default function CapacitorBridge() {
       try {
         const { StatusBar, Style } = await import('@capacitor/status-bar')
         const isDark = document.documentElement.classList.contains('dark')
-        await StatusBar.setOverlaysWebView({ overlay: true })
+        await StatusBar.setOverlaysWebView({ overlay: false })
         await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light })
-        await StatusBar.setBackgroundColor({ color: '#00000000' })
       } catch {}
     }
 

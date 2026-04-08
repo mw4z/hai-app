@@ -219,34 +219,6 @@ html {
   background-color: #000000;
 }
 
-/* iOS status bar: push body content below the safe area */
-body {
-  padding-top: env(safe-area-inset-top);
-}
-
-/* Fixed background behind the iOS status bar so scrolling content doesn't peek through */
-body::after {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: env(safe-area-inset-top);
-  z-index: 9999;
-  pointer-events: none;
-  background-color: rgba(255, 255, 255, 0.85);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-}
-html.dark body::after {
-  background-color: rgba(10, 15, 12, 0.85);
-}
-
-/* Sticky headers stick below the status bar, not behind it */
-.sticky.top-0 {
-  top: env(safe-area-inset-top, 0px) !important;
-}
-
 /* Pages with bottom nav need extra bottom padding for home indicator */
 .pb-safe {
   padding-bottom: calc(6rem + env(safe-area-inset-bottom)) !important;

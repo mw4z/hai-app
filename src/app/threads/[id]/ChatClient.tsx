@@ -123,7 +123,13 @@ export default function ChatClient({
     try { return localStorage.getItem('hai_chat_wallpaper') || 'default' } catch { return 'default' }
   })
   const wallpaper = getWallpaper(wallpaperId)
-  const isDark = typeof window !== 'undefined' && document.documentElement.classList.contains('dark')
+  const [isDark, setIsDark] = useState(() => typeof window !== 'undefined' && document.documentElement.classList.contains('dark'))
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains('dark'))
+    const obs = new MutationObserver(() => setIsDark(document.documentElement.classList.contains('dark')))
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => obs.disconnect()
+  }, [])
   const [showProfile, setShowProfile] = useState(false)
   const [profileData, setProfileData] = useState<any>(null)
   const [loadingProfile, setLoadingProfile] = useState(false)

@@ -1,43 +1,99 @@
 /**
- * Web-specific location collector.
- * Adapts browser Geolocation API into shared LocationSample types.
+ * Location collector — uses Capacitor Geolocation on native, browser API on web.
  *
  * Strategy: coarse-first (WiFi/cell), then refine with GPS.
- * Works reliably on Safari, Chrome, Firefox.
  */
 
 import type { LocationSample } from './types'
 
-const LOG_PREFIX = '[WEB-LOCATION]'
+const LOG_PREFIX = '[LOCATION]'
 const DEBUG = process.env.NODE_ENV !== 'production'
 function log(...args: unknown[]) { if (DEBUG) console.log(LOG_PREFIX, ...args) }
 
-/** Check permission state via Permissions API (where supported) */
+function isNative(): boolean {
+  return typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
+}
+
+/** Check permission state */
 export async function checkPermissionState(): Promise<'granted' | 'denied' | 'prompt' | 'unavailable'> {
+  if (isNative()) {
+    try {
+      const { Geolocation } = await import('@capacitor/geolocation')
+      const perm = await Geolocation.checkPermissions()
+      log('Native permission state:', perm.location)
+      if (perm.location === 'denied') return 'denied'
+      if (perm.location === 'granted') return 'granted'
+      return 'prompt'
+    } catch {
+      log('Native permission check failed, falling back to web')
+    }
+  }
+
   if (!navigator.geolocation) {
-    log( 'Geolocation API not available')
+    log('Geolocation API not available')
     return 'unavailable'
   }
 
-  // Permissions API — supported in Chrome, Firefox. Safari ignores it.
   if (navigator.permissions) {
     try {
       const perm = await navigator.permissions.query({ name: 'geolocation' })
-      log( 'Permission state:', perm.state)
+      log('Permission state:', perm.state)
       if (perm.state === 'denied') return 'denied'
       if (perm.state === 'granted') return 'granted'
       return 'prompt'
     } catch {
-      // Safari throws on permissions.query for geolocation
-      log( 'Permissions API not supported, falling back')
+      log('Permissions API not supported, falling back')
     }
   }
 
-  return 'prompt' // assume prompt if we can't check
+  return 'prompt'
 }
 
-/** Single getCurrentPosition wrapped in a promise */
+/** Request location permissions on native */
+async function requestNativePermissions(): Promise<void> {
+  if (!isNative()) return
+  try {
+    const { Geolocation } = await import('@capacitor/geolocation')
+    await Geolocation.requestPermissions()
+  } catch {
+    log('Native permission request failed')
+  }
+}
+
+/** Single position reading — uses Capacitor on native, browser API on web */
 function getPosition(opts: PositionOptions): Promise<LocationSample | null> {
+  if (isNative()) {
+    return getPositionNative(opts)
+  }
+  return getPositionWeb(opts)
+}
+
+async function getPositionNative(opts: PositionOptions): Promise<LocationSample | null> {
+  try {
+    const { Geolocation } = await import('@capacitor/geolocation')
+    const pos = await Geolocation.getCurrentPosition({
+      enableHighAccuracy: opts.enableHighAccuracy ?? false,
+      timeout: opts.timeout ?? 10000,
+      maximumAge: opts.maximumAge ?? 0,
+    })
+    const sample: LocationSample = {
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      accuracy: pos.coords.accuracy,
+      timestamp: pos.timestamp,
+    }
+    log(`Native sample: ${sample.lat.toFixed(5)}, ${sample.lng.toFixed(5)}, accuracy=${Math.round(sample.accuracy)}m`)
+    return sample
+  } catch (e: any) {
+    if (e?.message?.includes('denied') || e?.message?.includes('permission')) {
+      throw { code: 1, reason: 'denied' }
+    }
+    log('Native position error:', e)
+    return null
+  }
+}
+
+function getPositionWeb(opts: PositionOptions): Promise<LocationSample | null> {
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -47,18 +103,18 @@ function getPosition(opts: PositionOptions): Promise<LocationSample | null> {
           accuracy: pos.coords.accuracy,
           timestamp: pos.timestamp,
         }
-        log( `Sample: ${sample.lat.toFixed(5)}, ${sample.lng.toFixed(5)}, accuracy=${Math.round(sample.accuracy)}m`)
+        log(`Web sample: ${sample.lat.toFixed(5)}, ${sample.lng.toFixed(5)}, accuracy=${Math.round(sample.accuracy)}m`)
         resolve(sample)
       },
       (err) => {
         if (err.code === 1) {
-          log( 'Permission DENIED by user')
+          log('Permission DENIED by user')
           reject({ code: 1, reason: 'denied' })
         } else if (err.code === 2) {
-          log( 'Position UNAVAILABLE:', err.message)
+          log('Position UNAVAILABLE:', err.message)
           resolve(null)
         } else {
-          log( 'Position TIMEOUT')
+          log('Position TIMEOUT')
           resolve(null)
         }
       },
@@ -74,14 +130,6 @@ export interface CollectionResult {
 
 /**
  * Collect location samples using coarse-first strategy.
- *
- * 1. Check permission state
- * 2. Coarse reading (WiFi/cell, cached OK) — fast
- * 3. 1-2 high-accuracy GPS readings — slower but more precise
- * 4. Return all samples for the shared decision layer
- *
- * @param onSample - callback for each sample (for UI progress)
- * @param signal - AbortController signal to cancel
  */
 export async function collectSamples(
   onSample?: (count: number) => void,
@@ -112,13 +160,15 @@ export async function collectSamples(
     return { samples: [], permissionState: 'denied' }
   }
 
-  // If permission is 'prompt' (first visit), the browser will show a dialog.
-  // User needs time to read and tap Allow, so use a long timeout.
-  // If already 'granted', the position returns instantly — long timeout has no cost.
+  // On native, explicitly request permissions before first position call
+  if (prePerm === 'prompt') {
+    await requestNativePermissions()
+  }
+
   const firstCallTimeout = prePerm === 'granted' ? 8_000 : 30_000
 
   try {
-    // Step 1: coarse position — WiFi/cell, allow 5-min cache
+    // Step 1: coarse position
     log('Requesting coarse position... (timeout:', firstCallTimeout, 'ms)')
     const coarse = await getPosition({
       enableHighAccuracy: false,
@@ -138,14 +188,13 @@ export async function collectSamples(
       return { samples, permissionState: 'granted' }
     }
 
-    // If coarse is medium (≤150m), it's usable — still try to improve with GPS
     // Step 2: high-accuracy GPS reading
     if (!cancelled()) {
       log('Requesting high-accuracy position...')
       try {
         const fine = await getPosition({ enableHighAccuracy: true, timeout: 12_000, maximumAge: 0 })
         if (!cancelled()) addSample(fine)
-      } catch { /* GPS timeout is OK, we still have coarse */ }
+      } catch { /* GPS timeout is OK */ }
     }
 
     // Step 3: one more attempt only if still above medium threshold
@@ -158,15 +207,14 @@ export async function collectSamples(
       } catch { /* OK */ }
     }
 
-    log( `Collection done: ${samples.length} samples, best accuracy=${Math.round(Math.min(...samples.map(s => s.accuracy)))}m`)
+    log(`Collection done: ${samples.length} samples, best accuracy=${Math.round(Math.min(...samples.map(s => s.accuracy)))}m`)
     return { samples, permissionState: 'granted' }
   } catch (e: any) {
     if (e?.code === 1) {
-      log( 'Collection failed: permission denied')
+      log('Collection failed: permission denied')
       return { samples, permissionState: 'denied' }
     }
-    // Any other error — return what we have
-    log( 'Collection error:', e)
+    log('Collection error:', e)
     return { samples, permissionState: samples.length > 0 ? 'granted' : 'unavailable' }
   }
 }

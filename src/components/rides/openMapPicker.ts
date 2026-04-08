@@ -25,12 +25,12 @@ export function openMapPicker(options: {
     overlay.setAttribute('data-overlay', 'true')
     overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;background:#111827;'
 
-    // Header
+    // Header — includes safe area padding for iOS status bar
     const header = document.createElement('div')
-    header.style.cssText = 'flex-shrink:0;display:flex;align-items:center;gap:12px;padding:12px 16px;background:#1f2937;border-bottom:1px solid #374151;'
+    header.style.cssText = 'flex-shrink:0;display:flex;align-items:center;gap:12px;padding:12px 16px;padding-top:calc(env(safe-area-inset-top, 0px) + 12px);background:#1f2937;border-bottom:1px solid #374151;'
     const closeBtn = document.createElement('button')
     closeBtn.innerHTML = '✕'
-    closeBtn.style.cssText = 'color:#9ca3af;font-size:18px;padding:4px 8px;background:none;border:none;cursor:pointer;'
+    closeBtn.style.cssText = 'color:#ffffff;font-size:22px;padding:8px 12px;background:rgba(255,255,255,0.1);border:none;cursor:pointer;border-radius:8px;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;'
     closeBtn.onclick = () => { cleanup(); resolve(null) }
     const title = document.createElement('span')
     title.textContent = lang === 'en' ? 'Pick location on map' : lang === 'ur' ? 'نقشے پر مقام منتخب کریں' : 'اختر الموقع على الخريطة'
@@ -75,7 +75,14 @@ export function openMapPicker(options: {
     function cleanup() {
       if (map) map.remove()
       overlay.remove()
+      document.removeEventListener('keydown', handleEsc)
     }
+
+    // ESC key to close
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === 'Escape') { cleanup(); resolve(null) }
+    }
+    document.addEventListener('keydown', handleEsc)
 
     // Reverse geocode
     async function reverseGeocode(lat: number, lng: number) {
