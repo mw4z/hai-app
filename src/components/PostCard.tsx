@@ -112,6 +112,7 @@ export default function PostCard({
   const isAdmin = ['SUPER_ADMIN', 'PLATFORM_MOD', 'NEIGHBORHOOD_MOD'].includes(currentUserRole || '')
   const [reported, setReported] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   // Initialize reactions from server data
   const [myReaction, setMyReaction] = useState<string | null>(() => {
@@ -151,6 +152,20 @@ export default function PostCard({
       document.removeEventListener('touchstart', handleOutside)
     }
   }, [showReactionPicker])
+  useEffect(() => {
+    if (!showMenu) return
+    function handleOutside(e: MouseEvent | TouchEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('touchstart', handleOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('touchstart', handleOutside)
+    }
+  }, [showMenu])
   const [showComments, setShowComments] = useState(false)
   const [comments, setComments] = useState<Comment[]>([])
   const [commentText, setCommentText] = useState('')
@@ -430,7 +445,7 @@ export default function PostCard({
         </div>
         <div className="flex items-center gap-2">
           <span className={`category-badge ${style.bg} ${style.text}`}>{style.icon} {t(style.tKey)}</span>
-          <div className="relative">
+          <div className="relative" ref={menuRef}>
             <button onClick={() => { setShowMenu(!showMenu); hapticLight() }} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400">
               <FiMoreVertical className="w-4 h-4" />
             </button>

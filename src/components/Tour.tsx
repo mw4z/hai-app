@@ -424,6 +424,11 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
         if (el) {
           setTimeout(() => {
             if (isActiveRef.current) return
+            // Mark as seen immediately so it won't repeat if user navigates away
+            try {
+              localStorage.setItem(flow.storageKey, 'true')
+              document.cookie = `${flow.storageKey}=1; path=/; max-age=315360000; SameSite=Lax`
+            } catch {}
             setActiveFlowId(flowId)
             setCurrentStep(0)
             setIsActive(true)
