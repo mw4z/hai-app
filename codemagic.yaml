@@ -26,7 +26,6 @@ workflows:
       - name: Set up code signing
         script: |
           keychain initialize
-          export CERTIFICATE_PRIVATE_KEY=$(openssl genrsa 2048 2>/dev/null)
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create
