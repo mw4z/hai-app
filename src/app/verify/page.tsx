@@ -27,9 +27,9 @@ function VerifyForm() {
   }, [])
 
   function handleChange(value: string) {
-    const clean = value.replace(/\D/g, '').slice(0, 6)
+    const clean = value.replace(/\D/g, '').slice(0, 4)
     setCode(clean)
-    if (clean.length === 6) {
+    if (clean.length === 4) {
       setTimeout(() => {
         if (!loading) submitCode(clean)
       }, 300)
@@ -113,7 +113,7 @@ function VerifyForm() {
             autoComplete="one-time-code"
             name="otp"
             pattern="[0-9]*"
-            maxLength={6}
+            maxLength={4}
             value={code}
             onChange={(e) => handleChange(e.target.value)}
             style={{
@@ -126,10 +126,10 @@ function VerifyForm() {
             }}
           />
           {/* Visual boxes */}
-          {Array.from({ length: 6 }).map((_, i) => (
+          {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className={`w-12 h-14 flex items-center justify-center text-xl font-bold border-2 rounded-xl transition-all ${
+              className={`w-14 h-16 flex items-center justify-center text-2xl font-bold border-2 rounded-xl transition-all ${
                 code[i]
                   ? 'border-primary-500'
                   : i === code.length

@@ -9,13 +9,13 @@ const VERIFY_SID = process.env.TWILIO_VERIFY_SERVICE_SID!
 
 // Test accounts — skip real SMS (Google Play review + dev testing)
 const TEST_PHONES: Record<string, string> = {
-  '+966500000000': '123456',  // Google Play review
-  '+966564375970': '111111',  // Dev testing (Twilio Verify temporarily blocked)
+  '+966500000000': '1234',  // Google Play review
+  '+966564375970': '1111',  // Dev testing (Twilio Verify temporarily blocked)
 }
 
-/** Generate a random 6-digit OTP code */
+/** Generate a random 4-digit OTP code */
 export function generateOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString()
+  return Math.floor(1000 + Math.random() * 9000).toString()
 }
 
 /** Send OTP — test phones skip SMS, others use Twilio Verify */
@@ -44,7 +44,7 @@ export async function verifyOTP(phone: string, code: string): Promise<boolean> {
   if (TEST_PHONES[phone]) return code === TEST_PHONES[phone]
 
   if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-    return code === '123456'
+    return code === '1234'
   }
 
   try {
