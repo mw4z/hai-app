@@ -26,13 +26,47 @@ function VerifyForm() {
     return () => clearInterval(timer)
   }, [])
 
+  const hiddenRef = useRef<HTMLInputElement>(null)
+
   function handleOtpChange(index: number, value: string) {
+    // Handle paste or autofill of full code into a single box
+    if (value.length > 1) {
+      const digits = value.replace(/\D/g, '').slice(0, 6)
+      if (digits.length >= 2) {
+        const newOtp = digits.split('').concat(Array(6).fill('')).slice(0, 6)
+        setOtp(newOtp)
+        if (digits.length === 6) {
+          inputRefs.current[5]?.focus()
+          // Auto-submit after a short delay
+          setTimeout(() => autoSubmit(newOtp.join('')), 300)
+        } else {
+          inputRefs.current[Math.min(digits.length, 5)]?.focus()
+        }
+        return
+      }
+    }
     if (!/^\d*$/.test(value)) return
     const newOtp = [...otp]
     newOtp[index] = value.slice(-1)
     setOtp(newOtp)
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus()
+    }
+    // Auto-submit when all 6 digits filled
+    const code = newOtp.join('')
+    if (code.length === 6 && !code.includes('')) {
+      setTimeout(() => autoSubmit(code), 300)
+    }
+  }
+
+  // Handle the hidden autofill input
+  function handleAutofill(value: string) {
+    const digits = value.replace(/\D/g, '').slice(0, 6)
+    if (digits.length === 0) return
+    const newOtp = digits.split('').concat(Array(6).fill('')).slice(0, 6)
+    setOtp(newOtp)
+    if (digits.length === 6) {
+      setTimeout(() => autoSubmit(digits), 300)
     }
   }
 
@@ -42,6 +76,11 @@ function VerifyForm() {
     }
   }
 
+  function autoSubmit(code: string) {
+    if (code.length !== 6 || loading) return
+    submitCode(code)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const code = otp.join('')
@@ -49,7 +88,11 @@ function VerifyForm() {
       toast.error(t('verify_enter_code'))
       return
     }
+    submitCode(code)
+  }
 
+  async function submitCode(code: string) {
+    if (loading) return
     setLoading(true)
     try {
       const res = await fetch('/api/auth/verify-otp', {
@@ -107,6 +150,16 @@ function VerifyForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Hidden input for iOS SMS autofill */}
+        <input
+          ref={hiddenRef}
+          type="tel"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          onChange={(e) => handleAutofill(e.target.value)}
+          className="absolute opacity-0 w-0 h-0"
+          tabIndex={-1}
+        />
         <div className="flex justify-center gap-2" dir="ltr">
           {otp.map((digit, index) => (
             <input
@@ -114,10 +167,20 @@ function VerifyForm() {
               ref={(el) => { inputRefs.current[index] = el }}
               type="tel"
               inputMode="numeric"
-              maxLength={1}
+              autoComplete={index === 0 ? 'one-time-code' : 'off'}
+              maxLength={6}
               value={digit}
               onChange={(e) => handleOtpChange(index, e.target.value)}
               onKeyDown={(e) => handleKeyDown(index, e)}
+              onPaste={(e) => {
+                const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+                if (paste.length >= 2) {
+                  e.preventDefault()
+                  const newOtp = paste.split('').concat(Array(6).fill('')).slice(0, 6)
+                  setOtp(newOtp)
+                  if (paste.length === 6) setTimeout(() => autoSubmit(paste), 300)
+                }
+              }}
               className="w-12 h-14 text-center text-xl font-bold border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
             />
           ))}
