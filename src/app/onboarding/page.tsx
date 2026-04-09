@@ -52,6 +52,28 @@ export default function OnboardingPage() {
     </button>
   )
 
+  // Direct browser geolocation as ultimate fallback
+  function tryDirectGeolocation() {
+    console.log('[ONBOARD-LOCATION] Trying direct navigator.geolocation...')
+    if (!navigator.geolocation) {
+      console.log('[ONBOARD-LOCATION] navigator.geolocation not available')
+      setLocationStep('denied')
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        console.log('[ONBOARD-LOCATION] Direct geolocation SUCCESS:', pos.coords.latitude, pos.coords.longitude)
+        resolveNeighborhood(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, false)
+      },
+      (err) => {
+        console.log('[ONBOARD-LOCATION] Direct geolocation FAILED:', err.code, err.message)
+        if (err.code === 1) setLocationStep('denied')
+        else setLocationStep('timeout')
+      },
+      { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 },
+    )
+  }
+
   // Called ONLY by explicit user button tap — never by useEffect or mount
   function requestLocation() {
     setLocationStep('detecting')
@@ -77,21 +99,22 @@ export default function OnboardingPage() {
 
     // denied / unavailable → denied screen
     if (error === 'denied' || error === 'unavailable') {
-      setLocationStep('denied')
+      // Last resort: try direct browser geolocation — this triggers the iOS permission dialog
+      console.log('[ONBOARD-LOCATION] Hook failed with', error, '— trying direct geolocation fallback')
+      tryDirectGeolocation()
       return
     }
 
-    // timeout with no result → timeout screen
+    // timeout with no result → try direct fallback
     if (error === 'timeout' || (!result && !error)) {
-      setLocationStep('timeout')
+      console.log('[ONBOARD-LOCATION] Hook timed out — trying direct geolocation fallback')
+      tryDirectGeolocation()
       return
     }
 
     // low_accuracy error from hook — but we still have a sample
-    // After 2 retries, relax and treat it like medium confidence
     if (error === 'low_accuracy' && result) {
       if (lowAccuracyRetries >= 1) {
-        // Escape hatch: resolve anyway with what we have
         console.log('[ONBOARD-LOCATION] Low-accuracy escape: resolving after', lowAccuracyRetries + 1, 'attempts')
         resolveNeighborhood(result.lat, result.lng, result.accuracy, true)
       } else {

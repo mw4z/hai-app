@@ -216,7 +216,7 @@ html {
   background-color: #ffffff;
 }
 .dark html, html.dark {
-  background-color: #000000;
+  background-color: #0f172a;
 }
 
 /* ── iOS safe area (env() = 0 on web, correct value on native iOS) ─── */

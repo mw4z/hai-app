@@ -75,6 +75,7 @@ export default function RootLayout({
     var l = localStorage.getItem('hai_language') || 'ar';
     document.documentElement.setAttribute('lang', l);
     document.documentElement.setAttribute('dir', l === 'en' ? 'ltr' : 'rtl');
+    if (window.history) window.history.scrollRestoration = 'manual';
   } catch(e) {}
 })();`,
           }}
