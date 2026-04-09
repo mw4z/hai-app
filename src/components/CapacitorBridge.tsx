@@ -12,6 +12,14 @@ export default function CapacitorBridge() {
   useEffect(() => {
     if (!window.Capacitor?.isNativePlatform()) return
 
+    // Re-apply theme now that native bridge is ready — matchMedia may not
+    // have worked correctly during the initial head script execution
+    const theme = localStorage.getItem('hai_theme') || 'system'
+    if (theme === 'system') {
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      document.documentElement.classList.toggle('dark', isDark)
+    }
+
     async function init() {
       try {
         const { StatusBar, Style } = await import('@capacitor/status-bar')
