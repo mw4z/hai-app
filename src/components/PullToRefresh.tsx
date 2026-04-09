@@ -19,7 +19,9 @@ export default function PullToRefresh() {
     function onTouchStart(e: TouchEvent) {
       if (window.scrollY > 0) return
       if (document.querySelector('[data-overlay="true"]')) return
-      if (window.location.pathname.match(/\/threads\/.+/)) return
+      // Only active on feed, market, and threads list
+      const path = window.location.pathname
+      if (path !== '/feed' && path !== '/market' && path !== '/threads') return
       startY.current = e.touches[0].clientY
       pulling.current = true
       hitThreshold.current = false
