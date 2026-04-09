@@ -32,7 +32,12 @@ function alreadyShown() {
 }
 
 export default function AppSplash() {
-  const [phase, setPhase] = useState<'show' | 'fade' | 'gone'>(() => alreadyShown() ? 'gone' : 'show')
+  const [phase, setPhase] = useState<'show' | 'fade' | 'gone'>(() => {
+    if (alreadyShown()) return 'gone'
+    // Mark IMMEDIATELY — prevents double-play if a redirect reloads the page
+    try { sessionStorage.setItem(SESSION_KEY, '1') } catch {}
+    return 'show'
+  })
   const dismissed = useRef(false)
   const mountTime = useRef(Date.now())
 
