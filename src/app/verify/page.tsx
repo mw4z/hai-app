@@ -13,77 +13,34 @@ function VerifyForm() {
   const searchParams = useSearchParams()
   const phone = searchParams.get('phone') || ''
 
-  const [otp, setOtp] = useState(['', '', '', '', '', ''])
+  const [code, setCode] = useState('')
+  const [focused, setFocused] = useState(false)
   const [loading, setLoading] = useState(false)
   const [resendTimer, setResendTimer] = useState(60)
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    inputRefs.current[0]?.focus()
+    inputRef.current?.focus()
     const timer = setInterval(() => {
       setResendTimer((t) => (t > 0 ? t - 1 : 0))
     }, 1000)
     return () => clearInterval(timer)
   }, [])
 
-  const hiddenRef = useRef<HTMLInputElement>(null)
+  const digits = code.split('').concat(Array(6).fill('')).slice(0, 6)
 
-  function handleOtpChange(index: number, value: string) {
-    // Handle paste or autofill of full code into a single box
-    if (value.length > 1) {
-      const digits = value.replace(/\D/g, '').slice(0, 6)
-      if (digits.length >= 2) {
-        const newOtp = digits.split('').concat(Array(6).fill('')).slice(0, 6)
-        setOtp(newOtp)
-        if (digits.length === 6) {
-          inputRefs.current[5]?.focus()
-          // Auto-submit after a short delay
-          setTimeout(() => autoSubmit(newOtp.join('')), 300)
-        } else {
-          inputRefs.current[Math.min(digits.length, 5)]?.focus()
-        }
-        return
-      }
+  function handleChange(value: string) {
+    const clean = value.replace(/\D/g, '').slice(0, 6)
+    setCode(clean)
+    if (clean.length === 6) {
+      setTimeout(() => {
+        if (!loading) submitCode(clean)
+      }, 300)
     }
-    if (!/^\d*$/.test(value)) return
-    const newOtp = [...otp]
-    newOtp[index] = value.slice(-1)
-    setOtp(newOtp)
-    if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus()
-    }
-    // Auto-submit when all 6 digits filled
-    const code = newOtp.join('')
-    if (code.length === 6 && !code.includes('')) {
-      setTimeout(() => autoSubmit(code), 300)
-    }
-  }
-
-  // Handle the hidden autofill input
-  function handleAutofill(value: string) {
-    const digits = value.replace(/\D/g, '').slice(0, 6)
-    if (digits.length === 0) return
-    const newOtp = digits.split('').concat(Array(6).fill('')).slice(0, 6)
-    setOtp(newOtp)
-    if (digits.length === 6) {
-      setTimeout(() => autoSubmit(digits), 300)
-    }
-  }
-
-  function handleKeyDown(index: number, e: React.KeyboardEvent) {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus()
-    }
-  }
-
-  function autoSubmit(code: string) {
-    if (code.length !== 6 || loading) return
-    submitCode(code)
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const code = otp.join('')
     if (code.length !== 6) {
       toast.error(t('verify_enter_code'))
       return
@@ -129,8 +86,8 @@ function VerifyForm() {
       })
       toast.success(t('verify_resent'))
       setResendTimer(60)
-      setOtp(['', '', '', '', '', ''])
-      inputRefs.current[0]?.focus()
+      setCode('')
+      inputRef.current?.focus()
     } catch {
       toast.error(t('auth_connection_err'))
     }
@@ -150,29 +107,46 @@ function VerifyForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="flex justify-center gap-2" dir="ltr">
-          {otp.map((digit, index) => (
-            <input
+        <div
+          className="relative flex justify-center gap-2"
+          dir="ltr"
+          onClick={() => inputRef.current?.focus()}
+        >
+          {/* Single real input for iOS SMS autofill */}
+          <input
+            ref={inputRef}
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]*"
+            maxLength={6}
+            value={code}
+            onChange={(e) => handleChange(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            style={{
+              position: 'absolute',
+              top: 0, left: 0,
+              width: '100%', height: '100%',
+              opacity: 0.01,
+              zIndex: 10,
+              fontSize: '16px',
+            }}
+          />
+          {/* Visual digit boxes */}
+          {digits.map((digit, index) => (
+            <div
               key={index}
-              ref={(el) => { inputRefs.current[index] = el }}
-              type="tel"
-              inputMode="numeric"
-              {...(index === 0 ? { autoComplete: 'one-time-code' } : {})}
-              maxLength={6}
-              value={digit}
-              onChange={(e) => handleOtpChange(index, e.target.value)}
-              onKeyDown={(e) => handleKeyDown(index, e)}
-              onPaste={(e) => {
-                const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-                if (paste.length >= 2) {
-                  e.preventDefault()
-                  const newOtp = paste.split('').concat(Array(6).fill('')).slice(0, 6)
-                  setOtp(newOtp)
-                  if (paste.length === 6) setTimeout(() => autoSubmit(paste), 300)
-                }
-              }}
-              className="w-12 h-14 text-center text-xl font-bold border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all"
-            />
+              className={`w-12 h-14 flex items-center justify-center text-xl font-bold border-2 rounded-xl transition-all ${
+                focused && index === code.length && code.length < 6
+                  ? 'border-primary-500 ring-2 ring-primary-200'
+                  : digit
+                  ? 'border-primary-500'
+                  : 'border-gray-200'
+              }`}
+            >
+              {digit}
+            </div>
           ))}
         </div>
 
