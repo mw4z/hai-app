@@ -219,6 +219,33 @@ html {
   background-color: #000000;
 }
 
+/* ── iOS native safe area (only on Capacitor with overlaysWebView: true) ── */
+/* Push body content below status bar */
+html.capacitor-ios body {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Fixed backdrop behind status bar — matches glass header exactly */
+html.capacitor-ios body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top);
+  z-index: 9990;
+  pointer-events: none;
+  background: #ffffff;
+}
+html.capacitor-ios.dark body::before {
+  background: #0f172a;
+}
+
+/* Sticky headers stick below the status bar */
+html.capacitor-ios .sticky.top-0 {
+  top: env(safe-area-inset-top, 0px) !important;
+}
+
 /* Pages with bottom nav need extra bottom padding for home indicator */
 .pb-safe {
   padding-bottom: calc(6rem + env(safe-area-inset-bottom)) !important;

@@ -37,22 +37,39 @@ export default function AppSplash() {
   const mountTime = useRef(Date.now())
 
   useEffect(() => {
-    // Remove the inline preload splash now that React has hydrated
     const preload = document.getElementById('__hai_preload')
-    if (preload) preload.remove()
 
-    // In Capacitor: hide native splash AFTER web splash is painted
-    if (typeof window !== 'undefined' && window.Capacitor?.isNativePlatform() && phase === 'show') {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          import('@capacitor/splash-screen').then(({ SplashScreen }) => {
-            SplashScreen.hide({ fadeOutDuration: 0 })
-          }).catch(() => {})
-        })
-      })
+    if (phase === 'gone') {
+      // Splash already shown this session — just clean up immediately
+      if (preload) preload.remove()
+      if (window.Capacitor?.isNativePlatform()) {
+        import('@capacitor/splash-screen').then(({ SplashScreen }) => {
+          SplashScreen.hide({ fadeOutDuration: 0 })
+        }).catch(() => {})
+      }
+      return
     }
 
-    if (phase === 'gone') return
+    // Fade out preload AFTER a delay so AppSplash animations have visually started
+    // (logo animates at 0.1s, rings at 0.4s — 200ms delay is enough for logo)
+    function removePreload() {
+      if (!preload) return
+      preload.style.transition = 'opacity 200ms ease-out'
+      preload.style.opacity = '0'
+      setTimeout(() => preload.remove(), 220)
+    }
+
+    if (window.Capacitor?.isNativePlatform()) {
+      // On native: hide native splash, then fade out preload
+      import('@capacitor/splash-screen').then(({ SplashScreen }) => {
+        SplashScreen.hide({ fadeOutDuration: 200 }).then(() => {
+          setTimeout(removePreload, 100)
+        })
+      }).catch(() => setTimeout(removePreload, 200))
+    } else {
+      // On web: small delay so CSS animations begin before preload disappears
+      setTimeout(removePreload, 200)
+    }
 
     let maxTimer: ReturnType<typeof setTimeout>
     let fadeTimer: ReturnType<typeof setTimeout>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -132,8 +132,13 @@ export default function FeedClient({
     setHasMore(initialPosts.length >= 20)
   }, [selectedCategory, isReadOnly, browseNeighborhood?.id])
 
-  // Auto-refresh feed posts every 15 seconds
+  // Guard: prevent overlapping refresh/pagination fetches
+  const fetchingRef = useRef(false)
+
+  // Auto-refresh: MERGE new posts into existing list, never replace paginated content
   const refreshFeed = useCallback(async () => {
+    if (fetchingRef.current) return
+    fetchingRef.current = true
     try {
       const nId = isReadOnly && browseNeighborhood ? browseNeighborhood.id : user.neighborhoodId
       const params = new URLSearchParams({ neighborhoodId: nId, category: selectedCategory })
@@ -141,8 +146,16 @@ export default function FeedClient({
       if (res.ok) {
         const data = await res.json()
         if (data.posts) {
-          setPosts(data.posts)
-          setHasMore(data.posts.length >= 20)
+          setPosts(prev => {
+            const prevIds = new Set(prev.map(p => p.id))
+            const freshMap = new Map<string, Post>(data.posts.map((p: Post) => [p.id, p]))
+            // Update existing posts with fresh data (reactions, etc.)
+            const updated = prev.map(p => freshMap.get(p.id) || p)
+            // Prepend truly new posts that weren't in the list
+            const brandNew = data.posts.filter((p: Post) => !prevIds.has(p.id))
+            return [...brandNew, ...updated]
+          })
+          // Don't touch hasMore — only loadMore should control that
         }
       }
     } catch { /* */ }
@@ -155,9 +168,10 @@ export default function FeedClient({
       const pRes = await fetch('/api/polls?neighborhood=' + (browseNeighborhood?.id || user.neighborhoodId || ''))
       if (pRes.ok) { const pData = await pRes.json(); setPolls(pData || []) }
     } catch { /* */ }
+    fetchingRef.current = false
   }, [selectedCategory, isReadOnly, browseNeighborhood?.id, user.neighborhoodId])
 
-  useAutoRefresh(refreshFeed, 5000)
+  useAutoRefresh(refreshFeed, 30000)
 
   // Initial ride requests + polls fetch
   useEffect(() => {
@@ -168,7 +182,8 @@ export default function FeedClient({
   }, [browseNeighborhood?.id])
 
   async function loadMore() {
-    if (loadingMore || !hasMore || posts.length === 0) return
+    if (loadingMore || !hasMore || posts.length === 0 || fetchingRef.current) return
+    fetchingRef.current = true
     setLoadingMore(true)
     try {
       const lastPost = posts[posts.length - 1]
@@ -189,6 +204,7 @@ export default function FeedClient({
       // silently fail
     } finally {
       setLoadingMore(false)
+      fetchingRef.current = false
     }
   }
 
