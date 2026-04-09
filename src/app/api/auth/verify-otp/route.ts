@@ -44,23 +44,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Check OTP against DB first (custom SMS stores code in DB)
-    let isValid = false
-    const latestOtp = await db.otpCode.findFirst({
-      where: {
-        phone: formattedPhone,
-        verified: false,
-        expiresAt: { gte: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+    // Verify via Twilio Verify API
+    const isValid = await verifyOTP(formattedPhone, code)
 
-    if (latestOtp && latestOtp.code === code) {
-      isValid = true
-      await db.otpCode.update({ where: { id: latestOtp.id }, data: { verified: true } })
-    } else {
-      // Fallback: Twilio Verify API (if OTP was sent via Verify)
-      isValid = await verifyOTP(formattedPhone, code)
+    // Mark DB record as verified
+    if (isValid) {
+      const latestOtp = await db.otpCode.findFirst({
+        where: { phone: formattedPhone, verified: false },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (latestOtp) {
+        await db.otpCode.update({ where: { id: latestOtp.id }, data: { verified: true } })
+      }
     }
 
     if (!isValid) {
