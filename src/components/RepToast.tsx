@@ -23,6 +23,10 @@ const MESSAGES = {
 }
 
 export default function RepToast() {
+  // Disabled — was triggering on every login/app open
+  return null
+
+  /* eslint-disable */
   const { lang } = useLanguage()
   const [popup, setPopup] = useState<{ diff: number; text: string } | null>(null)
   const [lastRep, setLastRep] = useState<number | null>(null)
@@ -35,7 +39,7 @@ export default function RepToast() {
       const currentRep: number = data.totalRep ?? 0
 
       setLastRep(prev => {
-        if (prev === null) return currentRep // first load, just store
+        if (prev === null) return currentRep
         const diff = currentRep - prev
         if (diff > 0) {
           const msgs = lang !== 'en' ? MESSAGES.ar : MESSAGES.en
@@ -50,15 +54,12 @@ export default function RepToast() {
 
   useEffect(() => {
     check()
-    const interval = setInterval(check, 5000)
+    const interval = setInterval(check, 30000)
     const onVisible = () => { if (document.visibilityState === 'visible') check() }
-    const onFocus = () => check()
     document.addEventListener('visibilitychange', onVisible)
-    window.addEventListener('focus', onFocus)
     return () => {
       clearInterval(interval)
       document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener('focus', onFocus)
     }
   }, [check])
 
