@@ -36,7 +36,6 @@ export async function POST(req: NextRequest) {
         },
       })
       if (!anySuccess) {
-        console.log(`[SECURITY] OTP lockout: phone=${formattedPhone}, failed=${recentFailed}`)
         return NextResponse.json(
           apiError('محاولات كثيرة، انتظر 15 دقيقة', 429, 'OTP_LOCKOUT'),
           { status: 429 }
@@ -44,9 +43,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Verify via Twilio Verify API (test phones check hardcoded code)
+    // Verify via Twilio Verify API
     const isValid = await verifyOTP(formattedPhone, code)
 
+    // Mark DB record
     if (isValid) {
       const latestOtp = await db.otpCode.findFirst({
         where: { phone: formattedPhone, verified: false },
@@ -58,7 +58,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (!isValid) {
-      console.log(`[SECURITY] OTP wrong code: phone=${formattedPhone}`)
       return NextResponse.json(
         apiError('رمز التحقق غير صحيح أو منتهي', 400, 'OTP_INVALID'),
         { status: 400 }

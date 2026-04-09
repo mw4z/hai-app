@@ -1,4 +1,4 @@
-// SMS OTP Service — Twilio Verify for OTP, custom SMS for alerts
+// SMS OTP Service — Twilio Verify
 import twilio from 'twilio'
 
 const client = twilio(
@@ -7,17 +7,12 @@ const client = twilio(
 )
 const VERIFY_SID = process.env.TWILIO_VERIFY_SERVICE_SID!
 
-// Test accounts — skip real SMS (Google Play review)
+// Google Play review test account — skip real SMS
 const TEST_PHONES: Record<string, string> = {
-  '+966500000000': '1234',  // Google Play review
+  '+966500000000': '1234',
 }
 
-/** Generate a random 4-digit OTP code */
-export function generateOTP(): string {
-  return Math.floor(1000 + Math.random() * 9000).toString()
-}
-
-/** Send OTP — test phones skip SMS, others use Twilio Verify */
+/** Send OTP via Twilio Verify */
 export async function sendOTP(phone: string): Promise<boolean> {
   if (TEST_PHONES[phone]) return true
 
@@ -30,15 +25,15 @@ export async function sendOTP(phone: string): Promise<boolean> {
     const verification = await client.verify.v2
       .services(VERIFY_SID)
       .verifications.create({ to: phone, channel: 'sms' })
-    console.log(`[OTP] Verify SMS sent to ${phone}, status: ${verification.status}`)
+    console.log(`[OTP] Verify sent to ${phone}, status: ${verification.status}`)
     return verification.status === 'pending'
   } catch (error) {
-    console.error('[OTP] Verify call error:', error)
+    console.error('[OTP] Verify send error:', error)
     return false
   }
 }
 
-/** Verify OTP — test phones check hardcoded code, others use Twilio Verify */
+/** Verify OTP via Twilio Verify API */
 export async function verifyOTP(phone: string, code: string): Promise<boolean> {
   if (TEST_PHONES[phone]) return code === TEST_PHONES[phone]
 

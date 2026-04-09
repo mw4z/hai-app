@@ -22,23 +22,18 @@ export async function POST(req: NextRequest) {
     })
 
     if (recentOtps >= 10) {
-      console.log(`[RATE_LIMIT] OTP 10min: phone=${formattedPhone}, count=${recentOtps}`)
       return NextResponse.json(
         { error: 'طلبات كثيرة، انتظر 10 دقائق' },
         { status: 429 }
       )
     }
 
-    // Hourly limit: max 5 per phone per hour
+    // Hourly limit
     const hourlyOtps = await db.otpCode.count({
       where: { phone: formattedPhone, createdAt: { gte: new Date(Date.now() - 3600_000) } },
     })
     if (hourlyOtps >= 20) {
-      console.log(`[RATE_LIMIT] OTP hourly: phone=${formattedPhone}, count=${hourlyOtps}`)
-      return NextResponse.json(
-        { error: 'حاول لاحقاً' },
-        { status: 429 }
-      )
+      return NextResponse.json({ error: 'حاول لاحقاً' }, { status: 429 })
     }
 
     // Find or create user
@@ -47,7 +42,7 @@ export async function POST(req: NextRequest) {
       user = await db.user.create({ data: { phone: formattedPhone } })
     }
 
-    // Track OTP request in DB (for rate limiting)
+    // Track in DB for rate limiting
     await db.otpCode.create({
       data: {
         phone: formattedPhone,
@@ -57,7 +52,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Send via Twilio Verify (test phones get auto-approved)
+    // Send via Twilio Verify
     const sent = await sendOTP(formattedPhone)
     if (!sent) {
       return NextResponse.json({ error: 'فشل إرسال الرمز' }, { status: 500 })

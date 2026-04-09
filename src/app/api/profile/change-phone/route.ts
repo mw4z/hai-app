@@ -53,12 +53,12 @@ export async function POST(req: NextRequest) {
 
     const formatted = formatSaudiPhone(phone)
 
-    // Verify via Twilio Verify API
     const isValid = await verifyOTP(formatted, code)
     if (!isValid) {
       return NextResponse.json({ error: 'رمز التحقق غير صحيح أو منتهي' }, { status: 400 })
     }
 
+    // Mark DB record as verified
     const latestOtp = await db.otpCode.findFirst({
       where: { phone: formatted, verified: false },
       orderBy: { createdAt: 'desc' },
