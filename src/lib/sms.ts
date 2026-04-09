@@ -26,15 +26,25 @@ export async function sendOTP(phone: string): Promise<boolean> {
     return true
   }
 
+  // Try SMS first, fallback to voice call if SMS fails
   try {
     const verification = await client.verify.v2
       .services(VERIFY_SID)
-      .verifications.create({ to: phone, channel: 'call' })
-    console.log(`[OTP] Verify sent to ${phone}, status: ${verification.status}`)
+      .verifications.create({ to: phone, channel: 'sms' })
+    console.log(`[OTP] Verify SMS sent to ${phone}, status: ${verification.status}`)
     return verification.status === 'pending'
-  } catch (error) {
-    console.error('[OTP] Verify send error:', error)
-    return false
+  } catch (smsError) {
+    console.warn('[OTP] SMS failed, trying voice call:', (smsError as any)?.message)
+    try {
+      const verification = await client.verify.v2
+        .services(VERIFY_SID)
+        .verifications.create({ to: phone, channel: 'call' })
+      console.log(`[OTP] Verify call to ${phone}, status: ${verification.status}`)
+      return verification.status === 'pending'
+    } catch (callError) {
+      console.error('[OTP] Voice call also failed:', callError)
+      return false
+    }
   }
 }
 
