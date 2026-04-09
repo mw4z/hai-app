@@ -6,7 +6,7 @@ const client = twilio(
   process.env.TWILIO_AUTH_TOKEN
 )
 const VERIFY_SID = process.env.TWILIO_VERIFY_SERVICE_SID!
-const APP_DOMAIN = 'hai-app.net'
+const APP_DOMAIN = 'app.hai-app.net'
 
 // Google Play review test account — skip real SMS
 const TEST_PHONE = '+966500000000'
