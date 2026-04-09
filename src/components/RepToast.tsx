@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useState, useRef } from 'react'
 import { useLanguage } from '@/hooks/useLanguage'
 
 const MESSAGES = {
@@ -22,14 +22,20 @@ const MESSAGES = {
   ],
 }
 
-export default function RepToast() {
-  // Disabled — was triggering on every login/app open
-  return null
+const STORAGE_KEY = 'hai_last_rep'
 
-  /* eslint-disable */
+export default function RepToast() {
   const { lang } = useLanguage()
   const [popup, setPopup] = useState<{ diff: number; text: string } | null>(null)
-  const [lastRep, setLastRep] = useState<number | null>(null)
+  // Use localStorage to persist last rep across sessions — prevents false popup on login
+  const lastRepRef = useRef<number | null>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      return stored ? parseInt(stored, 10) : null
+    } catch { return null }
+  })
+  // Skip the very first check after mount (login/page load)
+  const isFirstCheck = useRef(true)
 
   const check = useCallback(async () => {
     try {
@@ -38,8 +44,21 @@ export default function RepToast() {
       const data = await res.json()
       const currentRep: number = data.totalRep ?? 0
 
-      setLastRep(prev => {
-        if (prev === null) return currentRep
+      const prev = typeof lastRepRef.current === 'function'
+        ? (lastRepRef.current as () => number | null)()
+        : lastRepRef.current
+
+      // Always store current rep
+      lastRepRef.current = currentRep
+      try { localStorage.setItem(STORAGE_KEY, String(currentRep)) } catch {}
+
+      // Skip first check (login) — only show for real-time gains during the session
+      if (isFirstCheck.current) {
+        isFirstCheck.current = false
+        return
+      }
+
+      if (prev !== null) {
         const diff = currentRep - prev
         if (diff > 0) {
           const msgs = lang !== 'en' ? MESSAGES.ar : MESSAGES.en
@@ -47,8 +66,7 @@ export default function RepToast() {
           setPopup({ diff, text })
           setTimeout(() => setPopup(null), 5000)
         }
-        return currentRep
-      })
+      }
     } catch { /* ignore */ }
   }, [lang])
 
@@ -65,13 +83,12 @@ export default function RepToast() {
 
   if (!popup) return null
 
-  // Render as a fixed overlay — no dependency on react-hot-toast
   return (
     <div
       onClick={() => setPopup(null)}
       style={{
         position: 'fixed',
-        top: '16px',
+        top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 99999,
