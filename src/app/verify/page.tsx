@@ -14,7 +14,6 @@ function VerifyForm() {
   const phone = searchParams.get('phone') || ''
 
   const [code, setCode] = useState('')
-  const [focused, setFocused] = useState(false)
   const [loading, setLoading] = useState(false)
   const [resendTimer, setResendTimer] = useState(60)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -26,8 +25,6 @@ function VerifyForm() {
     }, 1000)
     return () => clearInterval(timer)
   }, [])
-
-  const digits = code.split('').concat(Array(6).fill('')).slice(0, 6)
 
   function handleChange(value: string) {
     const clean = value.replace(/\D/g, '').slice(0, 6)
@@ -107,47 +104,22 @@ function VerifyForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div
-          className="relative flex justify-center gap-2"
-          dir="ltr"
-          onClick={() => inputRef.current?.focus()}
-        >
-          {/* Single real input for iOS SMS autofill */}
+        <div dir="ltr">
           <input
             ref={inputRef}
             type="text"
             inputMode="numeric"
             autoComplete="one-time-code"
+            name="otp"
+            id="otp"
             pattern="[0-9]*"
             maxLength={6}
             value={code}
+            placeholder="000000"
             onChange={(e) => handleChange(e.target.value)}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            style={{
-              position: 'absolute',
-              top: 0, left: 0,
-              width: '100%', height: '100%',
-              opacity: 0.01,
-              zIndex: 10,
-              fontSize: '16px',
-            }}
+            className="w-full h-14 text-center text-2xl font-bold tracking-[0.5em] border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all placeholder:text-gray-300 placeholder:tracking-[0.5em]"
+            style={{ fontSize: '24px' }}
           />
-          {/* Visual digit boxes */}
-          {digits.map((digit, index) => (
-            <div
-              key={index}
-              className={`w-12 h-14 flex items-center justify-center text-xl font-bold border-2 rounded-xl transition-all ${
-                focused && index === code.length && code.length < 6
-                  ? 'border-primary-500 ring-2 ring-primary-200'
-                  : digit
-                  ? 'border-primary-500'
-                  : 'border-gray-200'
-              }`}
-            >
-              {digit}
-            </div>
-          ))}
         </div>
 
         <button type="submit" disabled={loading} className="btn-primary">
