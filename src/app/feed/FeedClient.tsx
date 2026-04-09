@@ -321,10 +321,10 @@ export default function FeedClient({
                       .finally(() => setLoadingNeighborhoods(false))
                   }
                 }}
-                className="flex items-center gap-1 text-gray-700 text-sm font-medium hover:text-primary-600 transition-colors min-w-0"
+                className="flex items-center gap-1 text-gray-700 text-sm font-medium hover:text-primary-600 transition-colors min-w-0 max-w-[45vw]"
               >
+                <FiMapPin className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" />
                 <span className="truncate">{currentNeighborhood.displayName}</span>
-                <FiMapPin className="w-3.5 h-3.5 text-primary-500" />
               </button>
             </div>
             <p className="text-gray-400 text-xs">{currentNeighborhood.displayCity}</p>
