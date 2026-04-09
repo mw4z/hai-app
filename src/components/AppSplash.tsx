@@ -23,9 +23,9 @@ import { useState, useEffect, useRef } from 'react'
  */
 
 const SESSION_KEY = 'hai_splash'
-const MIN_MS = 2800
-const MAX_MS = 4000
-const FADE_MS = 500
+const MIN_MS = 1500
+const MAX_MS = 2500
+const FADE_MS = 400
 
 function alreadyShown() {
   try { return !!sessionStorage.getItem(SESSION_KEY) } catch { return false }
