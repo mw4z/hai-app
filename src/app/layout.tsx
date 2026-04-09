@@ -9,6 +9,7 @@ import RouteTransition from '@/components/RouteTransition'
 import ArrivalAlert from '@/components/ArrivalAlert'
 import { TourProvider } from '@/components/Tour'
 import CapacitorBridge from '@/components/CapacitorBridge'
+import ScrollReset from '@/components/ScrollReset'
 import { LangProvider } from '@/hooks/useLanguage'
 import { checkEnvironment } from '@/lib/env-check'
 import type { Lang } from '@/lib/i18n'
@@ -85,14 +86,14 @@ export default function RootLayout({
         {/* Blank cover — prevents content flash before AppSplash renders */}
         <div id="__hai_preload" style={{
           position: 'fixed', inset: 0, zIndex: 99999,
-          background: '#fff',
+          background: 'radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #f0fdf4 40%, #fff 100%)',
         }} />
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){
             var d = document.documentElement.classList.contains('dark');
             if (d) {
               var el = document.getElementById('__hai_preload');
-              if (el) el.style.background = '#0a0f0c';
+              if (el) el.style.background = 'radial-gradient(ellipse at 50% 42%, #0d2818 0%, #0f1a14 40%, #0a0f0c 100%)';
             }
           })();
         `}} />
@@ -115,6 +116,7 @@ export default function RootLayout({
               {children}
             </TourProvider>
           </ErrorBoundary>
+          <ScrollReset />
           <ArrivalAlert />
           <RouteTransition />
         </LangProvider>

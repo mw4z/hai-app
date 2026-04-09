@@ -175,9 +175,9 @@ export default function ChatClient({
     // Scroll to unread divider if exists, otherwise to bottom
     if (unreadDividerId) {
       const el = document.getElementById('unread-divider')
-      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); return }
+      if (el) { el.scrollIntoView({ block: 'center' }); return }
     }
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    bottomRef.current?.scrollIntoView()
   }, [messages.length])
 
   useEffect(() => {
