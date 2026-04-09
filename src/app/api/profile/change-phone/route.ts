@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession, formatSaudiPhone, isValidSaudiPhone } from '@/lib/auth'
-import { sendOTP, verifyOTP } from '@/lib/sms'
+import { sendOTP, generateOTP } from '@/lib/sms'
 
 const OTP_EXPIRY_MS = 5 * 60 * 1000
 
@@ -32,16 +32,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'هذا رقمك الحالي' }, { status: 400 })
     }
 
+    const otpCode = generateOTP()
     await db.otpCode.create({
       data: {
         phone: formatted,
-        code: '------',
+        code: otpCode,
         expiresAt: new Date(Date.now() + OTP_EXPIRY_MS),
         userId: session.userId,
       },
     })
 
-    const sent = await sendOTP(formatted)
+    const sent = await sendOTP(formatted, otpCode)
     if (!sent) return NextResponse.json({ error: 'فشل إرسال الرمز' }, { status: 500 })
 
     return NextResponse.json({ success: true, formatted })
@@ -53,20 +54,21 @@ export async function POST(req: NextRequest) {
 
     const formatted = formatSaudiPhone(phone)
 
-    // Verify via Twilio Verify API
-    const isValid = await verifyOTP(formatted, code)
-    if (!isValid) {
+    // Verify OTP against DB
+    const latestOtp = await db.otpCode.findFirst({
+      where: {
+        phone: formatted,
+        verified: false,
+        expiresAt: { gte: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    if (!latestOtp || latestOtp.code !== code) {
       return NextResponse.json({ error: 'رمز التحقق غير صحيح أو منتهي' }, { status: 400 })
     }
 
-    // Mark DB record as verified
-    const latestOtp = await db.otpCode.findFirst({
-      where: { phone: formatted, verified: false },
-      orderBy: { createdAt: 'desc' },
-    })
-    if (latestOtp) {
-      await db.otpCode.update({ where: { id: latestOtp.id }, data: { verified: true } })
-    }
+    await db.otpCode.update({ where: { id: latestOtp.id }, data: { verified: true } })
 
     // Update phone number
     await db.user.update({ where: { id: session.userId }, data: { phone: formatted } })
