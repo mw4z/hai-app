@@ -28,12 +28,12 @@ export default function RepToast() {
   const { lang } = useLanguage()
   const [popup, setPopup] = useState<{ diff: number; text: string } | null>(null)
   // Use localStorage to persist last rep across sessions — prevents false popup on login
-  const lastRepRef = useRef<number | null>(() => {
+  const lastRepRef = useRef<number | null>((() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY)
+      const stored = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null
       return stored ? parseInt(stored, 10) : null
     } catch { return null }
-  })
+  })())
   // Skip the very first check after mount (login/page load)
   const isFirstCheck = useRef(true)
 
@@ -44,9 +44,7 @@ export default function RepToast() {
       const data = await res.json()
       const currentRep: number = data.totalRep ?? 0
 
-      const prev = typeof lastRepRef.current === 'function'
-        ? (lastRepRef.current as () => number | null)()
-        : lastRepRef.current
+      const prev = lastRepRef.current
 
       // Always store current rep
       lastRepRef.current = currentRep
