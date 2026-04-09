@@ -351,16 +351,12 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const [activeFlowId, setActiveFlowId] = useState<TourFlowId | null>(null)
   const [currentStep, setCurrentStep] = useState(0)
 
-  // Auto-start global tour on first visit — wait for page to be fully rendered
+  // Auto-start global tour only for new users (flag set during registration)
   useEffect(() => {
     try {
-      const lsSeen = localStorage.getItem('hai_tour_seen')
-      const cookieSeen = document.cookie.includes('hai_tour_seen=1')
-      // Restore localStorage from cookie if it was cleared (Capacitor sleep/restart)
-      if (!lsSeen && cookieSeen) {
-        localStorage.setItem('hai_tour_seen', 'true')
-      }
-      if (lsSeen || cookieSeen) return
+      const isNewUser = sessionStorage.getItem('hai_show_tour')
+      if (!isNewUser) return
+      sessionStorage.removeItem('hai_show_tour')
       // Wait for feed elements to render (cloud DB can be slow)
       const waitAndStart = (attempt: number) => {
         const el = document.querySelector('[data-tour="feed-title"]')

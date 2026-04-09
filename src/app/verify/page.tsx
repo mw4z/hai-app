@@ -62,6 +62,7 @@ function VerifyForm() {
       }
 
       if (data.isNewUser) {
+        try { sessionStorage.setItem('hai_show_tour', '1') } catch {}
         router.push('/onboarding')
       } else {
         router.push('/feed')
