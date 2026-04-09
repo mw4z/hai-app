@@ -39,7 +39,7 @@ export default function HomeClient() {
   useEffect(() => { setPhraseIdx(0) }, [lang])
 
   return (
-    <main className="min-h-[100dvh] flex flex-col bg-white dark:bg-gray-900">
+    <main className="flex flex-col bg-white dark:bg-gray-900" style={{ minHeight: 'calc(100dvh - env(safe-area-inset-top, 0px))' }}>
       {/* Language toggle */}
       <div className="flex justify-end px-6 pt-3 bg-white dark:bg-gray-900">
         <div className="flex rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden text-xs font-medium">

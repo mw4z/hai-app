@@ -137,7 +137,7 @@ function VerifyForm() {
   }
 
   return (
-    <main className="min-h-[100dvh] flex flex-col px-6 pt-6 bg-white">
+    <main className="flex flex-col px-6 pt-6 bg-white" style={{ minHeight: 'calc(100dvh - env(safe-area-inset-top, 0px))' }}>
       <Link href="/register" className="flex items-center gap-1 text-gray-400 text-sm mb-4 self-start">
         {lang !== 'en' ? <FiArrowRight className="w-4 h-4" /> : <FiArrowLeft className="w-4 h-4" />}
         {t('common_back')}
@@ -150,16 +150,6 @@ function VerifyForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Hidden input for iOS SMS autofill */}
-        <input
-          ref={hiddenRef}
-          type="tel"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          onChange={(e) => handleAutofill(e.target.value)}
-          className="absolute opacity-0 w-0 h-0"
-          tabIndex={-1}
-        />
         <div className="flex justify-center gap-2" dir="ltr">
           {otp.map((digit, index) => (
             <input
@@ -167,7 +157,7 @@ function VerifyForm() {
               ref={(el) => { inputRefs.current[index] = el }}
               type="tel"
               inputMode="numeric"
-              autoComplete={index === 0 ? 'one-time-code' : 'off'}
+              autoComplete="one-time-code"
               maxLength={6}
               value={digit}
               onChange={(e) => handleOtpChange(index, e.target.value)}

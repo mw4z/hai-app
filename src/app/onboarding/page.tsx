@@ -198,7 +198,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="min-h-[100dvh] flex flex-col px-6 pt-6 bg-white dark:bg-gray-900">
+    <main className="flex flex-col px-6 pt-6 bg-white dark:bg-gray-900" style={{ minHeight: 'calc(100dvh - env(safe-area-inset-top, 0px))' }}>
       {/* Progress */}
       <div className="flex gap-2 mb-5">
         {(['name', 'gender', 'account_type', 'location'] as Step[]).map((s, i) => (

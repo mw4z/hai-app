@@ -46,7 +46,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-[100dvh] flex flex-col px-6 pt-6 bg-white">
+    <main className="flex flex-col px-6 pt-6 bg-white" style={{ minHeight: 'calc(100dvh - env(safe-area-inset-top, 0px))' }}>
       <Link href="/" className="flex items-center gap-1 text-gray-400 text-sm mb-4 self-start">
         {lang !== 'en' ? <FiArrowRight className="w-4 h-4" /> : <FiArrowLeft className="w-4 h-4" />}
         {t('common_back')}
