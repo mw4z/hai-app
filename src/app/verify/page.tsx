@@ -104,22 +104,42 @@ function VerifyForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div dir="ltr">
+        <div className="relative flex justify-center gap-2" dir="ltr" onClick={() => inputRef.current?.focus()}>
+          {/* Hidden real input for autofill */}
           <input
             ref={inputRef}
             type="text"
             inputMode="numeric"
             autoComplete="one-time-code"
             name="otp"
-            id="otp"
             pattern="[0-9]*"
             maxLength={6}
             value={code}
-            placeholder="000000"
             onChange={(e) => handleChange(e.target.value)}
-            className="w-full h-14 text-center text-2xl font-bold tracking-[0.5em] border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-200 transition-all placeholder:text-gray-300 placeholder:tracking-[0.5em]"
-            style={{ fontSize: '24px' }}
+            style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              opacity: 0,
+              zIndex: 10,
+              fontSize: '16px',
+            }}
           />
+          {/* Visual boxes */}
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className={`w-12 h-14 flex items-center justify-center text-xl font-bold border-2 rounded-xl transition-all ${
+                code[i]
+                  ? 'border-primary-500'
+                  : i === code.length
+                  ? 'border-primary-500 ring-2 ring-primary-200'
+                  : 'border-gray-200'
+              }`}
+            >
+              {code[i] || ''}
+            </div>
+          ))}
         </div>
 
         <button type="submit" disabled={loading} className="btn-primary">
