@@ -293,10 +293,10 @@ export default function FeedClient({
       {/* Header */}
       <header className="glass sticky top-0 z-10">
         <div className="flex items-center justify-between px-4 pt-2.5 pb-1.5">
-          <div>
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">
-              <span data-tour="feed-title" className="text-xl font-bold text-primary-600">{t('feed_title')}</span>
-              <span className="text-gray-400 text-sm">·</span>
+              <span data-tour="feed-title" className="text-xl font-bold text-primary-600 flex-shrink-0">{t('feed_title')}</span>
+              <span className="text-gray-400 text-sm flex-shrink-0">·</span>
               <button
                 onClick={() => {
                   setShowNeighborhoodPicker(true)
@@ -321,9 +321,9 @@ export default function FeedClient({
                       .finally(() => setLoadingNeighborhoods(false))
                   }
                 }}
-                className="flex items-center gap-1 text-gray-700 text-sm font-medium hover:text-primary-600 transition-colors"
+                className="flex items-center gap-1 text-gray-700 text-sm font-medium hover:text-primary-600 transition-colors min-w-0"
               >
-                <span>{currentNeighborhood.displayName}</span>
+                <span className="truncate">{currentNeighborhood.displayName}</span>
                 <FiMapPin className="w-3.5 h-3.5 text-primary-500" />
               </button>
             </div>

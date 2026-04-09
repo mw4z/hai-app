@@ -77,8 +77,8 @@ export default function PullToRefresh() {
 
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-50 flex justify-center pointer-events-none"
-      style={{ transform: `translateY(${pullY - 52}px)`, transition: pulling.current ? 'none' : 'transform 0.3s ease' }}
+      className="fixed left-0 right-0 z-50 flex justify-center pointer-events-none"
+      style={{ top: 'env(safe-area-inset-top, 0px)', transform: `translateY(${pullY - 52}px)`, transition: pulling.current ? 'none' : 'transform 0.3s ease' }}
     >
       <div className={`w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${
         ready ? 'bg-primary-600 scale-110' : 'bg-white dark:bg-gray-800'
