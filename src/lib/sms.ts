@@ -7,10 +7,9 @@ const client = twilio(
 )
 const VERIFY_SID = process.env.TWILIO_VERIFY_SERVICE_SID!
 
-// Test accounts — skip real SMS (Google Play review + dev testing)
+// Test accounts — skip real SMS (Google Play review)
 const TEST_PHONES: Record<string, string> = {
   '+966500000000': '1234',  // Google Play review
-  '+966564375970': '1111',  // Dev testing (Twilio Verify temporarily blocked)
 }
 
 /** Generate a random 4-digit OTP code */
