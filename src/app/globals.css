@@ -231,7 +231,7 @@ body::before {
   left: 0;
   right: 0;
   height: env(safe-area-inset-top, 0px);
-  z-index: 9990;
+  z-index: 50;
   pointer-events: none;
   background: #ffffff;
 }
