@@ -32,16 +32,16 @@ function alreadyShown() {
 }
 
 export default function AppSplash() {
-  const [phase, setPhase] = useState<'show' | 'fade' | 'gone'>(() => {
-    if (alreadyShown()) return 'gone'
-    // Mark IMMEDIATELY — prevents double-play if a redirect reloads the page
-    try { sessionStorage.setItem(SESSION_KEY, '1') } catch {}
-    return 'show'
-  })
+  const [phase, setPhase] = useState<'show' | 'fade' | 'gone'>(() => alreadyShown() ? 'gone' : 'show')
   const dismissed = useRef(false)
   const mountTime = useRef(Date.now())
 
   useEffect(() => {
+    // Mark as shown IMMEDIATELY on client — prevents double-play if page redirects
+    if (phase === 'show') {
+      try { sessionStorage.setItem(SESSION_KEY, '1') } catch {}
+    }
+
     const preload = document.getElementById('__hai_preload')
     const isNativePlatform = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform()
 
