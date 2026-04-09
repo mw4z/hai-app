@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { formatSaudiPhone, signToken } from '@/lib/auth'
 import { apiError } from '@/lib/validation'
-import { verifyOTP } from '@/lib/sms'
 
 const MAX_FAILED_ATTEMPTS = 5
 const LOCKOUT_MINUTES = 15
@@ -44,28 +43,41 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Verify via Twilio Verify
-    const isValid = await verifyOTP(formattedPhone, code)
+    // Find the latest unexpired, unverified OTP for this phone
+    const latestOtp = await db.otpCode.findFirst({
+      where: {
+        phone: formattedPhone,
+        verified: false,
+        expiresAt: { gte: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
 
-    if (!isValid) {
-      console.log(`[SECURITY] OTP wrong code: phone=${formattedPhone}`)
+    if (!latestOtp) {
       return NextResponse.json(
-        apiError('رمز التحقق غير صحيح أو منتهي', 400, 'OTP_INVALID'),
+        apiError('رمز التحقق منتهي، أرسل رمز جديد', 400, 'OTP_EXPIRED'),
         { status: 400 }
       )
     }
 
-    // Mark latest OTP record as verified
-    const latestOtp = await db.otpCode.findFirst({
-      where: { phone: formattedPhone, verified: false },
-      orderBy: { createdAt: 'desc' },
-    })
-    if (latestOtp) {
-      await db.otpCode.update({
-        where: { id: latestOtp.id },
-        data: { verified: true },
-      })
+    // Test phone bypass
+    const TEST_PHONE = '+966500000000'
+    const isTestPhone = formattedPhone === TEST_PHONE
+    const isValid = isTestPhone ? code === '123456' : latestOtp.code === code
+
+    if (!isValid) {
+      console.log(`[SECURITY] OTP wrong code: phone=${formattedPhone}`)
+      return NextResponse.json(
+        apiError('رمز التحقق غير صحيح', 400, 'OTP_INVALID'),
+        { status: 400 }
+      )
     }
+
+    // Mark as verified
+    await db.otpCode.update({
+      where: { id: latestOtp.id },
+      data: { verified: true },
+    })
 
     // Get user
     const user = await db.user.findUnique({ where: { phone: formattedPhone } })

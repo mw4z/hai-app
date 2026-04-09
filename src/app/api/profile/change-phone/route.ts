@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession, formatSaudiPhone, isValidSaudiPhone } from '@/lib/auth'
-import { sendOTP, verifyOTP } from '@/lib/sms'
+import { sendOTP, generateOTP } from '@/lib/sms'
+
+const OTP_EXPIRY_MS = 5 * 60 * 1000
 
 // POST /api/profile/change-phone — two-step: send OTP, then verify
 export async function POST(req: NextRequest) {
@@ -30,7 +32,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'هذا رقمك الحالي' }, { status: 400 })
     }
 
-    const sent = await sendOTP(formatted)
+    const otpCode = generateOTP()
+    await db.otpCode.create({
+      data: {
+        phone: formatted,
+        code: otpCode,
+        expiresAt: new Date(Date.now() + OTP_EXPIRY_MS),
+        userId: session.userId,
+      },
+    })
+
+    const sent = await sendOTP(formatted, otpCode)
     if (!sent) return NextResponse.json({ error: 'فشل إرسال الرمز' }, { status: 500 })
 
     return NextResponse.json({ success: true, formatted })
@@ -42,10 +54,22 @@ export async function POST(req: NextRequest) {
 
     const formatted = formatSaudiPhone(phone)
 
-    const valid = await verifyOTP(formatted, code)
-    if (!valid) {
+    // Find latest unexpired OTP
+    const latestOtp = await db.otpCode.findFirst({
+      where: {
+        phone: formatted,
+        verified: false,
+        expiresAt: { gte: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    if (!latestOtp || latestOtp.code !== code) {
       return NextResponse.json({ error: 'رمز التحقق غير صحيح أو منتهي' }, { status: 400 })
     }
+
+    // Mark as verified
+    await db.otpCode.update({ where: { id: latestOtp.id }, data: { verified: true } })
 
     // Update phone number
     await db.user.update({ where: { id: session.userId }, data: { phone: formatted } })

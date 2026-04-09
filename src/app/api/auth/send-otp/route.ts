@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { sendOTP } from '@/lib/sms'
+import { sendOTP, generateOTP } from '@/lib/sms'
 import { formatSaudiPhone, isValidSaudiPhone } from '@/lib/auth'
+
+const OTP_EXPIRY_MS = 5 * 60 * 1000 // 5 minutes
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,18 +49,19 @@ export async function POST(req: NextRequest) {
       user = await db.user.create({ data: { phone: formattedPhone } })
     }
 
-    // Track OTP request in DB (for rate limiting)
+    // Generate code and store in DB
+    const code = generateOTP()
     await db.otpCode.create({
       data: {
         phone: formattedPhone,
-        code: '------', // Twilio manages the actual code
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        code,
+        expiresAt: new Date(Date.now() + OTP_EXPIRY_MS),
         userId: user.id,
       },
     })
 
-    // Send OTP via Twilio Verify
-    const sent = await sendOTP(formattedPhone)
+    // Send via Twilio SMS (not Verify) — includes iOS auto-fill domain hint
+    const sent = await sendOTP(formattedPhone, code)
     if (!sent) {
       return NextResponse.json({ error: 'فشل إرسال الرمز' }, { status: 500 })
     }
