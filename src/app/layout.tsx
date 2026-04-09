@@ -102,10 +102,12 @@ export default function RootLayout({
         <LangProvider initialLang={lang}>
           <Toaster
             position="top-center"
-            containerStyle={{ top: 'calc(env(safe-area-inset-top, 0px) + 8px)' }}
+            containerStyle={{ top: 'env(safe-area-inset-top, 0px)' }}
+            gutter={8}
             toastOptions={{
               style: {
                 fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, system-ui, sans-serif',
+                marginTop: 'env(safe-area-inset-top, 0px)',
               },
               duration: 3000,
             }}
