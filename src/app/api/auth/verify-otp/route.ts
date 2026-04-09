@@ -44,38 +44,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Test phone bypass
-    const TEST_PHONE = '+966500000000'
-    if (formattedPhone === TEST_PHONE) {
-      if (code !== '123456') {
-        return NextResponse.json(apiError('رمز التحقق غير صحيح', 400, 'OTP_INVALID'), { status: 400 })
-      }
-    } else if (process.env.TWILIO_PHONE_NUMBER) {
-      // Custom SMS was used — verify against DB
-      const latestOtp = await db.otpCode.findFirst({
-        where: {
-          phone: formattedPhone,
-          verified: false,
-          expiresAt: { gte: new Date() },
-        },
-        orderBy: { createdAt: 'desc' },
-      })
+    // Verify via Twilio Verify
+    const isValid = await verifyOTP(formattedPhone, code)
 
-      if (!latestOtp) {
-        return NextResponse.json(apiError('رمز التحقق منتهي، أرسل رمز جديد', 400, 'OTP_EXPIRED'), { status: 400 })
-      }
-
-      if (latestOtp.code !== code) {
-        console.log(`[SECURITY] OTP wrong code: phone=${formattedPhone}`)
-        return NextResponse.json(apiError('رمز التحقق غير صحيح', 400, 'OTP_INVALID'), { status: 400 })
-      }
-    } else {
-      // Twilio Verify was used — verify via API
-      const isValid = await verifyOTP(formattedPhone, code)
-      if (!isValid) {
-        console.log(`[SECURITY] OTP wrong code: phone=${formattedPhone}`)
-        return NextResponse.json(apiError('رمز التحقق غير صحيح أو منتهي', 400, 'OTP_INVALID'), { status: 400 })
-      }
+    if (!isValid) {
+      console.log(`[SECURITY] OTP wrong code: phone=${formattedPhone}`)
+      return NextResponse.json(
+        apiError('رمز التحقق غير صحيح أو منتهي', 400, 'OTP_INVALID'),
+        { status: 400 }
+      )
     }
 
     // Mark latest OTP record as verified
