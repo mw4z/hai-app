@@ -4,7 +4,7 @@ import { formatSaudiPhone, signToken } from '@/lib/auth'
 import { apiError } from '@/lib/validation'
 import { verifyOTP } from '@/lib/sms'
 
-const MAX_FAILED_ATTEMPTS = 5
+const MAX_FAILED_ATTEMPTS = 50
 const LOCKOUT_MINUTES = 15
 
 export async function POST(req: NextRequest) {
