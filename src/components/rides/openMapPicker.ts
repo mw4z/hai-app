@@ -45,7 +45,7 @@ export function openMapPicker(options: {
 
     // Bottom card
     const bottomCard = document.createElement('div')
-    bottomCard.style.cssText = 'position:absolute;bottom:0;left:0;right:0;background:#1f2937;border-top:1px solid #374151;border-radius:24px 24px 0 0;padding:16px;z-index:1;'
+    bottomCard.style.cssText = 'position:absolute;bottom:0;left:0;right:0;background:#1f2937;border-top:1px solid #374151;border-radius:24px 24px 0 0;padding:16px;padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 16px);z-index:2;'
     const addressText = document.createElement('p')
     addressText.style.cssText = 'font-size:13px;color:#d1d5db;margin-bottom:12px;min-height:36px;'
     addressText.textContent = lang === 'en' ? 'Tap the map to select a location' : lang === 'ur' ? 'مقام منتخب کرنے کیلئے نقشے پر ٹیپ کریں' : 'انقر على الخريطة لاختيار الموقع'

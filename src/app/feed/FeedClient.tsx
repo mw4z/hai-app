@@ -639,7 +639,6 @@ export default function FeedClient({
                   value={neighborhoodSearch}
                   onChange={e => setNeighborhoodSearch(e.target.value)}
                   className="flex-1 bg-transparent text-sm text-right focus:outline-none"
-                  autoFocus
                 />
               </div>
               {/* Your neighborhood */}

@@ -3,13 +3,13 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiMapPin, FiLoader, FiCheck, FiArrowRight, FiArrowLeft } from 'react-icons/fi'
+import { FiMapPin, FiLoader, FiCheck, FiArrowRight, FiArrowLeft, FiSearch } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useGPSLocation } from '@/hooks/useGPSLocation'
 
 type Step = 'name' | 'gender' | 'account_type' | 'location'
 
-type LocationStep = 'ask' | 'detecting' | 'confirm' | 'nearby' | 'denied' | 'timeout' | 'low_accuracy'
+type LocationStep = 'ask' | 'detecting' | 'confirm' | 'nearby' | 'denied' | 'timeout' | 'low_accuracy' | 'manual'
 
 interface DetectedNeighborhood {
   id: string
@@ -39,6 +39,9 @@ export default function OnboardingPage() {
   const [nearbyList, setNearbyList] = useState<{ id: string; name: string; nameEn: string; distanceKm: number; city: { name: string; nameEn: string } }[]>([])
   const [userLat, setUserLat] = useState<number | null>(null)
   const [userLng, setUserLng] = useState<number | null>(null)
+  const [manualSearch, setManualSearch] = useState('')
+  const [allNeighborhoods, setAllNeighborhoods] = useState<{ id: string; name: string; nameEn: string; city: { name: string; nameEn: string } }[]>([])
+  const [loadingNeighborhoods, setLoadingNeighborhoods] = useState(false)
 
   const gps = useGPSLocation()
 
@@ -475,8 +478,8 @@ export default function OnboardingPage() {
               </h1>
               <p className="text-gray-500 text-sm max-w-xs">
                 {lang === 'ar'
-                  ? 'فعّلها من إعدادات المتصفح أو الجهاز ثم أعد المحاولة'
-                  : 'Enable it in your browser or device settings, then try again'}
+                  ? 'يرجى تفعيل الموقع للحصول على تجربة أفضل'
+                  : 'Please enable location for a better experience'}
               </p>
               <button
                 onClick={requestLocation}
@@ -484,8 +487,14 @@ export default function OnboardingPage() {
               >
                 {lang !== 'en' ? 'أعد المحاولة' : 'Try Again'}
               </button>
-              <button onClick={() => setStep('gender')} className="text-sm text-gray-400 underline mt-2">
-                {t('common_back')}
+              <button onClick={() => {
+                setLocationStep('manual')
+                if (allNeighborhoods.length === 0 && !loadingNeighborhoods) {
+                  setLoadingNeighborhoods(true)
+                  fetch('/api/neighborhoods/all').then(r => r.json()).then(d => setAllNeighborhoods(d || [])).catch(() => {}).finally(() => setLoadingNeighborhoods(false))
+                }
+              }} className="text-sm text-primary-600 font-medium mt-2">
+                {lang !== 'en' ? 'اختر الحي يدويًا' : 'Choose neighborhood manually'}
               </button>
             </div>
           )}
@@ -510,8 +519,73 @@ export default function OnboardingPage() {
               >
                 {lang !== 'en' ? 'أعد المحاولة' : 'Try Again'}
               </button>
-              <button onClick={() => setStep('gender')} className="text-sm text-gray-400 underline mt-2">
-                {t('common_back')}
+              <button onClick={() => {
+                setLocationStep('manual')
+                if (allNeighborhoods.length === 0 && !loadingNeighborhoods) {
+                  setLoadingNeighborhoods(true)
+                  fetch('/api/neighborhoods/all').then(r => r.json()).then(d => setAllNeighborhoods(d || [])).catch(() => {}).finally(() => setLoadingNeighborhoods(false))
+                }
+              }} className="text-sm text-primary-600 font-medium mt-2">
+                {lang !== 'en' ? 'اختر الحي يدويًا' : 'Choose neighborhood manually'}
+              </button>
+            </div>
+          )}
+
+          {/* E2. Manual neighborhood selection */}
+          {locationStep === 'manual' && (
+            <div className="flex-1 flex flex-col">
+              <BackBtn onClick={() => setLocationStep('ask')} />
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                {lang !== 'en' ? 'اختر حيّك' : 'Choose your neighborhood'}
+              </h1>
+              <p className="text-gray-500 text-sm mb-4">
+                {lang !== 'en' ? 'ابحث عن حيّك وحدده' : 'Search and select your neighborhood'}
+              </p>
+              <div className="relative mb-4">
+                <FiSearch className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={manualSearch}
+                  onChange={e => setManualSearch(e.target.value)}
+                  placeholder={lang !== 'en' ? 'ابحث عن حي...' : 'Search neighborhood...'}
+                  className="input-field pr-10"
+                />
+              </div>
+              {loadingNeighborhoods ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <FiLoader className="w-6 h-6 text-primary-600 animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-2 mb-6 flex-1 overflow-y-auto">
+                  {allNeighborhoods
+                    .filter(n => !manualSearch || n.name.includes(manualSearch) || n.nameEn.toLowerCase().includes(manualSearch.toLowerCase()) || n.city.name.includes(manualSearch) || n.city.nameEn.toLowerCase().includes(manualSearch.toLowerCase()))
+                    .slice(0, 30)
+                    .map(n => (
+                      <button
+                        key={n.id}
+                        onClick={() => { setSelectedNeighborhoodId(n.id); setDetectedNeighborhood({ id: n.id, name: n.name, nameEn: n.nameEn, distanceKm: 0, confidence: 'high', city: { id: '', name: n.city.name, nameEn: n.city.nameEn } }) }}
+                        className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border-2 transition-all ${
+                          selectedNeighborhoodId === n.id
+                            ? 'border-primary-600 bg-primary-600 text-white'
+                            : 'border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white'
+                        }`}
+                      >
+                        <span className={`text-xs ${selectedNeighborhoodId === n.id ? 'opacity-70' : 'text-gray-400'}`}>
+                          {dn(n.city.name, n.city.nameEn)}
+                        </span>
+                        <span className="font-medium">{dn(n.name, n.nameEn)}</span>
+                      </button>
+                    ))}
+                </div>
+              )}
+              <button
+                onClick={handleFinish}
+                disabled={loading || !selectedNeighborhoodId}
+                className="btn-primary"
+              >
+                {loading
+                  ? (lang !== 'en' ? 'جاري الحفظ...' : 'Saving...')
+                  : (lang !== 'en' ? 'تأكيد الحي' : 'Confirm neighborhood')}
               </button>
             </div>
           )}

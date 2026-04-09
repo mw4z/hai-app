@@ -1,40 +1,57 @@
 /**
- * Haptic feedback using the Vibration API.
- * Falls back silently on unsupported devices.
+ * Haptic feedback — uses Capacitor Haptics on native iOS (Taptic Engine),
+ * falls back to Vibration API on Android/web.
  */
 
-export function hapticLight() {
-  if (typeof navigator !== 'undefined' && navigator.vibrate) {
-    navigator.vibrate(10)
+function isNative(): boolean {
+  return typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
+}
+
+async function nativeImpact(style: 'Light' | 'Medium' | 'Heavy') {
+  try {
+    const { Haptics, ImpactStyle } = await import('@capacitor/haptics')
+    await Haptics.impact({ style: ImpactStyle[style] })
+  } catch {
+    // fallback
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(style === 'Light' ? 10 : style === 'Medium' ? 25 : 50)
+    }
   }
+}
+
+async function nativeNotification(type: 'Success' | 'Warning' | 'Error') {
+  try {
+    const { Haptics, NotificationType } = await import('@capacitor/haptics')
+    await Haptics.notification({ type: NotificationType[type] })
+  } catch {}
+}
+
+export function hapticLight() {
+  if (isNative()) { nativeImpact('Light'); return }
+  if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10)
 }
 
 export function hapticMedium() {
-  if (typeof navigator !== 'undefined' && navigator.vibrate) {
-    navigator.vibrate(25)
-  }
+  if (isNative()) { nativeImpact('Medium'); return }
+  if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(25)
 }
 
 export function hapticHeavy() {
-  if (typeof navigator !== 'undefined' && navigator.vibrate) {
-    navigator.vibrate(50)
-  }
+  if (isNative()) { nativeImpact('Heavy'); return }
+  if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50)
 }
 
 export function hapticSuccess() {
-  if (typeof navigator !== 'undefined' && navigator.vibrate) {
-    navigator.vibrate([15, 50, 15])
-  }
+  if (isNative()) { nativeNotification('Success'); return }
+  if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([15, 50, 15])
 }
 
 export function hapticError() {
-  if (typeof navigator !== 'undefined' && navigator.vibrate) {
-    navigator.vibrate([30, 30, 30, 30, 30])
-  }
+  if (isNative()) { nativeNotification('Error'); return }
+  if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([30, 30, 30, 30, 30])
 }
 
 export function hapticWarning() {
-  if (typeof navigator !== 'undefined' && navigator.vibrate) {
-    navigator.vibrate([20, 40, 20])
-  }
+  if (isNative()) { nativeNotification('Warning'); return }
+  if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([20, 40, 20])
 }

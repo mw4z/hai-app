@@ -8,6 +8,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, FiTrash2, FiCheck, FiCopy, FiFlag, FiImage } from 'react-icons/fi'
 import { useContextTour } from '@/components/Tour'
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
+import { hapticLight } from '@/lib/haptic'
 
 interface Msg {
   id: string
@@ -223,6 +224,7 @@ export default function ChatClient({
   async function sendText(e: React.FormEvent) {
     e.preventDefault()
     if (!text.trim() || sending) return
+    hapticLight()
     setSending(true)
     try {
       const res = await fetch(`/api/threads/${threadId}/messages`, {
@@ -784,7 +786,7 @@ export default function ChatClient({
           </div>
         )
       ) : (
-        <div className="glass-bottom px-3 py-2.5 fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-20">
+        <div className="glass-bottom px-3 py-2.5 fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-20" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
           <div className="flex items-center gap-2">
             <input ref={imgInputRef} type="file" accept="image/*" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) sendImage(f) }} />
