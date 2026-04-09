@@ -60,19 +60,30 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
+        {/* CSS-based dark mode detection — more reliable than JS matchMedia in WKWebView */}
+        <style dangerouslySetInnerHTML={{ __html: ':root{--sys-dark:0}@media(prefers-color-scheme:dark){:root{--sys-dark:1}}' }} />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){
   try {
     var t = localStorage.getItem('hai_theme') || 'system';
     var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    // CSS-based fallback: read computed --sys-dark variable
+    function isSystemDark() {
+      var cssVal = getComputedStyle(document.documentElement).getPropertyValue('--sys-dark').trim();
+      if (cssVal === '1') return true;
+      if (cssVal === '0') return false;
+      return mq.matches;
+    }
     function applyTheme() {
       var th = localStorage.getItem('hai_theme') || 'system';
-      var isDark = th === 'dark' || (th === 'system' && mq.matches);
+      var isDark = th === 'dark' || (th === 'system' && isSystemDark());
       document.documentElement.classList.toggle('dark', isDark);
     }
     applyTheme();
     mq.addEventListener('change', applyTheme);
+    // Also poll every 2s in case matchMedia change event doesn't fire in WKWebView
+    setInterval(applyTheme, 2000);
     var l = localStorage.getItem('hai_language') || 'ar';
     document.documentElement.setAttribute('lang', l);
     document.documentElement.setAttribute('dir', l === 'en' ? 'ltr' : 'rtl');
