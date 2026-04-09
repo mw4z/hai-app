@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   server: {
     // DEV: use local network IP so phone can reach it
     // PROD: change to your deployed URL (e.g. https://hai.app)
-    url: 'https://hai-app-kappa.vercel.app',
+    url: 'https://hai-app.net',
     cleartext: true,
   },
   android: {
