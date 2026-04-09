@@ -219,13 +219,27 @@ html {
   background-color: #0f172a;
 }
 
-/* ── iOS safe area — headers extend into the status bar area ─── */
-/* Each header provides its own safe area padding + background.    */
-/* env() = 0 on web (no effect), ~47px on iOS.                    */
-/* On web: max(0, 10px) = 10px — close to original Tailwind padding */
-/* On iOS: max(47px, 10px) = 47px — full safe area coverage       */
-header {
-  padding-top: max(env(safe-area-inset-top, 0px), 0.625rem) !important;
+/* ── iOS safe area — universal approach ──────────────────────── */
+/* env() = 0 on web (no-op), ~47px on iOS native                 */
+body {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 9990;
+  pointer-events: none;
+  background: #ffffff;
+}
+html.dark body::before {
+  background: #0f172a;
+}
+.sticky.top-0 {
+  top: env(safe-area-inset-top, 0px) !important;
 }
 
 /* Pages with bottom nav need extra bottom padding for home indicator */

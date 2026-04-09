@@ -51,20 +51,20 @@ export default function AppSplash() {
     }
 
     if (isNativePlatform) {
-      // NATIVE: hide native splash instantly (0ms) — preload covers the gap.
-      // Then fade out preload after AppSplash animations have started.
-      // This prevents "plays twice" (native splash looked like a first animation).
-      import('@capacitor/splash-screen').then(({ SplashScreen }) => {
-        SplashScreen.hide({ fadeOutDuration: 0 })
-      }).catch(() => {})
-      if (preload) {
-        // Fade preload after 200ms — logo animation starts at 100ms
-        setTimeout(() => {
-          preload.style.transition = 'opacity 250ms ease-out'
-          preload.style.opacity = '0'
-          setTimeout(() => preload.remove(), 270)
-        }, 200)
-      }
+      // NATIVE: remove preload (it's behind native splash anyway).
+      // Wait 2 frames for AppSplash CSS animations to initialize,
+      // then fade native splash directly → reveals animated AppSplash.
+      // Single transition, no intermediate layers.
+      if (preload) preload.remove()
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          import('@capacitor/splash-screen').then(({ SplashScreen }) => {
+            SplashScreen.hide({ fadeOutDuration: 400 })
+          }).catch(() => {
+            // If plugin fails, preload is already gone, AppSplash is visible
+          })
+        })
+      })
     } else {
       // WEB: fade preload after AppSplash animations begin
       if (preload) {
