@@ -48,8 +48,10 @@ export default function AppSplash() {
     if (phase === 'gone') {
       if (preload) preload.remove()
       if (isNativePlatform) {
+        // Returning session — native launch screen may still be visible.
+        // Use a short fade so it doesn't cut abruptly.
         import('@capacitor/splash-screen').then(({ SplashScreen }) => {
-          SplashScreen.hide({ fadeOutDuration: 0 })
+          SplashScreen.hide({ fadeOutDuration: 300 })
         }).catch(() => {})
       }
       return
