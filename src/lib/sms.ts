@@ -29,8 +29,8 @@ export async function sendOTP(phone: string): Promise<boolean> {
   try {
     const verification = await client.verify.v2
       .services(VERIFY_SID)
-      .verifications.create({ to: phone, channel: 'call' })
-    console.log(`[OTP] Verify call to ${phone}, status: ${verification.status}`)
+      .verifications.create({ to: phone, channel: 'sms' })
+    console.log(`[OTP] Verify SMS sent to ${phone}, status: ${verification.status}`)
     return verification.status === 'pending'
   } catch (error) {
     console.error('[OTP] Verify call error:', error)
