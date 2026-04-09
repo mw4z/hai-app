@@ -30,7 +30,7 @@ export async function sendOTP(phone: string, code: string): Promise<boolean> {
   if (process.env.TWILIO_PHONE_NUMBER) {
     try {
       const msg = await client.messages.create({
-        body: `رمز التحقق لحي: ${code}\n\n@${APP_DOMAIN} #${code}`,
+        body: `رمز التحقق لتطبيق حي: ${code}`,
         from: process.env.TWILIO_PHONE_NUMBER,
         to: phone,
       })
