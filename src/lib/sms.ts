@@ -26,8 +26,23 @@ export async function sendOTP(phone: string, code: string): Promise<boolean> {
     return true
   }
 
-  // Use Twilio Verify — reliable for international SMS (Saudi Arabia)
-  // Custom SMS with iOS autofill requires a toll-free number (not local US)
+  // Send custom SMS with iOS autofill domain hint (toll-free number)
+  if (process.env.TWILIO_PHONE_NUMBER) {
+    try {
+      const msg = await client.messages.create({
+        body: `رمز التحقق لحي: ${code}\n\n@${APP_DOMAIN} #${code}`,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: phone,
+      })
+      console.log(`[OTP] Custom SMS sent to ${phone}, sid: ${msg.sid}`)
+      return msg.status !== 'failed'
+    } catch (error: any) {
+      console.error('[OTP] Custom SMS failed:', error?.message || error)
+      // Fallback to Twilio Verify
+    }
+  }
+
+  // Fallback: Twilio Verify
   try {
     const verification = await client.verify.v2
       .services(VERIFY_SID)
