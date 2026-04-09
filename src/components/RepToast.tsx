@@ -34,8 +34,8 @@ export default function RepToast() {
       return stored ? parseInt(stored, 10) : null
     } catch { return null }
   })())
-  // Skip the very first check after mount (login/page load)
-  const isFirstCheck = useRef(true)
+  // Skip the first two checks after mount (login/page load)
+  const skipCount = useRef(2)
 
   const check = useCallback(async () => {
     try {
@@ -50,9 +50,9 @@ export default function RepToast() {
       lastRepRef.current = currentRep
       try { localStorage.setItem(STORAGE_KEY, String(currentRep)) } catch {}
 
-      // Skip first check (login) — only show for real-time gains during the session
-      if (isFirstCheck.current) {
-        isFirstCheck.current = false
+      // Skip first checks after login — only show for real-time gains during the session
+      if (skipCount.current > 0) {
+        skipCount.current--
         return
       }
 
