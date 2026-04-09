@@ -44,19 +44,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Verify OTP against DB
-    const latestOtp = await db.otpCode.findFirst({
-      where: {
-        phone: formattedPhone,
-        verified: false,
-        expiresAt: { gte: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+    // Verify via Twilio Verify API (test phones check hardcoded code)
+    const isValid = await verifyOTP(formattedPhone, code)
 
-    const isValid = latestOtp && latestOtp.code === code
     if (isValid) {
-      await db.otpCode.update({ where: { id: latestOtp.id }, data: { verified: true } })
+      const latestOtp = await db.otpCode.findFirst({
+        where: { phone: formattedPhone, verified: false },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (latestOtp) {
+        await db.otpCode.update({ where: { id: latestOtp.id }, data: { verified: true } })
+      }
     }
 
     if (!isValid) {
