@@ -157,7 +157,7 @@ function VerifyForm() {
               ref={(el) => { inputRefs.current[index] = el }}
               type="tel"
               inputMode="numeric"
-              autoComplete="one-time-code"
+              {...(index === 0 ? { autoComplete: 'one-time-code' } : {})}
               maxLength={6}
               value={digit}
               onChange={(e) => handleOtpChange(index, e.target.value)}
