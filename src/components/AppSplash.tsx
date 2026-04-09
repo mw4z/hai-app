@@ -38,11 +38,11 @@ export default function AppSplash() {
 
   useEffect(() => {
     const preload = document.getElementById('__hai_preload')
+    const isNativePlatform = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform()
 
     if (phase === 'gone') {
-      // Splash already shown this session — just clean up immediately
       if (preload) preload.remove()
-      if (window.Capacitor?.isNativePlatform()) {
+      if (isNativePlatform) {
         import('@capacitor/splash-screen').then(({ SplashScreen }) => {
           SplashScreen.hide({ fadeOutDuration: 0 })
         }).catch(() => {})
@@ -50,25 +50,25 @@ export default function AppSplash() {
       return
     }
 
-    // Fade out preload AFTER a delay so AppSplash animations have visually started
-    // (logo animates at 0.1s, rings at 0.4s — 200ms delay is enough for logo)
-    function removePreload() {
-      if (!preload) return
-      preload.style.transition = 'opacity 200ms ease-out'
-      preload.style.opacity = '0'
-      setTimeout(() => preload.remove(), 220)
-    }
-
-    if (window.Capacitor?.isNativePlatform()) {
-      // On native: hide native splash, then fade out preload
-      import('@capacitor/splash-screen').then(({ SplashScreen }) => {
-        SplashScreen.hide({ fadeOutDuration: 200 }).then(() => {
-          setTimeout(removePreload, 100)
-        })
-      }).catch(() => setTimeout(removePreload, 200))
+    if (isNativePlatform) {
+      // NATIVE: preload is invisible (behind native splash) — remove it now.
+      // Wait 150ms for CSS animations to start, then fade out native splash
+      // directly to reveal the animated AppSplash. No intermediate frozen frame.
+      if (preload) preload.remove()
+      setTimeout(() => {
+        import('@capacitor/splash-screen').then(({ SplashScreen }) => {
+          SplashScreen.hide({ fadeOutDuration: 300 })
+        }).catch(() => {})
+      }, 150)
     } else {
-      // On web: small delay so CSS animations begin before preload disappears
-      setTimeout(removePreload, 200)
+      // WEB: fade preload after AppSplash animations begin
+      if (preload) {
+        setTimeout(() => {
+          preload.style.transition = 'opacity 200ms ease-out'
+          preload.style.opacity = '0'
+          setTimeout(() => preload.remove(), 220)
+        }, 200)
+      }
     }
 
     let maxTimer: ReturnType<typeof setTimeout>

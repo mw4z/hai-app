@@ -219,30 +219,30 @@ html {
   background-color: #000000;
 }
 
-/* ── iOS native safe area (only on Capacitor with overlaysWebView: true) ── */
-/* Push body content below status bar */
-html.capacitor-ios body {
-  padding-top: env(safe-area-inset-top);
+/* ── iOS safe area (env() = 0 on web, correct value on native iOS) ─── */
+/* Push body content below status bar — no-op on web */
+body {
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
-/* Fixed backdrop behind status bar — matches glass header exactly */
-html.capacitor-ios body::before {
+/* Fixed backdrop behind status bar — matches .glass exactly */
+body::before {
   content: '';
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: env(safe-area-inset-top);
+  height: env(safe-area-inset-top, 0px);
   z-index: 9990;
   pointer-events: none;
   background: #ffffff;
 }
-html.capacitor-ios.dark body::before {
+html.dark body::before {
   background: #0f172a;
 }
 
 /* Sticky headers stick below the status bar */
-html.capacitor-ios .sticky.top-0 {
+.sticky.top-0 {
   top: env(safe-area-inset-top, 0px) !important;
 }
 

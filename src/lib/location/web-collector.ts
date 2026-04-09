@@ -56,9 +56,9 @@ async function requestNativePermissions(): Promise<boolean> {
   try {
     const { Geolocation } = await import('@capacitor/geolocation')
     console.log(LOG, 'Requesting native permissions...')
-    const result = await Geolocation.requestPermissions({ permissions: ['location'] })
+    const result = await Geolocation.requestPermissions()
     console.log(LOG, 'Permission request result:', result.location, result.coarseLocation)
-    return result.location === 'granted'
+    return result.location === 'granted' || result.coarseLocation === 'granted'
   } catch (e) {
     console.warn(LOG, 'Permission request failed:', e)
     return false

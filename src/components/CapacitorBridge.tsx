@@ -16,12 +16,9 @@ export default function CapacitorBridge() {
       try {
         const { StatusBar, Style } = await import('@capacitor/status-bar')
         const isDark = document.documentElement.classList.contains('dark')
-        // Overlay: true = content goes behind status bar, we handle safe area in CSS
         await StatusBar.setOverlaysWebView({ overlay: true })
         await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light })
-        await StatusBar.setBackgroundColor({ color: '#00000000' }) // transparent
-        // Signal to CSS that safe area is needed
-        document.documentElement.classList.add('capacitor-ios')
+        await StatusBar.setBackgroundColor({ color: '#00000000' })
       } catch {}
     }
 
