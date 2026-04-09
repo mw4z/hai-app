@@ -26,7 +26,7 @@ export async function sendOTP(phone: string, code: string): Promise<boolean> {
     return true
   }
 
-  // Try custom SMS first (enables iOS autofill with domain hint)
+  // Send custom SMS with iOS autofill domain hint
   if (process.env.TWILIO_PHONE_NUMBER) {
     try {
       const msg = await client.messages.create({
@@ -34,14 +34,16 @@ export async function sendOTP(phone: string, code: string): Promise<boolean> {
         from: process.env.TWILIO_PHONE_NUMBER,
         to: phone,
       })
-      console.log(`[OTP] Custom SMS sent to ${phone}, sid: ${msg.sid}`)
+      console.log(`[OTP] Custom SMS sent to ${phone}, sid: ${msg.sid}, status: ${msg.status}`)
       return msg.status !== 'failed'
-    } catch (error) {
-      console.warn('[OTP] Custom SMS failed, falling back to Twilio Verify:', error)
+    } catch (error: any) {
+      console.error('[OTP] Custom SMS FAILED:', error?.message || error)
+      // Don't silently fallback — return false so we know it failed
+      return false
     }
   }
 
-  // Fallback: Twilio Verify (always works, no phone number needed)
+  // No phone number configured — use Twilio Verify
   try {
     const verification = await client.verify.v2
       .services(VERIFY_SID)
