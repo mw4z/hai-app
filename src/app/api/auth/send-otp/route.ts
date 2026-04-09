@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    if (recentOtps >= 3) {
+    if (recentOtps >= 10) {
       console.log(`[RATE_LIMIT] OTP 10min: phone=${formattedPhone}, count=${recentOtps}`)
       return NextResponse.json(
         { error: 'طلبات كثيرة، انتظر 10 دقائق' },
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const hourlyOtps = await db.otpCode.count({
       where: { phone: formattedPhone, createdAt: { gte: new Date(Date.now() - 3600_000) } },
     })
-    if (hourlyOtps >= 5) {
+    if (hourlyOtps >= 20) {
       console.log(`[RATE_LIMIT] OTP hourly: phone=${formattedPhone}, count=${hourlyOtps}`)
       return NextResponse.json(
         { error: 'حاول لاحقاً' },
