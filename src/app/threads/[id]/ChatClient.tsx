@@ -319,7 +319,7 @@ export default function ChatClient({
   const [showMoreEmojis, setShowMoreEmojis] = useState(false)
   const [otherOnline, setOtherOnline] = useState(false)
   const [otherLastSeen, setOtherLastSeen] = useState<string | null>(null)
-  const [statusHidden, setStatusHidden] = useState(false)
+  const [statusHidden, setStatusHidden] = useState(true)
 
   async function reactToMessage(msgId: string, emoji: string) {
     try {
