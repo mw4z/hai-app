@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    if (recentOtps >= 10) {
+    if (recentOtps >= 3) {
       return NextResponse.json(
         { error: 'طلبات كثيرة، انتظر 10 دقائق' },
         { status: 429 }
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const hourlyOtps = await db.otpCode.count({
       where: { phone: formattedPhone, createdAt: { gte: new Date(Date.now() - 3600_000) } },
     })
-    if (hourlyOtps >= 20) {
+    if (hourlyOtps >= 5) {
       return NextResponse.json({ error: 'حاول لاحقاً' }, { status: 429 })
     }
 
