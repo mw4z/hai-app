@@ -160,6 +160,7 @@ export default function ChatClient({
           setStatusHidden(!!data.hidden)
           setOtherOnline(data.online)
           setOtherLastSeen(data.lastSeenAt)
+          setStatusLoaded(true)
         }
       } catch { /* ignore */ }
     }
@@ -320,6 +321,7 @@ export default function ChatClient({
   const [otherOnline, setOtherOnline] = useState(false)
   const [otherLastSeen, setOtherLastSeen] = useState<string | null>(null)
   const [statusHidden, setStatusHidden] = useState(true)
+  const [statusLoaded, setStatusLoaded] = useState(false)
 
   async function reactToMessage(msgId: string, emoji: string) {
     try {
@@ -419,7 +421,7 @@ export default function ChatClient({
             <h1 className="text-[15px] font-semibold text-gray-900 dark:text-white truncate">
               {other.name || (lang === 'en' ? 'Neighbor' : 'جار')}
             </h1>
-            {!closed && !statusHidden && (
+            {!closed && statusLoaded && !statusHidden && (
               <p className={`text-[11px] font-medium ${otherOnline ? 'text-green-500' : 'text-gray-400'}`}>
                 {otherOnline
                   ? (lang === 'en' ? 'Online' : 'متصل')
