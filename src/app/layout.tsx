@@ -7,7 +7,6 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 import AppSplash from '@/components/AppSplash'
 import RouteTransition from '@/components/RouteTransition'
 import ArrivalAlert from '@/components/ArrivalAlert'
-import { TourProvider } from '@/components/Tour'
 import CapacitorBridge from '@/components/CapacitorBridge'
 import ScrollReset from '@/components/ScrollReset'
 import { LangProvider } from '@/hooks/useLanguage'
@@ -114,9 +113,7 @@ export default function RootLayout({
           <PullToRefresh />
           <RepToast />
           <ErrorBoundary>
-            <TourProvider>
               {children}
-            </TourProvider>
           </ErrorBoundary>
           <ScrollReset />
           <ArrivalAlert />

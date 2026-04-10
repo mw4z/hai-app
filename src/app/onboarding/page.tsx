@@ -189,7 +189,7 @@ export default function OnboardingPage() {
         localStorage.removeItem('hai_tour_chat')
         localStorage.removeItem('hai_splash')
       } catch {}
-      router.push('/feed')
+      router.push('/tutorial')
     } catch {
       toast.error(t('auth_connection_err'))
     } finally {
