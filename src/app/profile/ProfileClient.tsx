@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -13,6 +13,7 @@ import {
   FiMonitor, FiCheck, FiChevronLeft, FiChevronDown, FiEdit2, FiBell,
   FiSettings, FiHelpCircle, FiAward, FiShield, FiBookmark, FiX, FiShare2, FiUpload
 } from 'react-icons/fi'
+const ImageCropper = lazy(() => import('@/components/ImageCropper'))
 import { DEFAULT_AVATARS, AVATAR_CATEGORIES } from '@/lib/defaultAvatars'
 import { DEFAULT_COVERS } from '@/lib/defaultCovers'
 
@@ -149,6 +150,10 @@ export default function ProfileClient({ user, postCount }: Props) {
     window.location.href = '/'
   }
 
+  // Image cropper state
+  const [cropImage, setCropImage] = useState<string | null>(null)
+  const [cropType, setCropType] = useState<'avatar' | 'cover'>('avatar')
+
   // Avatar upload / picker
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
 
@@ -175,37 +180,26 @@ export default function ProfileClient({ user, postCount }: Props) {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 5 * 1024 * 1024) { toast.error('الصورة أكبر من 5MB'); return }
-
     const reader = new FileReader()
     reader.onload = (ev) => {
-      const img = new Image()
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        const size = 256
-        canvas.width = size
-        canvas.height = size
-        const ctx = canvas.getContext('2d')!
-        // Center-crop
-        const s = Math.min(img.width, img.height)
-        const sx = (img.width - s) / 2
-        const sy = (img.height - s) / 2
-        ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size)
-        const base64 = canvas.toDataURL('image/jpeg', 0.8)
-        setAvatar(base64)
-        // Save to server
-        fetch('/api/profile', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ avatar: base64 }),
-        }).then(r => {
-          if (r.ok) toast.success('تم تحديث الصورة')
-          else toast.error('فشل رفع الصورة')
-        })
-      }
-      img.src = ev.target?.result as string
+      setCropType('avatar')
+      setCropImage(ev.target?.result as string)
     }
     reader.readAsDataURL(file)
     e.target.value = ''
+  }
+
+  function handleCroppedAvatar(base64: string) {
+    setCropImage(null)
+    setAvatar(base64)
+    fetch('/api/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ avatar: base64 }),
+    }).then(r => {
+      if (r.ok) toast.success('تم تحديث الصورة')
+      else toast.error('فشل رفع الصورة')
+    })
   }
 
   const [showCoverPicker, setShowCoverPicker] = useState(false)
@@ -233,44 +227,26 @@ export default function ProfileClient({ user, postCount }: Props) {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 5 * 1024 * 1024) { toast.error('الصورة أكبر من 5MB'); return }
-
     const reader = new FileReader()
     reader.onload = (ev) => {
-      const img = new Image()
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        const w = 800
-        const h = 300
-        canvas.width = w
-        canvas.height = h
-        const ctx = canvas.getContext('2d')!
-        // Center-crop to banner ratio
-        const srcRatio = img.width / img.height
-        const dstRatio = w / h
-        let sx = 0, sy = 0, sw = img.width, sh = img.height
-        if (srcRatio > dstRatio) {
-          sw = img.height * dstRatio
-          sx = (img.width - sw) / 2
-        } else {
-          sh = img.width / dstRatio
-          sy = (img.height - sh) / 2
-        }
-        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h)
-        const base64 = canvas.toDataURL('image/jpeg', 0.8)
-        setCover(base64)
-        fetch('/api/profile', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cover: base64 }),
-        }).then(r => {
-          if (r.ok) toast.success(lang === 'en' ? 'Cover updated' : lang === 'ur' ? 'کور اپ ڈیٹ ہو گیا' : 'تم تحديث الغلاف')
-          else toast.error(lang === 'en' ? 'Upload failed' : lang === 'ur' ? 'تصویر اپ لوڈ ناکام' : 'فشل رفع الصورة')
-        })
-      }
-      img.src = ev.target?.result as string
+      setCropType('cover')
+      setCropImage(ev.target?.result as string)
     }
     reader.readAsDataURL(file)
     e.target.value = ''
+  }
+
+  function handleCroppedCover(base64: string) {
+    setCropImage(null)
+    setCover(base64)
+    fetch('/api/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cover: base64 }),
+    }).then(r => {
+      if (r.ok) toast.success(lang === 'en' ? 'Cover updated' : 'تم تحديث الغلاف')
+      else toast.error(lang === 'en' ? 'Upload failed' : 'فشل رفع الصورة')
+    })
   }
 
   // Save name
@@ -339,6 +315,19 @@ export default function ProfileClient({ user, postCount }: Props) {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-28">
+      {/* Image cropper modal */}
+      {cropImage && (
+        <Suspense fallback={null}>
+          <ImageCropper
+            image={cropImage}
+            aspect={cropType === 'avatar' ? 1 : 800 / 300}
+            outputWidth={cropType === 'avatar' ? 256 : 800}
+            outputHeight={cropType === 'avatar' ? 256 : 300}
+            onDone={cropType === 'avatar' ? handleCroppedAvatar : handleCroppedCover}
+            onCancel={() => setCropImage(null)}
+          />
+        </Suspense>
+      )}
       {/* Header with cover photo */}
       <div className="relative bg-primary-600 pt-10 pb-6 px-4 text-white text-center overflow-hidden">
         {/* Cover image */}
