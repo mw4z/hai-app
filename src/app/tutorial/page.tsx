@@ -9,65 +9,32 @@ const slides = [
     image: '/screenshot-1-feed.png',
     titleAr: 'تنبيهات الحي',
     titleEn: 'Neighborhood Feed',
-    tipsAr: [
-      'تابع آخر أخبار وتنبيهات حيّك',
-      'اضغط + لإضافة منشور أو تنبيه جديد',
-      'اسحب لأسفل لتحديث المنشورات',
-    ],
-    tipsEn: [
-      'Follow the latest news & alerts in your area',
-      'Tap + to add a new post or alert',
-      'Pull down to refresh the feed',
-    ],
+    descAr: 'تابع آخر الأخبار والتنبيهات • اضغط + للنشر • اسحب لأسفل للتحديث',
+    descEn: 'Follow latest news & alerts • Tap + to post • Pull down to refresh',
   },
   {
     image: '/screenshot-2-market.png',
     titleAr: 'سوق الحي',
     titleEn: 'Local Market',
-    tipsAr: [
-      'تصفح المنتجات والخدمات القريبة منك',
-      'اضغط على أي منتج لعرض التفاصيل والتواصل',
-      'أضف منتجك للبيع بضغطة واحدة',
-    ],
-    tipsEn: [
-      'Browse products & services near you',
-      'Tap any item to view details & chat',
-      'List your own items with one tap',
-    ],
+    descAr: 'تصفح المنتجات القريبة • اضغط للتفاصيل والتواصل • أضف منتجك للبيع',
+    descEn: 'Browse nearby products • Tap for details & chat • List your items to sell',
   },
   {
     image: '/screenshot-3-chat.png',
     titleAr: 'المحادثات',
     titleEn: 'Chat',
-    tipsAr: [
-      'تواصل مع جيرانك بشكل مباشر وآمن',
-      'أرسل صور ورسائل نصية',
-      'المحادثات خاصة بينك وبين الطرف الآخر',
-    ],
-    tipsEn: [
-      'Chat directly & safely with neighbors',
-      'Send photos and text messages',
-      'Conversations are private between you two',
-    ],
+    descAr: 'تواصل مع جيرانك مباشرة • أرسل صور ورسائل • محادثات خاصة وآمنة',
+    descEn: 'Chat directly with neighbors • Send photos & text • Private & secure',
   },
   {
     image: '/screenshot-4-profile.png',
     titleAr: 'ملفك الشخصي',
     titleEn: 'Your Profile',
-    tipsAr: [
-      'عدّل صورتك واسمك وإعدادات حسابك',
-      'تابع نقاط سمعتك ومستواك',
-      'غيّر اللغة والوضع (ليلي/نهاري)',
-    ],
-    tipsEn: [
-      'Edit your photo, name & account settings',
-      'Track your reputation points & level',
-      'Switch language and dark/light mode',
-    ],
+    descAr: 'عدّل صورتك وإعداداتك • تابع نقاط سمعتك • غيّر اللغة والوضع الليلي',
+    descEn: 'Edit your photo & settings • Track reputation • Switch language & theme',
   },
 ]
 
-// Preload all images
 function usePreloadImages() {
   useEffect(() => {
     slides.forEach(s => {
@@ -106,8 +73,7 @@ export default function TutorialPage() {
   }
 
   function handleTouchMove(e: React.TouchEvent) {
-    const diff = Math.abs(e.touches[0].clientX - touchStartX.current)
-    if (diff > 10) isDragging.current = true
+    if (Math.abs(e.touches[0].clientX - touchStartX.current) > 10) isDragging.current = true
   }
 
   function handleTouchEnd(e: React.TouchEvent) {
@@ -125,23 +91,24 @@ export default function TutorialPage() {
 
   return (
     <div
-      className="fixed inset-0 bg-white flex flex-col z-[9999]"
+      className="fixed inset-0 bg-gray-50 flex flex-col z-[9999]"
       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
       {/* Skip */}
-      <div className="flex justify-end px-6 pt-3">
-        <button onClick={finish} className="text-gray-400 text-sm font-medium py-2 px-3">
+      <div className="flex justify-end px-4 pt-2">
+        <button onClick={finish} className="text-gray-400 text-xs font-medium py-2 px-3">
           {isAr ? 'تخطي' : 'Skip'}
         </button>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 flex flex-col items-center px-6 overflow-hidden">
-        {/* Screenshot */}
-        <div className="relative w-48 h-[38vh] rounded-2xl overflow-hidden shadow-xl border border-gray-100 mb-5 bg-gray-100">
+      {/* Screenshot — takes most of the screen */}
+      <div className="flex-1 flex items-center justify-center px-8 pb-2">
+        <div className="relative w-full max-w-[240px] h-full max-h-[55vh] rounded-[2rem] overflow-hidden shadow-2xl shadow-black/20 border-[3px] border-gray-800 bg-gray-800">
+          {/* Phone notch */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-gray-800 rounded-b-2xl z-10" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={slide.image}
@@ -149,29 +116,22 @@ export default function TutorialPage() {
             className="w-full h-full object-cover object-top"
           />
         </div>
+      </div>
 
+      {/* Text + controls — compact at bottom */}
+      <div className="bg-white rounded-t-3xl px-6 pt-5 pb-8 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
         {/* Title */}
-        <h1 className="text-2xl font-bold text-gray-900 mb-4 text-center">
+        <h1 className="text-xl font-bold text-gray-900 mb-2 text-center">
           {isAr ? slide.titleAr : slide.titleEn}
         </h1>
 
-        {/* Tips */}
-        <div className="w-full max-w-xs space-y-3">
-          {(isAr ? slide.tipsAr : slide.tipsEn).map((tip, i) => (
-            <div key={i} className="flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5">
-                {i + 1}
-              </div>
-              <p className="text-gray-600 text-sm leading-relaxed">{tip}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+        {/* Description */}
+        <p className="text-gray-500 text-center text-sm leading-relaxed mb-5">
+          {isAr ? slide.descAr : slide.descEn}
+        </p>
 
-      {/* Bottom */}
-      <div className="px-8 pb-10">
         {/* Dots */}
-        <div className="flex justify-center gap-2 mb-6">
+        <div className="flex justify-center gap-2 mb-5">
           {slides.map((_, i) => (
             <button
               key={i}
@@ -183,10 +143,10 @@ export default function TutorialPage() {
           ))}
         </div>
 
-        {/* Next / Start */}
+        {/* Button */}
         <button
           onClick={next}
-          className="w-full py-4 rounded-2xl bg-primary-500 text-white font-bold text-lg shadow-lg shadow-primary-500/30 active:scale-[0.98] transition-transform"
+          className="w-full py-3.5 rounded-2xl bg-primary-500 text-white font-bold text-base shadow-lg shadow-primary-500/30 active:scale-[0.98] transition-transform"
         >
           {current === slides.length - 1
             ? (isAr ? 'يلا نبدأ!' : "Let's go!")
