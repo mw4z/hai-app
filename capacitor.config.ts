@@ -5,11 +5,10 @@ const config: CapacitorConfig = {
   appName: 'حي',
   webDir: 'out',
   server: {
-    // DEV: use local network IP so phone can reach it
-    // PROD: change to your deployed URL (e.g. https://hai.app)
     url: 'https://app.hai-app.net',
     cleartext: true,
   },
+  appendUserAgent: 'HaiNativeApp',
   android: {
     allowMixedContent: true,
     backgroundColor: '#0f172a',
