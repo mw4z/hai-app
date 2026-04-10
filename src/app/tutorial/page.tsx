@@ -106,9 +106,7 @@ export default function TutorialPage() {
 
       {/* Screenshot — takes most of the screen */}
       <div className="flex-1 flex items-center justify-center px-8 pb-2">
-        <div className="relative w-full max-w-[240px] h-full max-h-[55vh] rounded-[2rem] overflow-hidden shadow-2xl shadow-black/20 border-[3px] border-gray-800 bg-gray-800">
-          {/* Phone notch */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-gray-800 rounded-b-2xl z-10" />
+        <div className="relative w-full max-w-[260px] h-full max-h-[55vh] rounded-3xl overflow-hidden shadow-2xl shadow-black/15">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={slide.image}
