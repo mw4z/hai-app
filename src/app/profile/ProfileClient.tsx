@@ -356,7 +356,7 @@ export default function ProfileClient({ user, postCount }: Props) {
         <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverChange} />
         <div className="relative z-10 w-24 h-24 mx-auto mb-3">
           <div
-            onClick={handleAvatarClick}
+            onClick={() => fileInputRef.current?.click()}
             className="w-24 h-24 bg-white rounded-full overflow-hidden cursor-pointer shadow-lg border-2 border-white flex items-center justify-center"
           >
             {avatar
@@ -365,7 +365,7 @@ export default function ProfileClient({ user, postCount }: Props) {
             }
           </div>
           <div
-            onClick={handleAvatarClick}
+            onClick={() => fileInputRef.current?.click()}
             className="absolute bottom-0 left-0 bg-primary-700 rounded-full p-1.5 cursor-pointer border-2 border-white"
           >
             <FiCamera className="w-3.5 h-3.5 text-white" />
