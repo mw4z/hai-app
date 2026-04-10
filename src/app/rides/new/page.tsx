@@ -8,7 +8,6 @@ import BackButton from '@/components/BackButton'
 import LocationPicker from '@/components/rides/LocationPicker'
 import RiyalIcon from '@/components/RiyalIcon'
 import { FiNavigation, FiClock, FiFileText } from 'react-icons/fi'
-import { useContextTour } from '@/components/Tour'
 
 interface Location {
   lat: number
@@ -84,8 +83,6 @@ export default function NewRidePage() {
       setLoading(false)
     }
   }
-
-  useContextTour('ride_create')
 
   const canSubmit = !!pickup && !!dropoff && (isImmediate || !!scheduledAt)
 

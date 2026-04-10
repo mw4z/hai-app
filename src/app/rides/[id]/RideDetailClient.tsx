@@ -8,7 +8,6 @@ import { useLanguage } from '@/hooks/useLanguage'
 import { useRidePoll } from '@/hooks/useRidePoll'
 import { hapticSuccess, hapticMedium, hapticError, hapticWarning } from '@/lib/haptic'
 import StatusBadge from '@/components/rides/StatusBadge'
-import { useTour } from '@/components/Tour'
 import RiyalIcon from '@/components/RiyalIcon'
 import UserBadgeDisplay from '@/components/UserBadge'
 import {
@@ -122,16 +121,6 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
   }, [chatAllowed])
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages.length])
-
-  // Contextual tour for ride detail (triggers once when ride loads)
-  const { startContextTour } = useTour()
-  const tourTriggered = useRef(false)
-  useEffect(() => {
-    if (ride && !tourTriggered.current) {
-      tourTriggered.current = true
-      startContextTour('ride_detail')
-    }
-  }, [ride])
 
   // Auto-refetch ride data (offers, status changes) every 5 seconds
   // Stops polling on terminal states (completed, cancelled, expired)

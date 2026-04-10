@@ -7,7 +7,6 @@ import toast from 'react-hot-toast'
 import { FiArrowRight, FiArrowLeft } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import BackButton from '@/components/BackButton'
-import { useContextTour } from '@/components/Tour'
 import RiyalIcon from '@/components/RiyalIcon'
 
 const CATEGORIES = [
@@ -60,8 +59,6 @@ export default function NewPostPage() {
   const [loading, setLoading] = useState(false)
   const [location, setLocation] = useState<{ lat: number; lng: number; name: string } | null>(null)
   const [detectingLocation, setDetectingLocation] = useState(false)
-
-  useContextTour('post_create')
 
   const selected = ALL_ITEMS.find(i => i.key === category)
   const isLookingFor = category === 'LOOKING_FOR'

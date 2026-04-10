@@ -53,16 +53,6 @@ export default function TutorialPage() {
   const touchEnd = useRef(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Redirect if not a new user
-  useEffect(() => {
-    try {
-      if (!sessionStorage.getItem('hai_show_tour')) {
-        router.replace('/feed')
-      }
-    } catch {
-      router.replace('/feed')
-    }
-  }, [router])
 
   function next() {
     if (current < slides.length - 1) {

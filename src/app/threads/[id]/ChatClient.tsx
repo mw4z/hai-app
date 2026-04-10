@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, FiTrash2, FiCheck, FiCopy, FiFlag, FiImage } from 'react-icons/fi'
-import { useContextTour } from '@/components/Tour'
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
 
@@ -168,8 +167,6 @@ export default function ChatClient({
     const interval = setInterval(checkStatus, 15000)
     return () => clearInterval(interval)
   }, [other.id])
-
-  useContextTour('chat')
 
   useEffect(() => {
     // Scroll to unread divider if exists, otherwise to bottom

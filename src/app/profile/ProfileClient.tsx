@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useContextTour } from '@/components/Tour'
 import toast from 'react-hot-toast'
 import BottomNav from '@/components/BottomNav'
 import UserBadgeDisplay from '@/components/UserBadge'
@@ -88,7 +87,6 @@ export default function ProfileClient({ user, postCount }: Props) {
   const [verifyingEmail, setVerifyingEmail] = useState(false)
   const [verifyCode, setVerifyCode] = useState('')
   const [openSection, setOpenSection] = useState<string | null>(null)
-  useContextTour('profile')
   const [modRequestStatus, setModRequestStatus] = useState<string | null>(null)
   const [modRequestLoading, setModRequestLoading] = useState(false)
   const [showModForm, setShowModForm] = useState(false)
@@ -1101,25 +1099,15 @@ export default function ProfileClient({ user, postCount }: Props) {
         </button>
       </div>
 
-      {/* Restart tour */}
+      {/* How to use */}
       <div>
         <button
-          onClick={() => {
-            localStorage.removeItem('hai_tour_seen')
-            localStorage.removeItem('hai_tour_ride_create')
-            localStorage.removeItem('hai_tour_ride_detail')
-            localStorage.removeItem('hai_tour_post_create')
-            localStorage.removeItem('hai_tour_chat')
-            localStorage.removeItem('hai_tour_profile')
-            localStorage.removeItem('hai_splash')
-            toast.success(lang === 'en' ? 'All tours reset — redirecting...' : lang === 'ur' ? 'تمام ٹور ری سیٹ — ری ڈائریکٹ' : 'تم إعادة الجولات — جاري التحويل...')
-            setTimeout(() => window.location.href = '/feed', 500)
-          }}
+          onClick={() => window.location.href = '/tutorial'}
           className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl py-3 px-4 flex items-center gap-2 active:bg-gray-100 dark:active:bg-gray-700 transition-colors"
         >
-          <span className="text-lg">🎓</span>
+          <span className="text-lg">📖</span>
           <span className="text-sm text-gray-600 dark:text-gray-300 font-medium flex-1 text-start">
-            {lang === 'en' ? 'Restart App Tour' : lang === 'ur' ? 'ایپ ٹور دوبارہ شروع کریں' : 'إعادة جولة التطبيق'}
+            {lang === 'en' ? 'How to use the app' : lang === 'ur' ? 'ایپ کیسے استعمال کریں' : 'كيف تستخدم التطبيق'}
           </span>
         </button>
       </div>
