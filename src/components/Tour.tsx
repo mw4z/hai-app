@@ -584,11 +584,12 @@ function TourOverlay({ step, stepIndex, totalSteps }: { step: TourStep; stepInde
     height: targetRect.height + padding * 2,
   }
 
+  const safeTop = parseInt(getComputedStyle(document.documentElement).getPropertyValue('env(safe-area-inset-top)') || '0', 10) || 47
   const tooltipWidth = Math.min(300, window.innerWidth - 32)
   const tooltipHeight = 180
 
   let finalPos = tooltipPos
-  if (finalPos === 'top' && targetRect.top - padding - 12 - tooltipHeight < 10) {
+  if (finalPos === 'top' && targetRect.top - padding - 12 - tooltipHeight < safeTop + 10) {
     finalPos = 'bottom'
   }
   if (finalPos === 'bottom' && targetRect.bottom + padding + 12 + tooltipHeight > window.innerHeight - 10) {
@@ -605,7 +606,7 @@ function TourOverlay({ step, stepIndex, totalSteps }: { step: TourStep; stepInde
   if (finalPos === 'bottom') {
     tooltipStyle.top = Math.min(targetRect.bottom + padding + 12, window.innerHeight - tooltipHeight - 16)
   } else {
-    tooltipStyle.top = Math.max(16, targetRect.top - padding - 12 - tooltipHeight)
+    tooltipStyle.top = Math.max(safeTop + 10, targetRect.top - padding - 12 - tooltipHeight)
   }
 
   const isLast = stepIndex === totalSteps - 1
