@@ -104,14 +104,14 @@ export default function TutorialPage() {
         </button>
       </div>
 
-      {/* Screenshot — takes most of the screen */}
-      <div className="flex-1 flex items-center justify-center px-8 pb-2">
-        <div className="relative w-full max-w-[260px] h-full max-h-[55vh] rounded-3xl overflow-hidden shadow-2xl shadow-black/15">
+      {/* Screenshot */}
+      <div className="flex-1 flex items-center justify-center px-10 py-2">
+        <div className="relative rounded-2xl overflow-hidden shadow-xl shadow-black/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={slide.image}
             alt=""
-            className="w-full h-full object-cover object-top"
+            className="w-full h-auto max-h-[52vh] object-contain"
           />
         </div>
       </div>
