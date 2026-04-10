@@ -1,40 +1,81 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/hooks/useLanguage'
-import Image from 'next/image'
 
 const slides = [
   {
     image: '/screenshot-1-feed.png',
     titleAr: 'تنبيهات الحي',
-    titleEn: 'Neighborhood Alerts',
-    bodyAr: 'اعرف وش يصير في حيّك أول بأول — تنبيهات، أخبار، وتحديثات مباشرة',
-    bodyEn: 'Stay updated on what\'s happening around you — alerts, news, and live updates',
+    titleEn: 'Neighborhood Feed',
+    tipsAr: [
+      'تابع آخر أخبار وتنبيهات حيّك',
+      'اضغط + لإضافة منشور أو تنبيه جديد',
+      'اسحب لأسفل لتحديث المنشورات',
+    ],
+    tipsEn: [
+      'Follow the latest news & alerts in your area',
+      'Tap + to add a new post or alert',
+      'Pull down to refresh the feed',
+    ],
   },
   {
     image: '/screenshot-2-market.png',
     titleAr: 'سوق الحي',
     titleEn: 'Local Market',
-    bodyAr: 'بيع واشتري من ناس قريبة منك بسهولة وأمان',
-    bodyEn: 'Buy and sell from people near you — easy and safe',
+    tipsAr: [
+      'تصفح المنتجات والخدمات القريبة منك',
+      'اضغط على أي منتج لعرض التفاصيل والتواصل',
+      'أضف منتجك للبيع بضغطة واحدة',
+    ],
+    tipsEn: [
+      'Browse products & services near you',
+      'Tap any item to view details & chat',
+      'List your own items with one tap',
+    ],
   },
   {
     image: '/screenshot-3-chat.png',
-    titleAr: 'محادثات',
+    titleAr: 'المحادثات',
     titleEn: 'Chat',
-    bodyAr: 'تواصل مع جيرانك مباشرة — استفسر، تعاون، وشارك',
-    bodyEn: 'Connect with your neighbors directly — ask, collaborate, and share',
+    tipsAr: [
+      'تواصل مع جيرانك بشكل مباشر وآمن',
+      'أرسل صور ورسائل نصية',
+      'المحادثات خاصة بينك وبين الطرف الآخر',
+    ],
+    tipsEn: [
+      'Chat directly & safely with neighbors',
+      'Send photos and text messages',
+      'Conversations are private between you two',
+    ],
   },
   {
     image: '/screenshot-4-profile.png',
     titleAr: 'ملفك الشخصي',
     titleEn: 'Your Profile',
-    bodyAr: 'كل شي حولك في مكان واحد — خدمات، مساعدة، وجيران تقدر تعتمد عليهم',
-    bodyEn: 'Everything about you in one place — reputation, settings, and more',
+    tipsAr: [
+      'عدّل صورتك واسمك وإعدادات حسابك',
+      'تابع نقاط سمعتك ومستواك',
+      'غيّر اللغة والوضع (ليلي/نهاري)',
+    ],
+    tipsEn: [
+      'Edit your photo, name & account settings',
+      'Track your reputation points & level',
+      'Switch language and dark/light mode',
+    ],
   },
 ]
+
+// Preload all images
+function usePreloadImages() {
+  useEffect(() => {
+    slides.forEach(s => {
+      const img = new Image()
+      img.src = s.image
+    })
+  }, [])
+}
 
 export default function TutorialPage() {
   const router = useRouter()
@@ -43,6 +84,8 @@ export default function TutorialPage() {
   const [current, setCurrent] = useState(0)
   const touchStartX = useRef(0)
   const isDragging = useRef(false)
+
+  usePreloadImages()
 
   function next() {
     if (current < slides.length - 1) {
@@ -68,7 +111,7 @@ export default function TutorialPage() {
   }
 
   function handleTouchEnd(e: React.TouchEvent) {
-    if (!isDragging.current) return // Let click/tap events pass through
+    if (!isDragging.current) return
     const diff = touchStartX.current - e.changedTouches[0].clientX
     if (Math.abs(diff) < 50) return
     if (isAr ? diff < 0 : diff > 0) {
@@ -88,40 +131,44 @@ export default function TutorialPage() {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Skip button */}
-      <div className="flex justify-end px-6 pt-4">
-        <button
-          onClick={finish}
-          className="text-gray-400 text-sm font-medium py-2 px-3"
-        >
+      {/* Skip */}
+      <div className="flex justify-end px-6 pt-3">
+        <button onClick={finish} className="text-gray-400 text-sm font-medium py-2 px-3">
           {isAr ? 'تخطي' : 'Skip'}
         </button>
       </div>
 
-      {/* Screenshot */}
+      {/* Content */}
       <div className="flex-1 flex flex-col items-center px-6 overflow-hidden">
-        <div className="relative w-56 h-[45vh] rounded-3xl overflow-hidden shadow-2xl shadow-gray-300 border border-gray-100 mb-6">
-          <Image
+        {/* Screenshot */}
+        <div className="relative w-48 h-[38vh] rounded-2xl overflow-hidden shadow-xl border border-gray-100 mb-5 bg-gray-100">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src={slide.image}
             alt=""
-            fill
-            className="object-cover object-top"
-            priority
+            className="w-full h-full object-cover object-top"
           />
         </div>
 
         {/* Title */}
-        <h1 className="text-2xl font-bold text-gray-900 mb-3 text-center">
+        <h1 className="text-2xl font-bold text-gray-900 mb-4 text-center">
           {isAr ? slide.titleAr : slide.titleEn}
         </h1>
 
-        {/* Body */}
-        <p className="text-gray-500 text-center text-base leading-relaxed max-w-xs">
-          {isAr ? slide.bodyAr : slide.bodyEn}
-        </p>
+        {/* Tips */}
+        <div className="w-full max-w-xs space-y-3">
+          {(isAr ? slide.tipsAr : slide.tipsEn).map((tip, i) => (
+            <div key={i} className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5">
+                {i + 1}
+              </div>
+              <p className="text-gray-600 text-sm leading-relaxed">{tip}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Bottom section */}
+      {/* Bottom */}
       <div className="px-8 pb-10">
         {/* Dots */}
         <div className="flex justify-center gap-2 mb-6">
@@ -130,15 +177,13 @@ export default function TutorialPage() {
               key={i}
               onClick={() => setCurrent(i)}
               className={`h-2 rounded-full transition-all duration-300 ${
-                i === current
-                  ? 'w-8 bg-primary-500'
-                  : 'w-2 bg-gray-200'
+                i === current ? 'w-8 bg-primary-500' : 'w-2 bg-gray-200'
               }`}
             />
           ))}
         </div>
 
-        {/* Next / Start button */}
+        {/* Next / Start */}
         <button
           onClick={next}
           className="w-full py-4 rounded-2xl bg-primary-500 text-white font-bold text-lg shadow-lg shadow-primary-500/30 active:scale-[0.98] transition-transform"
