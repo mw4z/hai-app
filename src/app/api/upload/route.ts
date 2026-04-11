@@ -92,9 +92,11 @@ export async function POST(req: NextRequest) {
 
     log.info('Upload successful', { route: '/api/upload', userId: session.userId, fileCount: urls.length })
     return NextResponse.json({ urls })
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[UPLOAD ERROR]', error?.message || error, error?.stack)
     log.error('Upload failed', error, { route: '/api/upload' })
-    return NextResponse.json({ error: 'خطأ في رفع الملفات' }, { status: 500 })
+    const msg = error?.message || 'خطأ في رفع الملفات'
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
 
