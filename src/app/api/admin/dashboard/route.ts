@@ -10,7 +10,7 @@ export async function GET() {
 
   const admin = await db.user.findUnique({
     where: { id: session.userId },
-    select: { role: true, neighborhoodId: true },
+    select: { role: true, neighborhoodId: true, gender: true },
   })
   if (!admin || !ADMIN_ROLES.includes(admin.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -21,6 +21,8 @@ export async function GET() {
 
   // Scoping: neighborhood mods only see their neighborhood
   const nbhdFilter = isPlatform ? {} : { neighborhoodId: admin.neighborhoodId! }
+  // Male mods don't see WOMEN_ONLY posts in counts
+  const womenOnlyFilter = admin.gender !== 'FEMALE' ? { category: { not: 'WOMEN_ONLY' as any } } : {}
 
   const [
     pendingRequests,
@@ -34,8 +36,8 @@ export async function GET() {
     neighborhoodStats,
   ] = await Promise.all([
     db.neighborhoodChangeRequest.count({ where: { status: 'pending' } }),
-    db.post.count({ where: { ...nbhdFilter, status: 'HIDDEN' } }),
-    db.post.count({ where: { ...nbhdFilter, status: 'REMOVED' } }),
+    db.post.count({ where: { ...nbhdFilter, ...womenOnlyFilter, status: 'HIDDEN' } }),
+    db.post.count({ where: { ...nbhdFilter, ...womenOnlyFilter, status: 'REMOVED' } }),
     db.user.count({ where: nbhdFilter.neighborhoodId ? { neighborhoodId: nbhdFilter.neighborhoodId } : {} }),
     db.user.count({ where: { status: { in: ['BANNED_TEMP', 'BANNED_PERM'] }, ...(nbhdFilter.neighborhoodId ? { neighborhoodId: nbhdFilter.neighborhoodId } : {}) } }),
     db.post.count({ where: { ...nbhdFilter, status: { in: ['ACTIVE', 'IN_PROGRESS'] } } }),

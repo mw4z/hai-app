@@ -7,9 +7,10 @@ const ADMIN_ROLES = ['NEIGHBORHOOD_MOD', 'PLATFORM_MOD', 'SUPER_ADMIN']
 async function requireAdmin(session: { userId: string }) {
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { role: true },
+    select: { role: true, gender: true },
   })
-  return user && ADMIN_ROLES.includes(user.role)
+  if (!user || !ADMIN_ROLES.includes(user.role)) return null
+  return user
 }
 
 // POST /api/admin/moderate
@@ -18,10 +19,18 @@ export async function POST(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const isAdmin = await requireAdmin(session)
-  if (!isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const admin = await requireAdmin(session)
+  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { action, postId, userId, banType } = await req.json()
+
+  // Male mods cannot act on WOMEN_ONLY posts — route to female mods only
+  if (postId && admin.gender !== 'FEMALE') {
+    const post = await db.post.findUnique({ where: { id: postId }, select: { category: true } })
+    if (post?.category === 'WOMEN_ONLY') {
+      return NextResponse.json({ error: 'هذا المنشور مخصص للمشرفات فقط' }, { status: 403 })
+    }
+  }
 
   switch (action) {
     case 'hide_post': {

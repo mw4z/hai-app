@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -44,6 +44,13 @@ const CATEGORIES = [
   },
 ]
 
+const WOMEN_ONLY_GROUP = {
+  group: 'خاص',
+  items: [
+    { key: 'WOMEN_ONLY', label: 'للنساء فقط', icon: '👩', placeholder: 'مثال: توصية طبيبة، أو خدمة نسائية' },
+  ]
+}
+
 const ALL_ITEMS = CATEGORIES.flatMap(g => g.items)
 
 export default function NewPostPage() {
@@ -51,6 +58,13 @@ export default function NewPostPage() {
   const { lang } = useLanguage()
   const [step, setStep] = useState<'category' | 'content'>('category')
   const [category, setCategory] = useState('')
+  const [isFemale, setIsFemale] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/profile').then(r => r.json()).then(d => {
+      if (d.gender === 'FEMALE') setIsFemale(true)
+    }).catch(() => {})
+  }, [])
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [price, setPrice] = useState('')
@@ -60,7 +74,9 @@ export default function NewPostPage() {
   const [location, setLocation] = useState<{ lat: number; lng: number; name: string } | null>(null)
   const [detectingLocation, setDetectingLocation] = useState(false)
 
-  const selected = ALL_ITEMS.find(i => i.key === category)
+  const allItems = isFemale ? [...ALL_ITEMS, ...WOMEN_ONLY_GROUP.items] : ALL_ITEMS
+  const categoryGroups = isFemale ? [...CATEGORIES, WOMEN_ONLY_GROUP] : CATEGORIES
+  const selected = allItems.find(i => i.key === category)
   const isLookingFor = category === 'LOOKING_FOR'
   const showPrice = ['MARKETPLACE', 'REAL_ESTATE', 'FOOD_HOME'].includes(category)
 
@@ -177,7 +193,7 @@ export default function NewPostPage() {
         {step === 'category' && (
           <div className="space-y-5" data-tour="post-categories">
             <p className="text-gray-500 dark:text-gray-400 text-sm">اختر نوع المنشور</p>
-            {CATEGORIES.map((group) => (
+            {categoryGroups.map((group) => (
               <div key={group.group}>
                 <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase mb-2">{group.group}</p>
                 <div className="space-y-2">

@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   const admin = await db.user.findUnique({
     where: { id: session.userId },
-    select: { role: true, neighborhoodId: true },
+    select: { role: true, neighborhoodId: true, gender: true },
   })
   if (!admin || !ADMIN_ROLES.includes(admin.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -23,11 +23,13 @@ export async function GET(req: NextRequest) {
   const isNbhdMod = admin.role === 'NEIGHBORHOOD_MOD'
   const nbhdFilter = isNbhdMod && admin.neighborhoodId ? { neighborhoodId: admin.neighborhoodId } : {}
   const userNbhdFilter = isNbhdMod && admin.neighborhoodId ? { neighborhoodId: admin.neighborhoodId } : {}
+  // Male mods cannot see or manage WOMEN_ONLY posts
+  const womenOnlyFilter = admin.gender !== 'FEMALE' ? { category: { not: 'WOMEN_ONLY' as any } } : {}
 
   switch (list) {
     case 'reported_posts': {
       const posts = await db.post.findMany({
-        where: { reportCount: { gt: 0 }, status: { in: ['ACTIVE', 'HIDDEN', 'IN_PROGRESS'] }, ...nbhdFilter },
+        where: { reportCount: { gt: 0 }, status: { in: ['ACTIVE', 'HIDDEN', 'IN_PROGRESS'] }, ...nbhdFilter, ...womenOnlyFilter },
         include: {
           author: { select: { id: true, name: true, phone: true } },
           neighborhood: { select: { name: true } },
@@ -44,6 +46,7 @@ export async function GET(req: NextRequest) {
       const posts = await db.post.findMany({
         where: {
           ...nbhdFilter,
+          ...womenOnlyFilter,
           ...(q ? { OR: [{ title: { contains: q } }, { body: { contains: q } }] } : {}),
           ...(statusFilter ? { status: statusFilter as any } : {}),
         },
