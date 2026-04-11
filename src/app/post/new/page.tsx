@@ -156,6 +156,7 @@ export default function NewPostPage() {
       }
 
       toast.success('تم نشر منشورك!')
+      sessionStorage.setItem('hai_feed_refresh', '1')
       router.push('/feed')
     } catch {
       toast.error('تعذر الاتصال')

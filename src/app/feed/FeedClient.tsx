@@ -173,6 +173,16 @@ export default function FeedClient({
 
   useAutoRefresh(refreshFeed, 30000)
 
+  // Immediate refresh when returning from post creation
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('hai_feed_refresh')) {
+        sessionStorage.removeItem('hai_feed_refresh')
+        refreshFeed()
+      }
+    } catch {}
+  }, [])
+
   // Initial ride requests + polls fetch
   useEffect(() => {
     fetch('/api/rides?neighborhood=' + (browseNeighborhood?.id || user.neighborhoodId || ''))
