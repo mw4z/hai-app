@@ -98,19 +98,19 @@ export default function NewPostPage() {
     setImages(prev => { URL.revokeObjectURL(prev[index].preview); return prev.filter((_, i) => i !== index) })
   }
 
-  async function uploadImages(): Promise<string[]> {
+  async function uploadImages(): Promise<string[] | null> {
     if (images.length === 0) return []
     setUploading(true)
     try {
       const formData = new FormData()
       for (const img of images) formData.append('images', img.file)
       const res = await fetch('/api/upload', { method: 'POST', body: formData })
-      if (!res.ok) { const d = await res.json(); toast.error(d.error || 'فشل رفع الصور'); return [] }
+      if (!res.ok) { const d = await res.json(); toast.error(d.error || 'فشل رفع الصور'); return null }
       const data = await res.json()
       return data.urls || []
     } catch {
       toast.error('فشل رفع الصور')
-      return []
+      return null
     } finally {
       setUploading(false)
     }
@@ -129,8 +129,9 @@ export default function NewPostPage() {
 
     setLoading(true)
     try {
-      // Upload images first
+      // Upload images first — abort if upload fails
       const imageUrls = await uploadImages()
+      if (imageUrls === null) { setLoading(false); return }
 
       const res = await fetch('/api/posts', {
         method: 'POST',
