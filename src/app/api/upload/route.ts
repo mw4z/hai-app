@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { log } from '@/lib/logger'
-import { writeFile, mkdir } from 'fs/promises'
-import { existsSync } from 'fs'
-import path from 'path'
+import { put } from '@vercel/blob'
 import crypto from 'crypto'
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const MAX_FILES = 5
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads')
 
 // Rate limit: max 10 uploads per user per minute (in-memory, resets on restart)
 const uploadCounts = new Map<string, { count: number; resetAt: number }>()
@@ -54,11 +51,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `أقصى عدد ${MAX_FILES} صور` }, { status: 400 })
     }
 
-    // Ensure upload directory exists
-    if (!existsSync(UPLOAD_DIR)) {
-      await mkdir(UPLOAD_DIR, { recursive: true })
-    }
-
     const urls: string[] = []
 
     for (const file of files) {
@@ -67,12 +59,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'نوع الملف غير مدعوم. استخدم JPG أو PNG أو WebP' }, { status: 400 })
       }
 
-      // Validate size (double-check)
+      // Validate size
       if (!file.size || file.size > MAX_FILE_SIZE) {
         return NextResponse.json({ error: 'حجم الصورة كبير جداً (أقصى 5 ميقا)' }, { status: 400 })
       }
 
-      // Read file buffer
+      // Read file buffer and validate magic bytes
       let buffer: Buffer
       try {
         const bytes = await file.arrayBuffer()
@@ -81,18 +73,21 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'فشل قراءة الملف' }, { status: 400 })
       }
 
-      // Validate it's actually an image by checking magic bytes
       if (!isValidImageBuffer(buffer)) {
         return NextResponse.json({ error: 'الملف ليس صورة صالحة' }, { status: 400 })
       }
 
       // Generate unique filename
       const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
-      const filename = `${crypto.randomUUID()}.${ext}`
-      const filepath = path.join(UPLOAD_DIR, filename)
+      const filename = `uploads/${crypto.randomUUID()}.${ext}`
 
-      await writeFile(filepath, buffer)
-      urls.push(`/uploads/${filename}`)
+      // Upload to Vercel Blob
+      const blob = await put(filename, buffer, {
+        access: 'public',
+        contentType: file.type,
+      })
+
+      urls.push(blob.url)
     }
 
     log.info('Upload successful', { route: '/api/upload', userId: session.userId, fileCount: urls.length })
