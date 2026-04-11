@@ -30,6 +30,11 @@ export async function POST(req: NextRequest) {
 
     log.api('POST', '/api/upload', session.userId)
 
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.error('[UPLOAD] BLOB_READ_WRITE_TOKEN is missing!')
+      return NextResponse.json({ error: 'Storage not configured — BLOB_READ_WRITE_TOKEN missing' }, { status: 500 })
+    }
+
     if (!checkRateLimit(session.userId)) {
       log.warn('Upload rate limit hit', { route: '/api/upload', userId: session.userId })
       return NextResponse.json({ error: 'حاول لاحقاً' }, { status: 429 })
