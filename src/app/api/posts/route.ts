@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
     const validatedImages: string[] = []
     if (Array.isArray(imageUrls)) {
       for (const url of imageUrls.slice(0, 5)) {
-        if (typeof url === 'string' && url.startsWith('/uploads/') && url.length < 200) {
+        if (typeof url === 'string' && (url.startsWith('/uploads/') || url.startsWith('https://')) && url.length < 500) {
           validatedImages.push(url)
         }
       }
