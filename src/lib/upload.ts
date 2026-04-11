@@ -1,5 +1,3 @@
-import { upload } from '@vercel/blob/client'
-
 const MAX_WIDTH = 1200
 const MAX_HEIGHT = 1200
 const JPEG_QUALITY = 0.75
@@ -10,8 +8,7 @@ const JPEG_QUALITY = 0.75
  * Typical 3-5MB phone photo → 100-300KB output.
  */
 function compressImage(file: File): Promise<File> {
-  return new Promise((resolve, reject) => {
-    // Skip non-image or already tiny files
+  return new Promise((resolve) => {
     if (!file.type.startsWith('image/') || file.size < 50_000) {
       resolve(file)
       return
@@ -25,7 +22,6 @@ function compressImage(file: File): Promise<File> {
 
       let { width, height } = img
 
-      // Scale down if larger than max dimensions
       if (width > MAX_WIDTH || height > MAX_HEIGHT) {
         const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height)
         width = Math.round(width * ratio)
@@ -44,7 +40,6 @@ function compressImage(file: File): Promise<File> {
       canvas.toBlob(
         (blob) => {
           if (!blob) { resolve(file); return }
-          // Use original name but with .jpg extension
           const name = file.name.replace(/\.[^.]+$/, '') + '.jpg'
           resolve(new File([blob], name, { type: 'image/jpeg' }))
         },
@@ -53,30 +48,27 @@ function compressImage(file: File): Promise<File> {
       )
     }
 
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      resolve(file) // Fall back to original on error
-    }
-
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
     img.src = url
   })
 }
 
 /**
- * Upload files directly to Vercel Blob (client-side).
- * Compresses images first, then uploads straight to Blob storage.
+ * Compress images then upload via single POST to server → Blob.
  */
 export async function uploadFiles(files: File[]): Promise<string[]> {
   // Compress all images in parallel
   const compressed = await Promise.all(files.map(f => compressImage(f)))
 
-  const results = await Promise.all(
-    compressed.map(file =>
-      upload(`uploads/${Date.now()}-${file.name}`, file, {
-        access: 'public',
-        handleUploadUrl: '/api/upload',
-      })
-    )
-  )
-  return results.map(blob => blob.url)
+  const formData = new FormData()
+  for (const file of compressed) formData.append('images', file)
+
+  const res = await fetch('/api/upload', { method: 'POST', body: formData })
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}))
+    throw new Error(d.error || 'فشل رفع الصور')
+  }
+
+  const data = await res.json()
+  return data.urls || []
 }
