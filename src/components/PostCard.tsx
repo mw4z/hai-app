@@ -650,15 +650,24 @@ export default function PostCard({
             </div>
           )}
 
-          {/* Trigger button */}
+          {/* Trigger button — tap own reaction to remove, long-press to change */}
           <button
-            onClick={() => setShowReactionPicker(v => !v)}
+            onClick={() => myReaction ? handleReact(myReaction) : setShowReactionPicker(v => !v)}
             className="flex items-center gap-1.5 active:scale-90 transition-transform"
           >
             <span className={`text-2xl leading-none ${bouncingReaction && myReaction ? 'reaction-bounce' : ''}`}>
               {myReaction ?? '😊'}
             </span>
           </button>
+          {/* Change reaction button when already reacted */}
+          {myReaction && (
+            <button
+              onClick={() => setShowReactionPicker(v => !v)}
+              className="text-xs text-gray-400 active:text-gray-600"
+            >
+              +
+            </button>
+          )}
 
           {/* Reaction summary: unique emojis + total */}
           {totalReactions > 0 && (
