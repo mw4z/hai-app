@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { shouldArchivePost } from '@/lib/postExpiry'
+import { del } from '@vercel/blob'
 
 /**
  * POST /api/cron/archive-posts
  * Archives expired posts. Run periodically (e.g. every hour).
- * Can be called by a cron service or manually.
+ * Deletes images from Blob storage if no one bookmarked the post.
  */
 export async function POST() {
   try {
-    // Get all active posts with their comment counts
+    // Get all active posts with their comment counts and bookmark/image info
     const posts = await db.post.findMany({
       where: { status: 'ACTIVE' },
       select: {
@@ -18,16 +19,28 @@ export async function POST() {
         createdAt: true,
         activeThreadId: true,
         isPinned: true,
-        _count: { select: { comments: true } },
+        imageUrls: true,
+        _count: { select: { comments: true, bookmarks: true } },
       },
     })
 
     let archived = 0
+    let imagesDeleted = 0
     const toArchive: string[] = []
+    const blobUrlsToDelete: string[] = []
 
     for (const post of posts) {
       if (shouldArchivePost(post)) {
         toArchive.push(post.id)
+
+        // Delete images from Blob if no one saved this post
+        if (post._count.bookmarks === 0 && post.imageUrls.length > 0) {
+          for (const url of post.imageUrls) {
+            if (url.startsWith('https://')) {
+              blobUrlsToDelete.push(url)
+            }
+          }
+        }
       }
     }
 
@@ -37,10 +50,32 @@ export async function POST() {
         data: { status: 'ARCHIVED' },
       })
       archived = result.count
+
+      // Clear imageUrls for posts whose images we're deleting
+      if (blobUrlsToDelete.length > 0) {
+        // Find which posts had their images queued for deletion
+        const postsToClean = posts.filter(
+          p => toArchive.includes(p.id) && p._count.bookmarks === 0 && p.imageUrls.length > 0
+        )
+        if (postsToClean.length > 0) {
+          await db.post.updateMany({
+            where: { id: { in: postsToClean.map(p => p.id) } },
+            data: { imageUrls: [] },
+          })
+        }
+
+        // Delete from Blob storage in batches
+        try {
+          await del(blobUrlsToDelete)
+          imagesDeleted = blobUrlsToDelete.length
+        } catch (e) {
+          console.error('[CRON] Blob delete error:', e)
+        }
+      }
     }
 
-    console.log(`[CRON] Archive: checked ${posts.length} posts, archived ${archived}`)
-    return NextResponse.json({ checked: posts.length, archived })
+    console.log(`[CRON] Archive: checked ${posts.length} posts, archived ${archived}, images deleted ${imagesDeleted}`)
+    return NextResponse.json({ checked: posts.length, archived, imagesDeleted })
   } catch (error) {
     console.error('[CRON] Archive error:', error)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
