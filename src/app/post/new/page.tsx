@@ -8,6 +8,7 @@ import { FiArrowRight, FiArrowLeft } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import BackButton from '@/components/BackButton'
 import RiyalIcon from '@/components/RiyalIcon'
+import { uploadFiles } from '@/lib/upload'
 
 const CATEGORIES = [
   {
@@ -102,14 +103,9 @@ export default function NewPostPage() {
     if (images.length === 0) return []
     setUploading(true)
     try {
-      const formData = new FormData()
-      for (const img of images) formData.append('images', img.file)
-      const res = await fetch('/api/upload', { method: 'POST', body: formData })
-      if (!res.ok) { const d = await res.json(); toast.error(d.error || 'فشل رفع الصور'); return null }
-      const data = await res.json()
-      return data.urls || []
-    } catch {
-      toast.error('فشل رفع الصور')
+      return await uploadFiles(images.map(img => img.file))
+    } catch (err: any) {
+      toast.error(err?.message || 'فشل رفع الصور')
       return null
     } finally {
       setUploading(false)

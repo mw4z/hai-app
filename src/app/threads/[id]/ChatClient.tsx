@@ -8,6 +8,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, FiTrash2, FiCheck, FiCopy, FiFlag, FiImage } from 'react-icons/fi'
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
+import { uploadFiles } from '@/lib/upload'
 
 interface Msg {
   id: string
@@ -267,12 +268,8 @@ export default function ChatClient({
     if (file.size > 5 * 1024 * 1024) { toast.error(lang === 'en' ? 'Max 5MB' : 'الحد الأقصى 5 ميقا'); return }
     setSendingImage(true)
     try {
-      const formData = new FormData()
-      formData.append('images', file)
-      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
-      if (!uploadRes.ok) { toast.error(lang === 'en' ? 'Upload failed' : 'فشل رفع الصورة'); return }
-      const { urls } = await uploadRes.json()
-      if (!urls?.[0]) return
+      const urls = await uploadFiles([file])
+      if (!urls[0]) return
       const res = await fetch(`/api/threads/${threadId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

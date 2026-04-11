@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
+import { uploadFiles } from '@/lib/upload'
 import BackButton from '@/components/BackButton'
 import BottomNav from '@/components/BottomNav'
 import { hapticSuccess } from '@/lib/haptic'
@@ -41,18 +42,9 @@ export default function SupportPage() {
 
   async function uploadImages(): Promise<string[]> {
     if (images.length === 0) return []
-    const formData = new FormData()
-    for (const img of images) {
-      formData.append('images', img.file)
-    }
     try {
-      const res = await fetch('/api/upload', { method: 'POST', body: formData })
-      if (res.ok) {
-        const data = await res.json()
-        return data.urls || []
-      }
-    } catch { /* skip */ }
-    return []
+      return await uploadFiles(images.map(img => img.file))
+    } catch { return [] }
   }
 
   useEffect(() => {

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
+import { uploadFiles } from '@/lib/upload'
 import BackButton from '@/components/BackButton'
 import BottomNav from '@/components/BottomNav'
 import { hapticSuccess } from '@/lib/haptic'
@@ -44,11 +45,8 @@ export default function NeighborhoodReportsPage() {
     setLoading(true)
     let imageUrls: string[] = []
     if (images.length > 0) {
-      const formData = new FormData()
-      images.forEach(img => formData.append('images', img.file))
       try {
-        const uRes = await fetch('/api/upload', { method: 'POST', body: formData })
-        if (uRes.ok) { const d = await uRes.json(); imageUrls = d.urls || [] }
+        imageUrls = await uploadFiles(images.map(img => img.file))
       } catch { /* */ }
     }
 

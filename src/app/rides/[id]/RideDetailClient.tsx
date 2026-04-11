@@ -8,6 +8,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import { useRidePoll } from '@/hooks/useRidePoll'
 import { hapticSuccess, hapticMedium, hapticError, hapticWarning } from '@/lib/haptic'
 import StatusBadge from '@/components/rides/StatusBadge'
+import { uploadFiles } from '@/lib/upload'
 import RiyalIcon from '@/components/RiyalIcon'
 import UserBadgeDisplay from '@/components/UserBadge'
 import {
@@ -199,13 +200,9 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
     if (file.size > 5 * 1024 * 1024) { toast.error(lang === 'en' ? 'Max 5MB' : 'الحد الأقصى 5 ميقا'); return }
     setSendingImg(true)
     try {
-      // Upload image first
-      const formData = new FormData()
-      formData.append('images', file)
-      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
-      if (!uploadRes.ok) { toast.error(lang === 'en' ? 'Upload failed' : 'فشل رفع الصورة'); return }
-      const { urls } = await uploadRes.json()
-      if (!urls?.[0]) return
+      // Upload image directly to Blob storage
+      const urls = await uploadFiles([file])
+      if (!urls[0]) return
 
       // Send as IMAGE message
       const res = await fetch(`/api/rides/${rideId}/messages`, {

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
+import { uploadFiles } from '@/lib/upload'
 import { useLanguage } from '@/hooks/useLanguage'
 import { FiArrowRight, FiArrowLeft, FiPlus, FiTrash2, FiCamera } from 'react-icons/fi'
 
@@ -45,13 +46,8 @@ export default function CatalogPage() {
     if (uploading) return
     setUploading(true)
     try {
-      const formData = new FormData()
-      formData.append('images', file)
-      const res = await fetch('/api/upload', { method: 'POST', body: formData })
-      if (res.ok) {
-        const { urls } = await res.json()
-        if (urls?.[0]) setImageUrl(urls[0])
-      } else { toast.error(dn('فشل رفع الصورة', 'Upload failed')) }
+      const urls = await uploadFiles([file])
+      if (urls[0]) setImageUrl(urls[0])
     } catch { toast.error(dn('فشل رفع الصورة', 'Upload failed')) }
     finally { setUploading(false) }
   }
