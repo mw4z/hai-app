@@ -613,7 +613,7 @@ export default function FeedClient({
           <>
             {displayPosts.map((post, idx) => (
               <div key={post.id} data-tour={idx === 0 ? 'first-post' : undefined} style={{ animationDelay: `${Math.min(idx * 50, 300)}ms`, animationFillMode: 'backwards' }} className="animate-fade-in-up">
-                <PostCard post={post} currentUserId={user.id} currentUserPhone={user.phone} currentUserRole={user.role} isBookmarked={bookmarkedIds.includes(post.id)} />
+                <PostCard post={post} currentUserId={user.id} currentUserPhone={user.phone} currentUserRole={user.role} isBookmarked={bookmarkedIds.includes(post.id)} onDelete={(id) => setPosts(prev => prev.filter(p => p.id !== id))} />
               </div>
             ))}
             {hasMore && (

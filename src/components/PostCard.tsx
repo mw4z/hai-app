@@ -96,12 +96,14 @@ export default function PostCard({
   currentUserPhone,
   currentUserRole,
   isBookmarked: initialBookmarked = false,
+  onDelete,
 }: {
   post: Post
   currentUserId: string
   currentUserPhone?: string
   currentUserRole?: string
   isBookmarked?: boolean
+  onDelete?: (postId: string) => void
 }) {
   const { t, lang } = useLanguage()
   const router = useRouter()
@@ -332,7 +334,8 @@ export default function PostCard({
       })
       if (res.ok) {
         toast.success('تم')
-        router.refresh()
+        if ((action === 'hide_post' || action === 'remove_post') && onDelete) onDelete(post.id)
+        else router.refresh()
       } else {
         const d = await res.json()
         toast.error(d.error || 'خطأ')
@@ -461,7 +464,7 @@ export default function PostCard({
                     <button onClick={async () => {
                       if (!confirm(lang === 'en' ? 'Delete post?' : lang === 'ur' ? 'پوسٹ حذف کریں؟' : 'حذف المنشور؟')) return
                       const res = await fetch(`/api/posts/${post.id}`, { method: 'DELETE' })
-                      if (res.ok) { toast.success(lang === 'en' ? 'Deleted' : lang === 'ur' ? 'حذف ہو گیا' : 'تم الحذف'); router.refresh() }
+                      if (res.ok) { toast.success(lang === 'en' ? 'Deleted' : lang === 'ur' ? 'حذف ہو گیا' : 'تم الحذف'); onDelete ? onDelete(post.id) : router.refresh() }
                       else toast.error(lang === 'en' ? 'Delete failed' : lang === 'ur' ? 'حذف ناکام' : 'فشل الحذف')
                       setShowMenu(false)
                     }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 w-full text-right">
