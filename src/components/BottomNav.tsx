@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiEdit3 } from 'react-icons/fi'
+import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import type { TranslationKey } from '@/lib/i18n'
 
@@ -72,7 +72,7 @@ export default function BottomNav({ active }: { active: string }) {
             {/* Outer soft ring */}
             <span className="absolute inset-0 rounded-full ring-[3px] ring-white/60 dark:ring-gray-900/60" />
             {/* Icon */}
-            <FiEdit3 className="w-[22px] h-[22px] relative z-10 drop-shadow-sm" />
+            <FiPlus className="w-7 h-7 relative z-10 drop-shadow-sm" />
           </button>
         </div>
 
