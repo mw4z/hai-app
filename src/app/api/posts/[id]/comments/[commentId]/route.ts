@@ -20,10 +20,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     if (comment.postId !== params.id) return NextResponse.json({ error: 'Mismatch' }, { status: 400 })
     if (comment.authorId !== session.userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    if (Date.now() - new Date(comment.createdAt).getTime() > EDIT_WINDOW) {
-      return NextResponse.json({ error: 'انتهت مهلة الحذف' }, { status: 403 })
-    }
-
     // Delete replies first, then the comment
     await db.comment.deleteMany({ where: { parentId: params.commentId } })
     await db.comment.delete({ where: { id: params.commentId } })

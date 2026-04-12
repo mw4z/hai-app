@@ -1044,10 +1044,12 @@ export default function PostCard({
                       >
                         {t('post_reply')}
                       </button>
-                      {c.author.id === currentUserId && Date.now() - new Date(c.createdAt).getTime() < 30 * 60_000 && (
+                      {c.author.id === currentUserId && (
                         <>
-                          <button onClick={() => { setEditingCommentId(c.id); setEditCommentBody(c.body) }}
-                            className="text-[12px] text-gray-400 hover:text-blue-500">{lang === 'en' ? 'Edit' : 'تعديل'}</button>
+                          {Date.now() - new Date(c.createdAt).getTime() < 30 * 60_000 && (
+                            <button onClick={() => { setEditingCommentId(c.id); setEditCommentBody(c.body) }}
+                              className="text-[12px] text-gray-400 hover:text-blue-500">{lang === 'en' ? 'Edit' : 'تعديل'}</button>
+                          )}
                           <button onClick={() => deleteComment(c.id, post.id)}
                             className="text-[12px] text-gray-400 hover:text-red-500">{lang === 'en' ? 'Delete' : 'حذف'}</button>
                         </>
