@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import { hapticMedium } from '@/lib/haptic'
 import type { TranslationKey } from '@/lib/i18n'
 
 const NAV_ITEMS: { key: string; href: string; icon: React.ComponentType<{ className?: string }>; tKey: TranslationKey; badgeKey?: 'messages' | 'other' }[] = [
@@ -61,7 +62,7 @@ export default function BottomNav({ active }: { active: string }) {
         {/* Center FAB */}
         <div className="flex-1 flex justify-center" style={{ marginTop: -20 }}>
           <button
-            onClick={() => router.push('/post/new')}
+            onClick={() => { hapticMedium(); router.push('/post/new') }}
             className="fab-glow relative w-[58px] h-[58px] rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"
             style={{
               background: 'radial-gradient(circle at 30% 30%, #34d399 0%, #16a34a 50%, #14532d 100%)',
