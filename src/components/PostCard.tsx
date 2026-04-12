@@ -725,23 +725,72 @@ export default function PostCard({
         </>
       )}
 
-      {/* Comment/reply image lightbox */}
+      {/* Comment/reply image lightbox — pinch zoom + long-press save */}
       {commentLightbox && (
         <div
           className="fixed inset-0 bg-black/95 z-50 flex flex-col items-center justify-center"
-          onClick={() => setCommentLightbox(null)}
+          onClick={() => { setCommentLightbox(null); setImgScale(1); setImgTranslate({ x: 0, y: 0 }) }}
         >
           <button
-            onClick={() => setCommentLightbox(null)}
+            onClick={() => { setCommentLightbox(null); setImgScale(1); setImgTranslate({ x: 0, y: 0 }) }}
             className="absolute right-4 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white text-xl z-10"
             style={{ top: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
           >✕</button>
+          <a
+            href={commentLightbox}
+            download
+            onClick={(e) => e.stopPropagation()}
+            className="absolute left-4 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white z-10"
+            style={{ top: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
+            aria-label="save"
+          >
+            ↓
+          </a>
           <img
             src={commentLightbox}
             alt=""
             className="max-w-full max-h-[90vh] object-contain select-none"
             draggable={false}
+            style={{
+              transform: `scale(${imgScale}) translate(${imgTranslate.x}px, ${imgTranslate.y}px)`,
+              transition: imgScale === 1 ? 'transform 0.2s' : 'none',
+              touchAction: 'none',
+            }}
             onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => {
+              e.stopPropagation()
+              if (imgScale > 1) { setImgScale(1); setImgTranslate({ x: 0, y: 0 }) }
+              else setImgScale(2.5)
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation()
+              if (e.touches.length === 2) {
+                const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
+                pinchRef.current = { startDist: d, startScale: imgScale }
+              } else if (e.touches.length === 1 && imgScale > 1) {
+                panRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, tx: imgTranslate.x, ty: imgTranslate.y }
+              }
+            }}
+            onTouchMove={(e) => {
+              e.stopPropagation()
+              if (e.touches.length === 2 && pinchRef.current) {
+                const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
+                const newScale = Math.min(5, Math.max(1, pinchRef.current.startScale * (d / pinchRef.current.startDist)))
+                setImgScale(newScale)
+                if (newScale <= 1) setImgTranslate({ x: 0, y: 0 })
+              } else if (e.touches.length === 1 && panRef.current && imgScale > 1) {
+                setImgTranslate({
+                  x: panRef.current.tx + (e.touches[0].clientX - panRef.current.startX) / imgScale,
+                  y: panRef.current.ty + (e.touches[0].clientY - panRef.current.startY) / imgScale,
+                })
+              }
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation()
+              pinchRef.current = null
+              panRef.current = null
+              if (imgScale <= 1) { setImgScale(1); setImgTranslate({ x: 0, y: 0 }) }
+            }}
           />
         </div>
       )}
