@@ -2,27 +2,25 @@ import toast from 'react-hot-toast'
 
 /**
  * Save an image to the user's device.
- * Uses Capacitor Filesystem + Share on native, falls back to Web Share API or download on web.
+ * Tries progressively: Capacitor Filesystem+Share → Capacitor Share URL → Web Share API → download.
  */
 export async function saveImageToDevice(imageUrl: string, lang: string = 'ar') {
   const msgSuccess = lang === 'en' ? 'Saved' : 'تم الحفظ'
   const msgFail = lang === 'en' ? 'Save failed' : 'فشل الحفظ'
 
-  try {
-    // Fetch the image as a blob
-    const res = await fetch(imageUrl)
-    const blob = await res.blob()
+  const cap = (window as any).Capacitor
+  const isCapacitor = typeof cap !== 'undefined' && cap?.isNativePlatform?.()
 
-    // Check if we're running inside Capacitor
-    const isCapacitor = typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor?.isNativePlatform?.()
-
-    if (isCapacitor) {
-      // Native: write to cache then share — iOS share sheet will show "Save Image"
-      const { Filesystem, Directory } = await import('@capacitor/filesystem')
-      const { Share } = await import('@capacitor/share')
-
+  // Step 1: Native Filesystem + Share (best — triggers "Save Image")
+  if (isCapacitor && cap?.isPluginAvailable?.('Filesystem')) {
+    try {
+      const res = await fetch(imageUrl)
+      const blob = await res.blob()
       const base64 = await blobToBase64(blob)
       const filename = `hai-${Date.now()}.jpg`
+
+      const { Filesystem, Directory } = await import('@capacitor/filesystem')
+      const { Share } = await import('@capacitor/share')
 
       const saved = await Filesystem.writeFile({
         path: filename,
@@ -35,9 +33,29 @@ export async function saveImageToDevice(imageUrl: string, lang: string = 'ar') {
         dialogTitle: lang === 'en' ? 'Save image' : 'حفظ الصورة',
       })
       return
+    } catch (err) {
+      console.error('[saveImage] filesystem failed, falling back', err)
     }
+  }
 
-    // Web fallback: Web Share API
+  // Step 2: Capacitor Share with image URL (works in current native build)
+  if (isCapacitor && cap?.isPluginAvailable?.('Share')) {
+    try {
+      const { Share } = await import('@capacitor/share')
+      await Share.share({
+        url: imageUrl,
+        dialogTitle: lang === 'en' ? 'Save image' : 'حفظ الصورة',
+      })
+      return
+    } catch (err) {
+      console.error('[saveImage] share URL failed', err)
+    }
+  }
+
+  // Step 3: Web Share API
+  try {
+    const res = await fetch(imageUrl)
+    const blob = await res.blob()
     const file = new File([blob], 'hai-image.jpg', { type: blob.type || 'image/jpeg' })
     const nav: any = navigator
     if (nav.share && nav.canShare && nav.canShare({ files: [file] })) {
@@ -45,7 +63,7 @@ export async function saveImageToDevice(imageUrl: string, lang: string = 'ar') {
       return
     }
 
-    // Final fallback: trigger download
+    // Step 4: Browser download fallback
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -64,7 +82,6 @@ function blobToBase64(blob: Blob): Promise<string> {
     const reader = new FileReader()
     reader.onloadend = () => {
       const result = reader.result as string
-      // Strip the data URL prefix — Filesystem expects raw base64
       const comma = result.indexOf(',')
       resolve(comma >= 0 ? result.slice(comma + 1) : result)
     }
