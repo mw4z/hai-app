@@ -77,11 +77,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json(apiError('حاول مجدداً بعد قليل', 429), { status: 429 })
   }
 
-  const { body, parentId } = await req.json()
-  if (!body?.trim() || body.trim().length < 2) {
-    return NextResponse.json({ error: 'التعليق قصير جداً' }, { status: 400 })
+  const { body, parentId, imageUrl } = await req.json()
+  const hasText = !!body?.trim() && body.trim().length >= 2
+  const hasImage = typeof imageUrl === 'string' && imageUrl.startsWith('https://') && imageUrl.length < 500
+
+  if (!hasText && !hasImage) {
+    return NextResponse.json({ error: 'التعليق فارغ' }, { status: 400 })
   }
-  if (body.length > 500) return NextResponse.json({ error: 'التعليق طويل جداً' }, { status: 400 })
+  if (body && body.length > 500) return NextResponse.json({ error: 'التعليق طويل جداً' }, { status: 400 })
 
   // Verify parentId belongs to this post
   let parentComment: { postId: string; authorId: string } | null = null
@@ -95,32 +98,37 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
   }
 
-  // ── Profanity check ───────────────────────────────────────────────────
-  const mod = moderateContent(body.trim())
-  if (mod.action === 'block') {
-    return NextResponse.json(apiError(mod.reason || 'تم حظر التعليق', 403), { status: 403 })
-  }
-  if (mod.reputationPenalty < 0) {
-    db.user.update({
-      where: { id: session.userId },
-      data: { reputation: { increment: mod.reputationPenalty } },
-    }).catch(() => {})
-    db.notification.create({
-      data: {
-        type: 'SYSTEM',
-        userId: session.userId,
-        actorId: session.userId,
-        actorName: 'النظام',
-        postTitle: `تم خصم ${Math.abs(mod.reputationPenalty)} نقطة سمعة بسبب تعليق مخالف`,
-      },
-    }).catch(() => {})
+  // ── Profanity check (skip when image-only) ────────────────────────────
+  let censoredBody = ''
+  if (hasText) {
+    const mod = moderateContent(body.trim())
+    if (mod.action === 'block') {
+      return NextResponse.json(apiError(mod.reason || 'تم حظر التعليق', 403), { status: 403 })
+    }
+    if (mod.reputationPenalty < 0) {
+      db.user.update({
+        where: { id: session.userId },
+        data: { reputation: { increment: mod.reputationPenalty } },
+      }).catch(() => {})
+      db.notification.create({
+        data: {
+          type: 'SYSTEM',
+          userId: session.userId,
+          actorId: session.userId,
+          actorName: 'النظام',
+          postTitle: `تم خصم ${Math.abs(mod.reputationPenalty)} نقطة سمعة بسبب تعليق مخالف`,
+        },
+      }).catch(() => {})
+    }
+    censoredBody = mod.censored
   }
 
   const comment = await db.comment.create({
     data: {
       postId: params.id,
       authorId: session.userId,
-      body: mod.censored,
+      body: censoredBody,
+      imageUrl: hasImage ? imageUrl : null,
       parentId: parentId || null,
     },
     include: {

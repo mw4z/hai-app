@@ -337,6 +337,7 @@ model Bookmark {
 model Comment {
   id        String    @id @default(cuid())
   body      String
+  imageUrl  String?
   post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId    String
   author    User      @relation(fields: [authorId], references: [id])

@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark } from 'react-icons/fi'
+import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiImage } from 'react-icons/fi'
+import { uploadFiles } from '@/lib/upload'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
 import EmojiPicker from './EmojiPickerWrapper'
 import { useLanguage } from '@/hooks/useLanguage'
@@ -34,6 +35,7 @@ const CATEGORY_STYLES: Record<string, { tKey: TranslationKey; bg: string; text: 
 interface Reply {
   id: string
   body: string
+  imageUrl?: string | null
   createdAt: string
   author: { id: string; name: string | null; reputation: number; accountType?: string }
   likeCount?: number
@@ -43,6 +45,7 @@ interface Reply {
 interface Comment {
   id: string
   body: string
+  imageUrl?: string | null
   createdAt: string
   author: { id: string; name: string | null; reputation: number; accountType?: string }
   likeCount?: number
@@ -175,6 +178,12 @@ export default function PostCard({
   const [showComments, setShowComments] = useState(false)
   const [comments, setComments] = useState<Comment[]>([])
   const [commentText, setCommentText] = useState('')
+  const [commentImage, setCommentImage] = useState<File | null>(null)
+  const [commentImagePreview, setCommentImagePreview] = useState<string | null>(null)
+  const [replyImage, setReplyImage] = useState<File | null>(null)
+  const [replyImagePreview, setReplyImagePreview] = useState<string | null>(null)
+  const commentImgRef = useRef<HTMLInputElement>(null)
+  const replyImgRef = useRef<HTMLInputElement>(null)
   const [commentsLoaded, setCommentsLoaded] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null)
@@ -282,18 +291,26 @@ export default function PostCard({
 
   async function handleComment(e: React.FormEvent) {
     e.preventDefault()
-    if (!commentText.trim()) return
+    if (!commentText.trim() && !commentImage) return
     setSubmitting(true)
     try {
+      let imageUrl: string | null = null
+      if (commentImage) {
+        const urls = await uploadFiles([commentImage])
+        if (!urls[0]) { toast.error(t('common_error')); return }
+        imageUrl = urls[0]
+      }
       const res = await fetch(`/api/posts/${post.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: commentText }),
+        body: JSON.stringify({ body: commentText, imageUrl }),
       })
       if (!res.ok) { toast.error(t('common_error')); return }
       const comment = await res.json()
       setComments(prev => [...prev, { ...comment, replies: comment.replies || [] }])
       setCommentText('')
+      setCommentImage(null)
+      setCommentImagePreview(null)
     } catch {
       toast.error(t('common_error'))
     } finally {
@@ -303,13 +320,19 @@ export default function PostCard({
 
   async function handleReply(e: React.FormEvent) {
     e.preventDefault()
-    if (!replyText.trim() || !replyingTo) return
+    if ((!replyText.trim() && !replyImage) || !replyingTo) return
     setSubmittingReply(true)
     try {
+      let imageUrl: string | null = null
+      if (replyImage) {
+        const urls = await uploadFiles([replyImage])
+        if (!urls[0]) { toast.error(t('common_error')); return }
+        imageUrl = urls[0]
+      }
       const res = await fetch(`/api/posts/${post.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: replyText, parentId: replyingTo.id }),
+        body: JSON.stringify({ body: replyText, parentId: replyingTo.id, imageUrl }),
       })
       if (!res.ok) { toast.error(t('common_error')); return }
       const reply = await res.json()
@@ -321,11 +344,31 @@ export default function PostCard({
         )
       )
       setReplyText('')
+      setReplyImage(null)
+      setReplyImagePreview(null)
       setReplyingTo(null)
     } catch {
       toast.error(t('common_error'))
     } finally {
       setSubmittingReply(false)
+    }
+  }
+
+  function handleCommentImageSelect(e: React.ChangeEvent<HTMLInputElement>, target: 'comment' | 'reply') {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) { toast.error(lang === 'en' ? 'Images only' : 'صور فقط'); return }
+    if (file.size > 10 * 1024 * 1024) { toast.error(lang === 'en' ? 'Max 10MB' : 'الحد الأقصى 10 ميقا'); return }
+    const preview = URL.createObjectURL(file)
+    if (target === 'comment') {
+      if (commentImagePreview) URL.revokeObjectURL(commentImagePreview)
+      setCommentImage(file)
+      setCommentImagePreview(preview)
+    } else {
+      if (replyImagePreview) URL.revokeObjectURL(replyImagePreview)
+      setReplyImage(file)
+      setReplyImagePreview(preview)
     }
   }
 
@@ -895,10 +938,22 @@ export default function PostCard({
                         <button onClick={() => setEditingCommentId(null)} className="w-8 h-8 bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-300 rounded-full flex items-center justify-center active:scale-90 transition-transform text-sm">✕</button>
                       </div>
                     ) : (
-                      <p className="text-[13px] text-gray-600 dark:text-gray-300 leading-relaxed">
-                        {c.body}
-                        {c.editedAt && <span className="text-[10px] text-gray-400 dark:text-gray-500 italic ml-1">{lang === 'en' ? '(edited)' : '(معدّل)'}</span>}
-                      </p>
+                      <>
+                        {c.body && (
+                          <p className="text-[13px] text-gray-600 dark:text-gray-300 leading-relaxed">
+                            {c.body}
+                            {c.editedAt && <span className="text-[10px] text-gray-400 dark:text-gray-500 italic ml-1">{lang === 'en' ? '(edited)' : '(معدّل)'}</span>}
+                          </p>
+                        )}
+                        {c.imageUrl && (
+                          <img
+                            src={c.imageUrl}
+                            alt=""
+                            className="mt-1.5 max-w-[200px] max-h-48 rounded-xl object-cover cursor-pointer"
+                            onClick={() => window.open(c.imageUrl!, '_blank')}
+                          />
+                        )}
+                      </>
                     )}
                     <div className="flex items-center gap-4 mt-1.5">
                       <button
@@ -943,7 +998,15 @@ export default function PostCard({
                             <span className="text-[12px] font-semibold text-gray-700 dark:text-gray-300">{reply.author.name || t('post_neighbor')}</span>
                             <UserBadgeDisplay accountType={reply.author.accountType} reputation={reply.author.reputation} />
                           </div>
-                          <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-relaxed">{reply.body}</p>
+                          {reply.body && <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-relaxed">{reply.body}</p>}
+                          {reply.imageUrl && (
+                            <img
+                              src={reply.imageUrl}
+                              alt=""
+                              className="mt-1 max-w-[160px] max-h-40 rounded-lg object-cover cursor-pointer"
+                              onClick={() => window.open(reply.imageUrl!, '_blank')}
+                            />
+                          )}
                           <button
                             onClick={() => handleCommentLike(reply.id)}
                             className={`text-[11px] flex items-center gap-1 mt-1 transition-colors ${reply.isLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-400'}`}
@@ -959,24 +1022,44 @@ export default function PostCard({
 
                 {/* Reply input */}
                 {replyingTo?.id === c.id && (
-                  <form onSubmit={handleReply} className="mr-9 mt-2 flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={replyText}
-                      onChange={e => setReplyText(e.target.value)}
-                      placeholder={`${t('post_reply')}...`}
-                      autoFocus
-                      className="flex-1 bg-gray-50 border border-primary-200 rounded-full px-3 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-primary-400"
-                      maxLength={500}
-                    />
-                    <button
-                      type="submit"
-                      disabled={submittingReply || !replyText.trim()}
-                      className="w-7 h-7 bg-primary-600 rounded-full flex items-center justify-center text-white disabled:opacity-40 flex-shrink-0"
-                    >
-                      <FiSend className="w-3 h-3" />
-                    </button>
-                  </form>
+                  <div className="mr-9 mt-2">
+                    {replyImagePreview && (
+                      <div className="relative inline-block mb-2">
+                        <img src={replyImagePreview} alt="" className="h-20 rounded-lg object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => { if (replyImagePreview) URL.revokeObjectURL(replyImagePreview); setReplyImage(null); setReplyImagePreview(null) }}
+                          className="absolute -top-1 -right-1 w-5 h-5 bg-black/70 text-white rounded-full flex items-center justify-center"
+                        ><FiX className="w-3 h-3" /></button>
+                      </div>
+                    )}
+                    <form onSubmit={handleReply} className="flex gap-2 items-center">
+                      <input
+                        type="text"
+                        value={replyText}
+                        onChange={e => setReplyText(e.target.value)}
+                        placeholder={`${t('post_reply')}...`}
+                        autoFocus
+                        className="flex-1 bg-gray-50 border border-primary-200 rounded-full px-3 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        maxLength={500}
+                      />
+                      <input type="file" accept="image/*" ref={replyImgRef} onChange={e => handleCommentImageSelect(e, 'reply')} className="hidden" />
+                      <button
+                        type="button"
+                        onClick={() => replyImgRef.current?.click()}
+                        className="w-7 h-7 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-500 flex-shrink-0"
+                      >
+                        <FiImage className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submittingReply || (!replyText.trim() && !replyImage)}
+                        className="w-7 h-7 bg-primary-600 rounded-full flex items-center justify-center text-white disabled:opacity-40 flex-shrink-0"
+                      >
+                        <FiSend className="w-3 h-3" />
+                      </button>
+                    </form>
+                  </div>
                 )}
               </div>
             ))
@@ -1007,23 +1090,43 @@ export default function PostCard({
           )}
 
           {/* Add comment */}
-          <form onSubmit={handleComment} className="flex gap-2 items-center">
-            <input
-              type="text"
-              value={commentText}
-              onChange={e => setCommentText(e.target.value)}
-              placeholder={isLookingFor ? t('post_share_placeholder') : t('post_comment_placeholder')}
-              className="flex-1 bg-gray-50 border border-gray-200 rounded-full px-3 py-2 text-xs text-right focus:outline-none focus:ring-2 focus:ring-primary-400"
-              maxLength={500}
-            />
-            <button
-              type="submit"
-              disabled={submitting || !commentText.trim()}
-              className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white disabled:opacity-40 flex-shrink-0"
-            >
-              <FiSend className="w-3.5 h-3.5" />
-            </button>
-          </form>
+          <div>
+            {commentImagePreview && (
+              <div className="relative inline-block mb-2">
+                <img src={commentImagePreview} alt="" className="h-20 rounded-lg object-cover" />
+                <button
+                  type="button"
+                  onClick={() => { if (commentImagePreview) URL.revokeObjectURL(commentImagePreview); setCommentImage(null); setCommentImagePreview(null) }}
+                  className="absolute -top-1 -right-1 w-5 h-5 bg-black/70 text-white rounded-full flex items-center justify-center"
+                ><FiX className="w-3 h-3" /></button>
+              </div>
+            )}
+            <form onSubmit={handleComment} className="flex gap-2 items-center">
+              <input
+                type="text"
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                placeholder={isLookingFor ? t('post_share_placeholder') : t('post_comment_placeholder')}
+                className="flex-1 bg-gray-50 border border-gray-200 rounded-full px-3 py-2 text-xs text-right focus:outline-none focus:ring-2 focus:ring-primary-400"
+                maxLength={500}
+              />
+              <input type="file" accept="image/*" ref={commentImgRef} onChange={e => handleCommentImageSelect(e, 'comment')} className="hidden" />
+              <button
+                type="button"
+                onClick={() => commentImgRef.current?.click()}
+                className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-500 flex-shrink-0"
+              >
+                <FiImage className="w-4 h-4" />
+              </button>
+              <button
+                type="submit"
+                disabled={submitting || (!commentText.trim() && !commentImage)}
+                className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white disabled:opacity-40 flex-shrink-0"
+              >
+                <FiSend className="w-3.5 h-3.5" />
+              </button>
+            </form>
+          </div>
         </div>
       )}
 
