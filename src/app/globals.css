@@ -7,6 +7,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Disable text selection and copy app-wide ──────────────────────────── */
+html, body {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;  /* disable long-press callout on iOS */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Keep inputs, textareas and contenteditable fully usable */
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: auto;
+  -moz-user-select: auto;
+  -ms-user-select: auto;
+  user-select: auto;
+  -webkit-touch-callout: default;
+}
+
 :root {
   --primary: #16a34a;
   --bg:             #ffffff;
