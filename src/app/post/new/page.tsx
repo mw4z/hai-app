@@ -189,7 +189,7 @@ export default function NewPostPage() {
 
         {/* Step 1: Category */}
         {step === 'category' && (
-          <div className="space-y-5" data-tour="post-categories">
+          <div className="space-y-5 pb-24" data-tour="post-categories" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
             <p className="text-gray-500 dark:text-gray-400 text-sm">اختر نوع المنشور</p>
             {categoryGroups.map((group) => (
               <div key={group.group}>
@@ -203,10 +203,10 @@ export default function NewPostPage() {
                         if (cat.key === 'RIDE_REQUEST') { router.push('/rides/new'); return }
                         setCategory(cat.key); setStep('content')
                       }}
-                      className={`w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-right ${
+                      className={`w-full flex items-center gap-3 p-3.5 rounded-xl border active:scale-[0.98] transition-transform text-right ${
                         cat.highlight
-                          ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 hover:border-indigo-500'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30'
+                          ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20'
+                          : 'border-gray-200 dark:border-gray-700'
                       }`}
                     >
                       <span className="text-xl w-8 text-center">{cat.icon}</span>
