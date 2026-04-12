@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiImage, FiDownload } from 'react-icons/fi'
 import { uploadFiles } from '@/lib/upload'
+import { saveImageToDevice } from '@/lib/saveImage'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
 import EmojiPicker from './EmojiPickerWrapper'
 import { useLanguage } from '@/hooks/useLanguage'
@@ -787,20 +788,7 @@ export default function PostCard({
           <button
             onClick={async (e) => {
               e.stopPropagation()
-              try {
-                const res = await fetch(commentLightbox!)
-                const blob = await res.blob()
-                const file = new File([blob], 'hai-image.jpg', { type: blob.type || 'image/jpeg' })
-                const nav: any = navigator
-                if (nav.share && nav.canShare && nav.canShare({ files: [file] })) {
-                  await nav.share({ files: [file] })
-                } else {
-                  const url = URL.createObjectURL(blob)
-                  window.open(url, '_blank')
-                }
-              } catch {
-                toast.error(lang === 'en' ? 'Save failed' : 'فشل الحفظ')
-              }
+              await saveImageToDevice(commentLightbox!, lang)
             }}
             className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-3 bg-white rounded-full shadow-lg text-gray-900 font-semibold text-sm active:scale-95 transition-transform z-10"
             style={{ bottom: 'max(1.5rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))' }}
