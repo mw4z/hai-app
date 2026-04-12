@@ -16,8 +16,10 @@ function getCtx(): AudioContext | null {
       if (!Ctx) return null
       audioCtx = new Ctx()
     }
-    if (audioCtx.state === 'suspended') audioCtx.resume()
-    return audioCtx
+    const ctx = audioCtx
+    if (!ctx) return null
+    if (ctx.state === 'suspended') ctx.resume()
+    return ctx
   } catch {
     return null
   }
