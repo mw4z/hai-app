@@ -736,16 +736,31 @@ export default function PostCard({
             className="absolute right-4 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white text-xl z-10"
             style={{ top: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
           >✕</button>
-          <a
-            href={commentLightbox}
-            download
-            onClick={(e) => e.stopPropagation()}
+          <button
+            onClick={async (e) => {
+              e.stopPropagation()
+              try {
+                const res = await fetch(commentLightbox!)
+                const blob = await res.blob()
+                const file = new File([blob], 'hai-image.jpg', { type: blob.type || 'image/jpeg' })
+                const nav: any = navigator
+                if (nav.share && nav.canShare && nav.canShare({ files: [file] })) {
+                  await nav.share({ files: [file] })
+                } else {
+                  // Fallback: open image in a new view for long-press save
+                  const url = URL.createObjectURL(blob)
+                  window.open(url, '_blank')
+                }
+              } catch {
+                toast.error(lang === 'en' ? 'Save failed' : 'فشل الحفظ')
+              }
+            }}
             className="absolute left-4 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white z-10"
             style={{ top: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
             aria-label="save"
           >
             ↓
-          </a>
+          </button>
           <img
             src={commentLightbox}
             alt=""
