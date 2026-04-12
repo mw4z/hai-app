@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus } from 'react-icons/fi'
+import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiEdit3 } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import type { TranslationKey } from '@/lib/i18n'
 
@@ -59,12 +59,20 @@ export default function BottomNav({ active }: { active: string }) {
         })}
 
         {/* Center FAB */}
-        <div className="flex-1 flex justify-center" style={{ marginTop: -14 }}>
+        <div className="flex-1 flex justify-center" style={{ marginTop: -20 }}>
           <button
             onClick={() => router.push('/post/new')}
-            className="w-[52px] h-[52px] bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"
+            className="fab-glow relative w-[58px] h-[58px] rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"
+            style={{
+              background: 'radial-gradient(circle at 30% 30%, #34d399 0%, #16a34a 50%, #14532d 100%)',
+              boxShadow: '0 6px 20px -2px rgba(22, 163, 74, 0.55), 0 2px 6px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.35)',
+            }}
+            aria-label="new post"
           >
-            <FiPlus className="w-6 h-6" />
+            {/* Outer soft ring */}
+            <span className="absolute inset-0 rounded-full ring-[3px] ring-white/60 dark:ring-gray-900/60" />
+            {/* Icon */}
+            <FiEdit3 className="w-[22px] h-[22px] relative z-10 drop-shadow-sm" />
           </button>
         </div>
 
