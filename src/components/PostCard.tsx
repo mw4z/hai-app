@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiImage, FiDownload } from 'react-icons/fi'
 import { uploadFiles } from '@/lib/upload'
 import { saveImageToDevice } from '@/lib/saveImage'
+import { playSend, playReaction, playDelete } from '@/lib/sound'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
 import EmojiPicker from './EmojiPickerWrapper'
 import { useLanguage } from '@/hooks/useLanguage'
@@ -225,6 +226,7 @@ export default function PostCard({
 
   async function handleReact(emoji: string) {
     hapticLight()
+    playReaction()
     setBouncingReaction(emoji)
     setTimeout(() => setBouncingReaction(null), 400)
     try {
@@ -309,6 +311,7 @@ export default function PostCard({
       })
       if (!res.ok) { toast.error(t('common_error')); return }
       const comment = await res.json()
+      playSend()
       setComments(prev => [...prev, { ...comment, replies: comment.replies || [] }])
       setCommentText('')
       setCommentImage(null)
@@ -338,6 +341,7 @@ export default function PostCard({
       })
       if (!res.ok) { toast.error(t('common_error')); return }
       const reply = await res.json()
+      playSend()
       setComments(prev =>
         prev.map(c =>
           c.id === replyingTo.id
@@ -408,6 +412,7 @@ export default function PostCard({
     try {
       const res = await fetch(`/api/posts/${postId}/comments/${commentId}`, { method: 'DELETE' })
       if (res.ok) {
+        playDelete()
         setComments(prev => prev.filter((c: any) => c.id !== commentId))
         toast.success(lang === 'en' ? 'Deleted' : 'تم الحذف')
       } else {

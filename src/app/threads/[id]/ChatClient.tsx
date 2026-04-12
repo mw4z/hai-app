@@ -9,6 +9,7 @@ import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, Fi
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
 import { uploadFiles } from '@/lib/upload'
+import { playSend } from '@/lib/sound'
 
 interface Msg {
   id: string
@@ -233,6 +234,7 @@ export default function ChatClient({
       })
       if (res.ok) {
         const msg = await res.json()
+        playSend()
         setMessages(prev => [...prev, msg])
         setText('')
       }

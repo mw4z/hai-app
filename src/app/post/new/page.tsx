@@ -9,6 +9,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import BackButton from '@/components/BackButton'
 import RiyalIcon from '@/components/RiyalIcon'
 import { uploadFiles } from '@/lib/upload'
+import { playSuccess, playError } from '@/lib/sound'
 
 const CATEGORIES = [
   {
@@ -147,10 +148,12 @@ export default function NewPostPage() {
       const data = await res.json()
 
       if (!res.ok) {
+        playError()
         toast.error(typeof data.error === 'string' ? data.error : data.error?.message || 'فشل نشر المنشور')
         return
       }
 
+      playSuccess()
       toast.success('تم نشر منشورك!')
       sessionStorage.setItem('hai_feed_refresh', '1')
       router.push('/feed')
