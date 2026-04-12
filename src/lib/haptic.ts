@@ -7,6 +7,15 @@ function isNative(): boolean {
   return typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
 }
 
+function hapticsEnabled(): boolean {
+  if (typeof window === 'undefined') return false
+  try { return localStorage.getItem('hai_haptics') !== '0' } catch { return true }
+}
+
+export function setHapticsEnabled(on: boolean) {
+  try { localStorage.setItem('hai_haptics', on ? '1' : '0') } catch {}
+}
+
 async function nativeImpact(style: 'Light' | 'Medium' | 'Heavy') {
   try {
     const { Haptics, ImpactStyle } = await import('@capacitor/haptics')
@@ -27,31 +36,37 @@ async function nativeNotification(type: 'Success' | 'Warning' | 'Error') {
 }
 
 export function hapticLight() {
+  if (!hapticsEnabled()) return
   if (isNative()) { nativeImpact('Light'); return }
   if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10)
 }
 
 export function hapticMedium() {
+  if (!hapticsEnabled()) return
   if (isNative()) { nativeImpact('Medium'); return }
   if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(25)
 }
 
 export function hapticHeavy() {
+  if (!hapticsEnabled()) return
   if (isNative()) { nativeImpact('Heavy'); return }
   if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50)
 }
 
 export function hapticSuccess() {
+  if (!hapticsEnabled()) return
   if (isNative()) { nativeNotification('Success'); return }
   if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([15, 50, 15])
 }
 
 export function hapticError() {
+  if (!hapticsEnabled()) return
   if (isNative()) { nativeNotification('Error'); return }
   if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([30, 30, 30, 30, 30])
 }
 
 export function hapticWarning() {
+  if (!hapticsEnabled()) return
   if (isNative()) { nativeNotification('Warning'); return }
   if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([20, 40, 20])
 }

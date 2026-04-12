@@ -69,6 +69,8 @@ export const translations = {
   profile_light:         { ar: 'فاتح',               en: 'Light'             , ur: 'ہلکا' },
   profile_dark:          { ar: 'داكن',               en: 'Dark'              , ur: 'گہرا' },
   profile_system:        { ar: 'تلقائي',             en: 'System'            , ur: 'خودکار' },
+  profile_sounds:        { ar: 'الأصوات',             en: 'Sounds'            , ur: 'آوازیں' },
+  profile_vibration:     { ar: 'الاهتزاز',            en: 'Vibration'         , ur: 'وائبریشن' },
   profile_logout:        { ar: 'تسجيل الخروج',       en: 'Log Out',          ur: 'لاگ آؤٹ'          },
   profile_reputation:    { ar: 'السمعة',             en: 'Reputation',       ur: 'ساکھ'             },
   profile_posts:         { ar: 'منشوراتي',           en: 'My Posts',         ur: 'میری پوسٹیں'      },

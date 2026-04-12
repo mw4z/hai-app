@@ -11,8 +11,11 @@ import {
   FiMapPin, FiStar, FiFileText, FiLogOut, FiCamera,
   FiUser, FiPhone, FiMail, FiGlobe, FiSun, FiMoon,
   FiMonitor, FiCheck, FiChevronLeft, FiChevronDown, FiEdit2, FiBell,
-  FiSettings, FiHelpCircle, FiAward, FiShield, FiBookmark, FiX, FiShare2, FiUpload
+  FiSettings, FiHelpCircle, FiAward, FiShield, FiBookmark, FiX, FiShare2, FiUpload,
+  FiVolume2, FiVolumeX
 } from 'react-icons/fi'
+import { setSoundsEnabled, playTap } from '@/lib/sound'
+import { setHapticsEnabled, hapticMedium } from '@/lib/haptic'
 const ImageCropper = lazy(() => import('@/components/ImageCropper'))
 import { DEFAULT_AVATARS, AVATAR_CATEGORIES } from '@/lib/defaultAvatars'
 import { DEFAULT_COVERS } from '@/lib/defaultCovers'
@@ -68,6 +71,8 @@ export default function ProfileClient({ user, postCount }: Props) {
   const [email, setEmail] = useState(user.email || '')
   const [emailVerified, setEmailVerified] = useState(user.emailVerified || false)
   const [theme, setTheme] = useState<Theme>('system')
+  const [soundsOn, setSoundsOn] = useState(true)
+  const [hapticsOn, setHapticsOn] = useState(true)
   const [language, setLanguage] = useState<Language>('ar')
   const [notifyComments, setNotifyComments] = useState(user.notifyComments !== false)
   const [notifyReactions, setNotifyReactions] = useState(user.notifyReactions !== false)
@@ -112,6 +117,8 @@ export default function ProfileClient({ user, postCount }: Props) {
   useEffect(() => {
     setTheme((localStorage.getItem('hai_theme') as Theme) || 'system')
     setLanguage((localStorage.getItem('hai_language') as Language) || 'ar')
+    setSoundsOn(localStorage.getItem('hai_sounds') !== '0')
+    setHapticsOn(localStorage.getItem('hai_haptics') !== '0')
     // Fetch mod request status for RESIDENT users
     if (user.role === 'RESIDENT') {
       fetch('/api/mod-request').then(r => r.json()).then(d => {
@@ -925,6 +932,44 @@ export default function ProfileClient({ user, postCount }: Props) {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Sounds toggle */}
+        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 flex items-center gap-3">
+          <span className="text-gray-400">{soundsOn ? <FiVolume2 /> : <FiVolumeX />}</span>
+          <span className="text-gray-700 dark:text-gray-300 text-sm font-medium flex-1">{t('profile_sounds')}</span>
+          <button
+            onClick={() => {
+              const next = !soundsOn
+              setSoundsOn(next)
+              setSoundsEnabled(next)
+              if (next) playTap()
+            }}
+            role="switch"
+            aria-checked={soundsOn}
+            className={`w-11 h-6 rounded-full relative transition-colors ${soundsOn ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+          >
+            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${soundsOn ? 'left-5' : 'left-0.5'}`} />
+          </button>
+        </div>
+
+        {/* Vibration toggle */}
+        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700 flex items-center gap-3">
+          <span className="text-gray-400">📳</span>
+          <span className="text-gray-700 dark:text-gray-300 text-sm font-medium flex-1">{t('profile_vibration')}</span>
+          <button
+            onClick={() => {
+              const next = !hapticsOn
+              setHapticsOn(next)
+              setHapticsEnabled(next)
+              if (next) hapticMedium()
+            }}
+            role="switch"
+            aria-checked={hapticsOn}
+            className={`w-11 h-6 rounded-full relative transition-colors ${hapticsOn ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+          >
+            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${hapticsOn ? 'left-5' : 'left-0.5'}`} />
+          </button>
         </div>
       </div>
 
