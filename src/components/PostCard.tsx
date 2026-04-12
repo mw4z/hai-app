@@ -134,6 +134,7 @@ export default function PostCard({
   const [showReactionPicker, setShowReactionPicker] = useState(false)
   const [bouncingReaction, setBouncingReaction] = useState<string | null>(null)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const [commentLightbox, setCommentLightbox] = useState<string | null>(null)
   const [imgScale, setImgScale] = useState(1)
   const [imgTranslate, setImgTranslate] = useState({ x: 0, y: 0 })
   const pinchRef = useRef<{ startDist: number; startScale: number } | null>(null)
@@ -724,6 +725,27 @@ export default function PostCard({
         </>
       )}
 
+      {/* Comment/reply image lightbox */}
+      {commentLightbox && (
+        <div
+          className="fixed inset-0 bg-black/95 z-50 flex flex-col items-center justify-center"
+          onClick={() => setCommentLightbox(null)}
+        >
+          <button
+            onClick={() => setCommentLightbox(null)}
+            className="absolute right-4 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white text-xl z-10"
+            style={{ top: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
+          >✕</button>
+          <img
+            src={commentLightbox}
+            alt=""
+            className="max-w-full max-h-[90vh] object-contain select-none"
+            draggable={false}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+
       {/* Reaction + Comment bar */}
       <div className="mt-3 pt-3 border-t border-gray-100/50 dark:border-white/[0.06] flex items-center justify-between">
         {/* Reactions — full emoji picker */}
@@ -950,7 +972,7 @@ export default function PostCard({
                             src={c.imageUrl}
                             alt=""
                             className="mt-1.5 max-w-[200px] max-h-48 rounded-xl object-cover cursor-pointer"
-                            onClick={() => window.open(c.imageUrl!, '_blank')}
+                            onClick={() => setCommentLightbox(c.imageUrl!)}
                           />
                         )}
                       </>
@@ -1004,7 +1026,7 @@ export default function PostCard({
                               src={reply.imageUrl}
                               alt=""
                               className="mt-1 max-w-[160px] max-h-40 rounded-lg object-cover cursor-pointer"
-                              onClick={() => window.open(reply.imageUrl!, '_blank')}
+                              onClick={() => setCommentLightbox(reply.imageUrl!)}
                             />
                           )}
                           <button
