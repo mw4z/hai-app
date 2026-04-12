@@ -51,5 +51,13 @@
 	<string>We need your location to find your neighborhood and connect you with nearby neighbors and services</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>We need your location to find your neighborhood and connect you with nearby neighbors and services</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Allow Hai to use the camera so you can take photos for your profile, posts, and chat messages</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Allow Hai to access your photo library so you can pick images for your profile, posts, and chat messages</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Allow Hai to save images to your photo library</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Allow Hai to use the microphone for video recordings</string>
 </dict>
 </plist>
