@@ -64,6 +64,73 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     })
   }
 
+  // ── Push notification enqueue with 30-min dedup/aggregation ─────────
+  if (post && post.authorId !== session.userId) {
+    const recipientId = post.authorId
+    const dedupKey = `reaction:${params.id}:${recipientId}`
+    const actorNameForPush = user?.name || null
+    const actorIdForPush = session.userId
+    const postIdForPush = params.id
+
+    ;(async () => {
+      const windowStart = new Date(Date.now() - 30 * 60_000)
+      try {
+        await db.$transaction(async (tx) => {
+          const existingJob = await tx.notifJob.findFirst({
+            where: {
+              dedupKey,
+              status: 'pending',
+              createdAt: { gte: windowStart },
+            },
+            orderBy: { createdAt: 'desc' },
+          })
+          if (existingJob) {
+            const old = (existingJob.payload || {}) as {
+              actorIds?: string[]
+              actorNames?: (string | null)[]
+            }
+            const actorIds = Array.isArray(old.actorIds) ? [...old.actorIds] : []
+            const actorNames = Array.isArray(old.actorNames) ? [...old.actorNames] : []
+            if (actorIds.includes(actorIdForPush)) return
+            actorIds.push(actorIdForPush)
+            actorNames.push(actorNameForPush)
+            await tx.notifJob.update({
+              where: { id: existingJob.id },
+              data: {
+                payload: {
+                  postId: postIdForPush,
+                  recipientId,
+                  actorIds,
+                  actorNames,
+                  count: actorIds.length,
+                },
+              },
+            })
+          } else {
+            await tx.notifJob.create({
+              data: {
+                type: 'reaction_on_post',
+                priority: 'normal',
+                targetType: 'user',
+                targetRef: recipientId,
+                dedupKey,
+                payload: {
+                  postId: postIdForPush,
+                  recipientId,
+                  actorIds: [actorIdForPush],
+                  actorNames: [actorNameForPush],
+                  count: 1,
+                },
+              },
+            })
+          }
+        })
+      } catch (err) {
+        console.error('[NOTIF_JOB] enqueue reaction_on_post failed:', err)
+      }
+    })()
+  }
+
   // Rep: +2 to post author — but NOT for request/help posts (the requester didn't help anyone)
   const NO_REP_CATEGORIES = ['LOOKING_FOR', 'RIDE_REQUEST']
   if (!NO_REP_CATEGORIES.includes(post.category)) {

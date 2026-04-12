@@ -11,8 +11,8 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Only apply to page routes — skip API, static files, public pages, etc.
+  // Only apply to page routes — skip API, static files, public pages, invite links
   matcher: [
-    '/((?!api|_next|favicon|icons|images|manifest|sw|workbox|privacy|contact|.*\\.).*)',
+    '/((?!api|_next|favicon|icons|images|manifest|sw|workbox|privacy|contact|i/|.*\\.).*)',
   ],
 }

@@ -160,5 +160,54 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     })
   }
 
+  // ── Push notification enqueue (fire-and-forget) ────────────────────
+  // Reply path is exclusive: never enqueue comment_on_post for a reply.
+  const actorNameForPush = comment.author?.name || null
+  const pushSnippet = (censoredBody || '').slice(0, 120)
+
+  if (parentId && parentComment) {
+    const recipientId = parentComment.authorId
+    if (recipientId !== session.userId) {
+      db.notifJob.create({
+        data: {
+          type: 'reply_to_comment',
+          priority: 'normal',
+          targetType: 'user',
+          targetRef: recipientId,
+          payload: {
+            postId: params.id,
+            commentId: comment.id,
+            parentCommentId: parentId,
+            actorId: session.userId,
+            actorName: actorNameForPush,
+            recipientId,
+            snippet: pushSnippet,
+          },
+        },
+      }).catch((err) => {
+        console.error('[NOTIF_JOB] enqueue reply_to_comment failed:', err)
+      })
+    }
+  } else if (post.authorId !== session.userId) {
+    db.notifJob.create({
+      data: {
+        type: 'comment_on_post',
+        priority: 'normal',
+        targetType: 'user',
+        targetRef: post.authorId,
+        payload: {
+          postId: params.id,
+          commentId: comment.id,
+          actorId: session.userId,
+          actorName: actorNameForPush,
+          postAuthorId: post.authorId,
+          snippet: pushSnippet,
+        },
+      },
+    }).catch((err) => {
+      console.error('[NOTIF_JOB] enqueue comment_on_post failed:', err)
+    })
+  }
+
   return NextResponse.json(comment)
 }

@@ -184,6 +184,26 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    // Fire-and-forget: enqueue neighborhood push fanout via NotifJob.
+    // Processor applies filtering (author exclusion, prefs, quiet hours, gender).
+    db.notifJob.create({
+      data: {
+        type: 'new_post',
+        priority: 'normal',
+        targetType: 'nbhd_topic',
+        targetRef: user.neighborhoodId,
+        payload: {
+          postId: post.id,
+          authorId: user.id,
+          authorName: user.name || null,
+          title: finalTitle.slice(0, 140),
+          category,
+        },
+      },
+    }).catch((err) => {
+      console.error('[NOTIF_JOB] enqueue new_post failed:', err)
+    })
+
     // Notify all neighbors when someone posts in LOOKING_FOR
     if (category === 'LOOKING_FOR') {
       notifyNeighborhood({

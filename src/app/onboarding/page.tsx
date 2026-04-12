@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { FiMapPin, FiLoader, FiCheck, FiArrowRight, FiArrowLeft, FiSearch } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useGPSLocation } from '@/hooks/useGPSLocation'
+import { tryRedeemPendingInvite } from '@/lib/pendingInvite'
 
 type Step = 'name' | 'gender' | 'account_type' | 'location'
 
@@ -189,6 +190,23 @@ export default function OnboardingPage() {
         localStorage.removeItem('hai_tour_chat')
         localStorage.removeItem('hai_splash')
       } catch {}
+
+      // Fire-and-forget invite redemption — MUST NOT block onboarding
+      tryRedeemPendingInvite()
+        .then((result) => {
+          if (result.status === 'success') {
+            const msg = result.inviterName
+              ? lang === 'en'
+                ? `Thanks for joining via ${result.inviterName}`
+                : `شكراً لانضمامك عبر ${result.inviterName}`
+              : lang === 'en'
+                ? 'Invite linked successfully'
+                : 'تم ربط الدعوة بنجاح'
+            toast.success(msg, { duration: 3500 })
+          }
+        })
+        .catch(() => { /* silent */ })
+
       router.push('/tutorial')
     } catch {
       toast.error(t('auth_connection_err'))

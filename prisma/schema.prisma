@@ -33,6 +33,7 @@ model Neighborhood {
   users     User[]
   posts     Post[]
   compounds Compound[]
+  emergencyAlerts EmergencyAlert[]
   createdAt DateTime @default(now())
 }
 
@@ -96,6 +97,30 @@ model User {
   notifyRides      Boolean       @default(true)
   notifySystem     Boolean       @default(true)
   serviceItems     ServiceItem[]
+
+  // ── Push notifications (FCM) ──
+  deviceTokens     DeviceToken[]
+  notifPreference  NotifPreference?
+
+  // ── Emergency alerts ──
+  emergencyAlerts        EmergencyAlert[]          @relation("emergencyAuthor")
+  emergencyAlertsRevoked EmergencyAlert[]          @relation("emergencyRevoker")
+  emergencyDismissals    EmergencyAlertDismissal[]
+
+  // ── Invite / density engine ──
+  invitedById       String?
+  invitesQualified  Int              @default(0)
+  inviteBadgeTier   Int              @default(0)
+  signupDeviceId    String?
+  signupIpHash      String?
+  inviteCode        InviteCode?
+  invitesGiven      InviteRedemption[] @relation("invitesGiven")
+  inviteReceived    InviteRedemption?  @relation("invitesReceived")
+  fraudSignals      InviteFraudSignal[]
+
+  // ── Weekly digest log back-relation ──
+  digestLogs        DigestLog[]
+
   deletedAt        DateTime?     // soft delete — null = active, set = deleted
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
@@ -943,4 +968,160 @@ model RideMessage {
   createdAt       DateTime    @default(now())
 
   @@index([rideRequestId, createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PUSH NOTIFICATIONS (FCM + DB-backed queue)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model DeviceToken {
+  id         String   @id @default(cuid())
+  userId     String
+  token      String   @unique
+  platform   String   // ios | android | web
+  deviceId   String?
+  appVersion String?
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([lastSeenAt])
+}
+
+model NotifPreference {
+  userId          String   @id
+  newPostInNbhd   Boolean  @default(true)
+  commentOnYours  Boolean  @default(true)
+  replyOnYours    Boolean  @default(true)
+  reactionOnYours Boolean  @default(true)
+  directMessage   Boolean  @default(true)
+  emergencyAlert  Boolean  @default(true)
+  weeklyDigest    Boolean  @default(true)
+  quietStartHr    Int?
+  quietEndHr      Int?
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NotifJob {
+  id           String    @id @default(cuid())
+  type         String    // new_post | comment_on_post | reply_to_comment | reaction_on_post | weekly_digest | emergency_alert | dm
+  priority     String    @default("normal") // high | normal | low
+  targetType   String    // user | user_list | nbhd_topic
+  targetRef    String    // userId | JSON array | neighborhoodId
+  payload      Json
+  dedupKey     String?
+  runAt        DateTime  @default(now())
+  attempts     Int       @default(0)
+  maxAttempts  Int       @default(3)
+  status       String    @default("pending") // pending | running | done | failed | dropped
+  lastError    String?
+  createdAt    DateTime  @default(now())
+  processedAt  DateTime?
+
+  @@index([status, runAt, priority])
+  @@index([dedupKey, createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WEEKLY DIGEST
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model DigestLog {
+  userId    String
+  weekStart DateTime
+  sentAt    DateTime @default(now())
+  postCount Int      @default(0)
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, weekStart])
+  @@index([weekStart])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EMERGENCY ALERTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model EmergencyAlert {
+  id             String    @id @default(cuid())
+  neighborhoodId String
+  authorId       String
+  title          String
+  body           String
+  severity       String    // critical | warning | info
+  createdAt      DateTime  @default(now())
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  revokedById    String?
+
+  neighborhood   Neighborhood              @relation(fields: [neighborhoodId], references: [id], onDelete: Cascade)
+  author         User                      @relation("emergencyAuthor",  fields: [authorId],    references: [id])
+  revokedBy      User?                     @relation("emergencyRevoker", fields: [revokedById], references: [id])
+  dismissals     EmergencyAlertDismissal[]
+
+  @@index([neighborhoodId, expiresAt, revokedAt])
+}
+
+model EmergencyAlertDismissal {
+  alertId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  alert     EmergencyAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId],  references: [id], onDelete: Cascade)
+
+  @@id([alertId, userId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INVITE / DENSITY ENGINE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model InviteCode {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  code      String   @unique
+  uses      Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([code])
+}
+
+model InviteRedemption {
+  id             String    @id @default(cuid())
+  inviterId      String
+  inviteeId      String    @unique
+  code           String
+  status         String    // PENDING | QUALIFIED | REWARDED | REJECTED
+  action1At      DateTime?
+  d2ReturnAt     DateTime?
+  rewardedAt     DateTime?
+  rejectedReason String?
+  signupIpHash   String?
+  signupDeviceId String?
+  createdAt      DateTime  @default(now())
+
+  inviter        User      @relation("invitesGiven",    fields: [inviterId], references: [id])
+  invitee        User      @relation("invitesReceived", fields: [inviteeId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([inviterId, status])
+}
+
+model InviteFraudSignal {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String   // shared_device | shared_ip | velocity | orphan_signup | manual
+  detail    Json
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([kind, createdAt])
 }
