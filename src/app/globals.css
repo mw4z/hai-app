@@ -7,22 +7,23 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Disable text selection and copy app-wide ──────────────────────────── */
+/* ── Disable UI text selection, keep content selectable ──────────────── */
 html, body {
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
-  -webkit-touch-callout: none;  /* disable long-press callout on iOS */
+  -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Keep inputs, textareas and contenteditable fully usable */
+/* Allow selection and copy on actual content (post body, comments, replies) */
+.selectable-text,
 input, textarea, [contenteditable="true"] {
-  -webkit-user-select: auto;
-  -moz-user-select: auto;
-  -ms-user-select: auto;
-  user-select: auto;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
   -webkit-touch-callout: default;
 }
 

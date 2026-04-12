@@ -590,8 +590,8 @@ export default function PostCard({
         </div>
       ) : (
         <>
-          <h3 className="font-semibold text-gray-900 text-sm mb-1">{postData.title}</h3>
-          <p className="text-gray-600 text-sm leading-relaxed line-clamp-3">{postData.body}</p>
+          <h3 className="font-semibold text-gray-900 text-sm mb-1 selectable-text">{postData.title}</h3>
+          <p className="text-gray-600 text-sm leading-relaxed line-clamp-3 selectable-text">{postData.body}</p>
           {postData.editedAt && (
             <p className="text-[10px] text-gray-400 mt-1">
               {lang === 'en' ? 'Edited' : lang === 'ur' ? 'ترمیم شدہ' : 'تم التعديل'} {new Date(postData.editedAt).toLocaleDateString(lang !== 'en' ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -1015,7 +1015,7 @@ export default function PostCard({
                     ) : (
                       <>
                         {c.body && (
-                          <p className="text-[13px] text-gray-600 dark:text-gray-300 leading-relaxed">
+                          <p className="text-[13px] text-gray-600 dark:text-gray-300 leading-relaxed selectable-text">
                             {c.body}
                             {c.editedAt && <span className="text-[10px] text-gray-400 dark:text-gray-500 italic ml-1">{lang === 'en' ? '(edited)' : '(معدّل)'}</span>}
                           </p>
@@ -1075,7 +1075,7 @@ export default function PostCard({
                             <span className="text-[12px] font-semibold text-gray-700 dark:text-gray-300">{reply.author.name || t('post_neighbor')}</span>
                             <UserBadgeDisplay accountType={reply.author.accountType} reputation={reply.author.reputation} />
                           </div>
-                          {reply.body && <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-relaxed">{reply.body}</p>}
+                          {reply.body && <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-relaxed selectable-text">{reply.body}</p>}
                           {reply.imageUrl && (
                             <img
                               src={reply.imageUrl}
