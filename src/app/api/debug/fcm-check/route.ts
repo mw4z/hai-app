@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import crypto from 'crypto'
@@ -8,23 +8,35 @@ export const dynamic = 'force-dynamic'
 /**
  * GET /api/debug/fcm-check
  *
- * Admin-only diagnostic endpoint that verifies FCM credentials are valid
- * and can mint an OAuth access token. Does NOT leak the credentials
- * themselves — only reports presence, length, and a pass/fail signal.
+ * Diagnostic endpoint that verifies FCM credentials are valid and can
+ * mint an OAuth access token. Does NOT leak the credentials themselves
+ * — only reports presence, length, and a pass/fail signal.
+ *
+ * Auth (either works):
+ *   1. Admin session cookie (PLATFORM_MOD / SUPER_ADMIN), or
+ *   2. Authorization: Bearer <CRON_SECRET>
  *
  * Intended to be hit once after setting FCM_* env vars to confirm the
  * processor cron will be able to send push notifications.
  */
-export async function GET() {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+export async function GET(req: NextRequest) {
+  // Allow CRON_SECRET bearer as a bypass — simpler for curl from dev laptop
+  const auth = req.headers.get('authorization') || ''
+  const cronSecret = process.env.CRON_SECRET
+  const hasCronBearer =
+    !!cronSecret && auth === `Bearer ${cronSecret}`
 
-  const user = await db.user.findUnique({
-    where: { id: session.userId },
-    select: { role: true },
-  })
-  if (!user || !['PLATFORM_MOD', 'SUPER_ADMIN'].includes(user.role)) {
-    return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  if (!hasCronBearer) {
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+    const user = await db.user.findUnique({
+      where: { id: session.userId },
+      select: { role: true },
+    })
+    if (!user || !['PLATFORM_MOD', 'SUPER_ADMIN'].includes(user.role)) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    }
   }
 
   const projectId = process.env.FCM_PROJECT_ID
