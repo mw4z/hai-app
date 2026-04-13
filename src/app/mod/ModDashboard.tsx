@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useLanguage } from '@/hooks/useLanguage'
 import { FiArrowRight, FiArrowLeft, FiAlertTriangle, FiEyeOff, FiUserX, FiActivity, FiFileText } from 'react-icons/fi'
 import BottomNav from '@/components/BottomNav'
+import EmergencyCreator from '@/components/EmergencyCreator'
 
 const ACTION_LABELS: Record<string, { ar: string; en: string }> = {
   hide_post: { ar: 'إخفاء منشور', en: 'Hide post' },
@@ -120,8 +121,13 @@ export default function ModDashboard({ data }: Props) {
         </div>
       </header>
 
+      {/* Emergency alert creator — top-of-dashboard ─── */}
+      <div className="px-4 pt-4">
+        <EmergencyCreator />
+      </div>
+
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-2.5 px-4 pt-4 pb-2">
+      <div className="grid grid-cols-4 gap-2.5 px-4 pt-2 pb-2">
         {[
           { label: dn('منشورات', 'Posts'), value: data.stats.activePosts },
           { label: dn('بلاغات', 'Reports'), value: data.stats.reportedPosts },
