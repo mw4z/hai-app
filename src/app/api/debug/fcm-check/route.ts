@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import crypto from 'crypto'
+import { loadFcmCredentials } from '@/lib/fcm'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,16 +16,11 @@ export const dynamic = 'force-dynamic'
  * Auth (either works):
  *   1. Admin session cookie (PLATFORM_MOD / SUPER_ADMIN), or
  *   2. Authorization: Bearer <CRON_SECRET>
- *
- * Intended to be hit once after setting FCM_* env vars to confirm the
- * processor cron will be able to send push notifications.
  */
 export async function GET(req: NextRequest) {
-  // Allow CRON_SECRET bearer as a bypass — simpler for curl from dev laptop
   const auth = req.headers.get('authorization') || ''
   const cronSecret = process.env.CRON_SECRET
-  const hasCronBearer =
-    !!cronSecret && auth === `Bearer ${cronSecret}`
+  const hasCronBearer = !!cronSecret && auth === `Bearer ${cronSecret}`
 
   if (!hasCronBearer) {
     const session = await getSession()
@@ -39,26 +35,42 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const projectId = process.env.FCM_PROJECT_ID
-  const clientEmail = process.env.FCM_CLIENT_EMAIL
   const privateKeyRaw = process.env.FCM_PRIVATE_KEY
+  const base64Raw = process.env.FCM_SERVICE_ACCOUNT_BASE64
 
   const report: Record<string, any> = {
     envCheck: {
+      FCM_SERVICE_ACCOUNT_BASE64: {
+        present: !!base64Raw,
+        length: base64Raw?.length || 0,
+      },
       FCM_PROJECT_ID: {
-        present: !!projectId,
-        preview: projectId ? projectId : null,
+        present: !!process.env.FCM_PROJECT_ID,
+        preview: process.env.FCM_PROJECT_ID || null,
       },
       FCM_CLIENT_EMAIL: {
-        present: !!clientEmail,
-        preview: clientEmail ? clientEmail.replace(/^(.{4}).*(@.*)$/, '$1***$2') : null,
+        present: !!process.env.FCM_CLIENT_EMAIL,
+        preview: process.env.FCM_CLIENT_EMAIL
+          ? process.env.FCM_CLIENT_EMAIL.replace(/^(.{4}).*(@.*)$/, '$1***$2')
+          : null,
       },
       FCM_PRIVATE_KEY: {
         present: !!privateKeyRaw,
         length: privateKeyRaw?.length || 0,
         hasBeginMarker: privateKeyRaw?.includes('BEGIN PRIVATE KEY') ?? false,
         hasEscapedNewlines: privateKeyRaw?.includes('\\n') ?? false,
+        hasCR: privateKeyRaw?.includes('\r') ?? false,
       },
+    },
+    loaderCheck: {
+      source: null as string | null,
+      ok: false,
+      projectId: null as string | null,
+      privateKeyStartsWith: null as string | null,
+      privateKeyEndsWith: null as string | null,
+      privateKeyRealLength: 0,
+      privateKeyHasCR: false,
+      privateKeyNewlineCount: 0,
     },
     oauthCheck: {
       ok: false,
@@ -68,18 +80,29 @@ export async function GET(req: NextRequest) {
     },
   }
 
-  if (!projectId || !clientEmail || !privateKeyRaw) {
-    report.oauthCheck.error = 'one_or_more_env_vars_missing'
+  const creds = loadFcmCredentials()
+  if (!creds) {
+    report.loaderCheck.ok = false
+    report.oauthCheck.error = 'no_valid_credentials'
     return NextResponse.json(report, { status: 200 })
   }
 
-  const privateKey = privateKeyRaw.replace(/\\n/g, '\n')
+  report.loaderCheck.source = base64Raw ? 'base64' : 'three_env_vars'
+  report.loaderCheck.ok = true
+  report.loaderCheck.projectId = creds.projectId
+  report.loaderCheck.privateKeyStartsWith = creds.privateKey.slice(0, 30)
+  report.loaderCheck.privateKeyEndsWith = creds.privateKey.slice(-30)
+  report.loaderCheck.privateKeyRealLength = creds.privateKey.length
+  report.loaderCheck.privateKeyHasCR = creds.privateKey.includes('\r')
+  report.loaderCheck.privateKeyNewlineCount = (
+    creds.privateKey.match(/\n/g) || []
+  ).length
 
   try {
     const nowSec = Math.floor(Date.now() / 1000)
     const header = { alg: 'RS256', typ: 'JWT' }
     const claim = {
-      iss: clientEmail,
+      iss: creds.clientEmail,
       scope: 'https://www.googleapis.com/auth/firebase.messaging',
       aud: 'https://oauth2.googleapis.com/token',
       iat: nowSec,
@@ -89,7 +112,7 @@ export async function GET(req: NextRequest) {
     const toSign = `${enc(header)}.${enc(claim)}`
     const signer = crypto.createSign('RSA-SHA256')
     signer.update(toSign)
-    const signature = signer.sign(privateKey).toString('base64url')
+    const signature = signer.sign(creds.privateKey).toString('base64url')
     const jwt = `${toSign}.${signature}`
 
     const res = await fetch('https://oauth2.googleapis.com/token', {

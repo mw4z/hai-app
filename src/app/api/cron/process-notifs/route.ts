@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import crypto from 'crypto'
+import { loadFcmCredentials } from '@/lib/fcm'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -33,9 +34,9 @@ async function getFcmAccessToken(): Promise<string> {
   if (cachedAccessToken && cachedAccessToken.expiresAt > Date.now() + 60_000) {
     return cachedAccessToken.token
   }
-  const clientEmail = process.env.FCM_CLIENT_EMAIL
-  const privateKey = process.env.FCM_PRIVATE_KEY?.replace(/\\n/g, '\n')
-  if (!clientEmail || !privateKey) throw new Error('FCM credentials not configured')
+  const creds = loadFcmCredentials()
+  if (!creds) throw new Error('FCM credentials not configured')
+  const { clientEmail, privateKey } = creds
 
   const nowSec = Math.floor(Date.now() / 1000)
   const header = { alg: 'RS256', typ: 'JWT' }
@@ -96,8 +97,9 @@ async function sendFcmBatch(
   const result: FcmSendResult = { success: 0, failed: 0, invalidTokens: [] }
   if (tokens.length === 0) return result
 
-  const projectId = process.env.FCM_PROJECT_ID
-  if (!projectId) throw new Error('FCM_PROJECT_ID not set')
+  const creds = loadFcmCredentials()
+  if (!creds) throw new Error('FCM credentials not configured')
+  const projectId = creds.projectId
 
   const accessToken = await getFcmAccessToken()
   const url = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`
