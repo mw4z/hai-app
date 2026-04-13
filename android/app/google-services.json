@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "79053592280",
+    "project_id": "hai-app-db3d5",
+    "storage_bucket": "hai-app-db3d5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:79053592280:android:03f0dd1669f49cac9ea9ad",
+        "android_client_info": {
+          "package_name": "com.hai.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAnuPN1ncwEr8mlhTIx5d9g4PbOJJeiJWc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
