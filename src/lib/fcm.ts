@@ -14,16 +14,30 @@
  *
  * Returns null if no valid credentials are found.
  */
-export function loadFcmCredentials(): {
+export interface FcmCredentials {
   projectId: string
   clientEmail: string
   privateKey: string
-} | null {
+  source: 'base64' | 'three_env_vars'
+  base64Error?: string
+}
+
+export function loadFcmCredentials(): FcmCredentials | null {
+  let base64Error: string | undefined
+
   // Preferred: single base64-encoded JSON
   const b64 = process.env.FCM_SERVICE_ACCOUNT_BASE64
   if (b64) {
     try {
-      const decoded = Buffer.from(b64, 'base64').toString('utf-8')
+      const decoded = Buffer.from(b64.trim(), 'base64').toString('utf-8')
+      // Sanity check: decoded content must start with `{` and contain `project_id`
+      if (!decoded.trimStart().startsWith('{')) {
+        throw new Error(
+          'decoded_not_json (first byte: ' +
+            JSON.stringify(decoded.slice(0, 20)) +
+            ')',
+        )
+      }
       const json = JSON.parse(decoded) as {
         project_id?: string
         client_email?: string
@@ -34,10 +48,13 @@ export function loadFcmCredentials(): {
           projectId: json.project_id,
           clientEmail: json.client_email,
           privateKey: json.private_key,
+          source: 'base64',
         }
       }
-    } catch (err) {
-      console.error('[FCM] base64 decode failed:', err)
+      throw new Error('decoded_json_missing_required_fields')
+    } catch (err: any) {
+      base64Error = err?.message || String(err)
+      console.error('[FCM] base64 decode failed:', base64Error)
     }
   }
 
@@ -54,5 +71,11 @@ export function loadFcmCredentials(): {
     privateKey = privateKey.slice(1, -1)
   }
 
-  return { projectId, clientEmail, privateKey }
+  return {
+    projectId,
+    clientEmail,
+    privateKey,
+    source: 'three_env_vars',
+    base64Error,
+  }
 }

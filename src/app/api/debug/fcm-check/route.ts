@@ -38,11 +38,22 @@ export async function GET(req: NextRequest) {
   const privateKeyRaw = process.env.FCM_PRIVATE_KEY
   const base64Raw = process.env.FCM_SERVICE_ACCOUNT_BASE64
 
+  // Quick sanity check on the base64 env var
+  let base64Preview: string | null = null
+  let base64LooksLikeB64 = false
+  if (base64Raw) {
+    base64Preview = base64Raw.trim().slice(0, 20)
+    // Real base64 only uses A-Z a-z 0-9 + / = (no PEM dashes, no spaces)
+    base64LooksLikeB64 = /^[A-Za-z0-9+/]+=*$/.test(base64Raw.trim())
+  }
+
   const report: Record<string, any> = {
     envCheck: {
       FCM_SERVICE_ACCOUNT_BASE64: {
         present: !!base64Raw,
         length: base64Raw?.length || 0,
+        preview: base64Preview,
+        looksLikeBase64: base64LooksLikeB64,
       },
       FCM_PROJECT_ID: {
         present: !!process.env.FCM_PROJECT_ID,
@@ -87,7 +98,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(report, { status: 200 })
   }
 
-  report.loaderCheck.source = base64Raw ? 'base64' : 'three_env_vars'
+  report.loaderCheck.source = creds.source
+  report.loaderCheck.base64Error = creds.base64Error || null
   report.loaderCheck.ok = true
   report.loaderCheck.projectId = creds.projectId
   report.loaderCheck.privateKeyStartsWith = creds.privateKey.slice(0, 30)
