@@ -8,6 +8,7 @@ import PostCard from '@/components/PostCard'
 import PollCard from '@/components/PollCard'
 import BottomNav from '@/components/BottomNav'
 import EmergencyBanner from '@/components/EmergencyBanner'
+import InviteLeaderboardCard from '@/components/InviteLeaderboardCard'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import QuickAskSheet from '@/components/QuickAskSheet'
 import { FiBell, FiPlus, FiMapPin, FiX, FiSearch, FiFilter, FiCheck } from 'react-icons/fi'
@@ -571,6 +572,9 @@ export default function FeedClient({
         </div>
       )}
 
+      {/* Emergency alerts — pinned above everything */}
+      <EmergencyBanner />
+
       {/* Active polls */}
       {polls.length > 0 && selectedCategory === 'ALL' && (
         <div className="px-4 pt-3 space-y-3">
@@ -580,8 +584,8 @@ export default function FeedClient({
         </div>
       )}
 
-      {/* Emergency alerts — pinned above everything */}
-      <EmergencyBanner />
+      {/* Invite leaderboard — ALL tab only, self-hides when <2 leaders */}
+      {selectedCategory === 'ALL' && <InviteLeaderboardCard />}
 
       {/* Posts */}
       <div className="px-4 py-4 space-y-3">
