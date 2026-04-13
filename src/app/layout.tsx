@@ -8,6 +8,7 @@ import AppSplash from '@/components/AppSplash'
 import RouteTransition from '@/components/RouteTransition'
 import ArrivalAlert from '@/components/ArrivalAlert'
 import CapacitorBridge from '@/components/CapacitorBridge'
+import PushRegistration from '@/components/PushRegistration'
 import ScrollReset from '@/components/ScrollReset'
 import { LangProvider } from '@/hooks/useLanguage'
 import { checkEnvironment } from '@/lib/env-check'
@@ -97,6 +98,7 @@ export default function RootLayout({
         `}} />
         <AppSplash />
         <CapacitorBridge />
+        <PushRegistration />
         <LangProvider initialLang={lang}>
           <Toaster
             position="top-center"

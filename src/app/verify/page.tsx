@@ -65,6 +65,9 @@ function VerifyForm() {
         try { sessionStorage.setItem('hai_show_tour', '1') } catch {}
         router.push('/onboarding')
       } else {
+        // Returning user — fire auth-ready so push registration can kick in.
+        // New users will fire this themselves after onboarding completes.
+        try { window.dispatchEvent(new CustomEvent('hai:auth-ready')) } catch {}
         router.push('/feed')
       }
     } catch {

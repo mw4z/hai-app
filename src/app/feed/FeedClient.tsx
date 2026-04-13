@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import PostCard from '@/components/PostCard'
 import PollCard from '@/components/PollCard'
 import BottomNav from '@/components/BottomNav'
+import EmergencyBanner from '@/components/EmergencyBanner'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import QuickAskSheet from '@/components/QuickAskSheet'
 import { FiBell, FiPlus, FiMapPin, FiX, FiSearch, FiFilter, FiCheck } from 'react-icons/fi'
@@ -578,6 +579,9 @@ export default function FeedClient({
           ))}
         </div>
       )}
+
+      {/* Emergency alerts — pinned above everything */}
+      <EmergencyBanner />
 
       {/* Posts */}
       <div className="px-4 py-4 space-y-3">

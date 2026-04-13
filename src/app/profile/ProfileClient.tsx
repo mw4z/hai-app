@@ -997,32 +997,7 @@ export default function ProfileClient({ user, postCount }: Props) {
         openSection={openSection}
         setOpenSection={setOpenSection}
       >
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 text-center">
-          <div className="w-14 h-14 bg-primary-50 dark:bg-primary-900/20 rounded-full flex items-center justify-center mx-auto mb-3">
-            <FiShare2 className="w-6 h-6 text-primary-600" />
-          </div>
-          <p className="text-sm font-semibold text-gray-800 dark:text-white mb-1">
-            {lang === 'en' ? 'Share Hai with your neighbors' : 'شارك حي مع أهل حيّك'}
-          </p>
-          <p className="text-xs text-gray-400 mb-4">hai-app.net</p>
-          <button
-            onClick={async () => {
-              const url = 'https://hai-app.net'
-              const text = lang === 'en'
-                ? '🏘️ Join Hai — connect with your neighbors! Find services, share alerts, and build your community.'
-                : '🏘️ انضم لتطبيق حي — تواصل مع جيرانك! خدمات، تنبيهات، سوق، ومشاوير في حيّك.'
-              if (navigator.share) {
-                try { await navigator.share({ title: 'حي | Hai', text, url }) } catch { /* cancelled */ }
-              } else {
-                await navigator.clipboard?.writeText(`${text}\n${url}`)
-                toast.success(lang === 'en' ? 'Link copied!' : 'تم نسخ الرابط!')
-              }
-            }}
-            className="w-full py-3 bg-primary-600 text-white font-semibold text-sm rounded-xl active:scale-95 transition-transform glow-primary"
-          >
-            {lang === 'en' ? 'Share App Link' : 'مشاركة رابط التطبيق'}
-          </button>
-        </div>
+        <InviteCard lang={lang} />
       </AccordionSection>
       </div>
 
@@ -1886,6 +1861,187 @@ function RepSection({ userId, reputation, lang, t }: { userId: string; reputatio
           <p className="text-xs text-gray-500">⭐ {lang === 'en' ? 'Get a positive rating' : lang === 'ur' ? 'مثبت درجہ بندی حاصل کریں' : 'احصل على تقييم إيجابي'}</p>
           <p className="text-xs text-gray-500">💬 {lang === 'en' ? 'Help with useful comments' : lang === 'ur' ? 'مفید تبصروں سے پڑوسیوں کی مدد کریں' : 'ساعد جيرانك بتعليقات مفيدة'}</p>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Invite card — fetches /api/invites/my-code, shows code + stats + share ───
+const TIER_ICONS = ['🏘️', '🥉', '🥈', '🥇', '💎']
+const TIER_LABELS_AR = ['جديد', 'برونزي', 'فضي', 'ذهبي', 'بلاتيني']
+const TIER_LABELS_EN = ['Newcomer', 'Bronze', 'Silver', 'Gold', 'Platinum']
+
+function InviteCard({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
+  const [data, setData] = useState<{
+    code: string
+    shareUrl: string
+    pending: number
+    qualified: number
+    rewarded: number
+    badgeTier: number
+    nextTierAt: number | null
+  } | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/invites/my-code')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled) return
+        if (d) setData(d)
+        setLoading(false)
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function handleShare() {
+    if (!data) return
+    const text =
+      lang === 'en'
+        ? `🏘️ Join my neighborhood on Hai — use my code: ${data.code}`
+        : `🏘️ انضم لجيرانك في حي — كود الدعوة: ${data.code}`
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'حي | Hai',
+          text,
+          url: data.shareUrl,
+        })
+      } else {
+        await navigator.clipboard?.writeText(`${text}\n${data.shareUrl}`)
+        toast.success(lang === 'en' ? 'Link copied!' : 'تم نسخ الرابط!')
+      }
+    } catch {
+      /* share sheet cancelled */
+    }
+  }
+
+  async function handleCopy() {
+    if (!data) return
+    try {
+      await navigator.clipboard?.writeText(data.code)
+      toast.success(lang === 'en' ? 'Code copied!' : 'تم نسخ الكود!')
+    } catch {}
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 text-center">
+        <div className="h-20 animate-pulse bg-gray-50 dark:bg-gray-900/40 rounded-xl" />
+      </div>
+    )
+  }
+
+  if (!data) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 text-center">
+        <p className="text-xs text-gray-400">
+          {lang === 'en' ? 'Could not load invite code' : 'تعذر تحميل كود الدعوة'}
+        </p>
+      </div>
+    )
+  }
+
+  const tierIcon = TIER_ICONS[data.badgeTier] || '🏘️'
+  const tierLabel =
+    lang === 'en'
+      ? TIER_LABELS_EN[data.badgeTier] || 'Newcomer'
+      : TIER_LABELS_AR[data.badgeTier] || 'جديد'
+
+  const progressText = data.nextTierAt
+    ? lang === 'en'
+      ? `${data.qualified} / ${data.nextTierAt} to next tier`
+      : `${data.qualified} / ${data.nextTierAt} للمستوى التالي`
+    : lang === 'en'
+      ? 'Top tier reached!'
+      : 'وصلت لأعلى مستوى!'
+
+  const progressPct = data.nextTierAt
+    ? Math.min(100, Math.round((data.qualified / data.nextTierAt) * 100))
+    : 100
+
+  return (
+    <div className="space-y-3">
+      {/* Tier + stats card */}
+      <div className="bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-900/20 dark:to-primary-800/10 rounded-2xl border border-primary-200 dark:border-primary-800/30 p-4">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="text-3xl">{tierIcon}</div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-primary-700 dark:text-primary-300 font-semibold">
+              {tierLabel}
+            </p>
+            <p className="text-[11px] text-primary-600/70 dark:text-primary-400/70">
+              {progressText}
+            </p>
+          </div>
+        </div>
+        {data.nextTierAt && (
+          <div className="w-full h-1.5 bg-white/50 dark:bg-black/20 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary-600 rounded-full transition-all"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        )}
+        <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+          <div>
+            <p className="text-base font-bold text-gray-800 dark:text-white">
+              {data.rewarded}
+            </p>
+            <p className="text-[10px] text-gray-500">
+              {lang === 'en' ? 'Rewarded' : 'مكافآت'}
+            </p>
+          </div>
+          <div>
+            <p className="text-base font-bold text-gray-800 dark:text-white">
+              {data.pending}
+            </p>
+            <p className="text-[10px] text-gray-500">
+              {lang === 'en' ? 'Pending' : 'معلّقة'}
+            </p>
+          </div>
+          <div>
+            <p className="text-base font-bold text-gray-800 dark:text-white">
+              {data.qualified}
+            </p>
+            <p className="text-[10px] text-gray-500">
+              {lang === 'en' ? 'Qualified' : 'مؤهلة'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Code + share */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 text-center">
+          {lang === 'en' ? 'Your invite code' : 'كود دعوتك'}
+        </p>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="w-full py-3 mb-3 bg-gray-50 dark:bg-gray-900/40 rounded-xl font-mono text-lg font-bold tracking-wider text-gray-800 dark:text-white active:scale-[0.98] transition-transform"
+        >
+          {data.code}
+        </button>
+        <button
+          type="button"
+          onClick={handleShare}
+          className="w-full py-3 bg-primary-600 text-white font-semibold text-sm rounded-xl active:scale-95 transition-transform glow-primary flex items-center justify-center gap-2"
+        >
+          <FiShare2 className="w-4 h-4" />
+          {lang === 'en' ? 'Invite Neighbors' : 'ادعُ جيرانك'}
+        </button>
+        <p className="text-[11px] text-gray-400 mt-3 text-center leading-relaxed">
+          {lang === 'en'
+            ? 'Earn 50 rep when a neighbor joins through your code'
+            : 'احصل على 50 نقطة عند انضمام جار عبر كودك'}
+        </p>
       </div>
     </div>
   )

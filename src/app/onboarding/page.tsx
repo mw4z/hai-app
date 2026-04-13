@@ -191,6 +191,12 @@ export default function OnboardingPage() {
         localStorage.removeItem('hai_splash')
       } catch {}
 
+      // Signal push registration that auth + profile are fully ready.
+      // Delaying this until after onboarding makes the permission prompt
+      // feel contextual ("notify me about my neighborhood") instead of
+      // firing immediately after OTP.
+      try { window.dispatchEvent(new CustomEvent('hai:auth-ready')) } catch {}
+
       // Fire-and-forget invite redemption — MUST NOT block onboarding
       tryRedeemPendingInvite()
         .then((result) => {
