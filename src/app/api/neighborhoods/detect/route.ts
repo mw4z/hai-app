@@ -58,9 +58,14 @@ export async function GET(req: NextRequest) {
   // the onboarding fallback picker when precise GPS failed. Must ALWAYS
   // return at least one candidate when any neighborhood centroid exists,
   // so the user is never left with an empty list after a location miss.
+  //
+  // Radius depends on GPS accuracy:
+  //   <150m  → 2km (user was precise but not in a polygon)
+  //   ≥150m  → 4km (user was known-imprecise; wider net)
+  // Bounded at MAX_RESULTS regardless.
   if (searchParams.get('nearby') === 'true') {
-    const FALLBACK_RADIUS_KM = 8
-    const MAX_RESULTS = 6
+    const MAX_RESULTS = 4
+    const radiusKm = accuracy < 150 ? 2 : 4
 
     const scored = neighborhoods
       .filter(n => n.lat != null && n.lng != null)
@@ -73,15 +78,14 @@ export async function GET(req: NextRequest) {
       }))
       .sort((a, b) => a.distanceKm - b.distanceKm)
 
-    // First, the ones within the fallback radius
-    let withinRadius = scored.filter(n => n.distanceKm <= FALLBACK_RADIUS_KM)
+    let withinRadius = scored.filter(n => n.distanceKm <= radiusKm)
 
-    // If nothing is within radius but we have neighborhoods at all, fall
-    // back to the 3 closest (still bounded — never the whole database).
-    // This matches the product rule: the user must always have a real
-    // next step, but the list stays small and deterministic.
+    // Safety: never a dead-end. If the radius catches nothing but the DB
+    // has at least one neighborhood, offer the 2 closest anyway. The
+    // server-side verifier will still reject out-of-range selections, so
+    // this only widens the display, not the authentication surface.
     if (withinRadius.length === 0 && scored.length > 0) {
-      withinRadius = scored.slice(0, 3)
+      withinRadius = scored.slice(0, 2)
     }
 
     return NextResponse.json(withinRadius.slice(0, MAX_RESULTS))

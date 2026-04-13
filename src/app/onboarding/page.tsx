@@ -44,7 +44,7 @@ interface NearbyNeighborhood {
 }
 
 // Must match src/lib/location/verify.ts
-const NEARBY_MAX_RESULTS = 6
+const NEARBY_MAX_RESULTS = 4
 
 export default function OnboardingPage() {
   const router = useRouter()

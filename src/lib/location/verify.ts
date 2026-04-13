@@ -16,11 +16,13 @@
 import { pointInPolygon, pointInBbox } from './polygon'
 
 // ─── Tunable constants ────────────────────────────────────────────────────
-/** Max distance (km) from neighborhood center for a fallback (low-accuracy) match */
-export const FALLBACK_RADIUS_KM = 8
+/** Max distance (km) from neighborhood center for a LOW-accuracy fallback match (≥150m GPS) */
+export const FALLBACK_RADIUS_KM = 4
+/** Max distance (km) when GPS was precise but user still landed outside the polygon */
+export const PRECISE_OUTSIDE_RADIUS_KM = 2
 /** Max number of nearby neighborhoods shown to users after low-accuracy GPS */
-export const MAX_NEARBY_RESULTS = 6
-/** Accuracy threshold (meters) above which we treat the reading as low-accuracy fallback */
+export const MAX_NEARBY_RESULTS = 4
+/** Accuracy threshold (meters). <150m is treated as precise, ≥150m as low-accuracy fallback */
 export const LOW_ACCURACY_THRESHOLD_M = 150
 
 export type VerifyResult = 'precise' | 'fallback' | 'rejected'
@@ -90,13 +92,15 @@ export function verifyNeighborhoodAssignment(
   }
   const distanceKm = haversineKm(lat, lng, neighborhood.lat, neighborhood.lng)
 
-  // When GPS was precise but the user still landed outside the polygon,
-  // require a tight radius. When GPS was known-imprecise (low_accuracy),
-  // allow the full fallback radius — matches what the client offered.
+  // accuracy <150m  → GPS was precise, but user landed outside the polygon.
+  //                    Require a tight 2km radius (prevents "close enough"
+  //                    misassignments when polygons are well-defined).
+  // accuracy ≥150m → GPS was known-imprecise. Allow the 4km fallback radius,
+  //                    matching what the client offered in the nearby picker.
   const maxKm =
-    accuracy > LOW_ACCURACY_THRESHOLD_M
-      ? FALLBACK_RADIUS_KM
-      : Math.min(FALLBACK_RADIUS_KM, 2)
+    accuracy < LOW_ACCURACY_THRESHOLD_M
+      ? PRECISE_OUTSIDE_RADIUS_KM
+      : FALLBACK_RADIUS_KM
 
   if (distanceKm <= maxKm) return 'fallback'
   return 'rejected'
