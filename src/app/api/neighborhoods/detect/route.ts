@@ -54,9 +54,15 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ?nearby=true → return all within 10km sorted by distance (for fallback UI)
+  // ?nearby=true → return nearby neighborhoods sorted by distance. Used by
+  // the onboarding fallback picker when precise GPS failed. Must ALWAYS
+  // return at least one candidate when any neighborhood centroid exists,
+  // so the user is never left with an empty list after a location miss.
   if (searchParams.get('nearby') === 'true') {
-    const withDistances = neighborhoods
+    const FALLBACK_RADIUS_KM = 8
+    const MAX_RESULTS = 6
+
+    const scored = neighborhoods
       .filter(n => n.lat != null && n.lng != null)
       .map(n => ({
         id: n.id,
@@ -65,9 +71,20 @@ export async function GET(req: NextRequest) {
         distanceKm: Math.round(haversineKm(lat, lng, n.lat!, n.lng!) * 10) / 10,
         city: n.city,
       }))
-      .filter(n => n.distanceKm <= 10)
       .sort((a, b) => a.distanceKm - b.distanceKm)
-    return NextResponse.json(withDistances)
+
+    // First, the ones within the fallback radius
+    let withinRadius = scored.filter(n => n.distanceKm <= FALLBACK_RADIUS_KM)
+
+    // If nothing is within radius but we have neighborhoods at all, fall
+    // back to the 3 closest (still bounded — never the whole database).
+    // This matches the product rule: the user must always have a real
+    // next step, but the list stays small and deterministic.
+    if (withinRadius.length === 0 && scored.length > 0) {
+      withinRadius = scored.slice(0, 3)
+    }
+
+    return NextResponse.json(withinRadius.slice(0, MAX_RESULTS))
   }
 
   // ─── If polygon match found ──────────────────────────────────────────────

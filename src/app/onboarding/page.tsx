@@ -3,14 +3,28 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiMapPin, FiLoader, FiCheck, FiArrowRight, FiArrowLeft, FiSearch } from 'react-icons/fi'
+import { FiMapPin, FiLoader, FiCheck, FiArrowRight, FiArrowLeft, FiRefreshCw } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useGPSLocation } from '@/hooks/useGPSLocation'
 import { tryRedeemPendingInvite } from '@/lib/pendingInvite'
 
 type Step = 'name' | 'gender' | 'account_type' | 'location'
 
-type LocationStep = 'ask' | 'detecting' | 'confirm' | 'nearby' | 'denied' | 'timeout' | 'low_accuracy' | 'manual'
+// Simplified location states:
+//   ask            → user hasn't shared location yet (initial prompt)
+//   detecting      → GPS is running
+//   confirm        → precise match found, ask user to confirm
+//   nearby         → either low-accuracy fallback OR user said "not my neighborhood" —
+//                    show the short nearby list derived from the captured coordinates
+//   denied         → permission explicitly denied; retry only
+//   timeout        → location request failed with no sample at all; retry only
+type LocationStep =
+  | 'ask'
+  | 'detecting'
+  | 'confirm'
+  | 'nearby'
+  | 'denied'
+  | 'timeout'
 
 interface DetectedNeighborhood {
   id: string
@@ -20,6 +34,17 @@ interface DetectedNeighborhood {
   confidence: 'high' | 'medium' | 'low'
   city: { id: string; name: string; nameEn: string }
 }
+
+interface NearbyNeighborhood {
+  id: string
+  name: string
+  nameEn: string
+  distanceKm: number
+  city: { name: string; nameEn: string }
+}
+
+// Must match src/lib/location/verify.ts
+const NEARBY_MAX_RESULTS = 6
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -31,18 +56,15 @@ export default function OnboardingPage() {
   const [gender, setGender] = useState<'MALE' | 'FEMALE' | 'UNSPECIFIED'>('MALE')
   const [accountType, setAccountType] = useState<'NORMAL' | 'SERVICE_PROVIDER'>('NORMAL')
 
-  // Location state — starts at 'ask', NOT 'detecting'
   const [locationStep, setLocationStep] = useState<LocationStep>('ask')
   const [detectedNeighborhood, setDetectedNeighborhood] = useState<DetectedNeighborhood | null>(null)
   const [selectedNeighborhoodId, setSelectedNeighborhoodId] = useState('')
   const [loading, setLoading] = useState(false)
-  const [lowAccuracyRetries, setLowAccuracyRetries] = useState(0)
-  const [nearbyList, setNearbyList] = useState<{ id: string; name: string; nameEn: string; distanceKm: number; city: { name: string; nameEn: string } }[]>([])
+  const [nearbyList, setNearbyList] = useState<NearbyNeighborhood[]>([])
+  const [nearbyLoading, setNearbyLoading] = useState(false)
   const [userLat, setUserLat] = useState<number | null>(null)
   const [userLng, setUserLng] = useState<number | null>(null)
-  const [manualSearch, setManualSearch] = useState('')
-  const [allNeighborhoods, setAllNeighborhoods] = useState<{ id: string; name: string; nameEn: string; city: { name: string; nameEn: string } }[]>([])
-  const [loadingNeighborhoods, setLoadingNeighborhoods] = useState(false)
+  const [userAccuracy, setUserAccuracy] = useState<number | null>(null)
 
   const gps = useGPSLocation()
 
@@ -53,17 +75,16 @@ export default function OnboardingPage() {
     </button>
   )
 
-  // Direct browser geolocation as ultimate fallback
+  // Ultimate fallback: plain browser geolocation, low accuracy allowed
   function tryDirectGeolocation() {
     console.log('[ONBOARD-LOCATION] Trying direct navigator.geolocation...')
     if (!navigator.geolocation) {
-      console.log('[ONBOARD-LOCATION] navigator.geolocation not available')
-      setLocationStep('denied')
+      setLocationStep('timeout')
       return
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        console.log('[ONBOARD-LOCATION] Direct geolocation SUCCESS:', pos.coords.latitude, pos.coords.longitude)
+        console.log('[ONBOARD-LOCATION] Direct geolocation SUCCESS:', pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy)
         resolveNeighborhood(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, false)
       },
       (err) => {
@@ -75,15 +96,14 @@ export default function OnboardingPage() {
     )
   }
 
-  // Called ONLY by explicit user button tap — never by useEffect or mount
   function requestLocation() {
     setLocationStep('detecting')
     setDetectedNeighborhood(null)
     setSelectedNeighborhoodId('')
+    setNearbyList([])
     gps.startCollecting()
   }
 
-  // Single effect: react when GPS finishes collecting
   useEffect(() => {
     if (gps.collecting) return
     if (locationStep !== 'detecting') return
@@ -95,12 +115,10 @@ export default function OnboardingPage() {
       hasResult: !!result,
       accuracy: result?.accuracy,
       confidence: result?.confidence,
-      lowAccuracyRetries,
     })
 
-    // denied / unavailable → denied screen
+    // denied / unavailable → try direct browser fallback once to trigger permission dialog
     if (error === 'denied' || error === 'unavailable') {
-      // Last resort: try direct browser geolocation — this triggers the iOS permission dialog
       console.log('[ONBOARD-LOCATION] Hook failed with', error, '— trying direct geolocation fallback')
       tryDirectGeolocation()
       return
@@ -113,19 +131,14 @@ export default function OnboardingPage() {
       return
     }
 
-    // low_accuracy error from hook — but we still have a sample
+    // Low accuracy: still have a usable coordinate for the fallback nearby list
     if (error === 'low_accuracy' && result) {
-      if (lowAccuracyRetries >= 1) {
-        console.log('[ONBOARD-LOCATION] Low-accuracy escape: resolving after', lowAccuracyRetries + 1, 'attempts')
-        resolveNeighborhood(result.lat, result.lng, result.accuracy, true)
-      } else {
-        setLowAccuracyRetries(prev => prev + 1)
-        setLocationStep('low_accuracy')
-      }
+      console.log('[ONBOARD-LOCATION] Low-accuracy sample — fetching nearby list from', result.lat, result.lng)
+      fetchNearbyAndShowPicker(result.lat, result.lng, result.accuracy)
       return
     }
 
-    // We have a usable result (high or medium confidence) → resolve
+    // We have a usable result (high or medium confidence) → resolve precisely
     if (result) {
       resolveNeighborhood(result.lat, result.lng, result.accuracy, false)
     }
@@ -135,42 +148,72 @@ export default function OnboardingPage() {
   async function resolveNeighborhood(lat: number, lng: number, accuracy: number, forceConfirm: boolean) {
     setUserLat(lat)
     setUserLng(lng)
+    setUserAccuracy(accuracy)
     try {
       const res = await fetch(`/api/neighborhoods/detect?lat=${lat}&lng=${lng}&accuracy=${accuracy}`)
-      if (!res.ok) { setLocationStep('timeout'); return }
+      if (!res.ok) {
+        // Detection itself failed — fall back to nearby picker so the user still has a path
+        await fetchNearbyAndShowPicker(lat, lng, accuracy)
+        return
+      }
       const data = await res.json()
+
+      // If the server only managed a low-confidence match, skip straight to
+      // the nearby picker so the user never sees a confusing "we think…" card
+      if (data.confidence === 'low' && !forceConfirm) {
+        await fetchNearbyAndShowPicker(lat, lng, accuracy)
+        return
+      }
 
       setDetectedNeighborhood(data)
       setSelectedNeighborhoodId(data.id)
-
-      if (data.confidence === 'low' && !forceConfirm) {
-        setLocationStep('low_accuracy')
-      } else {
-        setLocationStep('confirm')
-      }
+      setLocationStep('confirm')
     } catch {
-      setLocationStep('timeout')
+      await fetchNearbyAndShowPicker(lat, lng, accuracy)
     }
   }
 
-  async function showNearby() {
-    if (!userLat || !userLng) return
+  /**
+   * Fetch the short nearby list for a given fallback location and render
+   * the nearby picker. This is the key fix for the Apple dead-end: even
+   * when precise resolution fails, the user always has a real next step.
+   */
+  async function fetchNearbyAndShowPicker(lat: number, lng: number, accuracy: number) {
+    setUserLat(lat)
+    setUserLng(lng)
+    setUserAccuracy(accuracy)
+    setNearbyLoading(true)
+    setLocationStep('nearby')
     try {
-      const res = await fetch(`/api/neighborhoods/detect?lat=${userLat}&lng=${userLng}&nearby=true`)
+      const res = await fetch(`/api/neighborhoods/detect?lat=${lat}&lng=${lng}&nearby=true`)
       const data = await res.json()
-      // Filter to 4km and exclude the already-detected one
-      const filtered = (Array.isArray(data) ? data : [])
-        .filter((n: any) => n.distanceKm <= 4 && n.id !== detectedNeighborhood?.id)
-      setNearbyList(filtered)
-      setLocationStep('nearby')
+      const list: NearbyNeighborhood[] = (Array.isArray(data) ? data : []).slice(
+        0,
+        NEARBY_MAX_RESULTS,
+      )
+      setNearbyList(list)
+      // Pre-select the closest so the CTA is always enabled when anything is offered
+      if (list.length > 0) {
+        setSelectedNeighborhoodId(list[0].id)
+        setDetectedNeighborhood({
+          id: list[0].id,
+          name: list[0].name,
+          nameEn: list[0].nameEn,
+          distanceKm: list[0].distanceKm,
+          confidence: 'low',
+          city: { id: '', name: list[0].city.name, nameEn: list[0].city.nameEn },
+        })
+      }
     } catch {
-      // stay on confirm
+      setNearbyList([])
+    } finally {
+      setNearbyLoading(false)
     }
   }
 
   async function handleFinish() {
     if (!selectedNeighborhoodId) {
-      toast.error(lang !== 'en' ? 'لم يتم تحديد الحي' : 'Neighborhood not detected')
+      toast.error(lang !== 'en' ? 'لم يتم تحديد الحي' : 'Neighborhood not selected')
       return
     }
     setLoading(true)
@@ -178,10 +221,30 @@ export default function OnboardingPage() {
       const res = await fetch('/api/auth/complete-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, lastName, gender, accountType, neighborhoodId: selectedNeighborhoodId }),
+        body: JSON.stringify({
+          name,
+          lastName,
+          gender,
+          accountType,
+          neighborhoodId: selectedNeighborhoodId,
+          verifyLat: userLat,
+          verifyLng: userLng,
+          verifyAccuracy: userAccuracy,
+        }),
       })
-      if (!res.ok) { toast.error(t('onboard_error')); return }
-      // Reset tour so it starts automatically on first feed visit
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        if (data.error === 'neighborhood_mismatch') {
+          toast.error(
+            lang === 'en'
+              ? "This neighborhood doesn't match your location"
+              : 'هذا الحي لا يتطابق مع موقعك',
+          )
+          return
+        }
+        toast.error(t('onboard_error'))
+        return
+      }
       try {
         localStorage.removeItem('hai_tour_seen')
         localStorage.removeItem('hai_tour_ride_create')
@@ -191,13 +254,8 @@ export default function OnboardingPage() {
         localStorage.removeItem('hai_splash')
       } catch {}
 
-      // Signal push registration that auth + profile are fully ready.
-      // Delaying this until after onboarding makes the permission prompt
-      // feel contextual ("notify me about my neighborhood") instead of
-      // firing immediately after OTP.
       try { window.dispatchEvent(new CustomEvent('hai:auth-ready')) } catch {}
 
-      // Fire-and-forget invite redemption — MUST NOT block onboarding
       tryRedeemPendingInvite()
         .then((result) => {
           if (result.status === 'success') {
@@ -356,7 +414,7 @@ export default function OnboardingPage() {
       {step === 'location' && (
         <div className="flex-1 flex flex-col">
 
-          {/* A. Initial: ask user to share location — NO auto-request */}
+          {/* A. Initial: ask user to share location */}
           {locationStep === 'ask' && (
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-4">
               <div className="w-20 h-20 rounded-full bg-primary-50 flex items-center justify-center">
@@ -409,7 +467,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* C. Success — confirm detected neighborhood */}
+          {/* C. Precise match — confirm detected neighborhood */}
           {locationStep === 'confirm' && detectedNeighborhood && (
             <div className="flex-1 flex flex-col">
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
@@ -448,7 +506,11 @@ export default function OnboardingPage() {
                 {lang !== 'en' ? 'نعم، هذا حيّي' : 'Yes, this is my neighborhood'}
               </button>
               <button
-                onClick={showNearby}
+                onClick={() => {
+                  if (userLat != null && userLng != null) {
+                    fetchNearbyAndShowPicker(userLat, userLng, userAccuracy ?? 9999)
+                  }
+                }}
                 className="w-full text-sm text-gray-500 underline"
               >
                 {lang !== 'en' ? 'لا، حيّي مختلف' : 'No, my neighborhood is different'}
@@ -456,209 +518,140 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Nearby picker — only reachable from confirm "not my neighborhood" */}
+          {/* D. Nearby picker — used for:
+              - low-accuracy GPS (automatic)
+              - user rejected the precise match (manual)
+              - detect endpoint error (fallback)
+              Always derived from the captured fallback coordinates — server
+              re-validates the selection against those same coordinates. */}
           {locationStep === 'nearby' && (
             <div className="flex-1 flex flex-col">
-              <BackBtn onClick={() => {
-                if (detectedNeighborhood) {
-                  setSelectedNeighborhoodId(detectedNeighborhood.id)
-                  setLocationStep('confirm')
-                } else {
-                  setLocationStep('ask')
-                }
-              }} />
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
                 {lang !== 'en' ? 'اختر حيّك' : 'Choose your neighborhood'}
               </h1>
               <p className="text-gray-500 text-sm mb-4">
-                {lang !== 'en' ? 'الأحياء القريبة من موقعك' : 'Neighborhoods near your location'}
+                {lang === 'en'
+                  ? 'We couldn\'t pinpoint you exactly. Pick from the neighborhoods near your current location.'
+                  : 'تعذّر تحديد موقعك بدقة. اختر من الأحياء القريبة من موقعك الحالي.'}
               </p>
 
-              {nearbyList.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <p className="text-4xl mb-2">😕</p>
-                  <p className="text-sm">
-                    {lang !== 'en' ? 'لا توجد أحياء أخرى قريبة' : 'No other neighborhoods nearby'}
+              {nearbyLoading ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <FiLoader className="w-6 h-6 text-primary-600 animate-spin" />
+                </div>
+              ) : nearbyList.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center text-gray-500">
+                  <div className="text-4xl">😕</div>
+                  <p className="text-sm max-w-xs">
+                    {lang === 'en'
+                      ? "We couldn't find neighborhoods near your location. Please try again."
+                      : 'لم نتمكن من العثور على أحياء قريبة. يرجى المحاولة مرة أخرى.'}
                   </p>
+                  <button
+                    onClick={requestLocation}
+                    className="btn-primary mt-3 flex items-center justify-center gap-2"
+                  >
+                    <FiRefreshCw className="w-4 h-4" />
+                    {lang !== 'en' ? 'إعادة تحديد الموقع' : 'Retry location'}
+                  </button>
                 </div>
               ) : (
-                <div className="space-y-2 mb-6 flex-1 overflow-y-auto">
-                  {nearbyList.map(n => (
-                    <button
-                      key={n.id}
-                      onClick={() => { setSelectedNeighborhoodId(n.id); setDetectedNeighborhood({ ...n, confidence: 'medium' } as any) }}
-                      className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border-2 transition-all ${
-                        selectedNeighborhoodId === n.id
-                          ? 'border-primary-600 bg-primary-600 text-white'
-                          : 'border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600 text-gray-800 dark:text-white'
-                      }`}
-                    >
-                      <span className={`text-xs ${selectedNeighborhoodId === n.id ? 'opacity-70' : 'text-gray-400'}`}>
-                        {n.distanceKm} {lang !== 'en' ? 'كم' : 'km'} · {dn(n.city.name, n.city.nameEn)}
-                      </span>
-                      <span className="font-medium">{dn(n.name, n.nameEn)}</span>
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <div className="space-y-2 mb-6 flex-1 overflow-y-auto">
+                    {nearbyList.map(n => (
+                      <button
+                        key={n.id}
+                        onClick={() => {
+                          setSelectedNeighborhoodId(n.id)
+                          setDetectedNeighborhood({
+                            id: n.id,
+                            name: n.name,
+                            nameEn: n.nameEn,
+                            distanceKm: n.distanceKm,
+                            confidence: 'low',
+                            city: { id: '', name: n.city.name, nameEn: n.city.nameEn },
+                          })
+                        }}
+                        className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border-2 transition-all ${
+                          selectedNeighborhoodId === n.id
+                            ? 'border-primary-600 bg-primary-600 text-white'
+                            : 'border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600 text-gray-800 dark:text-white'
+                        }`}
+                      >
+                        <span className={`text-xs ${selectedNeighborhoodId === n.id ? 'opacity-70' : 'text-gray-400'}`}>
+                          {n.distanceKm} {lang !== 'en' ? 'كم' : 'km'} · {dn(n.city.name, n.city.nameEn)}
+                        </span>
+                        <span className="font-medium">{dn(n.name, n.nameEn)}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={handleFinish}
+                    disabled={loading || !selectedNeighborhoodId}
+                    className="btn-primary flex items-center justify-center gap-2"
+                  >
+                    <FiCheck className="w-4 h-4" />
+                    {loading
+                      ? (lang !== 'en' ? 'جاري الحفظ...' : 'Saving...')
+                      : (lang !== 'en' ? 'تأكيد الحي' : 'Confirm neighborhood')}
+                  </button>
+                  <button
+                    onClick={requestLocation}
+                    className="w-full text-sm text-gray-500 underline mt-3 flex items-center justify-center gap-1.5"
+                  >
+                    <FiRefreshCw className="w-3 h-3" />
+                    {lang !== 'en' ? 'إعادة تحديد الموقع' : 'Retry location'}
+                  </button>
+                </>
               )}
-
-              <button
-                onClick={handleFinish}
-                disabled={loading || !selectedNeighborhoodId}
-                className="btn-primary"
-              >
-                {loading
-                  ? (lang !== 'en' ? 'جاري الحفظ...' : 'Saving...')
-                  : (lang !== 'en' ? 'تأكيد الحي' : 'Confirm neighborhood')}
-              </button>
             </div>
           )}
 
-          {/* D. Denied — permission was explicitly denied */}
+          {/* E. Permission denied — retry only. No "choose any neighborhood" fallback.
+              User must grant permission to use a hyperlocal app. */}
           {locationStep === 'denied' && (
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-4">
               <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center">
                 <FiMapPin className="w-10 h-10 text-red-400" />
               </div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                {lang !== 'en' ? 'تم رفض صلاحية الموقع' : 'Location permission denied'}
+                {lang !== 'en' ? 'صلاحية الموقع مطلوبة' : 'Location permission required'}
               </h1>
-              <p className="text-gray-500 text-sm max-w-xs">
-                {lang === 'ar'
-                  ? 'يرجى تفعيل الموقع للحصول على تجربة أفضل'
-                  : 'Please enable location for a better experience'}
+              <p className="text-gray-500 text-sm max-w-xs leading-relaxed">
+                {lang === 'en'
+                  ? 'Hai connects you with your actual neighborhood. Please allow location access in your device settings and try again.'
+                  : 'حي يربطك بجيرانك الحقيقيين. يرجى تفعيل صلاحية الموقع من إعدادات جهازك والمحاولة مرة أخرى.'}
               </p>
               <button
                 onClick={requestLocation}
-                className="btn-primary mt-4 w-full max-w-xs"
+                className="btn-primary mt-4 w-full max-w-xs flex items-center justify-center gap-2"
               >
+                <FiRefreshCw className="w-4 h-4" />
                 {lang !== 'en' ? 'أعد المحاولة' : 'Try Again'}
-              </button>
-              <button onClick={() => {
-                setLocationStep('manual')
-                if (allNeighborhoods.length === 0 && !loadingNeighborhoods) {
-                  setLoadingNeighborhoods(true)
-                  fetch('/api/neighborhoods/all').then(r => r.json()).then(d => setAllNeighborhoods(d || [])).catch(() => {}).finally(() => setLoadingNeighborhoods(false))
-                }
-              }} className="text-sm text-primary-600 font-medium mt-2">
-                {lang !== 'en' ? 'اختر الحي يدويًا' : 'Choose neighborhood manually'}
               </button>
             </div>
           )}
 
-          {/* E. Timeout — location request failed, NOT permission denied */}
+          {/* F. Timeout — no sample at all. Retry only. */}
           {locationStep === 'timeout' && (
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-4">
               <div className="w-20 h-20 rounded-full bg-amber-50 flex items-center justify-center">
                 <FiLoader className="w-10 h-10 text-amber-400" />
               </div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                {lang !== 'en' ? 'تعذر تحديد موقعك' : 'Could not detect location'}
+                {lang !== 'en' ? 'تعذر تحديد موقعك' : "Couldn't detect your location"}
               </h1>
-              <p className="text-gray-500 text-sm max-w-xs">
-                {lang === 'ar'
-                  ? 'تعذر تحديد موقعك الآن. حاول مرة أخرى'
-                  : 'Could not determine your location right now. Please try again'}
+              <p className="text-gray-500 text-sm max-w-xs leading-relaxed">
+                {lang === 'en'
+                  ? "We couldn't determine your location right now. Make sure location services are on, then try again."
+                  : 'تعذر تحديد موقعك حالياً. تأكد من تفعيل خدمات الموقع وأعد المحاولة.'}
               </p>
               <button
                 onClick={requestLocation}
-                className="btn-primary mt-4 w-full max-w-xs"
+                className="btn-primary mt-4 w-full max-w-xs flex items-center justify-center gap-2"
               >
+                <FiRefreshCw className="w-4 h-4" />
                 {lang !== 'en' ? 'أعد المحاولة' : 'Try Again'}
-              </button>
-              <button onClick={() => {
-                setLocationStep('manual')
-                if (allNeighborhoods.length === 0 && !loadingNeighborhoods) {
-                  setLoadingNeighborhoods(true)
-                  fetch('/api/neighborhoods/all').then(r => r.json()).then(d => setAllNeighborhoods(d || [])).catch(() => {}).finally(() => setLoadingNeighborhoods(false))
-                }
-              }} className="text-sm text-primary-600 font-medium mt-2">
-                {lang !== 'en' ? 'اختر الحي يدويًا' : 'Choose neighborhood manually'}
-              </button>
-            </div>
-          )}
-
-          {/* E2. Manual neighborhood selection */}
-          {locationStep === 'manual' && (
-            <div className="flex-1 flex flex-col">
-              <BackBtn onClick={() => setLocationStep('ask')} />
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                {lang !== 'en' ? 'اختر حيّك' : 'Choose your neighborhood'}
-              </h1>
-              <p className="text-gray-500 text-sm mb-4">
-                {lang !== 'en' ? 'ابحث عن حيّك وحدده' : 'Search and select your neighborhood'}
-              </p>
-              <div className="relative mb-4">
-                <FiSearch className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={manualSearch}
-                  onChange={e => setManualSearch(e.target.value)}
-                  placeholder={lang !== 'en' ? 'ابحث عن حي...' : 'Search neighborhood...'}
-                  className="input-field pr-10"
-                />
-              </div>
-              {loadingNeighborhoods ? (
-                <div className="flex-1 flex items-center justify-center">
-                  <FiLoader className="w-6 h-6 text-primary-600 animate-spin" />
-                </div>
-              ) : (
-                <div className="space-y-2 mb-6 flex-1 overflow-y-auto">
-                  {allNeighborhoods
-                    .filter(n => !manualSearch || n.name.includes(manualSearch) || n.nameEn.toLowerCase().includes(manualSearch.toLowerCase()) || n.city.name.includes(manualSearch) || n.city.nameEn.toLowerCase().includes(manualSearch.toLowerCase()))
-                    .slice(0, 30)
-                    .map(n => (
-                      <button
-                        key={n.id}
-                        onClick={() => { setSelectedNeighborhoodId(n.id); setDetectedNeighborhood({ id: n.id, name: n.name, nameEn: n.nameEn, distanceKm: 0, confidence: 'high', city: { id: '', name: n.city.name, nameEn: n.city.nameEn } }) }}
-                        className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border-2 transition-all ${
-                          selectedNeighborhoodId === n.id
-                            ? 'border-primary-600 bg-primary-600 text-white'
-                            : 'border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white'
-                        }`}
-                      >
-                        <span className={`text-xs ${selectedNeighborhoodId === n.id ? 'opacity-70' : 'text-gray-400'}`}>
-                          {dn(n.city.name, n.city.nameEn)}
-                        </span>
-                        <span className="font-medium">{dn(n.name, n.nameEn)}</span>
-                      </button>
-                    ))}
-                </div>
-              )}
-              <button
-                onClick={handleFinish}
-                disabled={loading || !selectedNeighborhoodId}
-                className="btn-primary"
-              >
-                {loading
-                  ? (lang !== 'en' ? 'جاري الحفظ...' : 'Saving...')
-                  : (lang !== 'en' ? 'تأكيد الحي' : 'Confirm neighborhood')}
-              </button>
-            </div>
-          )}
-
-          {/* F. Low accuracy — got a reading but not precise enough */}
-          {locationStep === 'low_accuracy' && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-amber-50 flex items-center justify-center">
-                <FiMapPin className="w-10 h-10 text-amber-400" />
-              </div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                {lang !== 'en' ? 'دقة الموقع منخفضة' : 'Low location accuracy'}
-              </h1>
-              <p className="text-gray-500 text-sm max-w-xs">
-                {lang === 'ar'
-                  ? 'تم العثور على موقع تقريبي فقط. حاول مرة أخرى للحصول على دقة أعلى'
-                  : 'Only an approximate location was found. Try again for better accuracy'}
-              </p>
-              <button
-                onClick={requestLocation}
-                className="btn-primary mt-4 w-full max-w-xs"
-              >
-                {lang !== 'en' ? 'أعد المحاولة' : 'Try Again'}
-              </button>
-              <button onClick={() => setStep('gender')} className="text-sm text-gray-400 underline mt-2">
-                {t('common_back')}
               </button>
             </div>
           )}
