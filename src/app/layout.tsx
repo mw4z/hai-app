@@ -9,6 +9,7 @@ import RouteTransition from '@/components/RouteTransition'
 import ArrivalAlert from '@/components/ArrivalAlert'
 import CapacitorBridge from '@/components/CapacitorBridge'
 import PushRegistration from '@/components/PushRegistration'
+import SwipeBack from '@/components/SwipeBack'
 import { ConfirmProvider } from '@/components/ConfirmProvider'
 import ScrollReset from '@/components/ScrollReset'
 import { LangProvider } from '@/hooks/useLanguage'
@@ -115,6 +116,7 @@ export default function RootLayout({
             }}
           />
           <PullToRefresh />
+          <SwipeBack />
           <RepToast />
           <ErrorBoundary>
               {children}
