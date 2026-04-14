@@ -47,7 +47,6 @@ export async function GET() {
         { status: { in: ['APPROVED', 'REJECTED'] }, reviewedAt: { gte: recentCutoff } },
       ],
     },
-    orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
     take: 50,
     select: {
       id: true,
@@ -66,8 +65,31 @@ export async function GET() {
     },
   })
 
+  // Sort:
+  //  1. PENDING before reviewed (so mods see work first)
+  //  2. Inside each group: severity critical → warning → info
+  //  3. Tiebreaker: newest first
+  const STATUS_RANK: Record<string, number> = {
+    PENDING: 0,
+    APPROVED: 1,
+    REJECTED: 2,
+    EXPIRED: 3,
+  }
+  const SEVERITY_RANK: Record<string, number> = {
+    critical: 0,
+    warning: 1,
+    info: 2,
+  }
+  const sorted = rows.sort((a, b) => {
+    const sDiff = (STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9)
+    if (sDiff !== 0) return sDiff
+    const svDiff = (SEVERITY_RANK[a.severity] ?? 9) - (SEVERITY_RANK[b.severity] ?? 9)
+    if (svDiff !== 0) return svDiff
+    return b.createdAt.getTime() - a.createdAt.getTime()
+  })
+
   return NextResponse.json(
-    rows.map((r) => ({
+    sorted.map((r) => ({
       id: r.id,
       title: r.title,
       body: r.body,

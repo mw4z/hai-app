@@ -4,7 +4,13 @@ import { getSession } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
-const REQUEST_TTL_HOURS = 2
+/**
+ * Request TTL is intentionally separate from (and longer than) the
+ * broadcast TTL (2h). If a resident reports something just before the
+ * mod team sleeps, a short window would auto-expire the request before
+ * anyone sees it. 8h covers a full working shift.
+ */
+const REQUEST_TTL_HOURS = 8
 const MAX_PER_24H = 3
 const VALID_SEVERITY = ['critical', 'warning', 'info'] as const
 type Severity = (typeof VALID_SEVERITY)[number]

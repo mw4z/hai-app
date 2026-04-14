@@ -11,7 +11,7 @@ import {
   FiShield,
 } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
-import { useConfirm } from './ConfirmProvider'
+import { useConfirm, usePrompt } from './ConfirmProvider'
 
 type Severity = 'critical' | 'warning' | 'info'
 
@@ -39,6 +39,7 @@ export default function EmergencyCreator() {
   const { lang } = useLanguage()
   const dn = (ar: string, en: string) => (lang === 'en' ? en : ar)
   const confirmDialog = useConfirm()
+  const promptDialog = usePrompt()
 
   const [active, setActive] = useState<ActiveAlert[]>([])
   const [loadingActive, setLoadingActive] = useState(true)
@@ -144,27 +145,42 @@ export default function EmergencyCreator() {
   }
 
   async function handleRejectRequest(id: string) {
-    const ok = await confirmDialog({
+    const reason = await promptDialog({
+      title: dn('رفض الطلب', 'Reject request'),
       message: dn(
-        'رفض هذا الطلب؟ لن يُبث للجيران.',
-        'Reject this request? It will not be broadcast.',
+        'اكتب سبب الرفض — سيراه مقدم الطلب.',
+        'Provide a reason for rejection — the requester will see this.',
       ),
-      variant: 'danger',
+      placeholder: dn('السبب...', 'Reason...'),
       confirmText: dn('رفض', 'Reject'),
+      multiline: true,
     })
-    if (!ok) return
+    if (reason === null) return
+    const trimmed = reason.trim()
+    if (trimmed.length < 3) {
+      toast.error(dn('سبب قصير جداً (3 أحرف على الأقل)', 'Reason too short (min 3 chars)'))
+      return
+    }
     setActingOn(id)
     try {
       const res = await fetch(`/api/admin/emergency-requests/${id}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: '' }),
+        body: JSON.stringify({ reason: trimmed }),
       })
       if (res.ok) {
         toast.success(dn('تم الرفض', 'Rejected'))
         refresh()
       } else {
-        toast.error(dn('فشل الرفض', 'Reject failed'))
+        const d = await res.json().catch(() => ({}))
+        if (d.error === 'reason_required') {
+          toast.error(dn('السبب مطلوب', 'Reason is required'))
+        } else if (d.error === 'already_reviewed') {
+          toast.error(dn('تمت المراجعة مسبقاً', 'Already reviewed'))
+          refresh()
+        } else {
+          toast.error(d.error || dn('فشل الرفض', 'Reject failed'))
+        }
       }
     } catch {
       toast.error(dn('فشل الاتصال', 'Connection failed'))

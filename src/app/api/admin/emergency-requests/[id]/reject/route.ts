@@ -5,14 +5,15 @@ import { getSession } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 
 const ADMIN_ROLES = ['NEIGHBORHOOD_MOD', 'PLATFORM_MOD', 'SUPER_ADMIN']
+const MIN_REASON_LEN = 3
 const MAX_REASON_LEN = 200
 
 /**
  * POST /api/admin/emergency-requests/[id]/reject
  *
  * Mod rejects a pending emergency request. Terminal — the request is
- * marked REJECTED with an optional reason and no alert is created.
- * The requester can see the rejection + reason via /api/emergency/requests/mine.
+ * marked REJECTED with a required reason and no alert is created.
+ * The requester sees the rejection + reason via /api/emergency/requests/mine.
  */
 export async function POST(
   req: NextRequest,
@@ -33,7 +34,13 @@ export async function POST(
   }
 
   const raw = (await req.json().catch(() => null)) as { reason?: string } | null
-  const reason = String(raw?.reason || '').trim().slice(0, MAX_REASON_LEN) || null
+  const reason = String(raw?.reason || '').trim().slice(0, MAX_REASON_LEN)
+  if (reason.length < MIN_REASON_LEN) {
+    return NextResponse.json(
+      { error: 'reason_required', message: 'A rejection reason is required' },
+      { status: 400 },
+    )
+  }
 
   const request = await db.emergencyAlertRequest.findUnique({
     where: { id: params.id },
@@ -57,8 +64,9 @@ export async function POST(
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
 
-  await db.emergencyAlertRequest.update({
-    where: { id: request.id },
+  // Optimistic concurrency: only flip if still PENDING
+  const claim = await db.emergencyAlertRequest.updateMany({
+    where: { id: request.id, status: 'PENDING' },
     data: {
       status: 'REJECTED',
       rejectedReason: reason,
@@ -66,6 +74,12 @@ export async function POST(
       reviewedAt: new Date(),
     },
   })
+  if (claim.count === 0) {
+    return NextResponse.json(
+      { error: 'already_reviewed', message: 'Another mod just reviewed this request' },
+      { status: 409 },
+    )
+  }
 
   console.log('[EMERGENCY_REQUEST] rejected', {
     requestId: request.id,

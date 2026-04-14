@@ -95,6 +95,24 @@ export async function POST(
 
   try {
     const alert = await db.$transaction(async (tx) => {
+      // Optimistic concurrency: atomically flip status only if still PENDING.
+      // If two mods race, one succeeds and the other gets rowcount=0.
+      const claim = await tx.emergencyAlertRequest.updateMany({
+        where: {
+          id: request.id,
+          status: 'PENDING',
+          expiresAt: { gt: now },
+        },
+        data: {
+          status: 'APPROVED',
+          reviewedById: user.id,
+          reviewedAt: now,
+        },
+      })
+      if (claim.count === 0) {
+        throw new Error('race_lost')
+      }
+
       const created = await tx.emergencyAlert.create({
         data: {
           neighborhoodId: request.neighborhoodId,
@@ -108,14 +126,10 @@ export async function POST(
           expiresAt,
         },
       })
+      // Link the request to the created alert now that we have its id
       await tx.emergencyAlertRequest.update({
         where: { id: request.id },
-        data: {
-          status: 'APPROVED',
-          reviewedById: user.id,
-          reviewedAt: now,
-          approvedAlertId: created.id,
-        },
+        data: { approvedAlertId: created.id },
       })
       await tx.notifJob.create({
         data: {
@@ -151,7 +165,14 @@ export async function POST(
         expiresAt: alert.expiresAt.toISOString(),
       },
     })
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.message === 'race_lost') {
+      console.log('[EMERGENCY_REQUEST] approve race lost', { requestId: request.id })
+      return NextResponse.json(
+        { error: 'already_reviewed', message: 'Another mod just reviewed this request' },
+        { status: 409 },
+      )
+    }
     console.error('[EMERGENCY_REQUEST] approve failed', err)
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
