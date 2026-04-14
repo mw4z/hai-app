@@ -163,6 +163,10 @@ export default function ProfileClient({ user, postCount }: Props) {
 
   // Avatar upload / picker
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
+  // Delete account modal: null = closed, 'confirm' = first stage, 'typed' = typed verification
+  const [deleteStage, setDeleteStage] = useState<null | 'confirm' | 'typed'>(null)
+  const [deleteInput, setDeleteInput] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   function handleAvatarClick() {
     setShowAvatarPicker(true)
@@ -1198,30 +1202,9 @@ export default function ProfileClient({ user, postCount }: Props) {
       {/* Delete Account */}
       <div className="mx-4 mt-3 mb-8" id="delete-account">
         <button
-          onClick={async () => {
-            const msg = lang === 'en'
-              ? 'Are you sure you want to delete your account? This cannot be undone.'
-              : 'هل أنت متأكد من حذف حسابك؟ لا يمكن التراجع عن هذا الإجراء.'
-            if (!confirm(msg)) return
-            const msg2 = lang === 'en' ? 'Type DELETE to confirm' : 'اكتب حذف للتأكيد'
-            const input = prompt(msg2)
-            if (input === null) return // user cancelled
-            if (input !== 'DELETE' && input !== 'حذف') {
-              toast.error(lang === 'en' ? 'Incorrect confirmation text. Type DELETE or حذف' : 'نص التأكيد غير صحيح. اكتب حذف أو DELETE')
-              return
-            }
-            try {
-              const res = await fetch('/api/account/delete', { method: 'DELETE' })
-              if (res.ok) {
-                await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
-                try { localStorage.clear() } catch {}
-                try { sessionStorage.clear() } catch {}
-                window.location.href = '/'
-              } else {
-                const d = await res.json()
-                toast.error(d.error || 'Error')
-              }
-            } catch { toast.error('Error') }
+          onClick={() => {
+            setDeleteInput('')
+            setDeleteStage('confirm')
           }}
           className="w-full text-center text-xs text-red-400 py-2"
         >
@@ -1348,6 +1331,121 @@ export default function ProfileClient({ user, postCount }: Props) {
             </div>
           </div>
         </>
+      )}
+
+      {/* Delete Account Modal — in-app RTL-aware, replaces native confirm/prompt */}
+      {deleteStage && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => { if (!deleting) setDeleteStage(null) }}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5"
+            onClick={(e) => e.stopPropagation()}
+            style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center flex-shrink-0">
+                <FiX className="w-5 h-5 text-red-600" />
+              </div>
+              <h2 className="font-bold text-gray-900 dark:text-white text-lg">
+                {lang === 'en' ? 'Delete Account' : lang === 'ur' ? 'اکاؤنٹ حذف کریں' : 'حذف الحساب'}
+              </h2>
+            </div>
+
+            {deleteStage === 'confirm' ? (
+              <>
+                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-5">
+                  {lang === 'en'
+                    ? 'Are you sure you want to delete your account? This action cannot be undone — all your posts, comments and reputation will be permanently removed.'
+                    : lang === 'ur'
+                      ? 'کیا آپ واقعی اپنا اکاؤنٹ حذف کرنا چاہتے ہیں؟ یہ عمل واپس نہیں کیا جا سکتا — آپ کی تمام پوسٹس، تبصرے اور ساکھ مستقل طور پر حذف ہو جائیں گی۔'
+                      : 'هل أنت متأكد من حذف حسابك؟ لا يمكن التراجع عن هذا الإجراء — ستُحذف جميع منشوراتك وتعليقاتك ونقاط سمعتك نهائياً.'}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteStage(null)}
+                    disabled={deleting}
+                    className="py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold text-sm rounded-xl active:scale-95 transition-transform disabled:opacity-50"
+                  >
+                    {lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteStage('typed')}
+                    disabled={deleting}
+                    className="py-3 bg-red-600 text-white font-bold text-sm rounded-xl active:scale-95 transition-transform disabled:opacity-50"
+                  >
+                    {lang === 'en' ? 'Continue' : lang === 'ur' ? 'جاری رکھیں' : 'متابعة'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-2">
+                  {lang === 'en'
+                    ? 'To confirm, type DELETE or حذف below:'
+                    : lang === 'ur'
+                      ? 'تصدیق کے لیے، نیچے DELETE یا حذف لکھیں:'
+                      : 'للتأكيد، اكتب حذف أو DELETE في الحقل أدناه:'}
+                </p>
+                <input
+                  type="text"
+                  value={deleteInput}
+                  onChange={(e) => setDeleteInput(e.target.value)}
+                  placeholder={lang === 'en' ? 'DELETE' : 'حذف'}
+                  className="w-full px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500 mb-4"
+                  autoFocus
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteStage(null)}
+                    disabled={deleting}
+                    className="py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold text-sm rounded-xl active:scale-95 transition-transform disabled:opacity-50"
+                  >
+                    {lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      deleting ||
+                      (deleteInput.trim() !== 'DELETE' && deleteInput.trim() !== 'حذف')
+                    }
+                    onClick={async () => {
+                      if (deleting) return
+                      setDeleting(true)
+                      try {
+                        const res = await fetch('/api/account/delete', { method: 'DELETE' })
+                        if (res.ok) {
+                          await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+                          try { localStorage.clear() } catch {}
+                          try { sessionStorage.clear() } catch {}
+                          window.location.href = '/'
+                        } else {
+                          const d = await res.json().catch(() => ({}))
+                          toast.error(d.error || (lang === 'en' ? 'Delete failed' : 'فشل الحذف'))
+                          setDeleting(false)
+                        }
+                      } catch {
+                        toast.error(lang === 'en' ? 'Connection failed' : 'فشل الاتصال')
+                        setDeleting(false)
+                      }
+                    }}
+                    className="py-3 bg-red-600 text-white font-bold text-sm rounded-xl active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {deleting
+                      ? (lang === 'en' ? 'Deleting...' : 'جاري الحذف...')
+                      : (lang === 'en' ? 'Delete Account' : lang === 'ur' ? 'حذف کریں' : 'احذف الحساب')}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       <BottomNav active="profile" />
