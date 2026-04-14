@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import { uploadFiles } from '@/lib/upload'
+import { pickImagesOrFallback } from '@/lib/imagePicker'
 import BackButton from '@/components/BackButton'
 import BottomNav from '@/components/BottomNav'
 import { hapticSuccess } from '@/lib/haptic'
@@ -33,11 +34,25 @@ export default function SupportPage() {
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
 
-  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []).slice(0, 3 - images.length)
-    const newImages = files.map(file => ({ file, preview: URL.createObjectURL(file) }))
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
+  function applySupportImages(files: File[]) {
+    const limited = files.slice(0, 3 - images.length)
+    const newImages = limited.map(file => ({ file, preview: URL.createObjectURL(file) }))
     setImages(prev => [...prev, ...newImages])
+  }
+
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
     e.target.value = ''
+    applySupportImages(files)
+  }
+
+  async function openSupportImagePicker() {
+    const remaining = 3 - images.length
+    if (remaining <= 0) return
+    const files = await pickImagesOrFallback(remaining, imageInputRef)
+    if (files.length > 0) applySupportImages(files)
   }
 
   async function uploadImages(): Promise<string[]> {
@@ -145,10 +160,16 @@ export default function SupportPage() {
                 </div>
               )}
               {images.length < 3 && (
-                <label className="flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-2.5 text-sm text-gray-400 cursor-pointer hover:border-primary-300 transition-colors">
-                  <span>+ {lang === 'en' ? 'Add photo' : lang === 'ur' ? 'تصویر شامل کریں' : 'إضافة صورة'}</span>
-                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageSelect} className="hidden" />
-                </label>
+                <>
+                  <button
+                    type="button"
+                    onClick={openSupportImagePicker}
+                    className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-2.5 text-sm text-gray-400 hover:border-primary-300 transition-colors"
+                  >
+                    <span>+ {lang === 'en' ? 'Add photo' : lang === 'ur' ? 'تصویر شامل کریں' : 'إضافة صورة'}</span>
+                  </button>
+                  <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleImageSelect} className="hidden" />
+                </>
               )}
             </div>
 

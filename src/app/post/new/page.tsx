@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -9,6 +9,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import BackButton from '@/components/BackButton'
 import RiyalIcon from '@/components/RiyalIcon'
 import { uploadFiles } from '@/lib/upload'
+import { pickImagesOrFallback } from '@/lib/imagePicker'
 import { playSuccess, playError } from '@/lib/sound'
 
 const CATEGORIES = [
@@ -82,18 +83,30 @@ export default function NewPostPage() {
   const isLookingFor = category === 'LOOKING_FOR'
   const showPrice = ['MARKETPLACE', 'REAL_ESTATE', 'FOOD_HOME'].includes(category)
 
-  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || [])
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
+  function applyPostImages(files: File[]) {
     const remaining = 5 - images.length
     const toAdd = files.slice(0, remaining)
-
     for (const file of toAdd) {
       if (file.size > 5 * 1024 * 1024) { toast.error('حجم الصورة كبير (أقصى 5 ميقا)'); continue }
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { toast.error('نوع غير مدعوم'); continue }
       const preview = URL.createObjectURL(file)
       setImages(prev => [...prev, { file, preview }])
     }
-    e.target.value = '' // reset input
+  }
+
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    applyPostImages(files)
+  }
+
+  async function openPostImagePicker() {
+    const remaining = 5 - images.length
+    if (remaining <= 0) return
+    const files = await pickImagesOrFallback(remaining, imageInputRef)
+    if (files.length > 0) applyPostImages(files)
   }
 
   function removeImage(index: number) {
@@ -282,10 +295,16 @@ export default function NewPostPage() {
                   )}
 
                   {images.length < 5 && (
-                    <label className="flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-3 text-sm text-gray-400 cursor-pointer hover:border-primary-300 hover:text-primary-500 transition-colors">
-                      <span>+ {lang === 'en' ? 'Choose photo' : lang === 'ur' ? 'تصویر منتخب کریں' : 'اختر صورة'}</span>
-                      <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleImageSelect} className="hidden" />
-                    </label>
+                    <>
+                      <button
+                        type="button"
+                        onClick={openPostImagePicker}
+                        className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-3 text-sm text-gray-400 cursor-pointer hover:border-primary-300 hover:text-primary-500 transition-colors"
+                      >
+                        <span>+ {lang === 'en' ? 'Choose photo' : lang === 'ur' ? 'تصویر منتخب کریں' : 'اختر صورة'}</span>
+                      </button>
+                      <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleImageSelect} className="hidden" />
+                    </>
                   )}
                 </div>
               </>

@@ -9,6 +9,7 @@ import { useRidePoll } from '@/hooks/useRidePoll'
 import { hapticSuccess, hapticMedium, hapticError, hapticWarning } from '@/lib/haptic'
 import StatusBadge from '@/components/rides/StatusBadge'
 import { uploadFiles } from '@/lib/upload'
+import { pickImageOrFallback } from '@/lib/imagePicker'
 import RiyalIcon from '@/components/RiyalIcon'
 import UserBadgeDisplay from '@/components/UserBadge'
 import {
@@ -889,7 +890,10 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
             <input ref={imgInputRef} type="file" accept="image/*" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) sendImage(f) }} />
             <button
-              onClick={() => imgInputRef.current?.click()}
+              onClick={async () => {
+                const f = await pickImageOrFallback(lang as 'ar' | 'en' | 'ur', imgInputRef)
+                if (f) sendImage(f)
+              }}
               disabled={sendingImg}
               className="p-2.5 rounded-full bg-gray-700 text-gray-300 active:scale-90 disabled:opacity-50 flex-shrink-0"
             >

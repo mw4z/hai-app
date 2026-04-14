@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import BottomNav from '@/components/BottomNav'
 import UserBadgeDisplay from '@/components/UserBadge'
 import EmergencyRequestSheet from '@/components/EmergencyRequestSheet'
+import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useLanguage, LANGUAGE_CHANGE_EVENT } from '@/hooks/useLanguage'
 import {
   FiMapPin, FiStar, FiFileText, FiLogOut, FiCamera,
@@ -188,10 +189,8 @@ export default function ProfileClient({ user, postCount }: Props) {
     } catch { toast.error(lang === 'en' ? 'Error' : 'خطأ') }
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function applyAvatarFile(file: File) {
     setShowAvatarPicker(false)
-    const file = e.target.files?.[0]
-    if (!file) return
     if (file.size > 5 * 1024 * 1024) { toast.error('الصورة أكبر من 5MB'); return }
     const reader = new FileReader()
     reader.onload = (ev) => {
@@ -199,7 +198,18 @@ export default function ProfileClient({ user, postCount }: Props) {
       setCropImage(ev.target?.result as string)
     }
     reader.readAsDataURL(file)
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
     e.target.value = ''
+    if (!file) return
+    applyAvatarFile(file)
+  }
+
+  async function openAvatarPicker() {
+    const f = await pickImageOrFallback(lang as 'ar' | 'en' | 'ur', fileInputRef)
+    if (f) applyAvatarFile(f)
   }
 
   function handleCroppedAvatar(base64: string) {
@@ -235,10 +245,8 @@ export default function ProfileClient({ user, postCount }: Props) {
     } catch { toast.error(lang === 'en' ? 'Error' : 'خطأ') }
   }
 
-  function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function applyCoverFile(file: File) {
     setShowCoverPicker(false)
-    const file = e.target.files?.[0]
-    if (!file) return
     if (file.size > 5 * 1024 * 1024) { toast.error('الصورة أكبر من 5MB'); return }
     const reader = new FileReader()
     reader.onload = (ev) => {
@@ -246,7 +254,18 @@ export default function ProfileClient({ user, postCount }: Props) {
       setCropImage(ev.target?.result as string)
     }
     reader.readAsDataURL(file)
+  }
+
+  function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
     e.target.value = ''
+    if (!file) return
+    applyCoverFile(file)
+  }
+
+  async function openCoverPickerNative() {
+    const f = await pickImageOrFallback(lang as 'ar' | 'en' | 'ur', coverInputRef)
+    if (f) applyCoverFile(f)
   }
 
   function handleCroppedCover(base64: string) {
@@ -369,7 +388,7 @@ export default function ProfileClient({ user, postCount }: Props) {
         <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverChange} />
         <div className="relative z-10 w-24 h-24 mx-auto mb-3">
           <div
-            onClick={() => fileInputRef.current?.click()}
+            onClick={openAvatarPicker}
             className="w-24 h-24 bg-white rounded-full overflow-hidden cursor-pointer shadow-lg border-2 border-white flex items-center justify-center"
           >
             {avatar
@@ -378,7 +397,7 @@ export default function ProfileClient({ user, postCount }: Props) {
             }
           </div>
           <div
-            onClick={() => fileInputRef.current?.click()}
+            onClick={openAvatarPicker}
             className="absolute bottom-0 left-0 bg-primary-700 rounded-full p-1.5 cursor-pointer border-2 border-white"
           >
             <FiCamera className="w-3.5 h-3.5 text-white" />
@@ -1240,7 +1259,7 @@ export default function ProfileClient({ user, postCount }: Props) {
 
               {/* Upload option */}
               <button
-                onClick={() => coverInputRef.current?.click()}
+                onClick={openCoverPickerNative}
                 className="w-full flex items-center gap-3 bg-gray-50 dark:bg-gray-700 rounded-2xl p-4 mb-4 active:scale-[0.98] transition-transform border border-gray-200 dark:border-gray-600"
               >
                 <div className="w-10 h-10 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
@@ -1297,7 +1316,7 @@ export default function ProfileClient({ user, postCount }: Props) {
 
               {/* Upload option */}
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={openAvatarPicker}
                 className="w-full flex items-center gap-3 bg-primary-50 dark:bg-primary-900/20 rounded-2xl p-4 mb-4 active:scale-[0.98] transition-transform border border-primary-100 dark:border-primary-800"
               >
                 <div className="w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0">

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import { uploadFiles } from '@/lib/upload'
+import { pickImagesOrFallback } from '@/lib/imagePicker'
 import BackButton from '@/components/BackButton'
 import BottomNav from '@/components/BottomNav'
 import { hapticSuccess } from '@/lib/haptic'
@@ -32,6 +33,20 @@ export default function NeighborhoodReportsPage() {
   const [images, setImages] = useState<{ file: File; preview: string }[]>([])
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
+  function applyReportImages(files: File[]) {
+    const limited = files.slice(0, 3 - images.length)
+    const newImages = limited.map(f => ({ file: f, preview: URL.createObjectURL(f) }))
+    setImages(prev => [...prev, ...newImages])
+  }
+
+  async function openReportImagePicker() {
+    const remaining = 3 - images.length
+    if (remaining <= 0) return
+    const files = await pickImagesOrFallback(remaining, imageInputRef)
+    if (files.length > 0) applyReportImages(files)
+  }
 
   useEffect(() => {
     fetch('/api/neighborhood-report').then(r => r.json()).then(setReports).catch(() => {}).finally(() => setFetching(false))
@@ -126,13 +141,20 @@ export default function NeighborhoodReportsPage() {
                 </div>
               )}
               {images.length < 3 && (
-                <label className="flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-2 text-xs text-gray-400 cursor-pointer">
-                  📷 {lang === 'en' ? 'Add photo' : lang === 'ur' ? 'تصویر شامل کریں' : 'إضافة صورة'}
-                  <input type="file" accept="image/*" onChange={e => {
-                    const f = e.target.files?.[0]; if (f) setImages(prev => [...prev, { file: f, preview: URL.createObjectURL(f) }])
+                <>
+                  <button
+                    type="button"
+                    onClick={openReportImagePicker}
+                    className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-2 text-xs text-gray-400"
+                  >
+                    📷 {lang === 'en' ? 'Add photo' : lang === 'ur' ? 'تصویر شامل کریں' : 'إضافة صورة'}
+                  </button>
+                  <input ref={imageInputRef} type="file" accept="image/*" multiple onChange={e => {
+                    const files = Array.from(e.target.files || [])
                     e.target.value = ''
+                    applyReportImages(files)
                   }} className="hidden" />
-                </label>
+                </>
               )}
             </div>
 

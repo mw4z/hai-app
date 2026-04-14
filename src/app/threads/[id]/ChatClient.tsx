@@ -10,6 +10,7 @@ import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, Fi
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
 import { uploadFiles } from '@/lib/upload'
+import { pickImageOrFallback } from '@/lib/imagePicker'
 import { playSend } from '@/lib/sound'
 
 interface Msg {
@@ -796,7 +797,10 @@ export default function ChatClient({
             <input ref={imgInputRef} type="file" accept="image/*" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) sendImage(f) }} />
             <div className="flex items-center gap-1">
-              <button onClick={() => imgInputRef.current?.click()} disabled={sendingImage}
+              <button onClick={async () => {
+                  const f = await pickImageOrFallback(lang as 'ar' | 'en' | 'ur', imgInputRef)
+                  if (f) sendImage(f)
+                }} disabled={sendingImage}
                 className="p-2.5 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50">
                 <FiCamera className={`w-5 h-5 ${sendingImage ? 'animate-pulse' : ''}`} />
               </button>

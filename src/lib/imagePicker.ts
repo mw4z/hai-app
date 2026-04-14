@@ -150,11 +150,95 @@ export async function pickImageOrFallback(
       ) {
         return null
       }
-      // Any other native error (plugin not installed, etc.) → fall back to web input
       console.warn('[imagePicker] native failed, falling back to web input:', err)
     }
   }
-  // Web path — trigger the fallback file input
   webInputRef.current?.click()
   return null
+}
+
+/**
+ * Pick multiple images from the photo library.
+ *
+ * Uses Capacitor Camera's pickImages() on native which goes directly
+ * to the OS photo library (bypasses the English "Photo Library/Take
+ * Photo/Choose File" intermediate sheet). The photo picker UI itself
+ * is iOS/Android native and uses system locale, but at least the
+ * English intermediate sheet is gone.
+ *
+ * Returns [] on cancel or web. Web callers should fall back to the
+ * file input via the webInputRef pattern.
+ */
+export async function pickImageFilesMulti(
+  limit: number,
+): Promise<File[]> {
+  if (!isNative()) {
+    throw new Error('web_unsupported')
+  }
+
+  const { Camera } = await import('@capacitor/camera')
+
+  const result = await Camera.pickImages({
+    quality: 85,
+    limit,
+    correctOrientation: true,
+  })
+
+  if (!result?.photos || result.photos.length === 0) return []
+
+  // Convert each Photo (webPath URL) to a File
+  const files: File[] = []
+  for (const photo of result.photos) {
+    try {
+      const res = await fetch(photo.webPath)
+      const blob = await res.blob()
+      const mime = blob.type || 'image/jpeg'
+      const ext =
+        photo.format === 'png'
+          ? 'png'
+          : photo.format === 'webp'
+            ? 'webp'
+            : 'jpg'
+      const file = new File([blob], `photo-${Date.now()}-${files.length}.${ext}`, {
+        type: mime,
+      })
+      if (file.size <= MAX_SIZE_MB * 1024 * 1024) {
+        files.push(file)
+      }
+    } catch (err) {
+      console.warn('[imagePicker] failed to read photo:', err)
+    }
+  }
+  return files
+}
+
+/**
+ * Multi-image variant of pickImageOrFallback.
+ *
+ * On native: opens the photo library directly via Camera.pickImages()
+ *            (no English intermediate sheet).
+ * On web:    triggers the hidden multi-capable <input type="file"> ref.
+ */
+export async function pickImagesOrFallback(
+  limit: number,
+  webInputRef: { current: HTMLInputElement | null },
+): Promise<File[]> {
+  if (isNative()) {
+    try {
+      return await pickImageFilesMulti(limit)
+    } catch (err: any) {
+      if (
+        err?.message?.toLowerCase?.().includes('cancel') ||
+        err?.message === 'no_image'
+      ) {
+        return []
+      }
+      console.warn(
+        '[imagePicker] native multi failed, falling back to web input:',
+        err,
+      )
+    }
+  }
+  webInputRef.current?.click()
+  return []
 }

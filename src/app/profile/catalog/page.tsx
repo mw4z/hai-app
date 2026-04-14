@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { uploadFiles } from '@/lib/upload'
+import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useLanguage } from '@/hooks/useLanguage'
 import { FiArrowRight, FiArrowLeft, FiPlus, FiTrash2, FiCamera } from 'react-icons/fi'
 
@@ -129,7 +130,10 @@ export default function CatalogPage() {
                   className="absolute top-2 right-2 w-6 h-6 bg-black/50 text-white rounded-full text-xs flex items-center justify-center">✕</button>
               </div>
             ) : (
-              <button onClick={() => fileRef.current?.click()} disabled={uploading}
+              <button onClick={async () => {
+                const f = await pickImageOrFallback(lang as 'ar' | 'en' | 'ur', fileRef)
+                if (f) uploadImage(f)
+              }} disabled={uploading}
                 className="w-full h-32 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-xl flex flex-col items-center justify-center gap-2 text-gray-400 active:bg-gray-50 dark:active:bg-gray-700 disabled:opacity-50">
                 <FiCamera className={`w-6 h-6 ${uploading ? 'animate-pulse' : ''}`} />
                 <span className="text-xs">{uploading ? '...' : dn('أضف صورة', 'Add photo')}</span>
