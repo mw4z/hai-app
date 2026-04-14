@@ -114,7 +114,7 @@ export async function GET(req: NextRequest) {
       ...(cursor ? { createdAt: { lt: new Date(cursor) } } : {}),
     },
     include: {
-      author: { select: { id: true, name: true, reputation: true, accountType: true, role: true, avatarUrl: true, coverUrl: true, gender: true, createdAt: true, bio: true, serviceDescription: true, serviceAddress: true, serviceLat: true, serviceLng: true, neighborhood: { select: { name: true, nameEn: true } }, _count: { select: { posts: true } } } },
+      author: { select: { id: true, name: true, reputation: true, accountType: true, role: true, avatarUrl: true, coverUrl: true, gender: true, showGender: true, createdAt: true, bio: true, serviceDescription: true, serviceAddress: true, serviceLat: true, serviceLng: true, neighborhood: { select: { name: true, nameEn: true } }, _count: { select: { posts: true } } } },
       reactions: { select: { emoji: true, userId: true } },
       _count: { select: { comments: true, reactions: true } },
     },
@@ -137,8 +137,20 @@ export async function GET(req: NextRequest) {
     ? posts[posts.length - 1].createdAt.toISOString()
     : null
 
+  // Respect each author's privacy: strip gender if they opted out
+  const sanitized = balanced.map((p: any) => ({
+    ...p,
+    author: p.author
+      ? {
+          ...p.author,
+          gender: p.author.showGender === false ? null : p.author.gender,
+          showGender: undefined,
+        }
+      : p.author,
+  }))
+
   return NextResponse.json({
-    posts: balanced,
+    posts: sanitized,
     nextCursor,
     hasMore,
   })

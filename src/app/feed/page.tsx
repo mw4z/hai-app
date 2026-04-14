@@ -52,7 +52,7 @@ export default async function FeedPage({
           ...categoryFilter,
         },
         include: {
-          author: { select: { id: true, name: true, reputation: true, accountType: true, role: true, avatarUrl: true, coverUrl: true, gender: true, createdAt: true, bio: true, serviceDescription: true, serviceAddress: true, serviceLat: true, serviceLng: true, neighborhood: { select: { name: true, nameEn: true } }, _count: { select: { posts: true } } } },
+          author: { select: { id: true, name: true, reputation: true, accountType: true, role: true, avatarUrl: true, coverUrl: true, gender: true, showGender: true, createdAt: true, bio: true, serviceDescription: true, serviceAddress: true, serviceLat: true, serviceLng: true, neighborhood: { select: { name: true, nameEn: true } }, _count: { select: { posts: true } } } },
           reactions: { select: { emoji: true, userId: true } },
           _count: { select: { comments: true, reactions: true } },
         },
@@ -151,7 +151,17 @@ export default async function FeedPage({
         neighborhoodId: user.neighborhoodId!,
         role: user.role,
       }}
-      initialPosts={JSON.parse(JSON.stringify(balanced))}
+      initialPosts={JSON.parse(JSON.stringify(balanced.map((p: any) => ({
+        ...p,
+        author: p.author
+          ? {
+              ...p.author,
+              // Respect author's privacy: hide gender if they opted out
+              gender: p.author.showGender === false ? null : p.author.gender,
+              showGender: undefined,
+            }
+          : p.author,
+      }))))}
       selectedCategory={category}
       isReadOnly={isReadOnly}
       browseNeighborhood={browseNeighborhood ? {

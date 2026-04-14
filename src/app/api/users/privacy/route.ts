@@ -11,7 +11,7 @@ export async function GET() {
 
     const user = await db.user.findUnique({
       where: { id: session.userId },
-      select: { showLastSeen: true, showReadReceipts: true },
+      select: { showLastSeen: true, showReadReceipts: true, showGender: true },
     })
 
     return NextResponse.json(user)
@@ -26,11 +26,12 @@ export async function PATCH(req: NextRequest) {
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { showLastSeen, showReadReceipts } = await req.json()
+    const { showLastSeen, showReadReceipts, showGender } = await req.json()
 
     const data: any = {}
     if (typeof showLastSeen === 'boolean') data.showLastSeen = showLastSeen
     if (typeof showReadReceipts === 'boolean') data.showReadReceipts = showReadReceipts
+    if (typeof showGender === 'boolean') data.showGender = showGender
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: 'No changes' }, { status: 400 })

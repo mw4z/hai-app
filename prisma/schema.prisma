@@ -46,6 +46,7 @@ model User {
   lastSeenAt       DateTime?     // updated on every API request
   showLastSeen     Boolean       @default(true)  // privacy: show online/last seen
   showReadReceipts Boolean       @default(true)  // privacy: send read receipts
+  showGender       Boolean       @default(true)  // privacy: show gender in profile popup
   name             String?       // first name
   lastName         String?       // last name / family name
   avatarUrl        String?

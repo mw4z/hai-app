@@ -1628,6 +1628,7 @@ function BookmarkedPosts({ lang, currentUserId }: { lang: string; currentUserId:
 function PrivacySettings({ lang }: { lang: string }) {
   const [showLastSeen, setShowLastSeen] = useState(true)
   const [showReadReceipts, setShowReadReceipts] = useState(true)
+  const [showGender, setShowGender] = useState(true)
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
@@ -1636,14 +1637,16 @@ function PrivacySettings({ lang }: { lang: string }) {
       .then(d => {
         setShowLastSeen(d.showLastSeen ?? true)
         setShowReadReceipts(d.showReadReceipts ?? true)
+        setShowGender(d.showGender ?? true)
         setLoaded(true)
       })
       .catch(() => setLoaded(true))
   }, [])
 
-  async function toggle(key: 'showLastSeen' | 'showReadReceipts', value: boolean) {
+  async function toggle(key: 'showLastSeen' | 'showReadReceipts' | 'showGender', value: boolean) {
     if (key === 'showLastSeen') setShowLastSeen(value)
-    else setShowReadReceipts(value)
+    else if (key === 'showReadReceipts') setShowReadReceipts(value)
+    else if (key === 'showGender') setShowGender(value)
     await fetch('/api/users/privacy', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -1692,6 +1695,26 @@ function PrivacySettings({ lang }: { lang: string }) {
           className={`w-11 h-6 rounded-full transition-colors relative ${showReadReceipts ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'}`}
         >
           <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-0.5 transition-all ${showReadReceipts ? 'right-0.5' : 'left-0.5'}`} />
+        </button>
+      </div>
+
+      {/* Show Gender */}
+      <div className="px-4 py-3.5 flex items-center justify-between">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-gray-800 dark:text-white">
+            {lang === 'en' ? 'Show Gender' : 'إظهار الجنس'}
+          </p>
+          <p className="text-[11px] text-gray-400 mt-0.5">
+            {lang === 'en'
+              ? 'When off, other users won\'t see your gender in your profile'
+              : 'عند إيقافه، لن يرى الآخرون جنسك في ملفك الشخصي'}
+          </p>
+        </div>
+        <button
+          onClick={() => toggle('showGender', !showGender)}
+          className={`w-11 h-6 rounded-full transition-colors relative ${showGender ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+        >
+          <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-0.5 transition-all ${showGender ? 'right-0.5' : 'left-0.5'}`} />
         </button>
       </div>
     </div>
