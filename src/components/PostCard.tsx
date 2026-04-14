@@ -389,8 +389,13 @@ export default function PostCard({
       })
       if (res.ok) {
         toast.success('تم')
-        if ((action === 'hide_post' || action === 'remove_post') && onDelete) onDelete(post.id)
-        else router.refresh()
+        if (action === 'hide_post' || action === 'remove_post') {
+          playDelete()
+          if (onDelete) onDelete(post.id)
+          else router.refresh()
+        } else {
+          router.refresh()
+        }
       } else {
         const d = await res.json()
         toast.error(d.error || 'خطأ')
@@ -530,8 +535,13 @@ export default function PostCard({
                       })
                       if (!ok) return
                       const res = await fetch(`/api/posts/${post.id}`, { method: 'DELETE' })
-                      if (res.ok) { toast.success(lang === 'en' ? 'Deleted' : lang === 'ur' ? 'حذف ہو گیا' : 'تم الحذف'); onDelete ? onDelete(post.id) : router.refresh() }
-                      else toast.error(lang === 'en' ? 'Delete failed' : lang === 'ur' ? 'حذف ناکام' : 'فشل الحذف')
+                      if (res.ok) {
+                        playDelete()
+                        toast.success(lang === 'en' ? 'Deleted' : lang === 'ur' ? 'حذف ہو گیا' : 'تم الحذف')
+                        onDelete ? onDelete(post.id) : router.refresh()
+                      } else {
+                        toast.error(lang === 'en' ? 'Delete failed' : lang === 'ur' ? 'حذف ناکام' : 'فشل الحذف')
+                      }
                       setShowMenu(false)
                     }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 w-full text-right">
                       <FiTrash2 className="w-3.5 h-3.5" />
