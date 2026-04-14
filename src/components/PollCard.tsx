@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useConfirm } from './ConfirmProvider'
 import { hapticLight, hapticMedium, hapticSuccess } from '@/lib/haptic'
 import { FiMessageCircle, FiSend, FiTrash2 } from 'react-icons/fi'
 
@@ -28,6 +29,7 @@ const QUICK_EMOJIS = ['👍', '❤️', '😂', '🙏']
 
 export default function PollCard({ poll, currentUserId, onDelete }: Props) {
   const { t, lang } = useLanguage()
+  const confirmDialog = useConfirm()
   const voteSignature = JSON.stringify(poll.votes.map(v => `${v.userId}:${v.optionIndex}`).sort())
   const [votes, setVotes] = useState(poll.votes)
   const [totalVotes, setTotalVotes] = useState(poll._count.votes)
@@ -84,7 +86,12 @@ export default function PollCard({ poll, currentUserId, onDelete }: Props) {
   }
 
   async function deletePoll() {
-    if (!confirm(lang === 'en' ? 'Delete poll?' : lang === 'ur' ? 'ووٹنگ حذف کریں؟' : 'حذف التصويت؟')) return
+    const ok = await confirmDialog({
+      message: lang === 'en' ? 'Delete this poll?' : lang === 'ur' ? 'ووٹنگ حذف کریں؟' : 'حذف هذا التصويت؟',
+      variant: 'danger',
+      confirmText: lang === 'en' ? 'Delete' : 'حذف',
+    })
+    if (!ok) return
     const res = await fetch(`/api/polls/${poll.id}`, { method: 'DELETE' })
     if (res.ok) { toast.success(lang === 'en' ? 'Deleted' : lang === 'ur' ? 'حذف ہو گیا' : 'تم الحذف'); onDelete?.() }
   }

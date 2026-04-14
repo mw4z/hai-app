@@ -11,6 +11,7 @@ import {
   FiShield,
 } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useConfirm } from './ConfirmProvider'
 
 type Severity = 'critical' | 'warning' | 'info'
 
@@ -26,6 +27,7 @@ interface ActiveAlert {
 export default function EmergencyCreator() {
   const { lang } = useLanguage()
   const dn = (ar: string, en: string) => (lang === 'en' ? en : ar)
+  const confirmDialog = useConfirm()
 
   const [active, setActive] = useState<ActiveAlert[]>([])
   const [loadingActive, setLoadingActive] = useState(true)
@@ -52,16 +54,15 @@ export default function EmergencyCreator() {
   }, [refresh])
 
   async function handleRevoke(id: string) {
-    if (
-      !confirm(
-        dn(
-          'هل أنت متأكد من إلغاء هذا التنبيه؟',
-          'Are you sure you want to revoke this alert?',
-        ),
-      )
-    ) {
-      return
-    }
+    const ok = await confirmDialog({
+      message: dn(
+        'هل أنت متأكد من إلغاء هذا التنبيه؟',
+        'Are you sure you want to revoke this alert?',
+      ),
+      variant: 'danger',
+      confirmText: dn('إلغاء التنبيه', 'Revoke alert'),
+    })
+    if (!ok) return
     try {
       const res = await fetch(`/api/emergency/${id}/revoke`, { method: 'POST' })
       if (res.ok) {

@@ -9,6 +9,7 @@ import RouteTransition from '@/components/RouteTransition'
 import ArrivalAlert from '@/components/ArrivalAlert'
 import CapacitorBridge from '@/components/CapacitorBridge'
 import PushRegistration from '@/components/PushRegistration'
+import { ConfirmProvider } from '@/components/ConfirmProvider'
 import ScrollReset from '@/components/ScrollReset'
 import { LangProvider } from '@/hooks/useLanguage'
 import { checkEnvironment } from '@/lib/env-check'
@@ -100,6 +101,7 @@ export default function RootLayout({
         <CapacitorBridge />
         <PushRegistration />
         <LangProvider initialLang={lang}>
+          <ConfirmProvider>
           <Toaster
             position="top-center"
             containerStyle={{ top: 'env(safe-area-inset-top, 0px)' }}
@@ -120,6 +122,7 @@ export default function RootLayout({
           <ScrollReset />
           <ArrivalAlert />
           <RouteTransition />
+          </ConfirmProvider>
         </LangProvider>
       </body>
     </html>

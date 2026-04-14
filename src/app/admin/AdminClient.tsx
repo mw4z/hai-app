@@ -5,6 +5,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { FiShield, FiUsers, FiFileText, FiMapPin, FiActivity, FiStar } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useConfirm, usePrompt } from '@/components/ConfirmProvider'
 import { getPrimaryBadge, getSecondaryBadge } from '@/lib/user-badge'
 import type { TranslationKey } from '@/lib/i18n'
 
@@ -39,6 +40,8 @@ type Tab = 'overview' | 'posts' | 'reports' | 'requests' | 'verify' | 'mod_reque
 
 export default function AdminClient({ role, adminName }: { role: string; adminName: string }) {
   const { t, lang } = useLanguage()
+  const confirmDialog = useConfirm()
+  const promptDialog = usePrompt()
   const [tab, setTab] = useState<Tab>('overview')
   const [stats, setStats] = useState<any>(null)
   const [reports, setReports] = useState<any[]>([])
@@ -467,8 +470,12 @@ export default function AdminClient({ role, adminName }: { role: string; adminNa
                     <span className="text-xs text-gray-400">{u.reputation || 0} {lang !== 'en' ? 'نقطة' : 'pts'}</span>
                     {isSuper && (
                       <button
-                        onClick={() => {
-                          const val = prompt(lang !== 'en' ? 'أدخل النقاط الجديدة:' : 'Enter new reputation:', String(u.reputation || 0))
+                        onClick={async () => {
+                          const val = await promptDialog({
+                            message: lang !== 'en' ? 'أدخل النقاط الجديدة:' : 'Enter new reputation:',
+                            defaultValue: String(u.reputation || 0),
+                            inputType: 'number',
+                          })
                           if (val !== null && !isNaN(Number(val))) {
                             doAction('set_reputation', u.id, undefined)
                             fetch('/api/admin/action', {
@@ -513,13 +520,27 @@ export default function AdminClient({ role, adminName }: { role: string; adminNa
                           <ActionBtn onClick={() => doAction('remove_provider', u.id)} color="gray">{lang !== 'en' ? 'إزالة الشارة' : 'Remove badge'}</ActionBtn>
                         )}
                         {isSuper && u.role !== 'SUPER_ADMIN' && (
-                          <ActionBtn onClick={() => { if (confirm(t('admin_delete_confirm'))) doAction('delete_user', u.id) }} color="redbg">{t('admin_delete_user')}</ActionBtn>
+                          <ActionBtn onClick={async () => {
+                            const ok = await confirmDialog({
+                              message: t('admin_delete_confirm'),
+                              variant: 'danger',
+                              confirmText: t('admin_delete_user'),
+                            })
+                            if (ok) doAction('delete_user', u.id)
+                          }} color="redbg">{t('admin_delete_user')}</ActionBtn>
                         )}
                         {isSuper && u.email && (
-                          <ActionBtn onClick={() => {
-                            const subject = prompt(lang !== 'en' ? 'عنوان البريد:' : 'Email subject:')
+                          <ActionBtn onClick={async () => {
+                            const subject = await promptDialog({
+                              message: lang !== 'en' ? 'عنوان البريد:' : 'Email subject:',
+                              placeholder: lang !== 'en' ? 'عنوان' : 'Subject',
+                            })
                             if (!subject) return
-                            const body = prompt(lang !== 'en' ? 'محتوى البريد:' : 'Email body:')
+                            const body = await promptDialog({
+                              message: lang !== 'en' ? 'محتوى البريد:' : 'Email body:',
+                              placeholder: lang !== 'en' ? 'المحتوى' : 'Body',
+                              multiline: true,
+                            })
                             if (!body) return
                             fetch('/api/admin/action', {
                               method: 'POST',

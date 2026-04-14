@@ -10,6 +10,7 @@ import { playSend, playReaction, playDelete } from '@/lib/sound'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
 import EmojiPicker from './EmojiPickerWrapper'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useConfirm } from './ConfirmProvider'
 import type { TranslationKey } from '@/lib/i18n'
 import { canStartPrivateThread } from '@/lib/thread-rules'
 import { getRepLevel } from '@/lib/reputation-levels'
@@ -112,6 +113,7 @@ export default function PostCard({
 }) {
   const { t, lang } = useLanguage()
   const router = useRouter()
+  const confirmDialog = useConfirm()
 
   // Safety guard — if post or author is missing, render nothing
   if (!post || !post.author) return null
@@ -408,7 +410,12 @@ export default function PostCard({
   }
 
   async function deleteComment(commentId: string, postId: string) {
-    if (!confirm(lang === 'en' ? 'Delete this comment?' : 'حذف هذا التعليق؟')) return
+    const ok = await confirmDialog({
+      message: lang === 'en' ? 'Delete this comment?' : 'حذف هذا التعليق؟',
+      variant: 'danger',
+      confirmText: lang === 'en' ? 'Delete' : 'حذف',
+    })
+    if (!ok) return
     try {
       const res = await fetch(`/api/posts/${postId}/comments/${commentId}`, { method: 'DELETE' })
       if (res.ok) {
@@ -516,7 +523,12 @@ export default function PostCard({
                       {lang === 'en' ? 'Edit' : lang === 'ur' ? 'ترمیم' : 'تعديل'}
                     </button>
                     <button onClick={async () => {
-                      if (!confirm(lang === 'en' ? 'Delete post?' : lang === 'ur' ? 'پوسٹ حذف کریں؟' : 'حذف المنشور؟')) return
+                      const ok = await confirmDialog({
+                        message: lang === 'en' ? 'Delete this post?' : lang === 'ur' ? 'پوسٹ حذف کریں؟' : 'حذف هذا المنشور؟',
+                        variant: 'danger',
+                        confirmText: lang === 'en' ? 'Delete' : lang === 'ur' ? 'حذف' : 'حذف',
+                      })
+                      if (!ok) return
                       const res = await fetch(`/api/posts/${post.id}`, { method: 'DELETE' })
                       if (res.ok) { toast.success(lang === 'en' ? 'Deleted' : lang === 'ur' ? 'حذف ہو گیا' : 'تم الحذف'); onDelete ? onDelete(post.id) : router.refresh() }
                       else toast.error(lang === 'en' ? 'Delete failed' : lang === 'ur' ? 'حذف ناکام' : 'فشل الحذف')
@@ -1402,7 +1414,12 @@ export default function PostCard({
                 {post.author.id !== currentUserId && (
                   <button
                     onClick={async () => {
-                      if (!confirm(lang === 'en' ? 'Block this user? You won\'t see their content.' : 'حظر هذا المستخدم؟ لن ترى محتواه.')) return
+                      const ok = await confirmDialog({
+                        message: lang === 'en' ? "Block this user? You won't see their content." : 'حظر هذا المستخدم؟ لن ترى محتواه.',
+                        variant: 'danger',
+                        confirmText: lang === 'en' ? 'Block' : 'حظر',
+                      })
+                      if (!ok) return
                       try {
                         await fetch('/api/users/block', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: post.author.id }) })
                         toast.success(lang === 'en' ? 'User blocked' : 'تم الحظر')

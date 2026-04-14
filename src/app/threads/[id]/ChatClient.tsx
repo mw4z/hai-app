@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useConfirm } from '@/components/ConfirmProvider'
 import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, FiTrash2, FiCheck, FiCopy, FiFlag, FiImage } from 'react-icons/fi'
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
@@ -107,6 +108,7 @@ export default function ChatClient({
   canRate?: boolean
 }) {
   const { t, lang } = useLanguage()
+  const confirmDialog = useConfirm()
   const router = useRouter()
   const [messages, setMessages] = useState(initialMessages)
   const [text, setText] = useState('')
@@ -373,7 +375,12 @@ export default function ChatClient({
   }
 
   async function closeThread() {
-    if (!confirm(lang !== 'en' ? 'إنهاء المحادثة؟' : 'End this conversation?')) return
+    const ok = await confirmDialog({
+      message: lang !== 'en' ? 'إنهاء هذه المحادثة؟' : 'End this conversation?',
+      variant: 'danger',
+      confirmText: lang !== 'en' ? 'إنهاء' : 'End',
+    })
+    if (!ok) return
     try {
       const res = await fetch(`/api/threads/${threadId}/close`, { method: 'POST' })
       if (res.ok) { setClosed(true); setShowRating(true) }
