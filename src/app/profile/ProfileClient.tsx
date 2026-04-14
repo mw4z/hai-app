@@ -6,6 +6,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import BottomNav from '@/components/BottomNav'
 import UserBadgeDisplay from '@/components/UserBadge'
+import EmergencyRequestSheet from '@/components/EmergencyRequestSheet'
 import { useLanguage, LANGUAGE_CHANGE_EVENT } from '@/hooks/useLanguage'
 import {
   FiMapPin, FiStar, FiFileText, FiLogOut, FiCamera,
@@ -167,6 +168,7 @@ export default function ProfileClient({ user, postCount }: Props) {
   const [deleteStage, setDeleteStage] = useState<null | 'confirm' | 'typed'>(null)
   const [deleteInput, setDeleteInput] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [emergencyRequestOpen, setEmergencyRequestOpen] = useState(false)
 
   function handleAvatarClick() {
     setShowAvatarPicker(true)
@@ -1125,6 +1127,19 @@ export default function ProfileClient({ user, postCount }: Props) {
         </button>
       </div>
 
+      {/* Report emergency (goes into mod review queue) */}
+      <div className="mt-2">
+        <button
+          onClick={() => setEmergencyRequestOpen(true)}
+          className="w-full bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded-xl py-3 px-4 flex items-center gap-2 active:bg-red-100 dark:active:bg-red-900/30 transition-colors"
+        >
+          <span className="text-lg">🚨</span>
+          <span className="text-sm text-red-700 dark:text-red-300 font-semibold flex-1 text-start">
+            {lang === 'en' ? 'Report an emergency' : lang === 'ur' ? 'ہنگامی اطلاع دیں' : 'الإبلاغ عن حالة طارئة'}
+          </span>
+        </button>
+      </div>
+
       {/* Contact & Support */}
       <div className="space-y-2">
         {/* Neighborhood reports — only for regular residents */}
@@ -1332,6 +1347,12 @@ export default function ProfileClient({ user, postCount }: Props) {
           </div>
         </>
       )}
+
+      {/* Emergency request sheet */}
+      <EmergencyRequestSheet
+        open={emergencyRequestOpen}
+        onClose={() => setEmergencyRequestOpen(false)}
+      />
 
       {/* Delete Account Modal — in-app RTL-aware, replaces native confirm/prompt */}
       {deleteStage && (

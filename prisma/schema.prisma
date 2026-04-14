@@ -33,7 +33,8 @@ model Neighborhood {
   users     User[]
   posts     Post[]
   compounds Compound[]
-  emergencyAlerts EmergencyAlert[]
+  emergencyAlerts        EmergencyAlert[]
+  emergencyAlertRequests EmergencyAlertRequest[]
   createdAt DateTime @default(now())
 }
 
@@ -106,6 +107,9 @@ model User {
   emergencyAlerts        EmergencyAlert[]          @relation("emergencyAuthor")
   emergencyAlertsRevoked EmergencyAlert[]          @relation("emergencyRevoker")
   emergencyDismissals    EmergencyAlertDismissal[]
+  // ── Emergency alert requests (user submissions pending mod review) ──
+  emergencyRequestsGiven    EmergencyAlertRequest[] @relation("emergencyRequestRequester")
+  emergencyRequestsReviewed EmergencyAlertRequest[] @relation("emergencyRequestReviewer")
 
   // ── Invite / density engine ──
   invitedById       String?
@@ -1074,6 +1078,33 @@ model EmergencyAlertDismissal {
   user      User           @relation(fields: [userId],  references: [id], onDelete: Cascade)
 
   @@id([alertId, userId])
+}
+
+// User-submitted emergency alert requests. Mods review and either
+// approve (→ creates EmergencyAlert + enqueues push) or reject.
+// Pending requests are NEVER visible in the public feed.
+model EmergencyAlertRequest {
+  id             String    @id @default(cuid())
+  neighborhoodId String
+  requesterId    String
+  title          String
+  body           String
+  severity       String    // critical | warning | info
+  status         String    @default("PENDING") // PENDING | APPROVED | REJECTED | EXPIRED
+  rejectedReason String?
+  reviewedById   String?
+  reviewedAt     DateTime?
+  approvedAlertId String?  @unique // FK to EmergencyAlert when approved
+  createdAt      DateTime  @default(now())
+  expiresAt      DateTime  // auto-expire 2 hours after createdAt
+
+  neighborhood   Neighborhood @relation(fields: [neighborhoodId], references: [id], onDelete: Cascade)
+  requester      User         @relation("emergencyRequestRequester", fields: [requesterId], references: [id])
+  reviewedBy     User?        @relation("emergencyRequestReviewer",  fields: [reviewedById], references: [id])
+
+  @@index([neighborhoodId, status, createdAt])
+  @@index([requesterId, status])
+  @@index([status, expiresAt])
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

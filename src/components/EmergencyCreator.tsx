@@ -24,6 +24,17 @@ interface ActiveAlert {
   authorName: string | null
 }
 
+interface PendingRequest {
+  id: string
+  title: string
+  body: string
+  severity: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED'
+  createdAt: string
+  expiresAt: string
+  requester: { id: string; name: string | null; reputation: number } | null
+}
+
 export default function EmergencyCreator() {
   const { lang } = useLanguage()
   const dn = (ar: string, en: string) => (lang === 'en' ? en : ar)
@@ -32,18 +43,30 @@ export default function EmergencyCreator() {
   const [active, setActive] = useState<ActiveAlert[]>([])
   const [loadingActive, setLoadingActive] = useState(true)
   const [open, setOpen] = useState(false)
+  const [requests, setRequests] = useState<PendingRequest[]>([])
+  const [actingOn, setActingOn] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch('/api/emergency/active')
-      if (!res.ok) {
+      const [activeRes, requestsRes] = await Promise.all([
+        fetch('/api/emergency/active'),
+        fetch('/api/admin/emergency-requests'),
+      ])
+      if (activeRes.ok) {
+        const data = await activeRes.json()
+        setActive(Array.isArray(data) ? data : [])
+      } else {
         setActive([])
-        return
       }
-      const data = await res.json()
-      setActive(Array.isArray(data) ? data : [])
+      if (requestsRes.ok) {
+        const data = await requestsRes.json()
+        setRequests(Array.isArray(data) ? data : [])
+      } else {
+        setRequests([])
+      }
     } catch {
       setActive([])
+      setRequests([])
     } finally {
       setLoadingActive(false)
     }
@@ -76,6 +99,81 @@ export default function EmergencyCreator() {
       toast.error(dn('فشل الاتصال', 'Connection failed'))
     }
   }
+
+  async function handleApproveRequest(id: string) {
+    const ok = await confirmDialog({
+      message: dn(
+        'الموافقة على هذا التنبيه وبثه لكل الجيران؟',
+        'Approve this alert and broadcast it to all neighbors?',
+      ),
+      confirmText: dn('موافقة وإرسال', 'Approve & send'),
+    })
+    if (!ok) return
+    setActingOn(id)
+    try {
+      const res = await fetch(`/api/admin/emergency-requests/${id}/approve`, {
+        method: 'POST',
+      })
+      if (res.ok) {
+        toast.success(dn('تم الإرسال', 'Sent'))
+        refresh()
+      } else {
+        const d = await res.json().catch(() => ({}))
+        if (d.error === 'rate_limited') {
+          toast.error(
+            dn(
+              'تم إرسال تنبيه في آخر ساعة — انتظر أو ألغِ الحالي',
+              'An alert was sent in the last hour — wait or revoke the current one',
+            ),
+          )
+        } else if (d.error === 'already_reviewed') {
+          toast.error(dn('تمت المراجعة مسبقاً', 'Already reviewed'))
+          refresh()
+        } else if (d.error === 'expired') {
+          toast.error(dn('انتهت صلاحية الطلب', 'Request expired'))
+          refresh()
+        } else {
+          toast.error(d.error || dn('فشل الإرسال', 'Approve failed'))
+        }
+      }
+    } catch {
+      toast.error(dn('فشل الاتصال', 'Connection failed'))
+    } finally {
+      setActingOn(null)
+    }
+  }
+
+  async function handleRejectRequest(id: string) {
+    const ok = await confirmDialog({
+      message: dn(
+        'رفض هذا الطلب؟ لن يُبث للجيران.',
+        'Reject this request? It will not be broadcast.',
+      ),
+      variant: 'danger',
+      confirmText: dn('رفض', 'Reject'),
+    })
+    if (!ok) return
+    setActingOn(id)
+    try {
+      const res = await fetch(`/api/admin/emergency-requests/${id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: '' }),
+      })
+      if (res.ok) {
+        toast.success(dn('تم الرفض', 'Rejected'))
+        refresh()
+      } else {
+        toast.error(dn('فشل الرفض', 'Reject failed'))
+      }
+    } catch {
+      toast.error(dn('فشل الاتصال', 'Connection failed'))
+    } finally {
+      setActingOn(null)
+    }
+  }
+
+  const pendingRequests = requests.filter((r) => r.status === 'PENDING')
 
   return (
     <div className="bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-900/10 dark:to-orange-900/10 border border-red-200 dark:border-red-900/30 rounded-2xl p-4 mb-3">
@@ -140,6 +238,66 @@ export default function EmergencyCreator() {
           <FiAlertTriangle className="w-4 h-4" />
           {dn('إنشاء تنبيه عاجل', 'Create Emergency Alert')}
         </button>
+      )}
+
+      {/* Pending user-submitted request queue */}
+      {pendingRequests.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-red-200 dark:border-red-900/30 space-y-2">
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-bold text-gray-700 dark:text-gray-300">
+              {dn('طلبات من الجيران', 'Requests from neighbors')}
+            </p>
+            <span className="min-w-[20px] h-[20px] px-1.5 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center">
+              {pendingRequests.length}
+            </span>
+          </div>
+          {pendingRequests.map((r) => {
+            const busy = actingOn === r.id
+            return (
+              <div
+                key={r.id}
+                className="bg-white dark:bg-gray-800 rounded-xl p-3 border border-amber-200 dark:border-amber-900/40"
+              >
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase">
+                    {severityLabel(r.severity, lang)}
+                  </p>
+                  <p className="text-[10px] text-gray-400">
+                    {r.requester?.name || dn('جار', 'Neighbor')}
+                    {typeof r.requester?.reputation === 'number' && (
+                      <> · {r.requester.reputation} {dn('نقطة', 'rep')}</>
+                    )}
+                  </p>
+                </div>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {r.title}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-3 whitespace-pre-wrap">
+                  {r.body}
+                </p>
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={() => handleRejectRequest(r.id)}
+                    disabled={busy}
+                    className="py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold text-xs rounded-lg active:scale-95 transition-transform disabled:opacity-50"
+                  >
+                    {dn('رفض', 'Reject')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApproveRequest(r.id)}
+                    disabled={busy}
+                    className="py-2 bg-red-600 text-white font-bold text-xs rounded-lg active:scale-95 transition-transform disabled:opacity-50 flex items-center justify-center gap-1"
+                  >
+                    <FiCheck className="w-3 h-3" />
+                    {busy ? dn('...', '...') : dn('موافقة وإرسال', 'Approve & send')}
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       )}
 
       {open && (
