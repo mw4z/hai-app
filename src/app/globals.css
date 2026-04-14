@@ -371,25 +371,26 @@ html.dark body::before {
 }
 
 /* ── Neighborhood Travel Overlay ──────────────────── */
-/* Pin arcs from start (near 0%) to end (near 100%) with a rise over
-   the midpoint. Independent LTR / RTL variants so the direction flips
-   naturally in Arabic/Urdu. */
+/* Pin arcs from the start marker to the end marker along a parabolic
+   path. Container is 280px wide × 110px tall, pin is 56px (w-14),
+   markers are at x=22 / x=258 (bottom-aligned). Animation uses only
+   transform so it runs on the GPU without triggering layout. */
 @keyframes hai-arc-travel-ltr {
-  0%   { left: 10px;  bottom: 4px;  transform: translateX(-50%) scale(0.55); opacity: 0; }
-  12%  { left: 14%;   bottom: 22px; transform: translateX(-50%) scale(1);    opacity: 1; }
-  50%  { left: 50%;   bottom: 62px; transform: translateX(-50%) scale(1.14); }
-  88%  { left: 86%;   bottom: 22px; transform: translateX(-50%) scale(1); }
-  100% { left: calc(100% - 10px); bottom: 4px; transform: translateX(-50%) scale(1); opacity: 1; }
+  0%   { transform: translate3d(-6px,    0px, 0) scale(0.55); opacity: 0; }
+  12%  { transform: translate3d(26px,  -22px, 0) scale(1);    opacity: 1; }
+  50%  { transform: translate3d(112px, -66px, 0) scale(1.12); }
+  88%  { transform: translate3d(198px, -22px, 0) scale(1); }
+  100% { transform: translate3d(230px,   0px, 0) scale(1);    opacity: 1; }
 }
 @keyframes hai-arc-travel-rtl {
-  0%   { right: 10px; bottom: 4px;  transform: translateX(50%) scale(0.55);  opacity: 0; }
-  12%  { right: 14%;  bottom: 22px; transform: translateX(50%) scale(1);     opacity: 1; }
-  50%  { right: 50%;  bottom: 62px; transform: translateX(50%) scale(1.14); }
-  88%  { right: 86%;  bottom: 22px; transform: translateX(50%) scale(1); }
-  100% { right: calc(100% - 10px); bottom: 4px; transform: translateX(50%) scale(1); opacity: 1; }
+  0%   { transform: translate3d(230px,   0px, 0) scale(0.55); opacity: 0; }
+  12%  { transform: translate3d(198px, -22px, 0) scale(1);    opacity: 1; }
+  50%  { transform: translate3d(112px, -66px, 0) scale(1.12); }
+  88%  { transform: translate3d(26px,  -22px, 0) scale(1); }
+  100% { transform: translate3d(-6px,    0px, 0) scale(1);    opacity: 1; }
 }
-.hai-arc-pin-ltr { animation: hai-arc-travel-ltr 520ms cubic-bezier(0.45, 0, 0.25, 1) forwards; }
-.hai-arc-pin-rtl { animation: hai-arc-travel-rtl 520ms cubic-bezier(0.45, 0, 0.25, 1) forwards; }
+.hai-arc-pin-ltr { animation: hai-arc-travel-ltr 560ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards; }
+.hai-arc-pin-rtl { animation: hai-arc-travel-rtl 560ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards; }
 
 @keyframes hai-trail-draw {
   0%   { stroke-dashoffset: 420; opacity: 0.25; }
