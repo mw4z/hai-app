@@ -19,6 +19,9 @@ export default function PullToRefresh() {
     function onTouchStart(e: TouchEvent) {
       if (window.scrollY > 0) return
       if (document.querySelector('[data-overlay="true"]')) return
+      // Any modal that locks body scroll is immune too — comments sheet,
+      // confirm dialogs, prompt dialogs, delete-account, emergency sheets.
+      if (document.body.style.overflow === 'hidden') return
       // Only active on feed, market, and threads list
       const path = window.location.pathname
       if (path !== '/feed' && path !== '/market' && path !== '/threads') return

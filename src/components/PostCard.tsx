@@ -1013,6 +1013,7 @@ export default function PostCard({
           the feed around. Scrollable body + pinned input at the bottom. */}
       {showComments && (
         <div
+          data-overlay="true"
           className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center"
           onClick={() => setShowComments(false)}
         >
