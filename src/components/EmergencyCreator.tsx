@@ -217,7 +217,7 @@ export default function EmergencyCreator() {
           {active.map((a) => (
             <div
               key={a.id}
-              className="bg-white dark:bg-gray-800 rounded-xl p-3 border border-red-200 dark:border-red-900/40"
+              className="bg-white dark:bg-gray-800 rounded-xl p-3 border-2 border-red-400 dark:border-red-500 animate-pulse-glow-emergency"
             >
               <div className="flex items-start justify-between gap-2 mb-1">
                 <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase">

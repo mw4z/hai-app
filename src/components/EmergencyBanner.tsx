@@ -73,10 +73,14 @@ export default function EmergencyBanner() {
 
         const isOpen = expanded === alert.id
 
+        // Continuous pulsing glow for critical/warning — grabs attention
+        // even when the user scrolls past. Info is quieter (no glow).
+        const glow = isCritical || isWarning ? 'animate-pulse-glow-emergency' : ''
+
         return (
           <div
             key={alert.id}
-            className={`${bg} ${ring} ring-2 text-white rounded-2xl shadow-lg overflow-hidden relative`}
+            className={`${bg} ${ring} ${glow} ring-2 text-white rounded-2xl shadow-lg overflow-hidden relative`}
           >
             <div
               role="button"
