@@ -6,11 +6,12 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useConfirm } from '@/components/ConfirmProvider'
-import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, FiTrash2, FiCheck, FiCopy, FiFlag, FiImage } from 'react-icons/fi'
+import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, FiTrash2, FiCheck, FiCopy, FiFlag, FiImage, FiUser } from 'react-icons/fi'
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
 import { uploadFiles } from '@/lib/upload'
 import { pickImageOrFallback } from '@/lib/imagePicker'
+import { useAttachContact } from '@/hooks/useAttachContact'
 import { playSend } from '@/lib/sound'
 
 interface Msg {
@@ -110,6 +111,7 @@ export default function ChatClient({
 }) {
   const { t, lang } = useLanguage()
   const confirmDialog = useConfirm()
+  const attachContact = useAttachContact()
   const router = useRouter()
   const [messages, setMessages] = useState(initialMessages)
   const [text, setText] = useState('')
@@ -803,6 +805,17 @@ export default function ChatClient({
                 }} disabled={sendingImage}
                 className="p-2.5 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50">
                 <FiCamera className={`w-5 h-5 ${sendingImage ? 'animate-pulse' : ''}`} />
+              </button>
+              <button onClick={async () => {
+                  hapticLight()
+                  const snippet = await attachContact()
+                  if (!snippet) return
+                  setText((prev) => (prev ? `${prev.trimEnd()}\n${snippet}` : snippet))
+                }}
+                aria-label={t('attach_contact')}
+                title={t('attach_contact')}
+                className="p-2.5 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all">
+                <FiUser className="w-5 h-5" />
               </button>
               <button data-tour="chat-location" onClick={() => setShowLocationConfirm(true)} disabled={sendingLocation}
                 className="p-2.5 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50">

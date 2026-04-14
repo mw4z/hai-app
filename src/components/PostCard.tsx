@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiImage, FiDownload } from 'react-icons/fi'
+import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiImage, FiDownload, FiUser } from 'react-icons/fi'
 import { uploadFiles } from '@/lib/upload'
 import { saveImageToDevice } from '@/lib/saveImage'
 import { playSend, playReaction, playDelete } from '@/lib/sound'
@@ -12,6 +12,7 @@ import EmojiPicker from './EmojiPickerWrapper'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useConfirm } from './ConfirmProvider'
 import { pickImageOrFallback } from '@/lib/imagePicker'
+import { useAttachContact } from '@/hooks/useAttachContact'
 import type { TranslationKey } from '@/lib/i18n'
 import { canStartPrivateThread } from '@/lib/thread-rules'
 import { getRepLevel } from '@/lib/reputation-levels'
@@ -115,6 +116,7 @@ export default function PostCard({
   const { t, lang } = useLanguage()
   const router = useRouter()
   const confirmDialog = useConfirm()
+  const attachContact = useAttachContact()
 
   // Safety guard — if post or author is missing, render nothing
   if (!post || !post.author) return null
@@ -404,6 +406,17 @@ export default function PostCard({
     const ref = target === 'comment' ? commentImgRef : replyImgRef
     const file = await pickImageOrFallback(lang, ref)
     if (file) applyPickedImage(file, target)
+  }
+
+  async function attachContactToComposer(target: 'comment' | 'reply') {
+    hapticLight()
+    const snippet = await attachContact()
+    if (!snippet) return
+    if (target === 'comment') {
+      setCommentText((prev) => (prev ? `${prev.trimEnd()}\n${snippet}` : snippet))
+    } else {
+      setReplyText((prev) => (prev ? `${prev.trimEnd()}\n${snippet}` : snippet))
+    }
   }
 
   async function handleAdminAction(action: string) {
@@ -1233,6 +1246,15 @@ export default function PostCard({
                         <FiImage className="w-3.5 h-3.5" />
                       </button>
                       <button
+                        type="button"
+                        onClick={() => attachContactToComposer('reply')}
+                        className="w-7 h-7 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-500 flex-shrink-0"
+                        aria-label={t('attach_contact')}
+                        title={t('attach_contact')}
+                      >
+                        <FiUser className="w-3.5 h-3.5" />
+                      </button>
+                      <button
                         type="submit"
                         disabled={submittingReply || (!replyText.trim() && !replyImage)}
                         className="w-7 h-7 bg-primary-600 rounded-full flex items-center justify-center text-white disabled:opacity-40 flex-shrink-0"
@@ -1303,6 +1325,15 @@ export default function PostCard({
                   className="w-9 h-9 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-500 flex-shrink-0"
                 >
                   <FiImage className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => attachContactToComposer('comment')}
+                  className="w-9 h-9 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-500 flex-shrink-0"
+                  aria-label={t('attach_contact')}
+                  title={t('attach_contact')}
+                >
+                  <FiUser className="w-4 h-4" />
                 </button>
                 <button
                   type="submit"

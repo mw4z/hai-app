@@ -57,5 +57,7 @@
 	<string>Allow Hai to save images to your photo library</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Allow Hai to use the microphone for video recordings</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Allow Hai to access your contacts so you can quickly attach a saved phone number when helping a neighbor in a comment or chat</string>
 </dict>
 </plist>

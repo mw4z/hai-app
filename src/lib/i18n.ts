@@ -134,6 +134,7 @@ export const translations = {
   feed_browse_no_match:  { ar: 'لا توجد نتائج مطابقة',                en: 'No neighborhoods match'                  , ur: 'کوئی محلہ نہیں ملا' },
   feed_browse_no_other:  { ar: 'لا توجد أحياء أخرى',                  en: 'No other neighborhoods'                  , ur: 'کوئی دوسرا محلہ نہیں' },
   common_km:             { ar: 'كم',                                  en: 'km'                                      , ur: 'کلومیٹر' },
+  attach_contact:        { ar: 'إرفاق جهة اتصال',                     en: 'Attach contact'                          , ur: 'رابطہ منسلک کریں' },
   feed_ask_placeholder:  { ar: 'تبحث عن شيء؟ اسأل جيرانك...',      en: 'Looking for something? Ask your neighbors...' , ur: 'کچھ ڈھونڈ رہے ہیں؟ پڑوسیوں سے پوچھیں...' },
   feed_suggest_ask:      { ar: 'اسأل جيرانك',                      en: 'Ask your neighbors'         , ur: 'پڑوسیوں سے پوچھیں' },
   feed_suggest_service:  { ar: 'اعرض خدمة',                        en: 'Offer a service'            , ur: 'خدمت پیش کریں' },
