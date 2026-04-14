@@ -1480,29 +1480,6 @@ export default function PostCard({
                   <ServiceCatalog userId={post.author.id} lang={lang} />
                 )}
 
-                {/* DM button */}
-                {post.author.id !== currentUserId && (
-                  <button
-                    onClick={async () => {
-                      try {
-                        const res = await fetch('/api/threads', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ userId: post.author.id, postId: post.id }),
-                        })
-                        if (res.ok) {
-                          const { threadId } = await res.json()
-                          router.push(`/threads/${threadId}`)
-                        }
-                      } catch { /* ignore */ }
-                    }}
-                    className="mt-5 w-full bg-primary-600 text-white rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
-                  >
-                    <FiMail className="w-4 h-4" />
-                    {lang !== 'en' ? 'إرسال رسالة' : 'Send Message'}
-                  </button>
-                )}
-
                 {/* Block user */}
                 {post.author.id !== currentUserId && (
                   <button
