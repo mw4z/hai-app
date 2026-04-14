@@ -1,19 +1,17 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { FiArrowLeft, FiArrowRight } from 'react-icons/fi'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
 
 /**
- * Edge swipe-to-go-back gesture.
+ * Edge swipe-to-go-back gesture. Invisible — no visual indicator.
  *
  * Touch starts within EDGE_THRESHOLD of the leading edge (left in LTR,
  * right in RTL). If the user drags more than GO_THRESHOLD horizontally,
  * we call router.back() on release.
  *
  * Bails out when:
- *  - Not a native platform (desktop browsers don't need this)
  *  - A modal overlay is open (same check as PullToRefresh)
  *  - We're on a root page where back would exit the app
  *  - The touch starts inside a horizontally scrollable container
@@ -33,13 +31,13 @@ const ROOT_PATHS = new Set([
 
 export default function SwipeBack() {
   const router = useRouter()
-  const [dragX, setDragX] = useState(0)
-  const [dragging, setDragging] = useState(false)
-  const [triggered, setTriggered] = useState(false)
 
+  // All state lives in refs — no re-renders during the gesture.
   const startX = useRef(0)
   const startY = useRef(0)
+  const currentDx = useRef(0)
   const active = useRef(false)
+  const triggered = useRef(false)
   const isRTL = useRef(false)
 
   useEffect(() => {
@@ -48,19 +46,12 @@ export default function SwipeBack() {
     function canGoBack(): boolean {
       const path = window.location.pathname
       if (ROOT_PATHS.has(path)) return false
-      // In-app navigation populates history, so length > 1 means we have
-      // somewhere to go. window.history.length stays >= 2 even for fresh
-      // loads in Capacitor (the embedded web view counts initial loads).
-      // Be conservative and allow when not on a root page.
       return true
     }
 
-    function isInOverlay(target: EventTarget | null): boolean {
-      if (!(target instanceof Element)) return false
-      // Respect the same modal guards as PullToRefresh
+    function isInOverlay(): boolean {
       if (document.querySelector('[data-overlay="true"]')) return true
       if (document.body.style.overflow === 'hidden') return true
-      // Text input focus = keyboard open
       const tag = (document.activeElement?.tagName || '').toLowerCase()
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return true
       return false
@@ -86,15 +77,12 @@ export default function SwipeBack() {
     function onTouchStart(e: TouchEvent) {
       if (e.touches.length !== 1) return
       if (!canGoBack()) return
-      if (isInOverlay(e.target)) return
+      if (isInOverlay()) return
       if (insideHorizontalScroller(e.target)) return
 
       const t = e.touches[0]
       isRTL.current = document.documentElement.getAttribute('dir') === 'rtl'
 
-      // Edge detection depends on direction — in RTL the back gesture
-      // starts from the right edge and drags left; in LTR it starts
-      // from the left edge and drags right.
       const nearEdge = isRTL.current
         ? t.clientX > window.innerWidth - EDGE_THRESHOLD
         : t.clientX < EDGE_THRESHOLD
@@ -102,9 +90,9 @@ export default function SwipeBack() {
 
       startX.current = t.clientX
       startY.current = t.clientY
+      currentDx.current = 0
       active.current = true
-      setDragX(0)
-      setTriggered(false)
+      triggered.current = false
     }
 
     function onTouchMove(e: TouchEvent) {
@@ -114,42 +102,34 @@ export default function SwipeBack() {
       if (dy > MAX_VERTICAL) {
         // Vertical scroll — cancel the swipe
         active.current = false
-        setDragging(false)
-        setDragX(0)
+        currentDx.current = 0
         return
       }
-      // In RTL, drag is negative (right-to-left), flip the sign so the
-      // indicator always grows in the "direction of progress".
+      // In RTL, drag is negative (right-to-left), flip the sign so progress
+      // is always positive.
       const rawDx = t.clientX - startX.current
       const dx = isRTL.current ? -rawDx : rawDx
-      if (dx < 0) {
-        // Dragging the wrong way — ignore, don't let it negative-peek
-        return
-      }
-      // Stop the page from scrolling horizontally while we drag
+      if (dx < 0) return
       if (dx > 8) e.preventDefault()
-      setDragging(true)
-      setDragX(dx)
+      currentDx.current = dx
       const crossedThreshold = dx >= GO_THRESHOLD
-      if (crossedThreshold && !triggered) {
-        setTriggered(true)
+      if (crossedThreshold && !triggered.current) {
+        triggered.current = true
         hapticLight()
-      } else if (!crossedThreshold && triggered) {
-        setTriggered(false)
+      } else if (!crossedThreshold && triggered.current) {
+        triggered.current = false
       }
     }
 
     function onTouchEnd() {
       if (!active.current) return
       active.current = false
-      const shouldGo = dragX >= GO_THRESHOLD
-      setDragging(false)
-      setDragX(0)
-      setTriggered(false)
+      const shouldGo = currentDx.current >= GO_THRESHOLD
+      currentDx.current = 0
+      triggered.current = false
       if (shouldGo) {
         hapticMedium()
-        // Tiny delay so the release animation is visible before navigating
-        setTimeout(() => router.back(), 30)
+        router.back()
       }
     }
 
@@ -163,44 +143,7 @@ export default function SwipeBack() {
       document.removeEventListener('touchend', onTouchEnd)
       document.removeEventListener('touchcancel', onTouchEnd)
     }
-  }, [router, dragX, triggered])
+  }, [router])
 
-  if (!dragging || dragX === 0) return null
-
-  // Visual indicator — a pill that grows from the edge and fills when
-  // threshold is reached. Position: leading edge (left in LTR, right in RTL).
-  const progress = Math.min(dragX / GO_THRESHOLD, 1)
-  const scale = 0.7 + progress * 0.5
-  const ready = dragX >= GO_THRESHOLD
-
-  return (
-    <div
-      className="pointer-events-none fixed top-1/2 -translate-y-1/2 z-[80]"
-      style={
-        isRTL.current
-          ? { right: 0, transform: `translate(${-dragX * 0.3}px, -50%)` }
-          : { left: 0, transform: `translate(${dragX * 0.3}px, -50%)` }
-      }
-    >
-      <div
-        className={`flex items-center justify-center rounded-full shadow-lg transition-colors duration-150 ${
-          ready
-            ? 'bg-primary-600 text-white'
-            : 'bg-white/90 dark:bg-gray-800/90 text-gray-500 dark:text-gray-300'
-        }`}
-        style={{
-          width: 44,
-          height: 44,
-          transform: `scale(${scale})`,
-          transition: 'transform 0.1s, background-color 0.15s',
-        }}
-      >
-        {isRTL.current ? (
-          <FiArrowRight className="w-5 h-5" />
-        ) : (
-          <FiArrowLeft className="w-5 h-5" />
-        )}
-      </div>
-    </div>
-  )
+  return null
 }
