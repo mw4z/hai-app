@@ -155,6 +155,7 @@ async function getOrCreateSeedUser(neighborhoodId: string, personaIndex: number)
           phone: persona.phone,
           name: persona.name,
           isVerified: true,
+          isSeed: true,
           neighborhoodId,
         },
       })
@@ -162,6 +163,9 @@ async function getOrCreateSeedUser(neighborhoodId: string, personaIndex: number)
       // Race condition: another call created it first — just fetch it
       user = await db.user.findUnique({ where: { phone: persona.phone } })
     }
+  } else if (!user.isSeed) {
+    // Backfill the flag for pre-existing seed users (one-time, cheap)
+    await db.user.update({ where: { id: user.id }, data: { isSeed: true } })
   }
   return user!.id
 }
@@ -308,5 +312,245 @@ export async function ensureNeighborhoodContent(neighborhoodId: string): Promise
 
   if (postCount < LOW_CONTENT_THRESHOLD) {
     await seedNeighborhood(neighborhoodId)
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ADMIN-FACING: custom quantities + seed comments + clear ops
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── Seed comment pool ──────────────────────────────────────────────────────
+const SEED_COMMENT_POOL: string[] = [
+  'شكراً على المعلومة 🙏',
+  'نفس المشكلة عندي، الله يعين',
+  'بلّغت البلدية قبل، خذوا بالكم',
+  'وأخيراً أحد انتبه لهذا الموضوع',
+  'عندي رقم كويس، راسلني خاص',
+  'صح كلامك، نحتاج نتحرك',
+  'الله يعطيك العافية',
+  'شكراً جزيلاً، معلومة مهمة',
+  'تسلم على المبادرة',
+  'نفس رأيي، أتفق معك',
+  'الله يجزاك خير',
+  'جربت شي مشابه، ما نفع معي',
+  'فعلاً نحتاج حل عاجل',
+  'أبشرك، فيه عند الدكان الجديد',
+  'هذي المشكلة من زمان',
+]
+
+/**
+ * Generate seed comments on seed posts in a neighborhood.
+ * Picks random seed users as authors, random seed posts as targets.
+ */
+export async function generateSeedComments(
+  neighborhoodId: string,
+  commentsPerPost: number,
+): Promise<number> {
+  const seedPosts = await db.post.findMany({
+    where: { neighborhoodId, isSeed: true, status: 'ACTIVE' },
+    select: { id: true, authorId: true },
+  })
+  if (seedPosts.length === 0) return 0
+
+  const seedUsers = await db.user.findMany({
+    where: { isSeed: true },
+    select: { id: true },
+  })
+  if (seedUsers.length === 0) return 0
+
+  // Ensure at least a few personas exist in this neighborhood by touching each
+  for (let i = 0; i < Math.min(SEED_PERSONAS.length, 6); i++) {
+    await getOrCreateSeedUser(neighborhoodId, i)
+  }
+  const seedUsersAll = await db.user.findMany({
+    where: { isSeed: true },
+    select: { id: true },
+  })
+
+  let created = 0
+  const commentsToCreate: any[] = []
+
+  for (const post of seedPosts) {
+    const count = Math.max(0, Math.min(commentsPerPost, SEED_COMMENT_POOL.length))
+    const picks = pickRandom(SEED_COMMENT_POOL, count)
+    for (const body of picks) {
+      // Pick a seed user that's not the post author
+      const candidates = seedUsersAll.filter(u => u.id !== post.authorId)
+      if (candidates.length === 0) continue
+      const author = candidates[Math.floor(Math.random() * candidates.length)]
+      // Backdate between 5 min and 36 hours ago
+      const minutesAgo = 5 + Math.floor(Math.random() * (36 * 60 - 5))
+      commentsToCreate.push({
+        body,
+        postId: post.id,
+        authorId: author.id,
+        createdAt: new Date(Date.now() - minutesAgo * 60_000),
+      })
+    }
+  }
+
+  if (commentsToCreate.length > 0) {
+    // createMany in chunks of 100 to avoid argument size limits
+    for (let i = 0; i < commentsToCreate.length; i += 100) {
+      const chunk = commentsToCreate.slice(i, i + 100)
+      const res = await db.comment.createMany({ data: chunk })
+      created += res.count
+    }
+  }
+  return created
+}
+
+/**
+ * Generate exactly `targetCount` seed posts in a neighborhood, ignoring
+ * the lazy-backfill thresholds. For SUPER_ADMIN "bulk generate" button.
+ */
+export async function generateSeedPostsExact(
+  neighborhoodId: string,
+  targetCount: number,
+): Promise<number> {
+  if (targetCount <= 0) return 0
+
+  const existingSeeds = await db.post.findMany({
+    where: { neighborhoodId, isSeed: true },
+    select: { title: true },
+  })
+  const existingTitles = new Set(existingSeeds.map((p) => p.title))
+
+  // Distribute the target across available categories evenly
+  const categories = Object.keys(CONTENT_POOL) as PostCategory[]
+  const perCategory = Math.max(1, Math.ceil(targetCount / categories.length))
+  const distribution = categories.map((category) => ({ category, count: perCategory }))
+
+  return insertSeedPosts(
+    neighborhoodId,
+    distribution,
+    existingTitles,
+    { minHours: 1, maxHours: 72 },
+  )
+}
+
+/**
+ * Delete seed content. Scope options:
+ *  - posts:    only seed posts (and their cascade-deleted comments/reactions)
+ *  - comments: only seed comments authored by seed users
+ *  - all:      seed posts + seed comments + (optionally) seed users
+ */
+export async function clearSeedContent(options: {
+  neighborhoodId?: string
+  scope: 'posts' | 'comments' | 'all'
+  includeUsers?: boolean
+}): Promise<{ posts: number; comments: number; users: number }> {
+  const { neighborhoodId, scope, includeUsers } = options
+  let postsDeleted = 0
+  let commentsDeleted = 0
+  let usersDeleted = 0
+
+  const nbhdFilter = neighborhoodId ? { neighborhoodId } : {}
+
+  if (scope === 'comments' || scope === 'all') {
+    // Delete comments authored by seed users, scoped by neighborhood if given
+    const del = await db.comment.deleteMany({
+      where: {
+        author: { isSeed: true },
+        ...(neighborhoodId ? { post: { neighborhoodId } } : {}),
+      },
+    })
+    commentsDeleted = del.count
+  }
+
+  if (scope === 'posts' || scope === 'all') {
+    // Cascade-delete comments + reactions when posts go via Prisma cascade
+    const del = await db.post.deleteMany({
+      where: {
+        isSeed: true,
+        ...nbhdFilter,
+      },
+    })
+    postsDeleted = del.count
+  }
+
+  if (scope === 'all' && includeUsers) {
+    // Deleting seed users is risky (they may have real rep history) — only
+    // when explicitly requested. Unscoped by neighborhood since seed users
+    // are shared across all neighborhoods via phone convention.
+    const del = await db.user.deleteMany({ where: { isSeed: true } })
+    usersDeleted = del.count
+  }
+
+  return { posts: postsDeleted, comments: commentsDeleted, users: usersDeleted }
+}
+
+/**
+ * Return aggregate seed stats for admin dashboard.
+ */
+export async function getSeedStats(): Promise<{
+  totalSeedUsers: number
+  totalSeedPosts: number
+  totalSeedComments: number
+  perNeighborhood: Array<{
+    id: string
+    name: string
+    nameEn: string
+    seedPosts: number
+    seedComments: number
+    realPosts: number
+  }>
+}> {
+  // Self-heal: backfill isSeed for any pre-existing users matching the seed
+  // phone pattern that haven't been flagged yet.
+  await db.user.updateMany({
+    where: {
+      phone: { startsWith: '059990000' },
+      isSeed: false,
+    },
+    data: { isSeed: true },
+  })
+
+  const [totalSeedUsers, totalSeedPosts, totalSeedComments, neighborhoods] =
+    await Promise.all([
+      db.user.count({ where: { isSeed: true } }),
+      db.post.count({ where: { isSeed: true } }),
+      db.comment.count({ where: { author: { isSeed: true } } }),
+      db.neighborhood.findMany({
+        where: { hidden: false },
+        select: { id: true, name: true, nameEn: true },
+        orderBy: { name: 'asc' },
+      }),
+    ])
+
+  const perNeighborhood = await Promise.all(
+    neighborhoods.map(async (n) => {
+      const [seedPosts, seedComments, realPosts] = await Promise.all([
+        db.post.count({ where: { neighborhoodId: n.id, isSeed: true } }),
+        db.comment.count({
+          where: {
+            post: { neighborhoodId: n.id },
+            author: { isSeed: true },
+          },
+        }),
+        db.post.count({
+          where: {
+            neighborhoodId: n.id,
+            isSeed: false,
+            status: { in: ['ACTIVE', 'IN_PROGRESS'] },
+          },
+        }),
+      ])
+      return {
+        id: n.id,
+        name: n.name,
+        nameEn: n.nameEn,
+        seedPosts,
+        seedComments,
+        realPosts,
+      }
+    }),
+  )
+
+  return {
+    totalSeedUsers,
+    totalSeedPosts,
+    totalSeedComments,
+    perNeighborhood,
   }
 }

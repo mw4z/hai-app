@@ -36,7 +36,7 @@ const ACTION_LABELS: Record<string, { ar: string; en: string }> = {
   CONFLICT_BLOCKED: { ar: 'تم حظر الإجراء (تعارض)', en: 'Action blocked (conflict)' },
 }
 
-type Tab = 'overview' | 'posts' | 'reports' | 'requests' | 'verify' | 'mod_requests' | 'users' | 'nbhd_reports' | 'support' | 'logs'
+type Tab = 'overview' | 'posts' | 'reports' | 'requests' | 'verify' | 'mod_requests' | 'users' | 'nbhd_reports' | 'support' | 'logs' | 'seeds'
 
 export default function AdminClient({ role, adminName }: { role: string; adminName: string }) {
   const { t, lang } = useLanguage()
@@ -59,6 +59,13 @@ export default function AdminClient({ role, adminName }: { role: string; adminNa
   const [logs, setLogs] = useState<any[]>([])
   const [userSearch, setUserSearch] = useState('')
 
+  // Seed control (SUPER_ADMIN only)
+  const [seedStats, setSeedStats] = useState<any>(null)
+  const [seedLoading, setSeedLoading] = useState(false)
+  const [seedTargetPosts, setSeedTargetPosts] = useState(8)
+  const [seedCommentsPerPost, setSeedCommentsPerPost] = useState(2)
+  const [seedActionOn, setSeedActionOn] = useState<string | null>(null)
+
   const isSuper = role === 'SUPER_ADMIN'
 
   useEffect(() => {
@@ -77,7 +84,94 @@ export default function AdminClient({ role, adminName }: { role: string; adminNa
     if (tab === 'nbhd_reports') fetchList('neighborhood_reports', setNbhdReports)
     if (tab === 'support') fetchList('support_tickets', setSupportTickets)
     if (tab === 'users') fetchUsers()
+    if (tab === 'seeds') fetchSeedStats()
   }, [tab, postStatusFilter])
+
+  async function fetchSeedStats() {
+    setSeedLoading(true)
+    try {
+      const res = await fetch('/api/admin/seed/stats')
+      if (res.ok) setSeedStats(await res.json())
+    } catch {}
+    finally { setSeedLoading(false) }
+  }
+
+  async function seedGenerate(scope: 'one' | 'all', neighborhoodId?: string) {
+    const label = scope === 'all'
+      ? (lang === 'en' ? `Generate ${seedTargetPosts} posts in EVERY neighborhood?` : `إنشاء ${seedTargetPosts} منشور في كل حي؟`)
+      : (lang === 'en' ? `Generate ${seedTargetPosts} posts here?` : `إنشاء ${seedTargetPosts} منشور في هذا الحي؟`)
+    const ok = await confirmDialog({ message: label, confirmText: lang === 'en' ? 'Generate' : 'إنشاء' })
+    if (!ok) return
+    const key = scope === 'all' ? 'all' : neighborhoodId || 'one'
+    setSeedActionOn(key)
+    try {
+      const res = await fetch('/api/admin/seed/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scope,
+          neighborhoodId,
+          targetPosts: seedTargetPosts,
+          commentsPerPost: seedCommentsPerPost,
+        }),
+      })
+      const d = await res.json()
+      if (res.ok) {
+        toast.success(
+          lang === 'en'
+            ? `+${d.totalPosts} posts, +${d.totalComments} comments`
+            : `+${d.totalPosts} منشور، +${d.totalComments} تعليق`,
+        )
+        fetchSeedStats()
+      } else {
+        toast.error(d.error || (lang === 'en' ? 'Failed' : 'فشل'))
+      }
+    } catch {
+      toast.error(lang === 'en' ? 'Connection failed' : 'فشل الاتصال')
+    } finally {
+      setSeedActionOn(null)
+    }
+  }
+
+  async function seedClear(
+    scope: 'posts' | 'comments' | 'all',
+    neighborhoodId?: string,
+    includeUsers = false,
+  ) {
+    const label = neighborhoodId
+      ? (lang === 'en' ? `Clear seed ${scope} in this neighborhood?` : `حذف محتوى البذور (${scope}) في هذا الحي؟`)
+      : (lang === 'en' ? `Clear seed ${scope} in ALL neighborhoods?${includeUsers ? ' (INCLUDING seed users)' : ''}` : `حذف محتوى البذور (${scope}) في كل الأحياء؟${includeUsers ? ' (مع المستخدمين)' : ''}`)
+    const ok = await confirmDialog({
+      message: label,
+      variant: 'danger',
+      confirmText: lang === 'en' ? 'Delete' : 'حذف',
+    })
+    if (!ok) return
+    const key = neighborhoodId || (includeUsers ? 'clear-all-users' : 'clear-all')
+    setSeedActionOn(key)
+    try {
+      const res = await fetch('/api/admin/seed/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ neighborhoodId, scope, includeUsers }),
+      })
+      const d = await res.json()
+      if (res.ok) {
+        toast.success(
+          lang === 'en'
+            ? `-${d.posts} posts, -${d.comments} comments, -${d.users} users`
+            : `-${d.posts} منشور، -${d.comments} تعليق، -${d.users} مستخدم`,
+        )
+        fetchSeedStats()
+      } else {
+        toast.error(d.error || (lang === 'en' ? 'Failed' : 'فشل'))
+      }
+    } catch {
+      toast.error(lang === 'en' ? 'Connection failed' : 'فشل الاتصال')
+    } finally {
+      setSeedActionOn(null)
+    }
+  }
 
   function fetchList(list: string, setter: (d: any[]) => void) {
     fetch(`/api/admin/lists?list=${list}`).then(r => r.json()).then(setter).catch(() => {})
@@ -121,6 +215,7 @@ export default function AdminClient({ role, adminName }: { role: string; adminNa
     { key: 'support' as Tab, label: 'admin_support' as TranslationKey, icon: <FiStar className="w-4 h-4" /> },
     { key: 'users' as Tab, label: 'admin_users' as TranslationKey, icon: <FiUsers className="w-4 h-4" /> },
     { key: 'logs' as Tab, label: 'admin_logs' as TranslationKey, icon: <FiShield className="w-4 h-4" /> },
+    ...(isSuper ? [{ key: 'seeds' as Tab, label: 'admin_seeds' as TranslationKey, icon: <FiActivity className="w-4 h-4" /> }] : []),
   ]
 
   const STATUS_FILTERS: { key: string; label: TranslationKey }[] = [
@@ -582,6 +677,159 @@ export default function AdminClient({ role, adminName }: { role: string; adminNa
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* SUPER_ADMIN content seed control */}
+        {tab === 'seeds' && isSuper && (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4">
+              <p className="text-sm font-bold text-amber-900 mb-1">
+                {lang === 'en' ? '🌱 Content Seed Control' : '🌱 التحكم في محتوى البذور'}
+              </p>
+              <p className="text-[11px] text-amber-700 leading-relaxed">
+                {lang === 'en'
+                  ? 'Generate or clear auto-content (users, posts, comments) per neighborhood. Used to bootstrap empty neighborhoods so the feed doesn\'t look dead to new real users.'
+                  : 'أنشئ أو احذف المحتوى التلقائي (مستخدمين، منشورات، تعليقات) لكل حي. يُستخدم لملء الأحياء الفارغة حتى لا يبدو الفيد فارغاً للمستخدمين الجدد.'}
+              </p>
+            </div>
+
+            {/* Global stats */}
+            {seedLoading && !seedStats ? (
+              <div className="text-center text-gray-400 py-8">...</div>
+            ) : seedStats ? (
+              <>
+                <div className="grid grid-cols-3 gap-2">
+                  <StatCard
+                    label={lang === 'en' ? 'Seed users' : 'مستخدمون'}
+                    value={seedStats.totalSeedUsers}
+                  />
+                  <StatCard
+                    label={lang === 'en' ? 'Seed posts' : 'منشورات'}
+                    value={seedStats.totalSeedPosts}
+                  />
+                  <StatCard
+                    label={lang === 'en' ? 'Seed comments' : 'تعليقات'}
+                    value={seedStats.totalSeedComments}
+                  />
+                </div>
+
+                {/* Control inputs */}
+                <div className="bg-white rounded-xl p-4 border border-gray-100 space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">
+                      {lang === 'en' ? 'Target posts per neighborhood' : 'عدد المنشورات لكل حي'}
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={30}
+                      value={seedTargetPosts}
+                      onChange={(e) => setSeedTargetPosts(Math.max(0, Math.min(30, Number(e.target.value) || 0)))}
+                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">
+                      {lang === 'en' ? 'Comments per seed post' : 'تعليقات لكل منشور'}
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10}
+                      value={seedCommentsPerPost}
+                      onChange={(e) => setSeedCommentsPerPost(Math.max(0, Math.min(10, Number(e.target.value) || 0)))}
+                      className="w-full px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm"
+                    />
+                  </div>
+
+                  {/* Global actions */}
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => seedGenerate('all')}
+                      disabled={seedActionOn === 'all'}
+                      className="py-2.5 bg-primary-600 text-white font-bold text-xs rounded-lg active:scale-95 disabled:opacity-50"
+                    >
+                      {seedActionOn === 'all'
+                        ? (lang === 'en' ? 'Generating...' : 'جاري الإنشاء...')
+                        : (lang === 'en' ? '+ Seed ALL neighborhoods' : '+ بذر كل الأحياء')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => seedClear('all')}
+                      disabled={seedActionOn === 'clear-all'}
+                      className="py-2.5 bg-red-600 text-white font-bold text-xs rounded-lg active:scale-95 disabled:opacity-50"
+                    >
+                      {seedActionOn === 'clear-all'
+                        ? (lang === 'en' ? 'Clearing...' : 'جاري الحذف...')
+                        : (lang === 'en' ? '✕ Clear ALL seed content' : '✕ حذف كل محتوى البذور')}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => seedClear('all', undefined, true)}
+                    disabled={seedActionOn === 'clear-all-users'}
+                    className="w-full py-2 bg-red-50 text-red-600 border border-red-200 font-semibold text-[11px] rounded-lg active:scale-95 disabled:opacity-50"
+                  >
+                    {seedActionOn === 'clear-all-users'
+                      ? (lang === 'en' ? 'Clearing...' : 'جاري الحذف...')
+                      : (lang === 'en' ? '⚠ Nuke seed content + seed users' : '⚠ احذف المحتوى + المستخدمين')}
+                  </button>
+                </div>
+
+                {/* Per-neighborhood table */}
+                <div className="bg-white rounded-xl border border-gray-100 divide-y divide-gray-100">
+                  <div className="px-3 py-2 text-xs font-bold text-gray-600 bg-gray-50">
+                    {lang === 'en' ? `Per neighborhood (${seedStats.perNeighborhood.length})` : `حسب الحي (${seedStats.perNeighborhood.length})`}
+                  </div>
+                  {seedStats.perNeighborhood.map((n: any) => (
+                    <div key={n.id} className="px-3 py-3">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-800 truncate">
+                            {lang === 'en' ? n.nameEn || n.name : n.name}
+                          </p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            {lang === 'en' ? 'seed' : 'بذور'}: {n.seedPosts}📝 {n.seedComments}💬 · {lang === 'en' ? 'real' : 'حقيقي'}: {n.realPosts}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => seedGenerate('one', n.id)}
+                          disabled={seedActionOn === n.id}
+                          className="flex-1 py-1.5 bg-primary-600 text-white text-[10px] font-bold rounded-lg active:scale-95 disabled:opacity-50"
+                        >
+                          {seedActionOn === n.id
+                            ? '...'
+                            : (lang === 'en' ? '+ Seed' : '+ بذر')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => seedClear('posts', n.id)}
+                          disabled={seedActionOn === n.id}
+                          className="flex-1 py-1.5 bg-red-100 text-red-700 text-[10px] font-bold rounded-lg active:scale-95 disabled:opacity-50"
+                        >
+                          {lang === 'en' ? '✕ Posts' : '✕ منشورات'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => seedClear('comments', n.id)}
+                          disabled={seedActionOn === n.id}
+                          className="flex-1 py-1.5 bg-red-50 text-red-600 text-[10px] font-bold rounded-lg active:scale-95 disabled:opacity-50"
+                        >
+                          {lang === 'en' ? '✕ Comments' : '✕ تعليقات'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-center text-gray-400 py-8">{lang === 'en' ? 'Failed to load' : 'فشل التحميل'}</p>
+            )}
           </div>
         )}
       </div>
