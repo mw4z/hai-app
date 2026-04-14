@@ -11,6 +11,7 @@ import { hapticLight, hapticMedium } from '@/lib/haptic'
 import EmojiPicker from './EmojiPickerWrapper'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useConfirm } from './ConfirmProvider'
+import { pickImageOrFallback } from '@/lib/imagePicker'
 import type { TranslationKey } from '@/lib/i18n'
 import { canStartPrivateThread } from '@/lib/thread-rules'
 import { getRepLevel } from '@/lib/reputation-levels'
@@ -377,10 +378,7 @@ export default function PostCard({
     }
   }
 
-  function handleCommentImageSelect(e: React.ChangeEvent<HTMLInputElement>, target: 'comment' | 'reply') {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
+  function applyPickedImage(file: File, target: 'comment' | 'reply') {
     if (!file.type.startsWith('image/')) { toast.error(lang === 'en' ? 'Images only' : 'صور فقط'); return }
     if (file.size > 10 * 1024 * 1024) { toast.error(lang === 'en' ? 'Max 10MB' : 'الحد الأقصى 10 ميقا'); return }
     const preview = URL.createObjectURL(file)
@@ -393,6 +391,19 @@ export default function PostCard({
       setReplyImage(file)
       setReplyImagePreview(preview)
     }
+  }
+
+  function handleCommentImageSelect(e: React.ChangeEvent<HTMLInputElement>, target: 'comment' | 'reply') {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    applyPickedImage(file, target)
+  }
+
+  async function openImagePicker(target: 'comment' | 'reply') {
+    const ref = target === 'comment' ? commentImgRef : replyImgRef
+    const file = await pickImageOrFallback(lang, ref)
+    if (file) applyPickedImage(file, target)
   }
 
   async function handleAdminAction(action: string) {
@@ -1216,7 +1227,7 @@ export default function PostCard({
                       <input type="file" accept="image/*" ref={replyImgRef} onChange={e => handleCommentImageSelect(e, 'reply')} className="hidden" />
                       <button
                         type="button"
-                        onClick={() => replyImgRef.current?.click()}
+                        onClick={() => openImagePicker('reply')}
                         className="w-7 h-7 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-500 flex-shrink-0"
                       >
                         <FiImage className="w-3.5 h-3.5" />
@@ -1288,7 +1299,7 @@ export default function PostCard({
                 <input type="file" accept="image/*" ref={commentImgRef} onChange={e => handleCommentImageSelect(e, 'comment')} className="hidden" />
                 <button
                   type="button"
-                  onClick={() => commentImgRef.current?.click()}
+                  onClick={() => openImagePicker('comment')}
                   className="w-9 h-9 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-500 flex-shrink-0"
                 >
                   <FiImage className="w-4 h-4" />
