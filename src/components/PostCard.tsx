@@ -440,7 +440,16 @@ export default function PostCard({
       const res = await fetch(`/api/posts/${postId}/comments/${commentId}`, { method: 'DELETE' })
       if (res.ok) {
         playDelete()
-        setComments(prev => prev.filter((c: any) => c.id !== commentId))
+        // Remove from top-level list OR from any parent's replies array
+        setComments(prev =>
+          prev
+            .filter((c: any) => c.id !== commentId)
+            .map((c: any) =>
+              c.replies && c.replies.length > 0
+                ? { ...c, replies: c.replies.filter((r: any) => r.id !== commentId) }
+                : c,
+            ),
+        )
         toast.success(lang === 'en' ? 'Deleted' : 'تم الحذف')
       } else {
         const d = await res.json()
@@ -1158,13 +1167,23 @@ export default function PostCard({
                               onClick={() => setCommentLightbox(reply.imageUrl!)}
                             />
                           )}
-                          <button
-                            onClick={() => handleCommentLike(reply.id)}
-                            className={`text-[11px] flex items-center gap-1 mt-1 transition-colors ${reply.isLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-400'}`}
-                          >
-                            <FiHeart className={`w-3 h-3 ${reply.isLiked ? 'fill-current' : ''}`} />
-                            {(reply.likeCount || 0) > 0 && <span>{reply.likeCount}</span>}
-                          </button>
+                          <div className="flex items-center gap-3 mt-1">
+                            <button
+                              onClick={() => handleCommentLike(reply.id)}
+                              className={`text-[11px] flex items-center gap-1 transition-colors ${reply.isLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-400'}`}
+                            >
+                              <FiHeart className={`w-3 h-3 ${reply.isLiked ? 'fill-current' : ''}`} />
+                              {(reply.likeCount || 0) > 0 && <span>{reply.likeCount}</span>}
+                            </button>
+                            {reply.author.id === currentUserId && (
+                              <button
+                                onClick={() => deleteComment(reply.id, post.id)}
+                                className="text-[11px] text-gray-400 hover:text-red-500"
+                              >
+                                {lang === 'en' ? 'Delete' : 'حذف'}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
