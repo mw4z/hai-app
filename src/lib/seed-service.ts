@@ -401,8 +401,11 @@ export async function generateSeedComments(
 }
 
 /**
- * Generate exactly `targetCount` seed posts in a neighborhood, ignoring
+ * Generate up to `targetCount` seed posts in a neighborhood, ignoring
  * the lazy-backfill thresholds. For SUPER_ADMIN "bulk generate" button.
+ *
+ * Caps strictly at targetCount — picks are distributed across available
+ * categories round-robin and then trimmed so we never over-generate.
  */
 export async function generateSeedPostsExact(
   neighborhoodId: string,
@@ -416,14 +419,49 @@ export async function generateSeedPostsExact(
   })
   const existingTitles = new Set(existingSeeds.map((p) => p.title))
 
-  // Distribute the target across available categories evenly
+  // Collect available picks per category, then round-robin until we
+  // reach targetCount. This guarantees we never exceed the target and
+  // keeps the mix diverse when the target < number of categories.
   const categories = Object.keys(CONTENT_POOL) as PostCategory[]
-  const perCategory = Math.max(1, Math.ceil(targetCount / categories.length))
-  const distribution = categories.map((category) => ({ category, count: perCategory }))
+  const pools: Record<string, { title: string; body: string }[]> = {}
+  for (const cat of categories) {
+    pools[cat] = shuffle(
+      (CONTENT_POOL[cat] || []).filter((p) => !existingTitles.has(p.title)),
+    )
+  }
+
+  const picked: { category: PostCategory; count: number }[] = []
+  const catMap: Record<string, number> = {}
+  let total = 0
+  let exhausted = 0
+
+  while (total < targetCount && exhausted < categories.length) {
+    exhausted = 0
+    for (const cat of categories) {
+      if (total >= targetCount) break
+      const pool = pools[cat]
+      if (!pool || pool.length === 0) {
+        exhausted++
+        continue
+      }
+      // Pop one — we only use it once
+      pool.pop()
+      catMap[cat] = (catMap[cat] || 0) + 1
+      total++
+    }
+  }
+
+  for (const cat of categories) {
+    if (catMap[cat]) {
+      picked.push({ category: cat, count: catMap[cat] })
+    }
+  }
+
+  if (picked.length === 0) return 0
 
   return insertSeedPosts(
     neighborhoodId,
-    distribution,
+    picked,
     existingTitles,
     { minHours: 1, maxHours: 72 },
   )

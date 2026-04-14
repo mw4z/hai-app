@@ -65,39 +65,76 @@ export async function POST(req: NextRequest) {
     targetNbhds = [body.neighborhoodId]
   }
 
+  // Parallel batched execution — 5 neighborhoods at a time. Each
+  // neighborhood's work is wrapped in try/catch so one failure doesn't
+  // corrupt the whole response. Overall time budget ~50s to stay well
+  // under Vercel's 60s limit.
+  const BATCH_SIZE = 5
+  const TIME_BUDGET_MS = 50_000
+  const startedAt = Date.now()
+
   let totalPosts = 0
   let totalComments = 0
-  const errors: string[] = []
+  const errors: { id: string; error: string }[] = []
+  const processed: string[] = []
 
-  for (const nbhdId of targetNbhds) {
-    try {
-      if (targetPosts > 0) {
-        const count = await generateSeedPostsExact(nbhdId, targetPosts)
-        totalPosts += count
+  for (let i = 0; i < targetNbhds.length; i += BATCH_SIZE) {
+    if (Date.now() - startedAt > TIME_BUDGET_MS) {
+      console.warn('[SEED_GENERATE] time budget exceeded, stopping early', {
+        processed: processed.length,
+        remaining: targetNbhds.length - processed.length,
+      })
+      break
+    }
+    const batch = targetNbhds.slice(i, i + BATCH_SIZE)
+    const results = await Promise.allSettled(
+      batch.map(async (nbhdId) => {
+        let postCount = 0
+        let commentCount = 0
+        if (targetPosts > 0) {
+          postCount = await generateSeedPostsExact(nbhdId, targetPosts)
+        }
+        if (commentsPerPost > 0) {
+          commentCount = await generateSeedComments(nbhdId, commentsPerPost)
+        }
+        return { nbhdId, postCount, commentCount }
+      }),
+    )
+    for (let j = 0; j < results.length; j++) {
+      const r = results[j]
+      const nbhdId = batch[j]
+      processed.push(nbhdId)
+      if (r.status === 'fulfilled') {
+        totalPosts += r.value.postCount
+        totalComments += r.value.commentCount
+      } else {
+        const errMsg = r.reason?.message || String(r.reason)
+        console.error('[SEED_GENERATE] failed for', nbhdId, errMsg)
+        errors.push({ id: nbhdId, error: errMsg.slice(0, 200) })
       }
-      if (commentsPerPost > 0) {
-        const count = await generateSeedComments(nbhdId, commentsPerPost)
-        totalComments += count
-      }
-    } catch (err: any) {
-      console.error('[SEED_GENERATE] failed for', nbhdId, err)
-      errors.push(nbhdId)
     }
   }
 
+  const partial = processed.length < targetNbhds.length
+
   console.log('[SEED_GENERATE] done', {
     scope,
-    neighborhoods: targetNbhds.length,
+    requested: targetNbhds.length,
+    processed: processed.length,
     totalPosts,
     totalComments,
     errors: errors.length,
+    partial,
+    tookMs: Date.now() - startedAt,
   })
 
   return NextResponse.json({
     ok: true,
-    neighborhoods: targetNbhds.length,
+    neighborhoods: processed.length,
+    requested: targetNbhds.length,
     totalPosts,
     totalComments,
     errors,
+    partial,
   })
 }

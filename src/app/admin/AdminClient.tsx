@@ -65,6 +65,7 @@ export default function AdminClient({ role, adminName }: { role: string; adminNa
   const [seedTargetPosts, setSeedTargetPosts] = useState(8)
   const [seedCommentsPerPost, setSeedCommentsPerPost] = useState(2)
   const [seedActionOn, setSeedActionOn] = useState<string | null>(null)
+  const [seedSearch, setSeedSearch] = useState('')
 
   const isSuper = role === 'SUPER_ADMIN'
 
@@ -115,19 +116,35 @@ export default function AdminClient({ role, adminName }: { role: string; adminNa
           commentsPerPost: seedCommentsPerPost,
         }),
       })
-      const d = await res.json()
+      const d = await res.json().catch(() => ({}))
       if (res.ok) {
+        const partialNote = d.partial
+          ? (lang === 'en' ? ` (${d.neighborhoods}/${d.requested} — rerun to continue)` : ` (${d.neighborhoods}/${d.requested} — أعد المحاولة للباقي)`)
+          : ''
         toast.success(
-          lang === 'en'
-            ? `+${d.totalPosts} posts, +${d.totalComments} comments`
-            : `+${d.totalPosts} منشور، +${d.totalComments} تعليق`,
+          (lang === 'en'
+            ? `+${d.totalPosts} posts, +${d.totalComments} comments${partialNote}`
+            : `+${d.totalPosts} منشور، +${d.totalComments} تعليق${partialNote}`),
+          { duration: 4500 },
         )
+        if (d.errors && d.errors.length > 0) {
+          console.error('[SEED] partial errors', d.errors)
+          toast.error(
+            lang === 'en'
+              ? `${d.errors.length} neighborhood(s) failed — check console`
+              : `فشل ${d.errors.length} حي — راجع وحدة التحكم`,
+          )
+        }
         fetchSeedStats()
       } else {
-        toast.error(d.error || (lang === 'en' ? 'Failed' : 'فشل'))
+        const msg = d.error || (lang === 'en' ? 'Failed' : 'فشل')
+        toast.error(typeof msg === 'string' ? msg : 'Failed')
       }
-    } catch {
-      toast.error(lang === 'en' ? 'Connection failed' : 'فشل الاتصال')
+    } catch (err: any) {
+      console.error('[SEED] network error', err)
+      toast.error(
+        (lang === 'en' ? 'Request timed out or network error' : 'انتهت المهلة أو خطأ في الشبكة'),
+      )
     } finally {
       setSeedActionOn(null)
     }
@@ -780,10 +797,37 @@ export default function AdminClient({ role, adminName }: { role: string; adminNa
 
                 {/* Per-neighborhood table */}
                 <div className="bg-white rounded-xl border border-gray-100 divide-y divide-gray-100">
-                  <div className="px-3 py-2 text-xs font-bold text-gray-600 bg-gray-50">
-                    {lang === 'en' ? `Per neighborhood (${seedStats.perNeighborhood.length})` : `حسب الحي (${seedStats.perNeighborhood.length})`}
+                  <div className="px-3 py-2 bg-gray-50 flex items-center gap-2">
+                    <span className="text-xs font-bold text-gray-600 flex-shrink-0">
+                      {lang === 'en' ? `Neighborhoods (${seedStats.perNeighborhood.length})` : `الأحياء (${seedStats.perNeighborhood.length})`}
+                    </span>
+                    <input
+                      type="text"
+                      value={seedSearch}
+                      onChange={(e) => setSeedSearch(e.target.value)}
+                      placeholder={lang === 'en' ? 'Search...' : 'بحث...'}
+                      className="flex-1 min-w-0 px-2 py-1 text-xs rounded-md bg-white border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-400"
+                    />
+                    {seedSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setSeedSearch('')}
+                        className="text-[10px] text-gray-400 px-1"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
-                  {seedStats.perNeighborhood.map((n: any) => (
+                  {seedStats.perNeighborhood
+                    .filter((n: any) => {
+                      if (!seedSearch.trim()) return true
+                      const q = seedSearch.trim().toLowerCase()
+                      return (
+                        n.name.toLowerCase().includes(q) ||
+                        (n.nameEn || '').toLowerCase().includes(q)
+                      )
+                    })
+                    .map((n: any) => (
                     <div key={n.id} className="px-3 py-3">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="flex-1 min-w-0">
