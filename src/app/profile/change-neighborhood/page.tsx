@@ -14,6 +14,13 @@ const REASONS = [
   { key: 'OTHER', ar: 'سبب آخر', en: 'Other reason' },
 ]
 
+function isNative(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    !!(window as any).Capacitor?.isNativePlatform?.()
+  )
+}
+
 export default function ChangeNeighborhoodPage() {
   const router = useRouter()
   const { t, lang } = useLanguage()
@@ -21,6 +28,7 @@ export default function ChangeNeighborhoodPage() {
   const [detecting, setDetecting] = useState(false)
   const [detected, setDetected] = useState<{ id: string; name: string; nameEn: string; cityName: string; cityNameEn: string; confidence: string } | null>(null)
   const [gpsError, setGpsError] = useState('')
+  const [permissionDenied, setPermissionDenied] = useState(false)
   const [reason, setReason] = useState('')
   const [customReason, setCustomReason] = useState('')
   const [loading, setLoading] = useState(false)
@@ -33,49 +41,156 @@ export default function ChangeNeighborhoodPage() {
       .catch(() => {})
   }, [])
 
+  async function resolveNeighborhood(lat: number, lng: number) {
+    try {
+      const res = await fetch(`/api/neighborhoods/detect?lat=${lat}&lng=${lng}`)
+      const data = await res.json()
+      if (data.id) {
+        setDetected({
+          id: data.id,
+          name: data.name,
+          nameEn: data.nameEn,
+          cityName: data.city?.name || '',
+          cityNameEn: data.city?.nameEn || '',
+          confidence: data.confidence || 'medium',
+        })
+      } else {
+        setGpsError(lang === 'en' ? 'Could not detect your neighborhood. Make sure you are in a supported area' : lang === 'ur' ? 'آپ کا محلہ معلوم نہیں ہو سکا' : 'لم نتمكن من تحديد حيّك. تأكد من وجودك في المنطقة المستهدفة')
+      }
+    } catch {
+      setGpsError(lang === 'en' ? 'Connection error' : lang === 'ur' ? 'رابطے میں خرابی' : 'خطأ في الاتصال')
+    }
+  }
+
   async function detectLocation() {
     setDetecting(true)
     setGpsError('')
+    setPermissionDenied(false)
     setDetected(null)
 
-    if (!navigator.geolocation) {
-      setGpsError(lang === 'en' ? 'Browser does not support geolocation' : lang === 'ur' ? 'براؤزر مقام کی حمایت نہیں کرتا' : 'المتصفح لا يدعم تحديد الموقع')
+    try {
+      // Native path — use Capacitor Geolocation so permission requests work
+      if (isNative()) {
+        const { Geolocation } = await import('@capacitor/geolocation')
+        const current = await Geolocation.checkPermissions()
+        let state: string = current.location || 'prompt'
+        if (state !== 'granted') {
+          const requested = await Geolocation.requestPermissions()
+          state = requested.location || 'prompt'
+        }
+        if (state === 'denied') {
+          setPermissionDenied(true)
+          setGpsError(
+            lang === 'en'
+              ? 'Location access is blocked. Please enable it in your device settings.'
+              : lang === 'ur'
+                ? 'مقام بلاک ہے — سیٹنگز میں اسے فعال کریں'
+                : 'صلاحية الموقع محظورة — فعّلها من إعدادات جهازك',
+          )
+          setDetecting(false)
+          return
+        }
+        const pos = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0,
+        })
+        await resolveNeighborhood(pos.coords.latitude, pos.coords.longitude)
+        setDetecting(false)
+        return
+      }
+
+      // Web fallback
+      if (!navigator.geolocation) {
+        setGpsError(
+          lang === 'en'
+            ? 'Browser does not support geolocation'
+            : lang === 'ur'
+              ? 'براؤزر مقام کی حمایت نہیں کرتا'
+              : 'المتصفح لا يدعم تحديد الموقع',
+        )
+        setDetecting(false)
+        return
+      }
+      await new Promise<void>((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            await resolveNeighborhood(pos.coords.latitude, pos.coords.longitude)
+            resolve()
+          },
+          (err) => {
+            if (err.code === 1) {
+              setPermissionDenied(true)
+              setGpsError(
+                lang === 'en'
+                  ? 'Location access is blocked. Please enable it in browser settings.'
+                  : lang === 'ur'
+                    ? 'براؤزر سیٹنگز میں مقام کی اجازت دیں'
+                    : 'صلاحية الموقع محظورة — فعّلها من إعدادات المتصفح',
+              )
+            } else {
+              setGpsError(
+                lang === 'en'
+                  ? 'Could not detect location. Try again'
+                  : lang === 'ur'
+                    ? 'مقام معلوم نہیں ہو سکا — دوبارہ کوشش کریں'
+                    : 'تعذر تحديد الموقع. حاول مرة أخرى',
+              )
+            }
+            resolve()
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+        )
+      })
+    } catch (err: any) {
+      const msg = err?.message?.toLowerCase?.() || ''
+      if (msg.includes('denied') || msg.includes('permission')) {
+        setPermissionDenied(true)
+        setGpsError(
+          lang === 'en'
+            ? 'Location access is blocked. Please enable it in your device settings.'
+            : 'صلاحية الموقع محظورة — فعّلها من إعدادات جهازك',
+        )
+      } else {
+        setGpsError(
+          lang === 'en'
+            ? 'Could not detect location. Try again'
+            : 'تعذر تحديد الموقع. حاول مرة أخرى',
+        )
+      }
+    } finally {
       setDetecting(false)
+    }
+  }
+
+  async function openSystemSettings() {
+    // iOS: the app-settings: URL scheme opens directly to the app's
+    // settings page in WKWebView. Android doesn't have a clean
+    // equivalent — we show instructions via toast.
+    if (isNative()) {
+      const platform = (window as any).Capacitor?.getPlatform?.() || 'unknown'
+      if (platform === 'ios') {
+        try {
+          window.location.href = 'app-settings:'
+          return
+        } catch {
+          /* fall through */
+        }
+      }
+      toast(
+        lang === 'en'
+          ? 'Open device Settings → Apps → Hai → Permissions → Location → Allow'
+          : 'افتح الإعدادات → التطبيقات → حي → الصلاحيات → الموقع → سماح',
+        { duration: 6000 },
+      )
       return
     }
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const res = await fetch(`/api/neighborhoods/detect?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`)
-          const data = await res.json()
-
-          if (data.id) {
-            setDetected({
-              id: data.id,
-              name: data.name,
-              nameEn: data.nameEn,
-              cityName: data.city?.name || '',
-              cityNameEn: data.city?.nameEn || '',
-              confidence: data.confidence || 'medium',
-            })
-          } else {
-            setGpsError(lang === 'en' ? 'Could not detect your neighborhood. Make sure you are in a supported area' : lang === 'ur' ? 'آپ کا محلہ معلوم نہیں ہو سکا' : 'لم نتمكن من تحديد حيّك. تأكد من وجودك في المنطقة المستهدفة')
-          }
-        } catch {
-          setGpsError(lang === 'en' ? 'Connection error' : lang === 'ur' ? 'رابطے میں خرابی' : 'خطأ في الاتصال')
-        }
-        setDetecting(false)
-      },
-      (err) => {
-        if (err.code === 1) {
-          setGpsError(lang === 'en' ? 'Please allow location access in browser settings' : lang === 'ur' ? 'براؤزر سیٹنگز میں مقام کی اجازت دیں' : 'يرجى السماح بالوصول إلى الموقع من إعدادات المتصفح')
-        } else {
-          setGpsError(lang === 'en' ? 'Could not detect location. Try again' : lang === 'ur' ? 'مقام معلوم نہیں ہو سکا — دوبارہ کوشش کریں' : 'تعذر تحديد الموقع. حاول مرة أخرى')
-        }
-        setDetecting(false)
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    // Web fallback — can't programmatically open browser settings
+    toast(
+      lang === 'en'
+        ? 'Click the lock icon next to the URL and enable location'
+        : 'اضغط على أيقونة القفل بجانب الرابط وفعّل الموقع',
+      { duration: 6000 },
     )
   }
 
@@ -159,7 +274,26 @@ export default function ChangeNeighborhoodPage() {
           {/* GPS Error */}
           {gpsError && (
             <div className="bg-red-50 dark:bg-red-900/30 rounded-xl p-3">
-              <p className="text-red-700 dark:text-red-300 text-xs">{gpsError}</p>
+              <p className="text-red-700 dark:text-red-300 text-xs leading-relaxed">{gpsError}</p>
+              {permissionDenied && (
+                <div className="flex gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={openSystemSettings}
+                    className="flex-1 py-2 bg-red-600 text-white text-xs font-bold rounded-lg active:scale-95"
+                  >
+                    {lang === 'en' ? 'Open Settings' : lang === 'ur' ? 'سیٹنگز کھولیں' : 'افتح الإعدادات'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={detectLocation}
+                    disabled={detecting}
+                    className="flex-1 py-2 bg-white dark:bg-gray-800 text-red-600 border border-red-300 text-xs font-bold rounded-lg active:scale-95 disabled:opacity-50"
+                  >
+                    {lang === 'en' ? 'Try Again' : lang === 'ur' ? 'دوبارہ کوشش' : 'إعادة المحاولة'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
