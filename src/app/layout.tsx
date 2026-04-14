@@ -10,6 +10,7 @@ import ArrivalAlert from '@/components/ArrivalAlert'
 import CapacitorBridge from '@/components/CapacitorBridge'
 import PushRegistration from '@/components/PushRegistration'
 import SwipeBack from '@/components/SwipeBack'
+import NeighborhoodTravelOverlay from '@/components/NeighborhoodTravelOverlay'
 import { ConfirmProvider } from '@/components/ConfirmProvider'
 import ScrollReset from '@/components/ScrollReset'
 import { LangProvider } from '@/hooks/useLanguage'
@@ -117,6 +118,7 @@ export default function RootLayout({
           />
           <PullToRefresh />
           <SwipeBack />
+          <NeighborhoodTravelOverlay />
           <RepToast />
           <ErrorBoundary>
               {children}

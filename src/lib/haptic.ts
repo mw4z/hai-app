@@ -7,6 +7,15 @@ function isNative(): boolean {
   return typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
 }
 
+// Pre-warm the Capacitor Haptics plugin on module load so the FIRST
+// hapticLight/Medium call doesn't pay the dynamic-import cost inside a
+// live gesture handler. Without this, the first swipe-back haptic races
+// with the router.back() that follows on touchend, and the navigation
+// occasionally gets dropped.
+if (typeof window !== 'undefined' && isNative()) {
+  import('@capacitor/haptics').catch(() => {})
+}
+
 function hapticsEnabled(): boolean {
   if (typeof window === 'undefined') return false
   try { return localStorage.getItem('hai_haptics') !== '0' } catch { return true }

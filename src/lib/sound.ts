@@ -7,6 +7,7 @@
  */
 
 let audioCtx: AudioContext | null = null
+let unlocked = false
 
 function getCtx(): AudioContext | null {
   if (typeof window === 'undefined') return null
@@ -23,6 +24,30 @@ function getCtx(): AudioContext | null {
   } catch {
     return null
   }
+}
+
+// Pre-unlock the AudioContext on the first user gesture. A fresh context
+// starts 'suspended' on iOS/WKWebView — `resume()` is async, so the very
+// first scheduled oscillator fires against a still-suspended context and
+// is silent. Listening globally (capture phase) means the context is
+// 'running' by the time any playX() is invoked from an actual button.
+if (typeof window !== 'undefined') {
+  const unlock = () => {
+    if (unlocked) return
+    unlocked = true
+    try {
+      const ctx = getCtx()
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {})
+      }
+    } catch {}
+    window.removeEventListener('touchstart', unlock, true)
+    window.removeEventListener('pointerdown', unlock, true)
+    window.removeEventListener('keydown', unlock, true)
+  }
+  window.addEventListener('touchstart', unlock, { passive: true, capture: true })
+  window.addEventListener('pointerdown', unlock, { capture: true })
+  window.addEventListener('keydown', unlock, { capture: true })
 }
 
 function soundsEnabled(): boolean {

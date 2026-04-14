@@ -370,6 +370,63 @@ html.dark body::before {
   to { transform: rotate(360deg); }
 }
 
+/* ── Neighborhood Travel Overlay ──────────────────── */
+/* Pin arcs from start (near 0%) to end (near 100%) with a rise over
+   the midpoint. Independent LTR / RTL variants so the direction flips
+   naturally in Arabic/Urdu. */
+@keyframes hai-arc-travel-ltr {
+  0%   { left: 10px;  bottom: 4px;  transform: translateX(-50%) scale(0.55); opacity: 0; }
+  12%  { left: 14%;   bottom: 22px; transform: translateX(-50%) scale(1);    opacity: 1; }
+  50%  { left: 50%;   bottom: 62px; transform: translateX(-50%) scale(1.14); }
+  88%  { left: 86%;   bottom: 22px; transform: translateX(-50%) scale(1); }
+  100% { left: calc(100% - 10px); bottom: 4px; transform: translateX(-50%) scale(1); opacity: 1; }
+}
+@keyframes hai-arc-travel-rtl {
+  0%   { right: 10px; bottom: 4px;  transform: translateX(50%) scale(0.55);  opacity: 0; }
+  12%  { right: 14%;  bottom: 22px; transform: translateX(50%) scale(1);     opacity: 1; }
+  50%  { right: 50%;  bottom: 62px; transform: translateX(50%) scale(1.14); }
+  88%  { right: 86%;  bottom: 22px; transform: translateX(50%) scale(1); }
+  100% { right: calc(100% - 10px); bottom: 4px; transform: translateX(50%) scale(1); opacity: 1; }
+}
+.hai-arc-pin-ltr { animation: hai-arc-travel-ltr 520ms cubic-bezier(0.45, 0, 0.25, 1) forwards; }
+.hai-arc-pin-rtl { animation: hai-arc-travel-rtl 520ms cubic-bezier(0.45, 0, 0.25, 1) forwards; }
+
+@keyframes hai-trail-draw {
+  0%   { stroke-dashoffset: 420; opacity: 0.25; }
+  100% { stroke-dashoffset: 0;   opacity: 0.75; }
+}
+.hai-trail-draw {
+  stroke-dasharray: 5 7;
+  stroke-dashoffset: 420;
+  animation: hai-trail-draw 460ms ease-out forwards;
+}
+
+@keyframes hai-label-out {
+  0%   { opacity: 0.9; transform: translateY(0) scale(1); }
+  100% { opacity: 0.45; transform: translateY(-3px) scale(0.94); }
+}
+@keyframes hai-label-in {
+  0%   { opacity: 0; transform: translateY(10px) scale(0.92); letter-spacing: 0.08em; }
+  55%  { opacity: 1; transform: translateY(0) scale(1.06); letter-spacing: 0; }
+  100% { opacity: 1; transform: translateY(0) scale(1); letter-spacing: 0; }
+}
+.hai-label-out { animation: hai-label-out 280ms ease-out forwards; }
+.hai-label-in  { animation: hai-label-in  560ms cubic-bezier(0.34, 1.56, 0.64, 1) 240ms both; }
+
+/* Shimmer used for neighborhood picker skeleton rows */
+@keyframes hai-shimmer {
+  0%   { background-position: -120% 0; }
+  100% { background-position:  220% 0; }
+}
+.hai-shimmer {
+  background-image: linear-gradient(90deg, #e5e7eb 0%, #f3f4f6 50%, #e5e7eb 100%);
+  background-size: 220% 100%;
+  animation: hai-shimmer 1.3s ease-in-out infinite;
+}
+.dark .hai-shimmer {
+  background-image: linear-gradient(90deg, #1f2937 0%, #374151 50%, #1f2937 100%);
+}
+
 /* FAB glow pulse — subtle outer halo on the center button */
 .fab-glow::after {
   content: '';

@@ -11,6 +11,7 @@ import EmergencyBanner from '@/components/EmergencyBanner'
 import InviteLeaderboardCard from '@/components/InviteLeaderboardCard'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import QuickAskSheet from '@/components/QuickAskSheet'
+import NeighborhoodSheet from '@/components/NeighborhoodSheet'
 import { FiBell, FiPlus, FiMapPin, FiX, FiSearch, FiFilter, FiCheck } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import type { TranslationKey } from '@/lib/i18n'
@@ -221,7 +222,6 @@ export default function FeedClient({
   }
 
   const [showNeighborhoodPicker, setShowNeighborhoodPicker] = useState(false)
-  const [neighborhoodSearch, setNeighborhoodSearch] = useState('')
   const [lazyNeighborhoods, setLazyNeighborhoods] = useState<NeighborhoodItem[]>([])
   const [loadingNeighborhoods, setLoadingNeighborhoods] = useState(false)
 
@@ -234,27 +234,38 @@ export default function FeedClient({
     router.push(`/feed?category=${cat}${nParam}`)
   }
 
-  function browseNeighborhoodById(id: string) {
-    setShowNeighborhoodPicker(false)
-    setNeighborhoodSearch('')
-    if (id === user.neighborhoodId) {
-      router.push('/feed')
-    } else {
-      router.push(`/feed?neighborhood=${id}`)
+  function browseNeighborhoodById(
+    id: string,
+    displayName: string,
+    isHome: boolean,
+  ) {
+    // If user picked the neighborhood they're already viewing, just close.
+    const alreadyHere =
+      (isHome && !isReadOnly) ||
+      (!isHome && isReadOnly && browseNeighborhood?.id === id)
+    if (alreadyHere) {
+      setShowNeighborhoodPicker(false)
+      return
     }
+    setShowNeighborhoodPicker(false)
+    const href = isHome ? '/feed' : `/feed?neighborhood=${id}`
+    // Hand off to the global travel overlay — it plays the branded
+    // transition and performs the router.push itself.
+    window.dispatchEvent(
+      new CustomEvent('hai:travel-nbhd', {
+        detail: {
+          from: currentNeighborhood.displayName,
+          to: displayName,
+          href,
+        },
+      }),
+    )
   }
 
   const showWomenOnly = user.gender === 'FEMALE'
   const categories = showWomenOnly
     ? [...CATEGORIES, { key: 'WOMEN_ONLY', tKey: 'cat_WOMEN_ONLY' as TranslationKey, icon: '👩' }]
     : CATEGORIES
-
-  const filteredNeighborhoods = lazyNeighborhoods.filter(n =>
-    n.name.includes(neighborhoodSearch) ||
-    n.nameEn.toLowerCase().includes(neighborhoodSearch.toLowerCase()) ||
-    n.cityName.includes(neighborhoodSearch) ||
-    n.cityNameEn.toLowerCase().includes(neighborhoodSearch.toLowerCase())
-  )
 
   // Filtered + sorted posts
   const displayPosts = useMemo(() => {
@@ -651,62 +662,23 @@ export default function FeedClient({
 
       {showAsk && <QuickAskSheet onClose={() => setShowAsk(false)} />}
 
-      {/* Neighborhood Picker Modal */}
-      {showNeighborhoodPicker && (
-        <>
-          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowNeighborhoodPicker(false)} />
-          <div className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white rounded-t-3xl shadow-2xl" style={{ maxHeight: '80vh' }}>
-            <div className="px-4 pt-3 pb-2">
-              <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-bold text-gray-900">{t('feed_browse_title')}</h2>
-                <button onClick={() => setShowNeighborhoodPicker(false)}>
-                  <FiX className="w-5 h-5 text-gray-400" />
-                </button>
-              </div>
-              {/* Search */}
-              <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 mb-3">
-                <FiSearch className="w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder={t('feed_search_area')}
-                  value={neighborhoodSearch}
-                  onChange={e => setNeighborhoodSearch(e.target.value)}
-                  className="flex-1 bg-transparent text-sm text-right focus:outline-none"
-                />
-              </div>
-              {/* Your neighborhood */}
-              <p className="text-xs text-gray-400 mb-2">{t('feed_your_nbhd')}</p>
-              <button
-                onClick={() => browseNeighborhoodById(user.neighborhoodId)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl mb-3 transition-colors ${
-                  !isReadOnly ? 'bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-700' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-              >
-                <span className="text-xs text-primary-600 dark:text-primary-400 font-medium">{!isReadOnly ? t('feed_current_nbhd') : t('feed_return_nbhd')}</span>
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{dn(user.neighborhood, user.neighborhoodEn)}</span>
-              </button>
-              <p className="text-xs text-gray-400 mb-2">{t('feed_other_nbhds')}</p>
-            </div>
-            <div className="overflow-y-auto px-4 pb-8" style={{ maxHeight: '50vh' }}>
-              {filteredNeighborhoods
-                .filter(n => n.id !== user.neighborhoodId)
-                .map(n => (
-                  <button
-                    key={n.id}
-                    onClick={() => browseNeighborhoodById(n.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl mb-1 transition-colors ${
-                      browseNeighborhood?.id === n.id ? 'bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    <span className="text-xs text-gray-400">{dn(n.cityName, n.cityNameEn)}</span>
-                    <span className="text-sm text-gray-800 dark:text-gray-200">{dn(n.name, n.nameEn)}</span>
-                  </button>
-                ))}
-            </div>
-          </div>
-        </>
-      )}
+      {/* Neighborhood picker — polished bottom sheet */}
+      <NeighborhoodSheet
+        open={showNeighborhoodPicker}
+        onClose={() => setShowNeighborhoodPicker(false)}
+        onSelect={(n) => browseNeighborhoodById(n.id, n.displayName, n.isHome)}
+        user={{
+          neighborhoodId: user.neighborhoodId,
+          neighborhood: user.neighborhood,
+          neighborhoodEn: user.neighborhoodEn,
+          city: user.city,
+          cityEn: user.cityEn,
+        }}
+        browseNeighborhoodId={browseNeighborhood?.id || null}
+        allNeighborhoods={lazyNeighborhoods.length > 0 ? lazyNeighborhoods : allNeighborhoods}
+        loading={loadingNeighborhoods && lazyNeighborhoods.length === 0}
+        isReadOnly={isReadOnly}
+      />
     </div>
   )
 }
