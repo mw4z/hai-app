@@ -1,6 +1,11 @@
 'use client'
 
 import { useEffect } from 'react'
+// Side-effect import: boots the sound module at app startup so its
+// first-gesture unlock listeners are attached before the user's first
+// tap — otherwise the very first playDelete/playSend fires against a
+// still-suspended AudioContext and is silent.
+import '@/lib/sound'
 
 declare global {
   interface Window {

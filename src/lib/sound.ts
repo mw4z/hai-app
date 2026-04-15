@@ -27,27 +27,61 @@ function getCtx(): AudioContext | null {
 }
 
 // Pre-unlock the AudioContext on the first user gesture. A fresh context
-// starts 'suspended' on iOS/WKWebView — `resume()` is async, so the very
-// first scheduled oscillator fires against a still-suspended context and
-// is silent. Listening globally (capture phase) means the context is
-// 'running' by the time any playX() is invoked from an actual button.
-if (typeof window !== 'undefined') {
-  const unlock = () => {
-    if (unlocked) return
-    unlocked = true
-    try {
-      const ctx = getCtx()
-      if (ctx && ctx.state === 'suspended') {
-        ctx.resume().catch(() => {})
-      }
-    } catch {}
-    window.removeEventListener('touchstart', unlock, true)
-    window.removeEventListener('pointerdown', unlock, true)
-    window.removeEventListener('keydown', unlock, true)
+// starts 'suspended' on iOS/WKWebView until a real user gesture is
+// observed. Just calling `ctx.resume()` is unreliable — the classic fix
+// is to synchronously play a silent 1-sample buffer inside the gesture
+// handler, which flips the context into 'running' at the OS level.
+//
+// We listen on BOTH capture and bubble phases across multiple event
+// types (touchstart, touchend, pointerdown, mousedown, click, keydown)
+// so we catch the very first gesture no matter what. This module is
+// imported eagerly from CapacitorBridge so the listeners are registered
+// before any tap happens.
+function primeAudio() {
+  if (unlocked) return
+  try {
+    const ctx = getCtx()
+    if (!ctx) return
+    // Silent 1-sample buffer trick — the canonical iOS unlock.
+    const buffer = ctx.createBuffer(1, 1, 22050)
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    source.connect(ctx.destination)
+    if (typeof source.start === 'function') {
+      source.start(0)
+    } else {
+      // Older WebKit
+      ;(source as any).noteOn?.(0)
+    }
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {})
+    }
+    if (ctx.state === 'running') {
+      unlocked = true
+      teardownUnlockListeners()
+    }
+  } catch {
+    /* will retry on next gesture */
   }
-  window.addEventListener('touchstart', unlock, { passive: true, capture: true })
-  window.addEventListener('pointerdown', unlock, { capture: true })
-  window.addEventListener('keydown', unlock, { capture: true })
+}
+
+function teardownUnlockListeners() {
+  if (typeof window === 'undefined') return
+  const types = ['touchstart', 'touchend', 'pointerdown', 'mousedown', 'click', 'keydown']
+  for (const t of types) {
+    window.removeEventListener(t, primeAudio, true)
+    window.removeEventListener(t, primeAudio, false)
+  }
+}
+
+if (typeof window !== 'undefined') {
+  const types = ['touchstart', 'touchend', 'pointerdown', 'mousedown', 'click', 'keydown']
+  for (const t of types) {
+    // Capture phase catches the event even if a child stops propagation.
+    window.addEventListener(t, primeAudio, { passive: true, capture: true })
+    // Bubble phase as a backup for environments that skip capture.
+    window.addEventListener(t, primeAudio, { passive: true })
+  }
 }
 
 function soundsEnabled(): boolean {
