@@ -206,15 +206,17 @@ export default function ImageLightbox({
     }
 
     if (g.mode === 'h') {
-      // Horizontal page drag with rubber band at edges
+      // Horizontal page drag with rubber band at edges. Compute in
+      // pure pixels — `calc(-100% + -50px)` is invalid CSS and gets
+      // silently rejected, which was pinning the track on left swipes.
       let offset = dx
       if ((index === 0 && dx > 0) || (index === images.length - 1 && dx < 0)) {
-        // Damped pull-past edge
         offset = dx * 0.32
       }
       if (trackRef.current) {
+        const vw = window.innerWidth
         trackRef.current.style.transform =
-          `translate3d(calc(${-index * 100}% + ${offset}px), 0, 0)`
+          `translate3d(${-index * vw + offset}px, 0, 0)`
       }
     } else if (g.mode === 'v') {
       // Vertical drag → dismiss with progressive fade + scale
