@@ -169,6 +169,35 @@ export async function pickImageOrFallback(
  * Returns [] on cancel or web. Web callers should fall back to the
  * file input via the webInputRef pattern.
  */
+async function imageUrlToJpegFile(src: string, index: number): Promise<File> {
+  // Load the image through an <img> tag. On iOS 14+ WKWebView decodes
+  // HEIC natively, so we can then draw onto a canvas and re-export as
+  // JPEG — guaranteeing a MIME type our upload pipeline accepts.
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error('image_load_failed'))
+    img.src = src
+  })
+
+  const canvas = document.createElement('canvas')
+  canvas.width = img.naturalWidth
+  canvas.height = img.naturalHeight
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('canvas_unavailable')
+  ctx.drawImage(img, 0, 0)
+
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.88),
+  )
+  if (!blob) throw new Error('canvas_export_failed')
+
+  return new File([blob], `photo-${Date.now()}-${index}.jpg`, {
+    type: 'image/jpeg',
+  })
+}
+
 export async function pickImageFilesMulti(
   limit: number,
 ): Promise<File[]> {
@@ -186,27 +215,16 @@ export async function pickImageFilesMulti(
 
   if (!result?.photos || result.photos.length === 0) return []
 
-  // Convert each Photo (webPath URL) to a File
   const files: File[] = []
-  for (const photo of result.photos) {
+  for (let i = 0; i < result.photos.length; i++) {
+    const photo = result.photos[i]
     try {
-      const res = await fetch(photo.webPath)
-      const blob = await res.blob()
-      const mime = blob.type || 'image/jpeg'
-      const ext =
-        photo.format === 'png'
-          ? 'png'
-          : photo.format === 'webp'
-            ? 'webp'
-            : 'jpg'
-      const file = new File([blob], `photo-${Date.now()}-${files.length}.${ext}`, {
-        type: mime,
-      })
+      const file = await imageUrlToJpegFile(photo.webPath, i)
       if (file.size <= MAX_SIZE_MB * 1024 * 1024) {
         files.push(file)
       }
     } catch (err) {
-      console.warn('[imagePicker] failed to read photo:', err)
+      console.warn('[imagePicker] failed to decode photo:', err)
     }
   }
   return files

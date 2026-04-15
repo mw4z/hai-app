@@ -89,8 +89,8 @@ export default function NewPostPage() {
     const remaining = 5 - images.length
     const toAdd = files.slice(0, remaining)
     for (const file of toAdd) {
-      if (file.size > 5 * 1024 * 1024) { toast.error('حجم الصورة كبير (أقصى 5 ميقا)'); continue }
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { toast.error('نوع غير مدعوم'); continue }
+      if (file.size > 10 * 1024 * 1024) { toast.error('حجم الصورة كبير (أقصى 10 ميقا)'); continue }
+      if (!file.type.startsWith('image/')) { toast.error('نوع غير مدعوم'); continue }
       const preview = URL.createObjectURL(file)
       setImages(prev => [...prev, { file, preview }])
     }
