@@ -1,9 +1,17 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
-import { FiMapPin, FiNavigation, FiSearch, FiX, FiMap } from 'react-icons/fi'
+import { FiMapPin, FiNavigation, FiSearch, FiX, FiMap, FiSettings, FiRefreshCw } from 'react-icons/fi'
 import { openMapPicker } from './openMapPicker'
+
+function isNative(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    !!(window as any).Capacitor?.isNativePlatform?.()
+  )
+}
 
 interface Location {
   lat: number
@@ -50,6 +58,7 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
   const [results, setResults] = useState<SearchResult[]>([])
   const [showSearch, setShowSearch] = useState(false)
   const [error, setError] = useState('')
+  const [permissionDenied, setPermissionDenied] = useState(false)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -59,41 +68,163 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
 
   // ── GPS Detection (pickup) ────────────────────────────────────────────────
 
+  async function resolveCoords(lat: number, lng: number) {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=${lang}&addressdetails=1`,
+      )
+      const data = await res.json()
+      const address = data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+      let area =
+        data.address?.suburb ||
+        data.address?.neighbourhood ||
+        data.address?.city_district ||
+        data.address?.city ||
+        ''
+      try {
+        const nbRes = await fetch(`/api/neighborhoods/detect?lat=${lat}&lng=${lng}`)
+        const nbData = await nbRes.json()
+        if (nbData.name) area = lang === 'en' && nbData.nameEn ? nbData.nameEn : nbData.name
+      } catch {
+        /* ignore */
+      }
+      onChange({ lat, lng, address, area })
+    } catch {
+      onChange({ lat, lng, address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, area: '' })
+    }
+  }
+
+  function permissionDeniedMsg() {
+    return lang === 'en'
+      ? 'Location access is blocked. Enable it in your device settings or pick pickup from the map.'
+      : lang === 'ur'
+        ? 'مقام بلاک ہے — سیٹنگز میں فعال کریں یا نقشے سے منتخب کریں'
+        : 'صلاحية الموقع محظورة — فعّلها من الإعدادات أو اختر نقطة الانطلاق من الخريطة'
+  }
+
   async function detectGPS() {
     setDetecting(true)
     setError('')
-    if (!navigator.geolocation) {
-      setError(lang === 'en' ? 'Geolocation not supported' : lang === 'ur' ? 'براؤزر مقام کی حمایت نہیں کرتا' : 'المتصفح لا يدعم تحديد الموقع')
+    setPermissionDenied(false)
+
+    try {
+      if (isNative()) {
+        const { Geolocation } = await import('@capacitor/geolocation')
+        const current = await Geolocation.checkPermissions()
+        let state: string = current.location || 'prompt'
+        if (state !== 'granted') {
+          const requested = await Geolocation.requestPermissions()
+          state = requested.location || 'prompt'
+        }
+        if (state === 'denied') {
+          setPermissionDenied(true)
+          setError(permissionDeniedMsg())
+          setDetecting(false)
+          return
+        }
+        const pos = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0,
+        })
+        await resolveCoords(pos.coords.latitude, pos.coords.longitude)
+        setDetecting(false)
+        return
+      }
+
+      // Web fallback
+      if (!navigator.geolocation) {
+        setError(
+          lang === 'en'
+            ? 'Geolocation not supported'
+            : lang === 'ur'
+              ? 'براؤزر مقام کی حمایت نہیں کرتا'
+              : 'المتصفح لا يدعم تحديد الموقع',
+        )
+        setDetecting(false)
+        return
+      }
+      await new Promise<void>((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            await resolveCoords(pos.coords.latitude, pos.coords.longitude)
+            resolve()
+          },
+          (err) => {
+            if (err.code === 1) {
+              setPermissionDenied(true)
+              setError(permissionDeniedMsg())
+            } else {
+              setError(
+                lang === 'en'
+                  ? 'Could not detect location'
+                  : lang === 'ur'
+                    ? 'مقام معلوم نہیں ہو سکا'
+                    : 'تعذر تحديد الموقع',
+              )
+            }
+            resolve()
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+        )
+      })
+    } catch (err: any) {
+      const msg = (err?.message || '').toString().toLowerCase()
+      if (msg.includes('denied') || msg.includes('permission')) {
+        setPermissionDenied(true)
+        setError(permissionDeniedMsg())
+      } else {
+        setError(
+          lang === 'en'
+            ? 'Could not detect location'
+            : lang === 'ur'
+              ? 'مقام معلوم نہیں ہو سکا'
+              : 'تعذر تحديد الموقع',
+        )
+      }
+    } finally {
       setDetecting(false)
+    }
+  }
+
+  async function openSystemSettings() {
+    if (isNative()) {
+      const platform = (window as any).Capacitor?.getPlatform?.() || 'unknown'
+      if (platform === 'ios') {
+        try {
+          window.location.href = 'app-settings:'
+          return
+        } catch {
+          /* fall through */
+        }
+      }
+      toast(
+        lang === 'en'
+          ? 'Open device Settings → Apps → Hai → Permissions → Location → Allow'
+          : lang === 'ur'
+            ? 'سیٹنگز → ایپس → Hai → اجازتیں → مقام → اجازت دیں'
+            : 'افتح الإعدادات → التطبيقات → حي → الصلاحيات → الموقع → سماح',
+        { duration: 6000 },
+      )
       return
     }
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude: lat, longitude: lng } = pos.coords
-        try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=${lang}&addressdetails=1`)
-          const data = await res.json()
-          const address = data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`
-          let area = data.address?.suburb || data.address?.neighbourhood || data.address?.city_district || data.address?.city || ''
-          try {
-            const nbRes = await fetch(`/api/neighborhoods/detect?lat=${lat}&lng=${lng}`)
-            const nbData = await nbRes.json()
-            if (nbData.name) area = lang === 'en' && nbData.nameEn ? nbData.nameEn : nbData.name
-          } catch { /* */ }
-          onChange({ lat, lng, address, area })
-        } catch {
-          onChange({ lat, lng, address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, area: '' })
-        }
-        setDetecting(false)
-      },
-      (err) => {
-        setError(err.code === 1
-          ? (lang === 'en' ? 'Please allow location access' : lang === 'ur' ? 'براہ کرم مقام کی اجازت دیں' : 'يرجى السماح بالوصول إلى الموقع')
-          : (lang === 'en' ? 'Could not detect location' : lang === 'ur' ? 'مقام معلوم نہیں ہو سکا' : 'تعذر تحديد الموقع'))
-        setDetecting(false)
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    toast(
+      lang === 'en'
+        ? 'Click the lock icon next to the URL and enable location'
+        : lang === 'ur'
+          ? 'URL کے آگے لاک آئیکن دبائیں اور مقام فعال کریں'
+          : 'اضغط على أيقونة القفل بجانب الرابط وفعّل الموقع',
+      { duration: 6000 },
     )
+  }
+
+  async function pickPickupFromMap() {
+    const result = await openMapPicker({ centerLat: refLat, centerLng: refLng, lang, maptilerKey })
+    if (result) {
+      setError('')
+      setPermissionDenied(false)
+      onChange(result)
+    }
   }
 
   // ── Search (MapTiler + Photon) ────────────────────────────────────────────
@@ -167,7 +298,7 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
         <span className={`w-2.5 h-2.5 rounded-full ${dotColor}`} /> {label}
       </label>
 
-      {/* Pickup: GPS */}
+      {/* Pickup: GPS + map fallback */}
       {isPickup && (
         <>
           {value ? (
@@ -177,19 +308,48 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
                 <p className="text-sm font-medium text-gray-900 dark:text-white">{value.area || label}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{value.address}</p>
               </div>
-              <button onClick={() => { onChange(null as any); detectGPS() }} className="text-gray-400 p-1"><FiX className="w-4 h-4" /></button>
+              <button onClick={() => { onChange(null as any); setPermissionDenied(false); setError('') }} className="text-gray-400 p-1"><FiX className="w-4 h-4" /></button>
             </div>
           ) : (
-            <button onClick={detectGPS} disabled={detecting}
-              className="w-full border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-4 flex items-center justify-center gap-3 hover:border-primary-400 transition-colors active:scale-[0.98]">
-              {detecting ? (
-                <><div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" /><span className="text-sm text-gray-400">{lang === 'en' ? 'Detecting...' : lang === 'ur' ? 'معلوم ہو رہا ہے...' : 'جاري التحديد...'}</span></>
-              ) : (
-                <><FiNavigation className="w-5 h-5 text-primary-600" /><span className="text-sm font-medium text-primary-600">{lang === 'en' ? 'Use my current location' : lang === 'ur' ? 'میرا موجودہ مقام استعمال کریں' : 'استخدم موقعي الحالي'}</span></>
-              )}
-            </button>
+            <div className="space-y-2">
+              <button onClick={detectGPS} disabled={detecting}
+                className="w-full border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-4 flex items-center justify-center gap-3 hover:border-primary-400 transition-colors active:scale-[0.98] disabled:opacity-60">
+                {detecting ? (
+                  <><div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" /><span className="text-sm text-gray-400">{lang === 'en' ? 'Detecting...' : lang === 'ur' ? 'معلوم ہو رہا ہے...' : 'جاري التحديد...'}</span></>
+                ) : (
+                  <><FiNavigation className="w-5 h-5 text-primary-600" /><span className="text-sm font-medium text-primary-600">{lang === 'en' ? 'Use my current location' : lang === 'ur' ? 'میرا موجودہ مقام استعمال کریں' : 'استخدم موقعي الحالي'}</span></>
+                )}
+              </button>
+              {/* Always offer map-pick as a fallback, even before denial */}
+              <button onClick={pickPickupFromMap}
+                className="w-full flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 rounded-xl py-3 text-sm font-medium text-gray-600 dark:text-gray-300 hover:border-primary-400 dark:hover:border-primary-600 transition-colors active:scale-[0.98]">
+                <FiMap className="w-4 h-4 text-primary-600" />
+                {lang === 'en' ? 'Pick from map' : lang === 'ur' ? 'نقشے سے منتخب کریں' : 'اختر من الخريطة'}
+              </button>
+            </div>
           )}
-          {error && <p className="text-xs text-red-500 mt-1.5 px-1">{error}</p>}
+
+          {/* Permission-denied recovery UI */}
+          {permissionDenied && !value && (
+            <div className="mt-3 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-900 rounded-xl p-3">
+              <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed mb-3">{error || permissionDeniedMsg()}</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={openSystemSettings}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-red-600 text-white text-xs font-bold rounded-lg active:scale-95">
+                  <FiSettings className="w-3.5 h-3.5" />
+                  {lang === 'en' ? 'Open Settings' : lang === 'ur' ? 'سیٹنگز' : 'الإعدادات'}
+                </button>
+                <button type="button" onClick={detectGPS} disabled={detecting}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-white dark:bg-gray-800 text-red-600 border border-red-300 dark:border-red-700 text-xs font-bold rounded-lg active:scale-95 disabled:opacity-50">
+                  <FiRefreshCw className={`w-3.5 h-3.5 ${detecting ? 'animate-spin' : ''}`} />
+                  {lang === 'en' ? 'Try again' : lang === 'ur' ? 'دوبارہ' : 'إعادة المحاولة'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Non-denial error (e.g., timeout) */}
+          {error && !permissionDenied && <p className="text-xs text-red-500 mt-1.5 px-1">{error}</p>}
         </>
       )}
 
