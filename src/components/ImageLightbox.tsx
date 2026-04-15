@@ -131,186 +131,222 @@ export default function ImageLightbox({
     wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`
   }
 
-  // ── Touch handlers ────────────────────────────────────────────────────
-  function onTouchStart(e: React.TouchEvent) {
-    const touches = e.touches
-    const now = Date.now()
+  // Keep mutable refs of index/length so the native listeners (which
+  // are attached once per open) can read the current values without
+  // being re-registered on every render.
+  const indexRef = useRef(index)
+  const imagesLenRef = useRef(images.length)
+  const onCloseRef = useRef(onClose)
+  useEffect(() => { indexRef.current = index }, [index])
+  useEffect(() => { imagesLenRef.current = images.length }, [images.length])
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
 
-    if (touches.length === 2) {
-      // Begin pinch
-      const dx = touches[0].clientX - touches[1].clientX
-      const dy = touches[0].clientY - touches[1].clientY
-      pinchRef.current = {
-        startDist: Math.hypot(dx, dy),
-        startScale: zoomRef.current.scale,
+  // ── Native touch handlers (non-passive) ─────────────────────────────
+  // React's synthetic touch events are passive — preventDefault() is
+  // silently ignored and the browser races us for the gesture. On iOS
+  // WKWebView the browser wins: it cancels touchmove delivery entirely
+  // after the first few events, so the track never moves. We attach
+  // listeners directly with { passive: false } so preventDefault works
+  // and we fully own the gesture.
+  useEffect(() => {
+    if (!mounted) return
+    const track = trackRef.current
+    if (!track) return
+
+    function handleTouchStart(e: TouchEvent) {
+      const touches = e.touches
+      const now = Date.now()
+
+      if (touches.length === 2) {
+        const dx = touches[0].clientX - touches[1].clientX
+        const dy = touches[0].clientY - touches[1].clientY
+        pinchRef.current = {
+          startDist: Math.hypot(dx, dy),
+          startScale: zoomRef.current.scale,
+        }
+        gestureRef.current = {
+          startX: 0, startY: 0, startT: now,
+          lastX: 0, lastY: 0, lastT: now,
+          mode: 'pinch',
+        }
+        return
       }
+
+      if (touches.length !== 1) return
+      const t = touches[0]
       gestureRef.current = {
-        startX: 0, startY: 0, startT: now,
-        lastX: 0, lastY: 0, lastT: now,
-        mode: 'pinch',
+        startX: t.clientX, startY: t.clientY, startT: now,
+        lastX: t.clientX, lastY: t.clientY, lastT: now,
+        mode: zoomRef.current.scale > 1.05 ? 'pan' : null,
       }
-      return
+      if (trackRef.current) trackRef.current.style.transition = 'none'
+      const wrap = imgWrapRefs.current[indexRef.current]
+      if (wrap) wrap.style.transition = 'none'
     }
 
-    if (touches.length !== 1) return
-    const t = touches[0]
-    gestureRef.current = {
-      startX: t.clientX, startY: t.clientY, startT: now,
-      lastX: t.clientX, lastY: t.clientY, lastT: now,
-      mode: zoomRef.current.scale > 1.05 ? 'pan' : null,
-    }
-    // Kill transitions during drag so touches update live
-    if (trackRef.current) trackRef.current.style.transition = 'none'
-    const wrap = getActiveWrap()
-    if (wrap) wrap.style.transition = 'none'
-  }
+    function handleTouchMove(e: TouchEvent) {
+      const g = gestureRef.current
+      if (!g) return
+      const touches = e.touches
 
-  function onTouchMove(e: React.TouchEvent) {
-    const g = gestureRef.current
-    if (!g) return
-    const touches = e.touches
+      // Pinch
+      if (g.mode === 'pinch' && touches.length === 2 && pinchRef.current) {
+        e.preventDefault()
+        const dx = touches[0].clientX - touches[1].clientX
+        const dy = touches[0].clientY - touches[1].clientY
+        const dist = Math.hypot(dx, dy)
+        let scale = (dist / pinchRef.current.startDist) * pinchRef.current.startScale
+        scale = Math.max(1, Math.min(MAX_ZOOM, scale))
+        zoomRef.current.scale = scale
+        applyImgTransform(zoomRef.current.tx, zoomRef.current.ty, scale)
+        return
+      }
 
-    // ── Pinch ──
-    if (g.mode === 'pinch' && touches.length === 2 && pinchRef.current) {
-      const dx = touches[0].clientX - touches[1].clientX
-      const dy = touches[0].clientY - touches[1].clientY
-      const dist = Math.hypot(dx, dy)
-      let scale = (dist / pinchRef.current.startDist) * pinchRef.current.startScale
-      scale = Math.max(1, Math.min(MAX_ZOOM, scale))
-      zoomRef.current.scale = scale
-      applyImgTransform(zoomRef.current.tx, zoomRef.current.ty, scale)
-      return
-    }
+      if (touches.length !== 1) return
+      const t = touches[0]
+      const dx = t.clientX - g.startX
+      const dy = t.clientY - g.startY
+      const idx = indexRef.current
+      const lenm1 = imagesLenRef.current - 1
 
-    if (touches.length !== 1) return
-    const t = touches[0]
-    const dx = t.clientX - g.startX
-    const dy = t.clientY - g.startY
+      // Pan when zoomed
+      if (g.mode === 'pan') {
+        e.preventDefault()
+        const ddx = t.clientX - g.lastX
+        const ddy = t.clientY - g.lastY
+        zoomRef.current.tx += ddx
+        zoomRef.current.ty += ddy
+        applyImgTransform(zoomRef.current.tx, zoomRef.current.ty, zoomRef.current.scale)
+        g.lastX = t.clientX
+        g.lastY = t.clientY
+        g.lastT = Date.now()
+        return
+      }
 
-    // ── Pan (when already zoomed) ──
-    if (g.mode === 'pan') {
-      const ddx = t.clientX - g.lastX
-      const ddy = t.clientY - g.lastY
-      zoomRef.current.tx += ddx
-      zoomRef.current.ty += ddy
-      applyImgTransform(zoomRef.current.tx, zoomRef.current.ty, zoomRef.current.scale)
+      // Direction lock
+      if (g.mode === null && (Math.abs(dx) > DIR_LOCK_PX || Math.abs(dy) > DIR_LOCK_PX)) {
+        g.mode = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
+      }
+
+      if (g.mode === 'h') {
+        e.preventDefault()
+        let offset = dx
+        if ((idx === 0 && dx > 0) || (idx === lenm1 && dx < 0)) {
+          offset = dx * 0.32
+        }
+        if (trackRef.current) {
+          const vw = window.innerWidth
+          trackRef.current.style.transform =
+            `translate3d(${-idx * vw + offset}px, 0, 0)`
+        }
+      } else if (g.mode === 'v') {
+        e.preventDefault()
+        const abs = Math.abs(dy)
+        const scale = Math.max(0.82, 1 - abs / 1200)
+        applyImgTransform(0, dy, scale)
+        if (backdropRef.current) {
+          const opacity = Math.max(0.3, 1 - abs / 520)
+          backdropRef.current.style.transition = 'none'
+          backdropRef.current.style.opacity = String(opacity)
+        }
+      }
+
       g.lastX = t.clientX
       g.lastY = t.clientY
       g.lastT = Date.now()
-      return
     }
 
-    // ── Direction lock on first meaningful move ──
-    if (g.mode === null && (Math.abs(dx) > DIR_LOCK_PX || Math.abs(dy) > DIR_LOCK_PX)) {
-      g.mode = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
-    }
+    function handleTouchEnd() {
+      const g = gestureRef.current
+      if (!g) return
 
-    if (g.mode === 'h') {
-      // Horizontal page drag with rubber band at edges. Compute in
-      // pure pixels — `calc(-100% + -50px)` is invalid CSS and gets
-      // silently rejected, which was pinning the track on left swipes.
-      let offset = dx
-      if ((index === 0 && dx > 0) || (index === images.length - 1 && dx < 0)) {
-        offset = dx * 0.32
-      }
-      if (trackRef.current) {
-        const vw = window.innerWidth
-        trackRef.current.style.transform =
-          `translate3d(${-index * vw + offset}px, 0, 0)`
-      }
-    } else if (g.mode === 'v') {
-      // Vertical drag → dismiss with progressive fade + scale
-      const abs = Math.abs(dy)
-      const scale = Math.max(0.82, 1 - abs / 1200)
-      applyImgTransform(0, dy, scale)
-      if (backdropRef.current) {
-        const opacity = Math.max(0.3, 1 - abs / 520)
-        backdropRef.current.style.transition = 'none'
-        backdropRef.current.style.opacity = String(opacity)
-      }
-    }
+      const totalDx = g.lastX - g.startX
+      const totalDy = g.lastY - g.startY
+      const dt = Math.max(1, g.lastT - g.startT)
+      const velX = totalDx / dt
+      const velY = totalDy / dt
+      const idx = indexRef.current
+      const lenm1 = imagesLenRef.current - 1
 
-    g.lastX = t.clientX
-    g.lastY = t.clientY
-    g.lastT = Date.now()
-  }
-
-  function onTouchEnd() {
-    const g = gestureRef.current
-    if (!g) return
-
-    const totalDx = g.lastX - g.startX
-    const totalDy = g.lastY - g.startY
-    const dt = Math.max(1, g.lastT - g.startT)
-    const velX = totalDx / dt
-    const velY = totalDy / dt
-
-    if (g.mode === 'h') {
-      let next = index
-      if (totalDx < -H_SWIPE_PX || velX < -H_SWIPE_VEL) {
-        next = Math.min(images.length - 1, index + 1)
-      } else if (totalDx > H_SWIPE_PX || velX > H_SWIPE_VEL) {
-        next = Math.max(0, index - 1)
-      }
-      if (trackRef.current) {
-        trackRef.current.style.transition = SPRING
-        trackRef.current.style.transform = `translate3d(${-next * 100}%, 0, 0)`
-      }
-      if (next !== index) {
-        hapticLight()
-        setIndex(next)
-      }
-    } else if (g.mode === 'v') {
-      const shouldDismiss = totalDy > V_DISMISS_PX || velY > V_DISMISS_VEL
-      if (shouldDismiss) {
-        onClose()
-      } else {
-        // Spring back into place
-        const wrap = getActiveWrap()
-        if (wrap) {
-          wrap.style.transition = ZOOM_SPRING
-          wrap.style.transform = 'translate3d(0, 0, 0) scale(1)'
+      if (g.mode === 'h') {
+        let next = idx
+        if (totalDx < -H_SWIPE_PX || velX < -H_SWIPE_VEL) {
+          next = Math.min(lenm1, idx + 1)
+        } else if (totalDx > H_SWIPE_PX || velX > H_SWIPE_VEL) {
+          next = Math.max(0, idx - 1)
         }
-        if (backdropRef.current) {
-          backdropRef.current.style.transition = 'opacity 260ms ease-out'
-          backdropRef.current.style.opacity = '1'
+        if (trackRef.current) {
+          trackRef.current.style.transition = SPRING
+          const vw = window.innerWidth
+          trackRef.current.style.transform = `translate3d(${-next * vw}px, 0, 0)`
         }
-      }
-    } else if (g.mode === 'pinch') {
-      // Snap back to 1× when pinched out fully
-      if (zoomRef.current.scale <= 1.02) {
-        zoomRef.current = { scale: 1, tx: 0, ty: 0 }
-        const wrap = getActiveWrap()
-        if (wrap) {
-          wrap.style.transition = ZOOM_SPRING
-          wrap.style.transform = 'translate3d(0, 0, 0) scale(1)'
+        if (next !== idx) {
+          hapticLight()
+          setIndex(next)
         }
-      }
-    } else if (g.mode === null) {
-      // Stationary tap → double-tap detection for zoom
-      const now = Date.now()
-      if (now - lastTapRef.current < 280) {
-        const wrap = getActiveWrap()
-        if (wrap) wrap.style.transition = ZOOM_SPRING
-        if (zoomRef.current.scale > 1.05) {
-          zoomRef.current = { scale: 1, tx: 0, ty: 0 }
+      } else if (g.mode === 'v') {
+        const shouldDismiss = totalDy > V_DISMISS_PX || velY > V_DISMISS_VEL
+        if (shouldDismiss) {
+          onCloseRef.current()
         } else {
-          zoomRef.current = { scale: 2.5, tx: 0, ty: 0 }
+          const wrap = imgWrapRefs.current[idx]
+          if (wrap) {
+            wrap.style.transition = ZOOM_SPRING
+            wrap.style.transform = 'translate3d(0, 0, 0) scale(1)'
+          }
+          if (backdropRef.current) {
+            backdropRef.current.style.transition = 'opacity 260ms ease-out'
+            backdropRef.current.style.opacity = '1'
+          }
         }
-        applyImgTransform(
-          zoomRef.current.tx,
-          zoomRef.current.ty,
-          zoomRef.current.scale,
-        )
-        lastTapRef.current = 0
-      } else {
-        lastTapRef.current = now
+      } else if (g.mode === 'pinch') {
+        if (zoomRef.current.scale <= 1.02) {
+          zoomRef.current = { scale: 1, tx: 0, ty: 0 }
+          const wrap = imgWrapRefs.current[idx]
+          if (wrap) {
+            wrap.style.transition = ZOOM_SPRING
+            wrap.style.transform = 'translate3d(0, 0, 0) scale(1)'
+          }
+        }
+      } else if (g.mode === null) {
+        // Stationary tap — double-tap to toggle zoom
+        const now = Date.now()
+        if (now - lastTapRef.current < 280) {
+          const wrap = imgWrapRefs.current[idx]
+          if (wrap) wrap.style.transition = ZOOM_SPRING
+          if (zoomRef.current.scale > 1.05) {
+            zoomRef.current = { scale: 1, tx: 0, ty: 0 }
+          } else {
+            zoomRef.current = { scale: 2.5, tx: 0, ty: 0 }
+          }
+          applyImgTransform(
+            zoomRef.current.tx,
+            zoomRef.current.ty,
+            zoomRef.current.scale,
+          )
+          lastTapRef.current = 0
+        } else {
+          lastTapRef.current = now
+        }
       }
+
+      gestureRef.current = null
+      pinchRef.current = null
     }
 
-    gestureRef.current = null
-    pinchRef.current = null
-  }
+    // Non-passive touchmove so preventDefault() is honoured.
+    track.addEventListener('touchstart', handleTouchStart, { passive: false })
+    track.addEventListener('touchmove', handleTouchMove, { passive: false })
+    track.addEventListener('touchend', handleTouchEnd)
+    track.addEventListener('touchcancel', handleTouchEnd)
+    return () => {
+      track.removeEventListener('touchstart', handleTouchStart)
+      track.removeEventListener('touchmove', handleTouchMove)
+      track.removeEventListener('touchend', handleTouchEnd)
+      track.removeEventListener('touchcancel', handleTouchEnd)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted])
 
   const handleSave = useCallback(async () => {
     const url = images[index]
@@ -342,11 +378,8 @@ export default function ImageLightbox({
           transform: `translate3d(${-index * 100}%, 0, 0)`,
           transition: SPRING,
           willChange: 'transform',
+          touchAction: 'none',
         }}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onTouchCancel={onTouchEnd}
       >
         {images.map((url, i) => (
           <div
