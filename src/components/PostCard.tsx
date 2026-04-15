@@ -3,9 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiImage, FiDownload, FiUser } from 'react-icons/fi'
+import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiImage, FiUser } from 'react-icons/fi'
 import { uploadFiles } from '@/lib/upload'
-import { saveImageToDevice } from '@/lib/saveImage'
 import { playSend, playReaction, playDelete } from '@/lib/sound'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
 import EmojiPicker from './EmojiPickerWrapper'
@@ -13,6 +12,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import { useConfirm } from './ConfirmProvider'
 import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useAttachContact } from '@/hooks/useAttachContact'
+import ImageLightbox from './ImageLightbox'
 import type { TranslationKey } from '@/lib/i18n'
 import { canStartPrivateThread } from '@/lib/thread-rules'
 import { getRepLevel } from '@/lib/reputation-levels'
@@ -142,10 +142,6 @@ export default function PostCard({
   const [bouncingReaction, setBouncingReaction] = useState<string | null>(null)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [commentLightbox, setCommentLightbox] = useState<string | null>(null)
-  const [imgScale, setImgScale] = useState(1)
-  const [imgTranslate, setImgTranslate] = useState({ x: 0, y: 0 })
-  const pinchRef = useRef<{ startDist: number; startScale: number } | null>(null)
-  const panRef = useRef<{ startX: number; startY: number; tx: number; ty: number } | null>(null)
   const [showUserPopup, setShowUserPopup] = useState(false)
   const [showFullAvatar, setShowFullAvatar] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -713,166 +709,23 @@ export default function PostCard({
             ))}
           </div>
 
-          {/* Fullscreen lightbox with pinch-to-zoom */}
-          {lightboxIndex !== null && (
-            <div
-              className="fixed inset-0 bg-black/95 z-50 flex flex-col items-center justify-center"
-              onClick={() => { setLightboxIndex(null); setImgScale(1); setImgTranslate({ x: 0, y: 0 }) }}
-            >
-              {/* Close button — safe area aware */}
-              <button
-                onClick={() => { setLightboxIndex(null); setImgScale(1); setImgTranslate({ x: 0, y: 0 }) }}
-                className="absolute right-4 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white text-xl z-10"
-                style={{ top: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
-              >✕</button>
-
-              {/* Counter */}
-              {post.imageUrls.length > 1 && (
-                <p className="absolute left-0 right-0 text-center text-white/60 text-sm"
-                  style={{ top: 'calc(max(1rem, env(safe-area-inset-top, 1rem)) + 0.25rem)' }}
-                >
-                  {lightboxIndex + 1} / {post.imageUrls.length}
-                </p>
-              )}
-
-              {/* Image — real pinch-to-zoom + drag */}
-              <img
-                src={post.imageUrls[lightboxIndex]}
-                alt=""
-                className="max-w-full max-h-[80vh] object-contain select-none"
-                draggable={false}
-                style={{
-                  transform: `scale(${imgScale}) translate(${imgTranslate.x}px, ${imgTranslate.y}px)`,
-                  transition: imgScale === 1 ? 'transform 0.2s' : 'none',
-                  touchAction: 'none',
-                }}
-                onClick={(e) => e.stopPropagation()}
-                onDoubleClick={(e) => {
-                  e.stopPropagation()
-                  if (imgScale > 1) { setImgScale(1); setImgTranslate({ x: 0, y: 0 }) }
-                  else setImgScale(2.5)
-                }}
-                onTouchStart={(e) => {
-                  e.stopPropagation()
-                  if (e.touches.length === 2) {
-                    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
-                    pinchRef.current = { startDist: d, startScale: imgScale }
-                  } else if (e.touches.length === 1 && imgScale > 1) {
-                    panRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, tx: imgTranslate.x, ty: imgTranslate.y }
-                  }
-                }}
-                onTouchMove={(e) => {
-                  e.stopPropagation()
-                  if (e.touches.length === 2 && pinchRef.current) {
-                    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
-                    const newScale = Math.min(5, Math.max(1, pinchRef.current.startScale * (d / pinchRef.current.startDist)))
-                    setImgScale(newScale)
-                    if (newScale <= 1) setImgTranslate({ x: 0, y: 0 })
-                  } else if (e.touches.length === 1 && panRef.current && imgScale > 1) {
-                    setImgTranslate({
-                      x: panRef.current.tx + (e.touches[0].clientX - panRef.current.startX) / imgScale,
-                      y: panRef.current.ty + (e.touches[0].clientY - panRef.current.startY) / imgScale,
-                    })
-                  }
-                }}
-                onTouchEnd={(e) => {
-                  e.stopPropagation()
-                  pinchRef.current = null
-                  panRef.current = null
-                  if (imgScale <= 1) { setImgScale(1); setImgTranslate({ x: 0, y: 0 }) }
-                }}
-              />
-
-              {/* Nav arrows */}
-              {post.imageUrls.length > 1 && (
-                <div className="absolute bottom-8 flex gap-6" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setImgScale(1); setImgTranslate({ x: 0, y: 0 }); setLightboxIndex(i => i !== null && i > 0 ? i - 1 : i) }}
-                    className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white text-lg"
-                  >‹</button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setImgScale(1); setImgTranslate({ x: 0, y: 0 }); setLightboxIndex(i => i !== null && i < post.imageUrls.length - 1 ? i + 1 : i) }}
-                    className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white text-lg"
-                  >›</button>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Fullscreen lightbox with pinch/swipe/double-tap gestures */}
+          <ImageLightbox
+            images={post.imageUrls}
+            initialIndex={lightboxIndex ?? 0}
+            open={lightboxIndex !== null}
+            onClose={() => setLightboxIndex(null)}
+          />
         </>
       )}
 
-      {/* Comment/reply image lightbox — pinch zoom + long-press save */}
-      {commentLightbox && (
-        <div
-          className="fixed inset-0 bg-black/95 z-50 flex flex-col items-center justify-center"
-          onClick={() => { setCommentLightbox(null); setImgScale(1); setImgTranslate({ x: 0, y: 0 }) }}
-        >
-          <button
-            onClick={() => { setCommentLightbox(null); setImgScale(1); setImgTranslate({ x: 0, y: 0 }) }}
-            className="absolute right-4 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white text-xl z-10"
-            style={{ top: 'max(1rem, env(safe-area-inset-top, 1rem))' }}
-          >✕</button>
-          <img
-            src={commentLightbox}
-            alt=""
-            className="max-w-full max-h-[90vh] object-contain select-none"
-            draggable={false}
-            style={{
-              transform: `scale(${imgScale}) translate(${imgTranslate.x}px, ${imgTranslate.y}px)`,
-              transition: imgScale === 1 ? 'transform 0.2s' : 'none',
-              touchAction: 'none',
-            }}
-            onClick={(e) => e.stopPropagation()}
-            onDoubleClick={(e) => {
-              e.stopPropagation()
-              if (imgScale > 1) { setImgScale(1); setImgTranslate({ x: 0, y: 0 }) }
-              else setImgScale(2.5)
-            }}
-            onTouchStart={(e) => {
-              e.stopPropagation()
-              if (e.touches.length === 2) {
-                const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
-                pinchRef.current = { startDist: d, startScale: imgScale }
-              } else if (e.touches.length === 1 && imgScale > 1) {
-                panRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, tx: imgTranslate.x, ty: imgTranslate.y }
-              }
-            }}
-            onTouchMove={(e) => {
-              e.stopPropagation()
-              if (e.touches.length === 2 && pinchRef.current) {
-                const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
-                const newScale = Math.min(5, Math.max(1, pinchRef.current.startScale * (d / pinchRef.current.startDist)))
-                setImgScale(newScale)
-                if (newScale <= 1) setImgTranslate({ x: 0, y: 0 })
-              } else if (e.touches.length === 1 && panRef.current && imgScale > 1) {
-                setImgTranslate({
-                  x: panRef.current.tx + (e.touches[0].clientX - panRef.current.startX) / imgScale,
-                  y: panRef.current.ty + (e.touches[0].clientY - panRef.current.startY) / imgScale,
-                })
-              }
-            }}
-            onTouchEnd={(e) => {
-              e.stopPropagation()
-              pinchRef.current = null
-              panRef.current = null
-              if (imgScale <= 1) { setImgScale(1); setImgTranslate({ x: 0, y: 0 }) }
-            }}
-          />
-
-          {/* Save button below image */}
-          <button
-            onClick={async (e) => {
-              e.stopPropagation()
-              await saveImageToDevice(commentLightbox!, lang)
-            }}
-            className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-3 bg-white rounded-full shadow-lg text-gray-900 font-semibold text-sm active:scale-95 transition-transform z-10"
-            style={{ bottom: 'max(1.5rem, calc(env(safe-area-inset-bottom, 0px) + 1rem))' }}
-          >
-            <FiDownload className="w-4 h-4" />
-            <span>{lang === 'en' ? 'Save' : lang === 'ur' ? 'محفوظ کریں' : 'حفظ'}</span>
-          </button>
-        </div>
-      )}
+      {/* Comment/reply image lightbox — single image, same component */}
+      <ImageLightbox
+        images={commentLightbox ? [commentLightbox] : []}
+        initialIndex={0}
+        open={commentLightbox !== null}
+        onClose={() => setCommentLightbox(null)}
+      />
 
       {/* Reaction + Comment bar */}
       <div className="mt-3 pt-3 border-t border-gray-100/50 dark:border-white/[0.06] flex items-center justify-between">
