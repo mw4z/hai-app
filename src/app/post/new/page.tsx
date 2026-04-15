@@ -386,16 +386,16 @@ export default function NewPostPage() {
                   )}
 
                   {images.length < 5 && (
-                    <label className="flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-3 text-sm text-gray-400 cursor-pointer hover:border-primary-300 hover:text-primary-500 transition-colors">
-                      <span>+ اختر صورة</span>
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        multiple
-                        onChange={handleImageSelect}
-                        className="hidden"
-                      />
-                    </label>
+                    <>
+                      <button
+                        type="button"
+                        onClick={openPostImagePicker}
+                        className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-3 text-sm text-gray-400 cursor-pointer hover:border-primary-300 hover:text-primary-500 transition-colors"
+                      >
+                        <span>+ {lang === 'en' ? 'Choose photo' : lang === 'ur' ? 'تصویر منتخب کریں' : 'اختر صورة'}</span>
+                      </button>
+                      <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleImageSelect} className="hidden" />
+                    </>
                   )}
                 </div>
 
