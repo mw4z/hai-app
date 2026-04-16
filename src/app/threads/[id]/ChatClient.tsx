@@ -131,6 +131,7 @@ export default function ChatClient({
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const composerRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
   const textInputRef = useRef<HTMLInputElement>(null)
 
   // Keyboard tracking — the exact code that worked before the reply feature.
@@ -207,24 +208,30 @@ export default function ChatClient({
     let prevHeight = composer.offsetHeight
     const apply = () => {
       const height = composer.offsetHeight
-      messages.style.paddingBottom = `${height + 16}px`
-      // If the composer grew (e.g. reply preview opened) and the user
-      // was near the bottom, the new pixels would push the last message
-      // behind the composer. Nudge the page scroll to compensate.
-      const grown = height - prevHeight
-      prevHeight = height
-      if (grown > 0) {
-        const distanceFromBottom =
-          document.documentElement.scrollHeight - window.scrollY - window.innerHeight
-        if (distanceFromBottom < height + 32) {
-          window.scrollBy({ top: grown, behavior: 'smooth' })
+      const gap = height + 16
+      messages.style.paddingBottom = `${gap}px`
+      // scroll-padding-bottom keeps the browser-driven scrollIntoView
+      // calls (ours + native focus scrolling) from placing content
+      // behind the fixed composer.
+      document.documentElement.style.scrollPaddingBottom = `${gap}px`
+      // If the composer grew while the user was at/near the bottom,
+      // keep them pinned to the bottom so the last message doesn't
+      // slip behind the taller composer.
+      if (height > prevHeight) {
+        const before = document.documentElement.scrollHeight - window.scrollY - window.innerHeight
+        if (before < prevHeight + 48) {
+          bottomRef.current?.scrollIntoView({ block: 'end' })
         }
       }
+      prevHeight = height
     }
     apply()
     const ro = new ResizeObserver(apply)
     ro.observe(composer)
-    return () => ro.disconnect()
+    return () => {
+      ro.disconnect()
+      document.documentElement.style.scrollPaddingBottom = ''
+    }
   }, [closed])
 
   const [showRating, setShowRating] = useState(isClosed)
@@ -250,7 +257,6 @@ export default function ChatClient({
   const [profileData, setProfileData] = useState<any>(null)
   const [loadingProfile, setLoadingProfile] = useState(false)
   const imgInputRef = useRef<HTMLInputElement>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
   // Find the first unread message from the other person on initial load
@@ -294,21 +300,13 @@ export default function ChatClient({
     bottomRef.current?.scrollIntoView()
   }, [messages.length])
 
-  // When the reply preview appears the composer grows. Browsers don't
-  // know the composer overlays the viewport, so scrollIntoView won't
-  // help on its own — compute the scroll manually so the replied-to
-  // message clears the (now-taller) composer.
+  // When replying to a message, nudge it into view above the composer
+  // (scroll-padding-bottom, set elsewhere, takes care of the offset).
   useEffect(() => {
     if (!replyingTo) return
     const id = setTimeout(() => {
       const el = document.querySelector(`[data-msg-id="${replyingTo.id}"]`) as HTMLElement | null
-      const composer = composerRef.current
-      if (!el || !composer) return
-      const safeBottom = window.innerHeight - composer.offsetHeight - 16
-      const rect = el.getBoundingClientRect()
-      if (rect.bottom > safeBottom) {
-        window.scrollBy({ top: rect.bottom - safeBottom, behavior: 'smooth' })
-      }
+      el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }, 60)
     return () => clearTimeout(id)
   }, [replyingTo])
