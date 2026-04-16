@@ -19,21 +19,17 @@ export function useAttachContact() {
 
   return useCallback(async (): Promise<string | null> => {
     const picked = await pickContact()
-    if (picked) {
-      const snippet = formatContactSnippet(picked)
-      if (!snippet) {
-        // Contact had a name but no phone number
-        toast.error(
-          lang === 'en'
-            ? 'This contact has no phone number'
-            : lang === 'ur'
-              ? 'اس رابطہ میں فون نمبر نہیں ہے'
-              : 'جهة الاتصال هذه ليس لديها رقم هاتف',
-        )
-        return null
-      }
-      return snippet
+
+    // If native picker returned a contact WITH a phone, we're done.
+    if (picked?.phone) {
+      return formatContactSnippet(picked) || null
     }
+
+    // Either the picker returned no contact (user cancelled / no picker
+    // available), or the contact had no phone number. In both cases,
+    // fall through to the manual prompt. If we got a name from the
+    // picker, pre-fill it so the user only needs to type the phone.
+    const prefillName = picked?.name || ''
 
     const name = await prompt({
       title: t('attach_contact'),
@@ -45,6 +41,7 @@ export function useAttachContact() {
             : 'اسم جهة الاتصال',
       placeholder:
         lang === 'en' ? 'e.g. Ahmed' : lang === 'ur' ? 'مثال: احمد' : 'مثال: أحمد',
+      defaultValue: prefillName,
     })
     if (!name || !name.trim()) return null
 
