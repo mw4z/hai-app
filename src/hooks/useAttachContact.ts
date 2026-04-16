@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback } from 'react'
+import toast from 'react-hot-toast'
 import { usePrompt } from '@/components/ConfirmProvider'
 import { useLanguage } from '@/hooks/useLanguage'
 import { pickContact, formatContactSnippet } from '@/lib/contactPicker'
@@ -20,7 +21,18 @@ export function useAttachContact() {
     const picked = await pickContact()
     if (picked) {
       const snippet = formatContactSnippet(picked)
-      return snippet || null
+      if (!snippet) {
+        // Contact had a name but no phone number
+        toast.error(
+          lang === 'en'
+            ? 'This contact has no phone number'
+            : lang === 'ur'
+              ? 'اس رابطہ میں فون نمبر نہیں ہے'
+              : 'جهة الاتصال هذه ليس لديها رقم هاتف',
+        )
+        return null
+      }
+      return snippet
     }
 
     const name = await prompt({

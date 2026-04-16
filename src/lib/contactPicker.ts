@@ -118,8 +118,9 @@ export async function pickContact(): Promise<PickedContact> {
 export function formatContactSnippet(c: { name: string; phone: string }): string {
   const name = (c.name || '').trim()
   const phone = (c.phone || '').trim()
-  if (name && phone) return `📱 ${name} — ${phone}`
-  if (phone) return `📱 ${phone}`
-  if (name) return `📱 ${name}`
-  return ''
+  // A phone number is required — without one the regex won't detect the
+  // snippet and it renders as plain text with no action buttons.
+  if (!phone) return ''
+  if (name) return `📱 ${name} — ${phone}`
+  return `📱 ${phone}`
 }
