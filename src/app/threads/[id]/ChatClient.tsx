@@ -185,8 +185,8 @@ export default function ChatClient({
       })
 
       cleanup = () => {
+        cancelAnimationFrame(resizeRaf)
         h1.then(h => h.remove())
-        h2.then(h => h.remove())
         h3.then(h => h.remove())
         h4.then(h => h.remove())
       }
