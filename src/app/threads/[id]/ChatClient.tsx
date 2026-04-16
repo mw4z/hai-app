@@ -117,6 +117,29 @@ export default function ChatClient({
   const [messages, setMessages] = useState(initialMessages)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const composerRef = useRef<HTMLDivElement>(null)
+
+  // Track the visual viewport to move the composer in sync with the
+  // iOS keyboard animation. visualViewport fires resize/scroll events
+  // frame-by-frame during the animation, unlike the viewport resize
+  // which only fires at the end.
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    if (!vv) return
+    function update() {
+      if (!composerRef.current || !vv) return
+      const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      composerRef.current.style.bottom = `${offset}px`
+      // When keyboard is up, safe-area is covered by the keyboard
+      composerRef.current.style.paddingBottom = offset > 0 ? '10px' : ''
+    }
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
   const [sendingLocation, setSendingLocation] = useState(false)
   const [closed, setClosed] = useState(isClosed)
   const [showRating, setShowRating] = useState(isClosed)
@@ -795,7 +818,7 @@ export default function ChatClient({
           </div>
         )
       ) : (
-        <div className="glass-bottom px-3 py-2.5 fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-20" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
+        <div ref={composerRef} className="glass-bottom px-3 py-2.5 fixed left-0 right-0 max-w-[480px] mx-auto z-20" style={{ bottom: 0, paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
           <div className="flex items-center gap-2">
             <input ref={imgInputRef} type="file" accept="image/*" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) sendImage(f) }} />
