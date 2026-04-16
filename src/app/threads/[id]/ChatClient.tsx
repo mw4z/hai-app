@@ -204,8 +204,22 @@ export default function ChatClient({
     const composer = composerRef.current
     const messages = messagesRef.current
     if (!composer || !messages) return
+    let prevHeight = composer.offsetHeight
     const apply = () => {
-      messages.style.paddingBottom = `${composer.offsetHeight + 16}px`
+      const height = composer.offsetHeight
+      messages.style.paddingBottom = `${height + 16}px`
+      // If the composer grew (e.g. reply preview opened) and the user
+      // was near the bottom, the new pixels would push the last message
+      // behind the composer. Nudge the page scroll to compensate.
+      const grown = height - prevHeight
+      prevHeight = height
+      if (grown > 0) {
+        const distanceFromBottom =
+          document.documentElement.scrollHeight - window.scrollY - window.innerHeight
+        if (distanceFromBottom < height + 32) {
+          window.scrollBy({ top: grown, behavior: 'smooth' })
+        }
+      }
     }
     apply()
     const ro = new ResizeObserver(apply)
