@@ -370,10 +370,14 @@ export default function ImageLightbox({
         }`}
       />
 
-      {/* Horizontal track of images */}
+      {/* Horizontal track of images. dir="ltr" forces left-to-right flex
+          ordering so img[0] is at x=0, img[1] at x=vw, etc. Without this,
+          RTL apps reverse the flex children and the translate math breaks
+          (index 0 would show the last image, swiping right shows black). */}
       <div
         ref={trackRef}
         className="absolute inset-0 flex"
+        dir="ltr"
         style={{
           transform: `translate3d(${-index * 100}%, 0, 0)`,
           transition: SPRING,
