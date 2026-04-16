@@ -415,15 +415,15 @@ export default function ChatClient({
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
       {/* Header */}
-      <header className="glass px-4 py-2.5 flex items-center gap-3 sticky top-0 z-10 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-        <Link href="/threads" className="text-gray-500 dark:text-gray-400 p-1.5 -ms-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+      <header className="glass px-4 py-2.5 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
+        <Link href="/threads" className="text-gray-500 dark:text-gray-400 p-1">
           {lang !== 'en' ? <FiArrowRight className="w-5 h-5" /> : <FiArrowLeft className="w-5 h-5" />}
         </Link>
         <button onClick={openProfile} className="flex items-center gap-3 flex-1 min-w-0">
           {other.avatarUrl ? (
-            <img src={other.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-2 ring-white/80 dark:ring-gray-700/80 shadow-sm" />
+            <img src={other.avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-md shadow-primary-500/20 ring-2 ring-white/80 dark:ring-gray-700/80">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm">
               {other.name?.[0] || '؟'}
             </div>
           )}
@@ -860,8 +860,8 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
         </div>
       )}
       {showDate && (
-        <div className="flex items-center justify-center my-5">
-          <span className="text-[10px] text-gray-500 dark:text-gray-400 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm px-3.5 py-1 rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.06)] font-semibold tracking-wide uppercase">
+        <div className="flex items-center justify-center my-4">
+          <span className="text-[11px] text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 px-3 py-1 rounded-full shadow-sm font-medium">
             {dateLabel}
           </span>
         </div>
@@ -869,27 +869,25 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
 
       <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} ${isLastInGroup ? 'mb-2' : 'mb-[3px]'} ${isFirstInGroup && !showDate ? 'mt-3' : ''}`}>
         {msg.type === 'IMAGE' && msg.imageUrl ? (
-          <div className={`max-w-[70%] relative`} data-msg-id={msg.id} {...longPress}>
+          <div className={`max-w-[70%]`} data-msg-id={msg.id} {...longPress}>
             <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="block">
-              <img src={msg.imageUrl} alt="" className={`rounded-[20px] max-h-56 object-cover ${
-                isMe ? 'shadow-[0_2px_8px_rgba(22,163,74,0.25)]' : 'shadow-[0_1px_4px_rgba(0,0,0,0.08)]'
-              } ${isLastInGroup ? (isMe ? 'ltr:rounded-br-md rtl:rounded-bl-md' : 'ltr:rounded-bl-md rtl:rounded-br-md') : ''}`} />
+              <img src={msg.imageUrl} alt="" className={`rounded-2xl max-h-52 object-cover shadow-sm ${isLastInGroup ? (isMe ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : 'ltr:rounded-bl-sm rtl:rounded-br-sm') : ''}`} />
             </a>
-            <span className="absolute bottom-2 end-3 flex items-center gap-0.5 text-[10px] text-white/90 bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
+            <p className={`text-[10px] mt-1 px-1 flex items-center gap-0.5 ${isMe ? 'text-gray-400 justify-start' : 'text-gray-400 justify-end'}`}>
               {timeStr}
               <MsgStatus msg={msg} isMe={isMe} />
-            </span>
+            </p>
           </div>
         ) : msg.type === 'DELETED' ? (
-          <div className={`max-w-[75%] rounded-[20px] px-3.5 py-2.5 ${
-            isMe ? `bg-primary-600/20 ${isLastInGroup ? 'ltr:rounded-br-md rtl:rounded-bl-md' : ''}` : `bg-gray-100/60 dark:bg-gray-800/40 ${isLastInGroup ? 'ltr:rounded-bl-md rtl:rounded-br-md' : ''}`
-          } border border-dashed ${isMe ? 'border-primary-400/20' : 'border-gray-300/20 dark:border-gray-600/20'}`}>
-            <p className={`text-[13px] italic ${isMe ? 'text-primary-300/60' : 'text-gray-400 dark:text-gray-500'}`}>
+          <div className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 ${
+            isMe ? `bg-primary-600/30 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white/30 dark:bg-gray-800/30 ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
+          } border border-dashed ${isMe ? 'border-primary-400/30' : 'border-gray-300/30 dark:border-gray-600/30'}`}>
+            <p className={`text-[13px] italic ${isMe ? 'text-primary-200/70' : 'text-gray-400 dark:text-gray-500'}`}>
               🚫 {isMe
                 ? (lang === 'en' ? 'You deleted this message' : 'حذفت هذه الرسالة')
                 : (lang === 'en' ? 'This message was deleted' : 'تم حذف هذه الرسالة')}
             </p>
-            <p className={`text-[10px] mt-1 ${isMe ? 'text-primary-300/40' : 'text-gray-400/40'}`}>{timeStr}</p>
+            <p className={`text-[10px] mt-1 ${isMe ? 'text-primary-200/50' : 'text-gray-400/50'}`}>{timeStr}</p>
           </div>
         ) : editingMsg === msg.id ? (
           <div className="max-w-[75%] w-full">
@@ -902,46 +900,37 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
             </div>
           </div>
         ) : (
-          <div {...longPress} data-msg-id={msg.id} className={`relative max-w-[78%] rounded-[20px] select-none ${
-            isMe
-              ? `bg-gradient-to-br from-primary-500 to-primary-700 text-white shadow-[0_2px_8px_rgba(22,163,74,0.3)] ${isLastInGroup ? 'ltr:rounded-br-md rtl:rounded-bl-md' : ''}`
-              : `bg-white dark:bg-gray-800/90 text-gray-800 dark:text-gray-100 shadow-[0_1px_4px_rgba(0,0,0,0.06)] dark:shadow-none border border-gray-100/80 dark:border-white/[0.06] ${isLastInGroup ? 'ltr:rounded-bl-md rtl:rounded-br-md' : ''}`
-          } ${selectedMsg === msg.id ? 'z-[52] ring-2 ring-white/50' : ''}`}>
-            <div className="px-3.5 pt-2 pb-1.5">
-              {msg.type === 'LOCATION' ? (
-                <div>
-                  <div className={`flex items-center gap-1.5 mb-1.5 ${isMe ? 'text-white/80' : 'text-primary-600 dark:text-primary-400'}`}>
-                    <FiMapPin className="w-3.5 h-3.5" />
-                    <span className="text-xs font-semibold">{t('thread_my_location')}</span>
-                  </div>
-                  <a href={`https://maps.google.com/?q=${msg.lat},${msg.lng}`} target="_blank" rel="noopener noreferrer"
-                    className={`block rounded-xl overflow-hidden mb-0.5 ${isMe ? 'bg-white/10' : 'bg-gray-50 dark:bg-gray-700/60'} p-3 text-center`}>
-                    <span className="text-2xl">📍</span>
-                    <p className={`text-xs mt-1 font-semibold ${isMe ? 'text-white/90' : 'text-primary-600 dark:text-primary-400'}`}>
-                      {t('thread_open_map')} ↗
-                    </p>
-                  </a>
+          <div {...longPress} data-msg-id={msg.id} className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 shadow-sm select-none ${
+            isMe ? `bg-primary-600 text-white ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
+          } ${selectedMsg === msg.id ? 'relative z-[52] ring-2 ring-white/50' : ''}`}>
+            {msg.type === 'LOCATION' ? (
+              <div>
+                <div className={`flex items-center gap-1.5 mb-1 ${isMe ? 'text-primary-100' : 'text-primary-600 dark:text-primary-400'}`}>
+                  <FiMapPin className="w-3.5 h-3.5" />
+                  <span className="text-xs font-medium">{t('thread_my_location')}</span>
                 </div>
-              ) : (
-                <p className="text-[15px] leading-[1.55] selectable-text">
-                  <SmartText text={msg.text || ''} />
-                  {msg.edited && (
-                    <span className={`text-[10px] italic ms-1 ${isMe ? 'text-white/50' : 'text-gray-400 dark:text-gray-500'}`}>
-                      {lang === 'en' ? '(edited)' : '(معدّل)'}
-                    </span>
-                  )}
-                  {/* Invisible spacer so the inline timestamp never overlaps text */}
-                  <span className="invisible text-[10px]">{'\u2004\u2004\u2004'}{msg.edited ? '\u2004' : ''}{isMe ? '\u2004\u2004' : ''}</span>
-                </p>
-              )}
-            </div>
-            {/* Inline timestamp + status — floated to the bottom-end of the bubble */}
-            <span className={`absolute bottom-1.5 flex items-center gap-0.5 text-[10px] leading-none ${
-              isMe ? 'text-white/60 end-3' : 'text-gray-400 dark:text-gray-500 end-3'
-            }`}>
+                <a href={`https://maps.google.com/?q=${msg.lat},${msg.lng}`} target="_blank" rel="noopener noreferrer"
+                  className={`block rounded-xl overflow-hidden mb-1 ${isMe ? 'bg-primary-700/50' : 'bg-gray-100 dark:bg-gray-700'} p-2.5 text-center`}>
+                  <span className="text-2xl">📍</span>
+                  <p className={`text-xs mt-1 font-medium ${isMe ? 'text-primary-100' : 'text-primary-600 dark:text-primary-400'}`}>
+                    {t('thread_open_map')} ↗
+                  </p>
+                </a>
+              </div>
+            ) : (
+              <p className="text-[15px] leading-relaxed selectable-text">
+                <SmartText text={msg.text || ''} />
+                {msg.edited && (
+                  <span className={`text-[10px] italic ml-1 ${isMe ? 'text-primary-200' : 'text-gray-400 dark:text-gray-500'}`}>
+                    {lang === 'en' ? '(edited)' : '(معدّل)'}
+                  </span>
+                )}
+              </p>
+            )}
+            <p className={`text-[10px] mt-1 flex items-center gap-0.5 ${isMe ? 'text-primary-200 justify-end' : 'text-gray-400 dark:text-gray-500'}`}>
               {timeStr}
               <MsgStatus msg={msg} isMe={isMe} />
-            </span>
+            </p>
           </div>
         )}
 
@@ -951,11 +940,11 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
             acc[r.emoji] = (acc[r.emoji] || 0) + 1; return acc
           }, {})
           return (
-            <div className={`-mt-2.5 ${isMe ? 'me-3' : 'ms-3'} mb-1`}>
-              <div className="inline-flex items-center gap-0.5 bg-white dark:bg-gray-800 rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.1)] dark:shadow-none border border-gray-100 dark:border-gray-700 px-2 py-0.5">
+            <div className={`-mt-2 ${isMe ? 'mr-2' : 'ml-2'} mb-1`}>
+              <div className="inline-flex items-center gap-0.5 bg-white dark:bg-gray-800 rounded-full shadow-md border-2 border-gray-200 dark:border-gray-600 px-2 py-1">
                 {Object.entries(grouped).map(([emoji, count]) => (
                   <span key={emoji} className="text-[13px] leading-none">
-                    {emoji}{(count as number) > 1 && <span className="text-[10px] text-gray-400 ms-0.5 tabular-nums">{count as number}</span>}
+                    {emoji}{(count as number) > 1 && <span className="text-[10px] text-gray-400 ml-0.5">{count as number}</span>}
                   </span>
                 ))}
               </div>
