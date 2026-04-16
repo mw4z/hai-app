@@ -132,37 +132,43 @@ export default function ChatClient({
 
     let cleanup: (() => void) | null = null
 
+    const safePad = 'calc(env(safe-area-inset-bottom, 0px) + 10px)'
+
     import('@capacitor/keyboard').then(({ Keyboard }) => {
       const el = () => composerRef.current
 
+      // Use transform for the animation so bottom stays at 0 the
+      // whole time. When Capacitor resizes the viewport, bottom-0
+      // is already at the correct position — just clear the
+      // transform. No frame where bottom + transform double-offset.
       const h1 = Keyboard.addListener('keyboardWillShow', (info) => {
         const c = el()
         if (!c) return
-        c.style.transition = 'bottom 280ms cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
-        c.style.bottom = `${info.keyboardHeight}px`
+        c.style.transition = 'transform 280ms cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
+        c.style.transform = `translateY(${-info.keyboardHeight}px)`
         c.style.paddingBottom = '10px'
       })
       const h2 = Keyboard.addListener('keyboardDidShow', () => {
         const c = el()
         if (!c) return
-        // Viewport has now shrunk — bottom:0 = above keyboard. Snap without transition.
+        // Viewport shrunk — bottom:0 is now above keyboard.
+        // Clear transform so it doesn't stack on top.
         c.style.transition = 'none'
-        c.style.bottom = '0px'
+        c.style.transform = 'none'
         c.style.paddingBottom = '10px'
       })
-      const safePad = 'calc(env(safe-area-inset-bottom, 0px) + 10px)'
       const h3 = Keyboard.addListener('keyboardWillHide', () => {
         const c = el()
         if (!c) return
-        c.style.transition = 'bottom 280ms cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
-        c.style.bottom = '0px'
+        c.style.transition = 'transform 280ms cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
+        c.style.transform = 'none'
         c.style.paddingBottom = safePad
       })
       const h4 = Keyboard.addListener('keyboardDidHide', () => {
         const c = el()
         if (!c) return
         c.style.transition = 'none'
-        c.style.bottom = '0px'
+        c.style.transform = 'none'
         c.style.paddingBottom = safePad
       })
 
