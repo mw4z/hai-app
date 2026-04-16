@@ -119,6 +119,7 @@ export default function ChatClient({
   const [sending, setSending] = useState(false)
   const [kbOpen, setKbOpen] = useState(false)
   const composerRef = useRef<HTMLDivElement>(null)
+  const textInputRef = useRef<HTMLInputElement>(null)
 
   // Smooth keyboard tracking for the composer bar.
   //
@@ -326,6 +327,8 @@ export default function ChatClient({
         playSend()
         setMessages(prev => [...prev, msg])
         setText('')
+        // Refocus so the keyboard stays open after sending
+        requestAnimationFrame(() => textInputRef.current?.focus())
       }
     } catch { toast.error(t('common_error')) }
     finally { setSending(false) }
@@ -907,7 +910,7 @@ export default function ChatClient({
               </button>
             </div>
             <form onSubmit={sendText} className="flex-1 flex items-center gap-2">
-              <input type="text" value={text} onChange={e => setText(e.target.value)}
+              <input ref={textInputRef} type="text" value={text} onChange={e => setText(e.target.value)}
                 placeholder={t('thread_placeholder')}
                 className="flex-1 bg-white/10 dark:bg-white/10 rounded-full px-4 py-2.5 text-[15px] text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-400/40 focus:border-primary-400/30 transition-shadow"
                 maxLength={1000} />
