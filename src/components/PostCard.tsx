@@ -696,17 +696,26 @@ export default function PostCard({
           <div className={`mt-3 grid gap-1 rounded-xl overflow-hidden ${
             post.imageUrls.length === 1 ? 'grid-cols-1' : post.imageUrls.length === 2 ? 'grid-cols-2' : 'grid-cols-3'
           }`}>
-            {post.imageUrls.slice(0, 3).map((url, i) => (
-              <img
-                key={i}
-                src={url}
-                alt=""
-                className={`w-full object-cover cursor-pointer active:opacity-80 ${
-                  post.imageUrls.length === 1 ? 'h-48 rounded-xl' : 'h-24'
-                }`}
-                onClick={() => setLightboxIndex(i)}
-              />
-            ))}
+            {post.imageUrls.slice(0, 3).map((url, i) => {
+              const extra = post.imageUrls.length - 3
+              const showOverlay = i === 2 && extra > 0
+              return (
+                <div key={i} className="relative cursor-pointer active:opacity-80" onClick={() => setLightboxIndex(i)}>
+                  <img
+                    src={url}
+                    alt=""
+                    className={`w-full object-cover ${
+                      post.imageUrls.length === 1 ? 'h-48 rounded-xl' : 'h-24'
+                    }`}
+                  />
+                  {showOverlay && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <span className="text-white text-xl font-black">+{extra}</span>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
 
           {/* Fullscreen lightbox with pinch/swipe/double-tap gestures */}
