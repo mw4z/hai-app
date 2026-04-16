@@ -513,6 +513,11 @@ export default function ChatClient({
         )}
       </header>
 
+      {/* TEMP: deployment-verification banner — delete me */}
+      <div className="bg-red-500 text-white text-center py-2 font-bold text-sm flex-shrink-0">
+        🧪 CLAUDE TEST BUILD — keyboard gap fix 🧪
+      </div>
+
       {/* Messages */}
       <div ref={messagesRef} className="px-4 py-3 flex-1 min-h-0 overflow-y-auto" data-tour="chat-messages"
         style={{ background: isDark ? wallpaper.dark : wallpaper.light }}>
