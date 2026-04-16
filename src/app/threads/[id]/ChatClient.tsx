@@ -413,7 +413,7 @@ export default function ChatClient({
   let lastDate = ''
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
+    <div className="bg-gray-100 dark:bg-gray-950" style={{ minHeight: 'calc(100vh - env(safe-area-inset-top, 0px))' }}>
       {/* Header */}
       <header className="glass px-4 py-2.5 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
         <Link href="/threads" className="text-gray-500 dark:text-gray-400 p-1">
@@ -461,7 +461,7 @@ export default function ChatClient({
 
       {/* Messages */}
       <div className="px-4 py-3 pb-28" data-tour="chat-messages"
-        style={{ background: isDark ? wallpaper.dark : wallpaper.light, minHeight: 'calc(100vh - 120px - env(safe-area-inset-top, 0px))' }}>
+        style={{ background: isDark ? wallpaper.dark : wallpaper.light }}>
         {messages.length === 0 && (
           <div className="text-center py-12">
             <div className="w-16 h-16 rounded-full bg-white dark:bg-gray-800 shadow-sm mx-auto mb-3 flex items-center justify-center">
