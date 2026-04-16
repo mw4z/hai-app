@@ -13,6 +13,7 @@ import { useConfirm } from './ConfirmProvider'
 import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useAttachContact } from '@/hooks/useAttachContact'
 import ImageLightbox from './ImageLightbox'
+import SmartText from './SmartText'
 import type { TranslationKey } from '@/lib/i18n'
 import { canStartPrivateThread } from '@/lib/thread-rules'
 import { getRepLevel } from '@/lib/reputation-levels'
@@ -985,7 +986,7 @@ export default function PostCard({
                       <>
                         {c.body && (
                           <p className="text-[13px] text-gray-600 dark:text-gray-300 leading-relaxed selectable-text">
-                            {c.body}
+                            <SmartText text={c.body} />
                             {c.editedAt && <span className="text-[10px] text-gray-400 dark:text-gray-500 italic ml-1">{lang === 'en' ? '(edited)' : '(معدّل)'}</span>}
                           </p>
                         )}
@@ -1044,7 +1045,7 @@ export default function PostCard({
                             <span className="text-[12px] font-semibold text-gray-700 dark:text-gray-300">{reply.author.name || t('post_neighbor')}</span>
                             <UserBadgeDisplay accountType={reply.author.accountType} reputation={reply.author.reputation} />
                           </div>
-                          {reply.body && <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-relaxed selectable-text">{reply.body}</p>}
+                          {reply.body && <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-relaxed selectable-text"><SmartText text={reply.body} /></p>}
                           {reply.imageUrl && (
                             <img
                               src={reply.imageUrl}

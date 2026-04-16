@@ -13,6 +13,7 @@ import { uploadFiles } from '@/lib/upload'
 import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useAttachContact } from '@/hooks/useAttachContact'
 import { playSend } from '@/lib/sound'
+import SmartText from '@/components/SmartText'
 
 interface Msg {
   id: string
@@ -918,7 +919,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
               </div>
             ) : (
               <p className="text-[15px] leading-relaxed selectable-text">
-                {msg.text}
+                <SmartText text={msg.text || ''} />
                 {msg.edited && (
                   <span className={`text-[10px] italic ml-1 ${isMe ? 'text-primary-200' : 'text-gray-400 dark:text-gray-500'}`}>
                     {lang === 'en' ? '(edited)' : '(معدّل)'}
