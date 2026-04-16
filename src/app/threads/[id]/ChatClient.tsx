@@ -150,19 +150,20 @@ export default function ChatClient({
         c.style.bottom = '0px'
         c.style.paddingBottom = '10px'
       })
+      const safePad = 'calc(env(safe-area-inset-bottom, 0px) + 10px)'
       const h3 = Keyboard.addListener('keyboardWillHide', () => {
         const c = el()
         if (!c) return
         c.style.transition = 'bottom 280ms cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
         c.style.bottom = '0px'
-        c.style.paddingBottom = ''
+        c.style.paddingBottom = safePad
       })
       const h4 = Keyboard.addListener('keyboardDidHide', () => {
         const c = el()
         if (!c) return
         c.style.transition = 'none'
         c.style.bottom = '0px'
-        c.style.paddingBottom = ''
+        c.style.paddingBottom = safePad
       })
 
       cleanup = () => {
