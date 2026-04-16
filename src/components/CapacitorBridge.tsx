@@ -34,6 +34,14 @@ export default function CapacitorBridge() {
         await StatusBar.setBackgroundColor({ color: '#00000000' })
       } catch {}
 
+      // Native resize mode makes iOS adjust the WKWebView's content inset
+      // in sync with the keyboard animation (no delay). Default 'body'
+      // mode fires the resize only after the animation finishes, which
+      // causes the composer to lag behind the rising keyboard.
+      try {
+        const { Keyboard, KeyboardResize } = await import('@capacitor/keyboard')
+        await Keyboard.setResizeMode({ mode: KeyboardResize.Native })
+      } catch {}
     }
 
     init()
