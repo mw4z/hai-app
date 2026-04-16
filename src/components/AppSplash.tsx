@@ -201,13 +201,12 @@ export default function AppSplash() {
           will-change: transform, opacity;
         }
         ._sp-out {
-          animation: _spZoom ${FADE_MS}ms linear forwards;
+          animation: _spZoom ${FADE_MS}ms ease-out forwards;
           pointer-events: none;
         }
         @keyframes _spZoom {
           0%   { opacity: 1; transform: scale(1); }
-          50%  { opacity: 1; transform: scale(1.5); }
-          100% { opacity: 0; transform: scale(2); }
+          100% { opacity: 0; transform: scale(1.15); }
         }
 
         /* ── Background ───────────────────────────────────── */
