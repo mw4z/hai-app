@@ -134,20 +134,24 @@ export default function ChatClient({
   const bottomRef = useRef<HTMLDivElement>(null)
   const textInputRef = useRef<HTMLInputElement>(null)
 
-  // Scroll the latest message into view once the native keyboard has
-  // opened and the webview has resized. Layout (flex column with a
-  // fixed-height root using 100dvh) keeps the composer above the
-  // keyboard on its own, so no transform hacks are needed.
+  // Keep the latest message visible as the keyboard opens. With native
+  // keyboard resize mode (set in CapacitorBridge) the WKWebView shrinks
+  // in sync with the keyboard animation, so scrolling on
+  // keyboardWillShow lands the message right above the composer as the
+  // keyboard rises — no post-animation jump.
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (!(window as any).Capacitor?.isNativePlatform?.()) return
 
     let cleanup: (() => void) | null = null
     import('@capacitor/keyboard').then(({ Keyboard }) => {
-      const h = Keyboard.addListener('keyboardDidShow', () => {
-        bottomRef.current?.scrollIntoView({ block: 'end' })
-      })
-      cleanup = () => { h.then(x => x.remove()) }
+      const scroll = () => bottomRef.current?.scrollIntoView({ block: 'end' })
+      const h1 = Keyboard.addListener('keyboardWillShow', scroll)
+      const h2 = Keyboard.addListener('keyboardDidShow', scroll)
+      cleanup = () => {
+        h1.then(x => x.remove())
+        h2.then(x => x.remove())
+      }
     }).catch(() => {})
     return () => { cleanup?.() }
   }, [])
