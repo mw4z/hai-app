@@ -314,23 +314,25 @@ export default function ChatClient({
   async function sendText(e: React.FormEvent) {
     e.preventDefault()
     if (!text.trim() || sending) return
+    // Keep focus on the input BEFORE any async work — prevents iOS
+    // from dismissing the keyboard when the form submits.
+    textInputRef.current?.focus()
     hapticLight()
+    const body = text.trim()
+    setText('')
     setSending(true)
     try {
       const res = await fetch(`/api/threads/${threadId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'TEXT', text: text.trim() }),
+        body: JSON.stringify({ type: 'TEXT', text: body }),
       })
       if (res.ok) {
         const msg = await res.json()
         playSend()
         setMessages(prev => [...prev, msg])
-        setText('')
-        // Refocus so the keyboard stays open after sending
-        requestAnimationFrame(() => textInputRef.current?.focus())
       }
-    } catch { toast.error(t('common_error')) }
+    } catch { toast.error(t('common_error')); setText(body) }
     finally { setSending(false) }
   }
 
@@ -915,6 +917,7 @@ export default function ChatClient({
                 className="flex-1 bg-white/10 dark:bg-white/10 rounded-full px-4 py-2.5 text-[15px] text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-400/40 focus:border-primary-400/30 transition-shadow"
                 maxLength={1000} />
               <button type="submit" disabled={sending || !text.trim()}
+                onTouchEnd={(e) => { e.preventDefault(); textInputRef.current?.focus(); (e.target as HTMLElement).closest('form')?.requestSubmit() }}
                 className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white disabled:opacity-30 flex-shrink-0 active:scale-90 transition-all shadow-sm hover:bg-primary-700 glow-primary">
                 <FiSend className="w-4.5 h-4.5" style={lang !== 'en' ? { transform: 'scaleX(-1)' } : undefined} />
               </button>
