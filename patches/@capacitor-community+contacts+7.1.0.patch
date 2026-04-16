@@ -1,0 +1,16 @@
+diff --git a/node_modules/@capacitor-community/contacts/android/src/main/java/getcapacitor/community/contacts/ContactPayload.java b/node_modules/@capacitor-community/contacts/android/src/main/java/getcapacitor/community/contacts/ContactPayload.java
+index 1b37e81..9fddb9a 100644
+--- a/node_modules/@capacitor-community/contacts/android/src/main/java/getcapacitor/community/contacts/ContactPayload.java
++++ b/node_modules/@capacitor-community/contacts/android/src/main/java/getcapacitor/community/contacts/ContactPayload.java
+@@ -175,9 +175,9 @@ public class ContactPayload {
+             case Phone.CONTENT_ITEM_TYPE:
+                 String number = getStringByColumnName(cursor, Phone.NUMBER);
+                 Integer phoneType = getIntByColumnName(cursor, Phone.TYPE);
+-                if (number != null && phoneType != null) {
++                if (number != null) {
+                     JSObject phoneObject = new JSObject();
+-                    phoneObject.put("type", Contacts.phoneTypeMap.getKey(phoneType));
++                    phoneObject.put("type", phoneType != null ? Contacts.phoneTypeMap.getKey(phoneType) : "other");
+                     phoneObject.put("label", getStringByColumnName(cursor, Phone.LABEL));
+                     phoneObject.put("isPrimary", getBooleanByColumnName(cursor, Phone.IS_PRIMARY));
+                     phoneObject.put("number", number);
