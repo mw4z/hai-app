@@ -127,76 +127,33 @@ export default function ChatClient({
   const [messages, setMessages] = useState(initialMessages)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
-  const [kbOpen, setKbOpen] = useState(false)
   const [replyingTo, setReplyingTo] = useState<Msg | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const composerRef = useRef<HTMLDivElement>(null)
+  const messagesRef = useRef<HTMLDivElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
   const textInputRef = useRef<HTMLInputElement>(null)
 
-  // Keyboard tracking — the exact code that worked before the reply feature.
+  // Scroll the latest message into view once the native keyboard has
+  // opened and the webview has resized. Layout (flex column with a
+  // fixed-height root using 100dvh) keeps the composer above the
+  // keyboard on its own, so no transform hacks are needed.
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (!(window as any).Capacitor?.isNativePlatform?.()) return
 
     let cleanup: (() => void) | null = null
-    const safePad = 'calc(env(safe-area-inset-bottom, 0px) + 10px)'
-
     import('@capacitor/keyboard').then(({ Keyboard }) => {
-      const el = () => composerRef.current
-
-      let resizeRaf = 0
-      const h1 = Keyboard.addListener('keyboardWillShow', (info) => {
-        const c = el()
-        if (!c) return
-        c.style.transition = 'transform 280ms cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
-        c.style.transform = `translateY(${-info.keyboardHeight}px)`
-        c.style.paddingBottom = '10px'
-        setKbOpen(true)
-
-        const startH = window.innerHeight
-        cancelAnimationFrame(resizeRaf)
-        const poll = () => {
-          if (window.innerHeight !== startH) {
-            const cc = el()
-            if (cc) {
-              cc.style.transition = 'none'
-              cc.style.transform = 'none'
-            }
-            bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-            return
-          }
-          resizeRaf = requestAnimationFrame(poll)
-        }
-        resizeRaf = requestAnimationFrame(poll)
+      const h = Keyboard.addListener('keyboardDidShow', () => {
+        bottomRef.current?.scrollIntoView({ block: 'end' })
       })
-      const h3 = Keyboard.addListener('keyboardWillHide', () => {
-        const c = el()
-        if (!c) return
-        c.style.transition = 'transform 280ms cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
-        c.style.transform = 'none'
-        c.style.paddingBottom = safePad
-        setKbOpen(false)
-      })
-      const h4 = Keyboard.addListener('keyboardDidHide', () => {
-        const c = el()
-        if (!c) return
-        c.style.transition = 'none'
-        c.style.transform = 'none'
-        c.style.paddingBottom = safePad
-      })
-
-      cleanup = () => {
-        cancelAnimationFrame(resizeRaf)
-        h1.then(h => h.remove())
-        h3.then(h => h.remove())
-        h4.then(h => h.remove())
-      }
+      cleanup = () => { h.then(x => x.remove()) }
     }).catch(() => {})
-
     return () => { cleanup?.() }
   }, [])
   const [sendingLocation, setSendingLocation] = useState(false)
   const [closed, setClosed] = useState(isClosed)
+
   const [showRating, setShowRating] = useState(isClosed)
   const [rated, setRated] = useState(false)
   const [sendingImage, setSendingImage] = useState(false)
@@ -220,7 +177,6 @@ export default function ChatClient({
   const [profileData, setProfileData] = useState<any>(null)
   const [loadingProfile, setLoadingProfile] = useState(false)
   const imgInputRef = useRef<HTMLInputElement>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
   // Find the first unread message from the other person on initial load
@@ -263,6 +219,18 @@ export default function ChatClient({
     }
     bottomRef.current?.scrollIntoView()
   }, [messages.length])
+
+  // When replying to a message, make sure it stays visible after the
+  // composer grows to show the reply preview. The messages container
+  // is the scroll root now, so scrollIntoView works cleanly.
+  useEffect(() => {
+    if (!replyingTo) return
+    const id = setTimeout(() => {
+      const el = document.querySelector(`[data-msg-id="${replyingTo.id}"]`) as HTMLElement | null
+      el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }, 60)
+    return () => clearTimeout(id)
+  }, [replyingTo])
 
   useEffect(() => {
     if (closed) return
@@ -499,9 +467,9 @@ export default function ChatClient({
   let lastDate = ''
 
   return (
-    <div className="flex flex-col bg-gray-100 dark:bg-gray-950" style={{ minHeight: 'calc(100vh - env(safe-area-inset-top, 0px))' }}>
+    <div className="flex flex-col bg-gray-100 dark:bg-gray-950" style={{ height: 'calc(100dvh - env(safe-area-inset-top, 0px))' }}>
       {/* Header */}
-      <header className="glass px-4 py-2.5 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
+      <header className="glass px-4 py-2.5 flex items-center gap-3 z-10 shadow-sm flex-shrink-0">
         <Link href="/threads" className="text-gray-500 dark:text-gray-400 p-1">
           {lang !== 'en' ? <FiArrowRight className="w-5 h-5" /> : <FiArrowLeft className="w-5 h-5" />}
         </Link>
@@ -545,8 +513,13 @@ export default function ChatClient({
         )}
       </header>
 
+      {/* TEMP: deployment-verification banner — delete me */}
+      <div className="bg-red-500 text-white text-center py-2 font-bold text-sm flex-shrink-0">
+        🧪 CLAUDE TEST BUILD — keyboard gap fix 🧪
+      </div>
+
       {/* Messages */}
-      <div className={`px-4 py-3 flex-1 ${kbOpen ? 'pb-14' : 'pb-24'}`} data-tour="chat-messages"
+      <div ref={messagesRef} className="px-4 py-3 flex-1 min-h-0 overflow-y-auto" data-tour="chat-messages"
         style={{ background: isDark ? wallpaper.dark : wallpaper.light }}>
         {messages.length === 0 && (
           <div className="text-center py-12">
@@ -885,7 +858,7 @@ export default function ChatClient({
           </div>
         )
       ) : (
-        <div ref={composerRef} className="glass-bottom px-3 fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-20 overflow-hidden" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
+        <div ref={composerRef} className="glass-bottom px-3 w-full max-w-[480px] mx-auto z-20 overflow-hidden flex-shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
           {/* Reply preview bar */}
           {replyingTo && (
             <div className="flex items-center gap-2 px-1 pt-2 pb-1">
