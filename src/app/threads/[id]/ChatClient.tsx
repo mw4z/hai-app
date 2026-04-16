@@ -117,8 +117,6 @@ export default function ChatClient({
   const [messages, setMessages] = useState(initialMessages)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
-  const [kbOffset, setKbOffset] = useState(0)
-  const composerRef = useRef<HTMLDivElement>(null)
   const [sendingLocation, setSendingLocation] = useState(false)
   const [closed, setClosed] = useState(isClosed)
   const [showRating, setShowRating] = useState(isClosed)
@@ -211,34 +209,6 @@ export default function ChatClient({
   useEffect(() => {
     if (editingMsg && editInputRef.current) editInputRef.current.focus()
   }, [editingMsg])
-
-  // Move the composer in sync with the iOS keyboard animation.
-  // The fixed bottom-0 position only updates AFTER the viewport resizes
-  // (when the keyboard finishes animating), causing a visible delay.
-  // Capacitor Keyboard fires keyboardWillShow at animation START with
-  // the target height, so we offset the composer immediately.
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const isNativePlatform = !!(window as any).Capacitor?.isNativePlatform?.()
-    if (!isNativePlatform) return
-
-    let cleanup: (() => void) | null = null
-
-    import('@capacitor/keyboard').then(({ Keyboard }) => {
-      const showListener = Keyboard.addListener('keyboardWillShow', (info) => {
-        setKbOffset(info.keyboardHeight)
-      })
-      const hideListener = Keyboard.addListener('keyboardWillHide', () => {
-        setKbOffset(0)
-      })
-      cleanup = () => {
-        showListener.then(h => h.remove())
-        hideListener.then(h => h.remove())
-      }
-    }).catch(() => {})
-
-    return () => { cleanup?.() }
-  }, [])
 
   function selectWallpaper(id: string) {
     setWallpaperId(id)
@@ -825,11 +795,7 @@ export default function ChatClient({
           </div>
         )
       ) : (
-        <div ref={composerRef} className="glass-bottom px-3 py-2.5 fixed left-0 right-0 max-w-[480px] mx-auto z-20" style={{
-          bottom: kbOffset > 0 ? `${kbOffset}px` : '0px',
-          paddingBottom: kbOffset > 0 ? '10px' : 'calc(env(safe-area-inset-bottom, 0px) + 10px)',
-          transition: 'bottom 250ms cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 250ms cubic-bezier(0.4, 0, 0.2, 1)',
-        }}>
+        <div className="glass-bottom px-3 py-2.5 fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-20" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
           <div className="flex items-center gap-2">
             <input ref={imgInputRef} type="file" accept="image/*" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) sendImage(f) }} />
