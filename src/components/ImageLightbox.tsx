@@ -43,7 +43,11 @@ export default function ImageLightbox({
   onClose,
 }: Props) {
   const { lang } = useLanguage()
+  const isRTL = lang !== 'en'
   const [index, setIndex] = useState(initialIndex)
+  // trackIdx maps real image index → physical track position. In RTL,
+  // images are reordered via CSS `order` so img[0] is on the right.
+  const trackIdx = isRTL ? images.length - 1 - index : index
   const [mounted, setMounted] = useState(open)
   const [entered, setEntered] = useState(false)
 
@@ -111,8 +115,9 @@ export default function ImageLightbox({
   useEffect(() => {
     const track = trackRef.current
     if (!track) return
+    const vw = window.innerWidth
     track.style.transition = SPRING
-    track.style.transform = `translate3d(${-index * 100}%, 0, 0)`
+    track.style.transform = `translate3d(${-trackIdx * vw}px, 0, 0)`
 
     // Reset zoom state of the newly-active image
     zoomRef.current = { scale: 1, tx: 0, ty: 0 }
@@ -121,7 +126,7 @@ export default function ImageLightbox({
       wrap.style.transition = ZOOM_SPRING
       wrap.style.transform = 'translate3d(0, 0, 0) scale(1)'
     }
-  }, [index])
+  }, [index, trackIdx])
 
   const getActiveWrap = () => imgWrapRefs.current[index]
 
@@ -131,15 +136,16 @@ export default function ImageLightbox({
     wrap.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`
   }
 
-  // Keep mutable refs of index/length so the native listeners (which
-  // are attached once per open) can read the current values without
-  // being re-registered on every render.
-  const indexRef = useRef(index)
+  // Mutable refs so the native listeners (attached once per open) can
+  // read the current values without being re-registered on every render.
+  const trackIdxRef = useRef(trackIdx)
   const imagesLenRef = useRef(images.length)
   const onCloseRef = useRef(onClose)
-  useEffect(() => { indexRef.current = index }, [index])
+  const isRTLRef = useRef(isRTL)
+  useEffect(() => { trackIdxRef.current = trackIdx }, [trackIdx])
   useEffect(() => { imagesLenRef.current = images.length }, [images.length])
   useEffect(() => { onCloseRef.current = onClose }, [onClose])
+  useEffect(() => { isRTLRef.current = isRTL }, [isRTL])
 
   // ── Native touch handlers (non-passive) ─────────────────────────────
   // React's synthetic touch events are passive — preventDefault() is
@@ -180,7 +186,8 @@ export default function ImageLightbox({
         mode: zoomRef.current.scale > 1.05 ? 'pan' : null,
       }
       if (trackRef.current) trackRef.current.style.transition = 'none'
-      const wrap = imgWrapRefs.current[indexRef.current]
+      const realIdx = isRTLRef.current ? imagesLenRef.current - 1 - trackIdxRef.current : trackIdxRef.current
+      const wrap = imgWrapRefs.current[realIdx]
       if (wrap) wrap.style.transition = 'none'
     }
 
@@ -206,7 +213,7 @@ export default function ImageLightbox({
       const t = touches[0]
       const dx = t.clientX - g.startX
       const dy = t.clientY - g.startY
-      const idx = indexRef.current
+      const tIdx = trackIdxRef.current
       const lenm1 = imagesLenRef.current - 1
 
       // Pan when zoomed
@@ -231,13 +238,14 @@ export default function ImageLightbox({
       if (g.mode === 'h') {
         e.preventDefault()
         let offset = dx
-        if ((idx === 0 && dx > 0) || (idx === lenm1 && dx < 0)) {
+        // Rubber band at physical track edges
+        if ((tIdx === 0 && dx > 0) || (tIdx === lenm1 && dx < 0)) {
           offset = dx * 0.32
         }
         if (trackRef.current) {
           const vw = window.innerWidth
           trackRef.current.style.transform =
-            `translate3d(${-idx * vw + offset}px, 0, 0)`
+            `translate3d(${-tIdx * vw + offset}px, 0, 0)`
         }
       } else if (g.mode === 'v') {
         e.preventDefault()
@@ -265,31 +273,38 @@ export default function ImageLightbox({
       const dt = Math.max(1, g.lastT - g.startT)
       const velX = totalDx / dt
       const velY = totalDy / dt
-      const idx = indexRef.current
-      const lenm1 = imagesLenRef.current - 1
+      const tIdx = trackIdxRef.current
+      const len = imagesLenRef.current
+      const lenm1 = len - 1
+      const rtl = isRTLRef.current
 
       if (g.mode === 'h') {
-        let next = idx
+        // Work in track space — swipe left = trackIdx+1, right = trackIdx-1
+        let nextTIdx = tIdx
         if (totalDx < -H_SWIPE_PX || velX < -H_SWIPE_VEL) {
-          next = Math.min(lenm1, idx + 1)
+          nextTIdx = Math.min(lenm1, tIdx + 1)
         } else if (totalDx > H_SWIPE_PX || velX > H_SWIPE_VEL) {
-          next = Math.max(0, idx - 1)
+          nextTIdx = Math.max(0, tIdx - 1)
         }
         if (trackRef.current) {
           trackRef.current.style.transition = SPRING
           const vw = window.innerWidth
-          trackRef.current.style.transform = `translate3d(${-next * vw}px, 0, 0)`
+          trackRef.current.style.transform = `translate3d(${-nextTIdx * vw}px, 0, 0)`
         }
-        if (next !== idx) {
+        // Convert track position back to real image index
+        const nextReal = rtl ? len - 1 - nextTIdx : nextTIdx
+        const curReal = rtl ? len - 1 - tIdx : tIdx
+        if (nextReal !== curReal) {
           hapticLight()
-          setIndex(next)
+          setIndex(nextReal)
         }
       } else if (g.mode === 'v') {
         const shouldDismiss = totalDy > V_DISMISS_PX || velY > V_DISMISS_VEL
         if (shouldDismiss) {
           onCloseRef.current()
         } else {
-          const wrap = imgWrapRefs.current[idx]
+          const realIdx = rtl ? len - 1 - tIdx : tIdx
+          const wrap = imgWrapRefs.current[realIdx]
           if (wrap) {
             wrap.style.transition = ZOOM_SPRING
             wrap.style.transform = 'translate3d(0, 0, 0) scale(1)'
@@ -302,7 +317,8 @@ export default function ImageLightbox({
       } else if (g.mode === 'pinch') {
         if (zoomRef.current.scale <= 1.02) {
           zoomRef.current = { scale: 1, tx: 0, ty: 0 }
-          const wrap = imgWrapRefs.current[idx]
+          const realIdx = rtl ? len - 1 - tIdx : tIdx
+          const wrap = imgWrapRefs.current[realIdx]
           if (wrap) {
             wrap.style.transition = ZOOM_SPRING
             wrap.style.transform = 'translate3d(0, 0, 0) scale(1)'
@@ -311,8 +327,9 @@ export default function ImageLightbox({
       } else if (g.mode === null) {
         // Stationary tap — double-tap to toggle zoom
         const now = Date.now()
+        const realIdx = rtl ? len - 1 - tIdx : tIdx
         if (now - lastTapRef.current < 280) {
-          const wrap = imgWrapRefs.current[idx]
+          const wrap = imgWrapRefs.current[realIdx]
           if (wrap) wrap.style.transition = ZOOM_SPRING
           if (zoomRef.current.scale > 1.05) {
             zoomRef.current = { scale: 1, tx: 0, ty: 0 }
@@ -379,7 +396,7 @@ export default function ImageLightbox({
         className="absolute inset-0 flex"
         dir="ltr"
         style={{
-          transform: `translate3d(${-index * 100}%, 0, 0)`,
+          transform: `translate3d(${-trackIdx * 100}%, 0, 0)`,
           transition: SPRING,
           willChange: 'transform',
           touchAction: 'none',
@@ -389,6 +406,7 @@ export default function ImageLightbox({
           <div
             key={i}
             className="relative w-full h-full flex-shrink-0 flex items-center justify-center px-4"
+            style={{ order: isRTL ? images.length - 1 - i : i }}
           >
             {/* Outer wrapper: enter fade+scale animation */}
             <div
@@ -445,12 +463,10 @@ export default function ImageLightbox({
         </button>
       </div>
 
-      {/* Bottom chrome — animated pill dots. dir="ltr" keeps dot order
-          aligned with the ltr image track so the active dot moves in the
-          same direction as the swipe. */}
+      {/* Bottom chrome — animated pill dots. Inherit the page's dir so
+          dot ordering matches the visual image progression. */}
       {images.length > 1 && (
         <div
-          dir="ltr"
           className={`absolute left-0 right-0 flex items-center justify-center gap-1.5 transition-all duration-[320ms] ease-out ${
             entered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'
           }`}
