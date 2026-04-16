@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiMapPin, FiLoader, FiCheck, FiArrowRight, FiArrowLeft, FiRefreshCw } from 'react-icons/fi'
+import { FiMapPin, FiLoader, FiCheck, FiArrowRight, FiArrowLeft, FiRefreshCw, FiSettings } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useGPSLocation } from '@/hooks/useGPSLocation'
 import { tryRedeemPendingInvite } from '@/lib/pendingInvite'
@@ -74,6 +74,56 @@ export default function OnboardingPage() {
       {t('common_back')}
     </button>
   )
+
+  function isNativePlatform(): boolean {
+    return typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
+  }
+
+  async function openSystemSettings() {
+    if (isNativePlatform()) {
+      const platform = (window as any).Capacitor?.getPlatform?.() || 'unknown'
+      if (platform === 'ios') {
+        try { window.location.href = 'app-settings:'; return } catch { /* fall through */ }
+      }
+      toast(
+        lang === 'en'
+          ? 'Open device Settings → Apps → Hai → Permissions → Location → Allow'
+          : lang === 'ur'
+            ? 'سیٹنگز → ایپس → Hai → اجازتیں → مقام → اجازت دیں'
+            : 'افتح الإعدادات → التطبيقات → حي → الصلاحيات → الموقع → سماح',
+        { duration: 6000 },
+      )
+      return
+    }
+    toast(
+      lang === 'en'
+        ? 'Click the lock icon next to the URL and enable location'
+        : 'اضغط على أيقونة القفل بجانب الرابط وفعّل الموقع',
+      { duration: 6000 },
+    )
+  }
+
+  // Smart retry: check permission status BEFORE attempting location.
+  // If still denied, stay on the denied screen — don't loop.
+  async function retryAfterSettings() {
+    if (isNativePlatform()) {
+      try {
+        const { Geolocation } = await import('@capacitor/geolocation')
+        const status = await Geolocation.checkPermissions()
+        if (status.location === 'denied') {
+          toast.error(
+            lang === 'en'
+              ? 'Location is still disabled. Please enable it in Settings first.'
+              : lang === 'ur'
+                ? 'مقام ابھی بھی غیر فعال ہے — پہلے سیٹنگز سے فعال کریں'
+                : 'الموقع لا يزال معطلاً — فعّله من الإعدادات أولاً',
+          )
+          return
+        }
+      } catch { /* fall through to requestLocation */ }
+    }
+    requestLocation()
+  }
 
   // Ultimate fallback: plain browser geolocation, low accuracy allowed
   function tryDirectGeolocation() {
@@ -607,28 +657,40 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* E. Permission denied — retry only. No "choose any neighborhood" fallback.
-              User must grant permission to use a hyperlocal app. */}
+          {/* E. Permission denied — dedicated recovery screen.
+              iOS will NOT re-show the permission dialog after denial.
+              The user MUST go to Settings to re-enable, then come back. */}
           {locationStep === 'denied' && (
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center">
+              <div className="w-20 h-20 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
                 <FiMapPin className="w-10 h-10 text-red-400" />
               </div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                {lang !== 'en' ? 'صلاحية الموقع مطلوبة' : 'Location permission required'}
+                {lang === 'en' ? 'Location access is required' : lang === 'ur' ? 'مقام کی اجازت ضروری ہے' : 'صلاحية الموقع مطلوبة'}
               </h1>
-              <p className="text-gray-500 text-sm max-w-xs leading-relaxed">
+              <p className="text-gray-500 dark:text-gray-400 text-sm max-w-xs leading-relaxed">
                 {lang === 'en'
-                  ? 'Hai connects you with your actual neighborhood. Please allow location access in your device settings and try again.'
-                  : 'حي يربطك بجيرانك الحقيقيين. يرجى تفعيل صلاحية الموقع من إعدادات جهازك والمحاولة مرة أخرى.'}
+                  ? 'We need your location to verify your neighborhood. Please enable location access in Settings to continue.'
+                  : lang === 'ur'
+                    ? 'آپ کے محلے کی تصدیق کیلئے مقام ضروری ہے۔ سیٹنگز سے مقام فعال کریں۔'
+                    : 'نحتاج موقعك للتحقق من حيّك. فعّل صلاحية الموقع من الإعدادات للمتابعة.'}
               </p>
-              <button
-                onClick={requestLocation}
-                className="btn-primary mt-4 w-full max-w-xs flex items-center justify-center gap-2"
-              >
-                <FiRefreshCw className="w-4 h-4" />
-                {lang !== 'en' ? 'أعد المحاولة' : 'Try Again'}
-              </button>
+              <div className="flex flex-col gap-3 w-full max-w-xs mt-2">
+                <button
+                  onClick={openSystemSettings}
+                  className="w-full flex items-center justify-center gap-2 bg-primary-600 text-white font-semibold py-3 rounded-xl active:scale-95 transition-transform"
+                >
+                  <FiSettings className="w-4 h-4" />
+                  {lang === 'en' ? 'Open Settings' : lang === 'ur' ? 'سیٹنگز کھولیں' : 'افتح الإعدادات'}
+                </button>
+                <button
+                  onClick={retryAfterSettings}
+                  className="w-full flex items-center justify-center gap-2 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold py-3 rounded-xl active:scale-95 transition-transform"
+                >
+                  <FiRefreshCw className="w-4 h-4" />
+                  {lang === 'en' ? "I've enabled it, try again" : lang === 'ur' ? 'فعال کر دیا، دوبارہ کوشش کریں' : 'فعّلتها، أعد المحاولة'}
+                </button>
+              </div>
             </div>
           )}
 
