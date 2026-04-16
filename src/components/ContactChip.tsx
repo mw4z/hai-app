@@ -66,7 +66,7 @@ export default function ContactChip({ name, phone }: Props) {
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
         <button
           onClick={handleCall}
           className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-primary-600 text-white rounded-xl text-xs font-bold active:scale-[0.97] transition-transform"
