@@ -117,6 +117,7 @@ export default function ChatClient({
   const [messages, setMessages] = useState(initialMessages)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const [kbOpen, setKbOpen] = useState(false)
   const composerRef = useRef<HTMLDivElement>(null)
 
   // Smooth keyboard tracking for the composer bar.
@@ -149,6 +150,7 @@ export default function ChatClient({
         c.style.transition = 'transform 280ms cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
         c.style.transform = `translateY(${-info.keyboardHeight}px)`
         c.style.paddingBottom = '10px'
+        setKbOpen(true)
 
         // Poll every frame until viewport actually resizes, then
         // clear the transform in that SAME frame — no intermediate
@@ -178,6 +180,7 @@ export default function ChatClient({
         c.style.transition = 'transform 280ms cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
         c.style.transform = 'none'
         c.style.paddingBottom = safePad
+        setKbOpen(false)
       })
       const h4 = Keyboard.addListener('keyboardDidHide', () => {
         const c = el()
@@ -540,7 +543,7 @@ export default function ChatClient({
       </header>
 
       {/* Messages */}
-      <div className="px-4 py-3 pb-28 flex-1" data-tour="chat-messages"
+      <div className={`px-4 py-3 flex-1 ${kbOpen ? 'pb-16' : 'pb-28'}`} data-tour="chat-messages"
         style={{ background: isDark ? wallpaper.dark : wallpaper.light }}>
         {messages.length === 0 && (
           <div className="text-center py-12">
@@ -875,7 +878,7 @@ export default function ChatClient({
           </div>
         )
       ) : (
-        <div ref={composerRef} className="glass-bottom px-3 py-2.5 fixed left-0 right-0 max-w-[480px] mx-auto z-20" style={{ bottom: 0, paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
+        <div ref={composerRef} className="glass-bottom px-3 py-2.5 fixed left-0 right-0 max-w-[480px] mx-auto z-20 overflow-hidden" style={{ bottom: 0, paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
           <div className="flex items-center gap-2">
             <input ref={imgInputRef} type="file" accept="image/*" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) sendImage(f) }} />
