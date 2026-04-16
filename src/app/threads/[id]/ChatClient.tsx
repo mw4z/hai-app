@@ -373,8 +373,8 @@ export default function ChatClient({
       })
       if (res.ok) { setRated(true); toast.success(t('rate_thanks')) }
       else { const d = await res.json(); toast.error(typeof d.error === 'string' ? d.error : d.error?.message || 'Error') }
-      setTimeout(() => router.push('/threads'), 1500)
-    } catch { router.push('/threads') }
+      setTimeout(() => { router.push('/threads'); router.refresh() }, 1500)
+    } catch { router.push('/threads'); router.refresh() }
   }
 
   async function closeThread() {
@@ -786,7 +786,7 @@ export default function ChatClient({
                 <span className="text-xl">😞</span>{t('rate_negative')}
               </button>
             </div>
-            <button onClick={() => router.push('/threads')} className="w-full text-xs text-gray-400 mt-1">{t('rate_skip')}</button>
+            <button onClick={() => { router.push('/threads'); router.refresh() }} className="w-full text-xs text-gray-400 mt-1">{t('rate_skip')}</button>
           </div>
         ) : (
           <div className="bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 px-4 py-4 text-center">

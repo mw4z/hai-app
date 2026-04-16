@@ -39,8 +39,7 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
   const [threads, setThreads] = useState(initialThreads)
 
   useEffect(() => {
-    const id = setInterval(async () => {
-      if (document.visibilityState !== 'visible') return
+    async function refresh() {
       try {
         const res = await fetch('/api/threads')
         if (res.ok) {
@@ -48,8 +47,29 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
           if (Array.isArray(data)) setThreads(data)
         }
       } catch { /* ignore */ }
+    }
+
+    // Immediate fetch on mount — the SSR data may be stale if the user
+    // just closed a thread and navigated back.
+    refresh()
+
+    // Poll every 10s while the tab is visible.
+    const id = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      refresh()
     }, 10000)
-    return () => clearInterval(id)
+
+    // Also refresh immediately when the tab becomes visible (e.g. user
+    // returns from the chat page via back gesture or app switch).
+    function onVisibility() {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [])
 
   return (
