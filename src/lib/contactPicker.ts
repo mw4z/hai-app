@@ -17,24 +17,54 @@ function getPlatform(): string {
   return (typeof window !== 'undefined' && (window as any).Capacitor?.getPlatform?.()) || 'web'
 }
 
+// Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩) → Western (0123456789)
+function arabicToWestern(s: string): string {
+  return s.replace(/[\u0660-\u0669]/g, (c) => String(c.charCodeAt(0) - 0x0660))
+          .replace(/[\u06F0-\u06F9]/g, (c) => String(c.charCodeAt(0) - 0x06F0))
+}
+
 function normalizePhone(raw: string): string {
-  // Strip everything except digits and leading +. Keep it readable.
-  const trimmed = (raw || '').trim()
-  if (!trimmed) return ''
-  const plus = trimmed.startsWith('+') ? '+' : ''
-  const digits = trimmed.replace(/[^\d]/g, '')
-  return plus + digits
+  if (!raw) return ''
+  // Convert Arabic-Indic digits, strip invisible Unicode control chars
+  const cleaned = arabicToWestern(raw)
+    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\u00a0]/g, '')
+    .trim()
+  if (!cleaned) return ''
+  const plus = cleaned.startsWith('+') ? '+' : ''
+  const digits = cleaned.replace(/[^\d]/g, '')
+  return digits.length >= 7 ? plus + digits : ''
 }
 
 function pickBestPhone(phones: any): string {
-  if (!phones || !Array.isArray(phones) || phones.length === 0) return ''
-  for (const p of phones) {
-    if (!p) continue
-    // Different plugins use different keys — try all known shapes
-    const raw = p.number || p.value || p.phoneNumber || p.stringValue || ''
-    const normalized = normalizePhone(typeof raw === 'string' ? raw : String(raw))
-    if (normalized && normalized.replace(/\D/g, '').length >= 7) return normalized
+  // 1. Try standard array of phone objects
+  if (Array.isArray(phones) && phones.length > 0) {
+    for (const p of phones) {
+      if (!p) continue
+      // Try every known key shape across different plugins
+      const raw = p.number || p.value || p.phoneNumber || p.stringValue ||
+                  p.digits || p.phone || ''
+      const normalized = normalizePhone(typeof raw === 'string' ? raw : String(raw))
+      if (normalized) return normalized
+    }
   }
+
+  // 2. Brute force: stringify the entire phones object and extract any
+  //    digit sequence that looks like a phone number (7+ digits). Catches
+  //    weird nested structures or unexpected key names.
+  try {
+    const json = typeof phones === 'string' ? phones : JSON.stringify(phones)
+    if (json) {
+      const westernJson = arabicToWestern(json)
+      const matches = westernJson.match(/\+?\d[\d\s()-]{5,}\d/g)
+      if (matches) {
+        for (const m of matches) {
+          const normalized = normalizePhone(m)
+          if (normalized) return normalized
+        }
+      }
+    }
+  } catch { /* */ }
+
   return ''
 }
 
@@ -62,7 +92,10 @@ export async function pickContact(): Promise<PickedContact> {
           contact.name?.display ||
           [contact.name?.given, contact.name?.family].filter(Boolean).join(' ').trim() ||
           ''
-        const phone = pickBestPhone(contact.phones as any)
+        // Try phones array first, then brute-force the entire contact
+        let phone = pickBestPhone(contact.phones)
+        if (!phone) phone = pickBestPhone((contact as any).phoneNumbers)
+        if (!phone) phone = pickBestPhone(contact)
         if (!phone && !display) return null
         return { name: display, phone }
       } catch {
@@ -88,7 +121,10 @@ export async function pickContact(): Promise<PickedContact> {
         contact.name?.display ||
         [contact.name?.given, contact.name?.family].filter(Boolean).join(' ').trim() ||
         ''
-      const phone = pickBestPhone(contact.phones)
+      // Try phones array first, then brute-force the entire contact
+      let phone = pickBestPhone(contact.phones)
+      if (!phone) phone = pickBestPhone((contact as any).phoneNumbers)
+      if (!phone) phone = pickBestPhone(contact)
       if (!phone && !display) return null
       return { name: display, phone }
     } catch {
