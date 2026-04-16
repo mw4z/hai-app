@@ -50,7 +50,7 @@ export default function ContactChip({ name, phone }: Props) {
 
   return (
     <div
-      className="flex flex-col gap-2 bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800 rounded-2xl px-4 py-3 my-1.5 w-full"
+      className="flex flex-col gap-2 bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800 rounded-2xl px-5 py-3 my-1.5 w-full"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center gap-2 min-w-0">
