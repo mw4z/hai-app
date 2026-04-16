@@ -32,6 +32,19 @@ export default function ContactChip({ name, phone, variant = 'light' }: Props) {
 
   const cleanPhone = phone.replace(/[^\d+]/g, '')
 
+  // Convert local Saudi numbers (05xxxxxxxx) to international format
+  // for WhatsApp. tel: links work with either format on the device.
+  function toInternational(num: string): string {
+    const digits = num.replace(/[^\d]/g, '')
+    // Saudi local mobile: 05xxxxxxxx (10 digits)
+    if (digits.startsWith('05') && digits.length === 10) {
+      return '966' + digits.slice(1)
+    }
+    // Already international with +
+    if (num.startsWith('+')) return digits
+    return digits
+  }
+
   const handleCall = useCallback(() => {
     hapticLight()
     window.open(`tel:${cleanPhone}`, '_self')
@@ -46,8 +59,7 @@ export default function ContactChip({ name, phone, variant = 'light' }: Props) {
 
   const handleWhatsApp = useCallback(() => {
     hapticLight()
-    const num = cleanPhone.startsWith('+') ? cleanPhone.slice(1) : cleanPhone
-    window.open(`https://wa.me/${num}`, '_blank')
+    window.open(`https://wa.me/${toInternational(cleanPhone)}`, '_blank')
   }, [cleanPhone])
 
   return (
