@@ -34,14 +34,6 @@ export default function CapacitorBridge() {
         await StatusBar.setBackgroundColor({ color: '#00000000' })
       } catch {}
 
-      // Switch keyboard resize to 'native' at runtime — iOS's built-in
-      // keyboard avoidance animates fixed elements in sync with the
-      // keyboard (no delay). The default 'body' mode resizes the body
-      // AFTER the animation, causing a ~300ms delay.
-      try {
-        const { Keyboard, KeyboardResize } = await import('@capacitor/keyboard')
-        await Keyboard.setResizeMode({ mode: KeyboardResize.Native })
-      } catch {}
     }
 
     init()
