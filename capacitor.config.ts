@@ -14,6 +14,9 @@ const config: CapacitorConfig = {
     backgroundColor: '#0f172a',
   },
   plugins: {
+    Keyboard: {
+      resize: 'none',
+    },
     SplashScreen: {
       launchAutoHide: false,
       backgroundColor: '#f0fdf4',
