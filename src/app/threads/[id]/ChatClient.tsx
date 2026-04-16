@@ -130,6 +130,7 @@ export default function ChatClient({
   const [replyingTo, setReplyingTo] = useState<Msg | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const composerRef = useRef<HTMLDivElement>(null)
+  const messagesRef = useRef<HTMLDivElement>(null)
   const textInputRef = useRef<HTMLInputElement>(null)
 
   // Keyboard tracking — the exact code that worked before the reply feature.
@@ -194,6 +195,24 @@ export default function ChatClient({
   }, [])
   const [sendingLocation, setSendingLocation] = useState(false)
   const [closed, setClosed] = useState(isClosed)
+
+  // Keep a gap between the last message and the fixed composer bar by
+  // syncing the messages container's bottom padding to the composer's
+  // actual height. Handles all three states: keyboard hidden, keyboard
+  // shown, and keyboard shown with a reply preview.
+  useEffect(() => {
+    const composer = composerRef.current
+    const messages = messagesRef.current
+    if (!composer || !messages) return
+    const apply = () => {
+      messages.style.paddingBottom = `${composer.offsetHeight + 16}px`
+    }
+    apply()
+    const ro = new ResizeObserver(apply)
+    ro.observe(composer)
+    return () => ro.disconnect()
+  }, [closed])
+
   const [showRating, setShowRating] = useState(isClosed)
   const [rated, setRated] = useState(false)
   const [sendingImage, setSendingImage] = useState(false)
@@ -543,7 +562,7 @@ export default function ChatClient({
       </header>
 
       {/* Messages */}
-      <div className="px-4 py-3 flex-1 pb-24" data-tour="chat-messages"
+      <div ref={messagesRef} className="px-4 py-3 flex-1" data-tour="chat-messages"
         style={{ background: isDark ? wallpaper.dark : wallpaper.light }}>
         {messages.length === 0 && (
           <div className="text-center py-12">
