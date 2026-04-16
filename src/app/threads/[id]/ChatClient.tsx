@@ -134,105 +134,25 @@ export default function ChatClient({
   const bottomRef = useRef<HTMLDivElement>(null)
   const textInputRef = useRef<HTMLInputElement>(null)
 
-  // Keyboard tracking — the exact code that worked before the reply feature.
+  // Scroll the latest message into view once the native keyboard has
+  // opened and the webview has resized. Layout (flex column with a
+  // fixed-height root using 100dvh) keeps the composer above the
+  // keyboard on its own, so no transform hacks are needed.
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (!(window as any).Capacitor?.isNativePlatform?.()) return
 
     let cleanup: (() => void) | null = null
-    const safePad = 'calc(env(safe-area-inset-bottom, 0px) + 10px)'
-
     import('@capacitor/keyboard').then(({ Keyboard }) => {
-      const el = () => composerRef.current
-
-      let resizeRaf = 0
-      const h1 = Keyboard.addListener('keyboardWillShow', (info) => {
-        const c = el()
-        if (!c) return
-        c.style.transition = 'transform 280ms cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
-        c.style.transform = `translateY(${-info.keyboardHeight}px)`
-        c.style.paddingBottom = '10px'
-
-        const startH = window.innerHeight
-        cancelAnimationFrame(resizeRaf)
-        const poll = () => {
-          if (window.innerHeight !== startH) {
-            const cc = el()
-            if (cc) {
-              cc.style.transition = 'none'
-              cc.style.transform = 'none'
-            }
-            bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-            return
-          }
-          resizeRaf = requestAnimationFrame(poll)
-        }
-        resizeRaf = requestAnimationFrame(poll)
+      const h = Keyboard.addListener('keyboardDidShow', () => {
+        bottomRef.current?.scrollIntoView({ block: 'end' })
       })
-      const h3 = Keyboard.addListener('keyboardWillHide', () => {
-        const c = el()
-        if (!c) return
-        c.style.transition = 'transform 280ms cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
-        c.style.transform = 'none'
-        c.style.paddingBottom = safePad
-      })
-      const h4 = Keyboard.addListener('keyboardDidHide', () => {
-        const c = el()
-        if (!c) return
-        c.style.transition = 'none'
-        c.style.transform = 'none'
-        c.style.paddingBottom = safePad
-      })
-
-      cleanup = () => {
-        cancelAnimationFrame(resizeRaf)
-        h1.then(h => h.remove())
-        h3.then(h => h.remove())
-        h4.then(h => h.remove())
-      }
+      cleanup = () => { h.then(x => x.remove()) }
     }).catch(() => {})
-
     return () => { cleanup?.() }
   }, [])
   const [sendingLocation, setSendingLocation] = useState(false)
   const [closed, setClosed] = useState(isClosed)
-
-  // Keep a gap between the last message and the fixed composer bar by
-  // syncing the messages container's bottom padding to the composer's
-  // actual height. Handles all three states: keyboard hidden, keyboard
-  // shown, and keyboard shown with a reply preview.
-  useEffect(() => {
-    const composer = composerRef.current
-    const messages = messagesRef.current
-    if (!composer || !messages) return
-    let prevHeight = composer.offsetHeight
-    const apply = () => {
-      const height = composer.offsetHeight
-      const gap = height + 16
-      messages.style.paddingBottom = `${gap}px`
-      // scroll-padding-bottom keeps the browser-driven scrollIntoView
-      // calls (ours + native focus scrolling) from placing content
-      // behind the fixed composer.
-      document.documentElement.style.scrollPaddingBottom = `${gap}px`
-      // If the composer grew while the user was at/near the bottom,
-      // keep them pinned to the bottom so the last message doesn't
-      // slip behind the taller composer.
-      if (height > prevHeight) {
-        const before = document.documentElement.scrollHeight - window.scrollY - window.innerHeight
-        if (before < prevHeight + 48) {
-          bottomRef.current?.scrollIntoView({ block: 'end' })
-        }
-      }
-      prevHeight = height
-    }
-    apply()
-    const ro = new ResizeObserver(apply)
-    ro.observe(composer)
-    return () => {
-      ro.disconnect()
-      document.documentElement.style.scrollPaddingBottom = ''
-    }
-  }, [closed])
 
   const [showRating, setShowRating] = useState(isClosed)
   const [rated, setRated] = useState(false)
@@ -300,8 +220,9 @@ export default function ChatClient({
     bottomRef.current?.scrollIntoView()
   }, [messages.length])
 
-  // When replying to a message, nudge it into view above the composer
-  // (scroll-padding-bottom, set elsewhere, takes care of the offset).
+  // When replying to a message, make sure it stays visible after the
+  // composer grows to show the reply preview. The messages container
+  // is the scroll root now, so scrollIntoView works cleanly.
   useEffect(() => {
     if (!replyingTo) return
     const id = setTimeout(() => {
@@ -546,9 +467,9 @@ export default function ChatClient({
   let lastDate = ''
 
   return (
-    <div className="flex flex-col bg-gray-100 dark:bg-gray-950" style={{ minHeight: 'calc(100vh - env(safe-area-inset-top, 0px))' }}>
+    <div className="flex flex-col bg-gray-100 dark:bg-gray-950" style={{ height: 'calc(100dvh - env(safe-area-inset-top, 0px))' }}>
       {/* Header */}
-      <header className="glass px-4 py-2.5 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
+      <header className="glass px-4 py-2.5 flex items-center gap-3 z-10 shadow-sm flex-shrink-0">
         <Link href="/threads" className="text-gray-500 dark:text-gray-400 p-1">
           {lang !== 'en' ? <FiArrowRight className="w-5 h-5" /> : <FiArrowLeft className="w-5 h-5" />}
         </Link>
@@ -593,7 +514,7 @@ export default function ChatClient({
       </header>
 
       {/* Messages */}
-      <div ref={messagesRef} className="px-4 py-3 flex-1" data-tour="chat-messages"
+      <div ref={messagesRef} className="px-4 py-3 flex-1 min-h-0 overflow-y-auto" data-tour="chat-messages"
         style={{ background: isDark ? wallpaper.dark : wallpaper.light }}>
         {messages.length === 0 && (
           <div className="text-center py-12">
@@ -932,7 +853,7 @@ export default function ChatClient({
           </div>
         )
       ) : (
-        <div ref={composerRef} className="glass-bottom px-3 fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-20 overflow-hidden" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
+        <div ref={composerRef} className="glass-bottom px-3 w-full max-w-[480px] mx-auto z-20 overflow-hidden flex-shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
           {/* Reply preview bar */}
           {replyingTo && (
             <div className="flex items-center gap-2 px-1 pt-2 pb-1">
