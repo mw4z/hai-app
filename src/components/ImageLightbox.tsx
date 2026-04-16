@@ -445,9 +445,12 @@ export default function ImageLightbox({
         </button>
       </div>
 
-      {/* Bottom chrome — animated pill dots */}
+      {/* Bottom chrome — animated pill dots. dir="ltr" keeps dot order
+          aligned with the ltr image track so the active dot moves in the
+          same direction as the swipe. */}
       {images.length > 1 && (
         <div
+          dir="ltr"
           className={`absolute left-0 right-0 flex items-center justify-center gap-1.5 transition-all duration-[320ms] ease-out ${
             entered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'
           }`}
