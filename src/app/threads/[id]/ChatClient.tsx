@@ -461,7 +461,7 @@ export default function ChatClient({
 
       {/* Messages */}
       <div className="px-4 py-3 pb-28" data-tour="chat-messages"
-        style={{ background: isDark ? wallpaper.dark : wallpaper.light, minHeight: 'calc(100vh - 120px)' }}>
+        style={{ background: isDark ? wallpaper.dark : wallpaper.light, minHeight: 'calc(100vh - 120px - env(safe-area-inset-top, 0px))' }}>
         {messages.length === 0 && (
           <div className="text-center py-12">
             <div className="w-16 h-16 rounded-full bg-white dark:bg-gray-800 shadow-sm mx-auto mb-3 flex items-center justify-center">
