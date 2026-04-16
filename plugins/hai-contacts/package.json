@@ -1,0 +1,15 @@
+{
+  "name": "hai-contacts",
+  "version": "1.0.0",
+  "description": "Hai native contact picker — iOS via CNContactPickerViewController",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=7.0.0"
+  }
+}

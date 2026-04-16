@@ -13,6 +13,10 @@ function isNative(): boolean {
   return typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
 }
 
+function getPlatform(): string {
+  return (typeof window !== 'undefined' && (window as any).Capacitor?.getPlatform?.()) || 'web'
+}
+
 function normalizePhone(raw: string): string {
   // Strip everything except digits and leading +. Keep it readable.
   const trimmed = (raw || '').trim()
@@ -39,6 +43,31 @@ export async function pickContact(): Promise<PickedContact> {
   if (typeof window === 'undefined') return null
 
   if (isNative()) {
+    const platform = getPlatform()
+
+    // iOS: use our custom HaiContacts plugin (pure Swift, SPM-compatible,
+    // uses CNContactPickerViewController — no NSContactsUsageDescription
+    // needed since it's a privacy-preserving system picker).
+    if (platform === 'ios') {
+      try {
+        const { HaiContacts } = await import('hai-contacts')
+        const result = await HaiContacts.pickContact()
+        const contact = result?.contact
+        if (!contact) return null
+        const display =
+          contact.name?.display ||
+          [contact.name?.given, contact.name?.family].filter(Boolean).join(' ').trim() ||
+          ''
+        const phone = pickBestPhone(contact.phones as any)
+        if (!phone && !display) return null
+        return { name: display, phone }
+      } catch {
+        return null
+      }
+    }
+
+    // Android: use @capacitor-community/contacts (linked via Gradle,
+    // READ_CONTACTS declared in AndroidManifest).
     try {
       const { Contacts } = await import('@capacitor-community/contacts')
       const perm = await Contacts.requestPermissions()
