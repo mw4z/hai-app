@@ -69,21 +69,21 @@ export default function ContactChip({ name, phone }: Props) {
       <div className="flex items-center gap-2">
         <button
           onClick={handleCall}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-primary-600 text-white rounded-xl text-xs font-bold active:scale-[0.97] transition-transform"
+          className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-primary-600 text-white rounded-xl text-xs font-bold active:scale-[0.97] transition-transform"
         >
           <FiPhone className="w-3.5 h-3.5" />
           {lang === 'en' ? 'Call' : lang === 'ur' ? 'کال' : 'اتصال'}
         </button>
         <button
           onClick={handleCopy}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold active:scale-[0.97] transition-transform"
+          className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold active:scale-[0.97] transition-transform"
         >
           <FiCopy className="w-3.5 h-3.5" />
           {lang === 'en' ? 'Copy' : lang === 'ur' ? 'کاپی' : 'نسخ'}
         </button>
         <button
           onClick={handleWhatsApp}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-[#25D366] text-white rounded-xl text-xs font-bold active:scale-[0.97] transition-transform"
+          className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-[#25D366] text-white rounded-xl text-xs font-bold active:scale-[0.97] transition-transform"
         >
           <WhatsAppIcon className="w-3.5 h-3.5" />
           {lang === 'en' ? 'WhatsApp' : 'واتساب'}
