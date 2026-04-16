@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiMapPin, FiLoader, FiCheck, FiArrowRight, FiArrowLeft, FiRefreshCw, FiSettings } from 'react-icons/fi'
+import { FiMapPin, FiLoader, FiCheck, FiArrowRight, FiArrowLeft, FiRefreshCw, FiSettings, FiSearch } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useGPSLocation } from '@/hooks/useGPSLocation'
 import { tryRedeemPendingInvite } from '@/lib/pendingInvite'
@@ -25,6 +25,7 @@ type LocationStep =
   | 'nearby'
   | 'denied'
   | 'timeout'
+  | 'manual'
 
 interface DetectedNeighborhood {
   id: string
@@ -65,6 +66,9 @@ export default function OnboardingPage() {
   const [userLat, setUserLat] = useState<number | null>(null)
   const [userLng, setUserLng] = useState<number | null>(null)
   const [userAccuracy, setUserAccuracy] = useState<number | null>(null)
+  const [allNeighborhoods, setAllNeighborhoods] = useState<Array<{ id: string; name: string; nameEn: string; cityName: string; cityNameEn: string }>>([])
+  const [manualSearch, setManualSearch] = useState('')
+  const [manualLoading, setManualLoading] = useState(false)
 
   const gps = useGPSLocation()
 
@@ -123,6 +127,31 @@ export default function OnboardingPage() {
       } catch { /* fall through to requestLocation */ }
     }
     requestLocation()
+  }
+
+  async function enterManualPicker() {
+    setManualLoading(true)
+    setLocationStep('manual')
+    setUserLat(null)
+    setUserLng(null)
+    setUserAccuracy(null)
+    try {
+      const res = await fetch('/api/neighborhoods/all')
+      const data = await res.json()
+      setAllNeighborhoods(
+        (Array.isArray(data) ? data : []).map((n: any) => ({
+          id: n.id,
+          name: n.name,
+          nameEn: n.nameEn,
+          cityName: n.cityName || n.city?.name || '',
+          cityNameEn: n.cityNameEn || n.city?.nameEn || '',
+        })),
+      )
+    } catch {
+      setAllNeighborhoods([])
+    } finally {
+      setManualLoading(false)
+    }
   }
 
   // Ultimate fallback: plain browser geolocation, low accuracy allowed
@@ -691,10 +720,104 @@ export default function OnboardingPage() {
                   {lang === 'en' ? "I've enabled it, try again" : lang === 'ur' ? 'فعال کر دیا، دوبارہ کوشش کریں' : 'فعّلتها، أعد المحاولة'}
                 </button>
               </div>
+              <button
+                onClick={enterManualPicker}
+                className="text-sm text-gray-400 dark:text-gray-500 underline mt-4"
+              >
+                {lang === 'en'
+                  ? 'Or continue choosing a neighborhood (limited access)'
+                  : lang === 'ur'
+                    ? 'یا محلہ منتخب کریں (محدود رسائی)'
+                    : 'أو تابع باختيار الحي (وصول محدود)'}
+              </button>
             </div>
           )}
 
-          {/* F. Timeout — no sample at all. Retry only. */}
+          {/* F. Manual neighborhood picker — limited access without GPS */}
+          {locationStep === 'manual' && (
+            <div className="flex-1 flex flex-col">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                {lang === 'en' ? 'Choose your neighborhood' : lang === 'ur' ? 'اپنا محلہ منتخب کریں' : 'اختر حيّك'}
+              </h1>
+              <p className="text-gray-500 text-sm mb-1">
+                {lang === 'en'
+                  ? 'Select your neighborhood manually. Some features will be limited until location is verified.'
+                  : lang === 'ur'
+                    ? 'اپنا محلہ دستی طور پر منتخب کریں۔ مقام کی تصدیق تک کچھ خصوصیات محدود ہوں گی۔'
+                    : 'اختر حيّك يدوياً. بعض المزايا ستكون محدودة حتى يتم التحقق من موقعك.'}
+              </p>
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-4">
+                <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
+                  ⚠️ {lang === 'en' ? 'Limited access — enable location later in Settings to unlock full features' : lang === 'ur' ? 'محدود رسائی — مکمل خصوصیات کیلئے بعد میں مقام فعال کریں' : 'وصول محدود — فعّل الموقع لاحقاً من الإعدادات لفتح جميع المزايا'}
+                </p>
+              </div>
+
+              {manualLoading ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <FiLoader className="w-6 h-6 text-primary-600 animate-spin" />
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-2.5 mb-3 border border-gray-100 dark:border-gray-700">
+                    <FiSearch className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    <input
+                      type="text"
+                      value={manualSearch}
+                      onChange={(e) => setManualSearch(e.target.value)}
+                      placeholder={lang === 'en' ? 'Search neighborhood...' : lang === 'ur' ? 'محلہ تلاش کریں...' : 'ابحث عن حي...'}
+                      className="flex-1 bg-transparent text-sm focus:outline-none text-gray-800 dark:text-gray-100 placeholder:text-gray-400"
+                    />
+                  </div>
+                  <div className="space-y-2 mb-6 flex-1 overflow-y-auto" style={{ maxHeight: '40vh' }}>
+                    {allNeighborhoods
+                      .filter(n => {
+                        if (!manualSearch.trim()) return true
+                        const q = manualSearch.toLowerCase()
+                        return n.name.toLowerCase().includes(q) || n.nameEn.toLowerCase().includes(q) || n.cityName.toLowerCase().includes(q) || n.cityNameEn.toLowerCase().includes(q)
+                      })
+                      .map(n => (
+                        <button
+                          key={n.id}
+                          onClick={() => {
+                            setSelectedNeighborhoodId(n.id)
+                            setDetectedNeighborhood({
+                              id: n.id,
+                              name: n.name,
+                              nameEn: n.nameEn,
+                              distanceKm: 0,
+                              confidence: 'low',
+                              city: { id: '', name: n.cityName, nameEn: n.cityNameEn },
+                            })
+                          }}
+                          className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border-2 transition-all ${
+                            selectedNeighborhoodId === n.id
+                              ? 'border-primary-600 bg-primary-600 text-white'
+                              : 'border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600 text-gray-800 dark:text-white'
+                          }`}
+                        >
+                          <span className={`text-xs ${selectedNeighborhoodId === n.id ? 'opacity-70' : 'text-gray-400'}`}>
+                            {dn(n.cityName, n.cityNameEn)}
+                          </span>
+                          <span className="font-medium">{dn(n.name, n.nameEn)}</span>
+                        </button>
+                      ))}
+                  </div>
+                  <button
+                    onClick={handleFinish}
+                    disabled={loading || !selectedNeighborhoodId}
+                    className="btn-primary flex items-center justify-center gap-2"
+                  >
+                    <FiCheck className="w-4 h-4" />
+                    {loading
+                      ? (lang !== 'en' ? 'جاري الحفظ...' : 'Saving...')
+                      : (lang !== 'en' ? 'تأكيد الحي' : 'Confirm neighborhood')}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* G. Timeout — no sample at all. Retry only. */}
           {locationStep === 'timeout' && (
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-4">
               <div className="w-20 h-20 rounded-full bg-amber-50 flex items-center justify-center">
