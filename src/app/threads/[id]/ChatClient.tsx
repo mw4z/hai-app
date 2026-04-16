@@ -127,70 +127,9 @@ export default function ChatClient({
   const [messages, setMessages] = useState(initialMessages)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
-  const [kbOpen, setKbOpen] = useState(false)
   const [replyingTo, setReplyingTo] = useState<Msg | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
-  const composerRef = useRef<HTMLDivElement>(null)
   const textInputRef = useRef<HTMLInputElement>(null)
-
-  // Keyboard tracking. Uses `bottom` (not `transform`) so the text
-  // input cursor renders at the correct position — iOS draws the caret
-  // at the element's LAYOUT position, and transform is visual-only.
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (!(window as any).Capacitor?.isNativePlatform?.()) return
-
-    let cleanup: (() => void) | null = null
-    const safePad = 'calc(env(safe-area-inset-bottom, 0px) + 10px)'
-
-    import('@capacitor/keyboard').then(({ Keyboard }) => {
-      const el = () => composerRef.current
-      let currentKbHeight = 0
-
-      const h1 = Keyboard.addListener('keyboardWillShow', (info) => {
-        const c = el()
-        if (!c) return
-        currentKbHeight = info.keyboardHeight
-        c.style.transition = 'bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
-        c.style.bottom = `${info.keyboardHeight}px`
-        c.style.paddingBottom = '10px'
-        setKbOpen(true)
-        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 300)
-      })
-      const h2 = Keyboard.addListener('keyboardDidShow', () => {
-        // If Capacitor resized the viewport, bottom:0 is now correct.
-        // If not, keep bottom at kbHeight. Check by comparing.
-        const c = el()
-        if (!c) return
-        c.style.transition = 'none'
-      })
-      const h3 = Keyboard.addListener('keyboardWillHide', () => {
-        const c = el()
-        if (!c) return
-        currentKbHeight = 0
-        c.style.transition = 'bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
-        c.style.bottom = '0px'
-        c.style.paddingBottom = safePad
-        setKbOpen(false)
-      })
-      const h4 = Keyboard.addListener('keyboardDidHide', () => {
-        const c = el()
-        if (!c) return
-        c.style.transition = 'none'
-        c.style.bottom = '0px'
-        c.style.paddingBottom = safePad
-      })
-
-      cleanup = () => {
-        h1.then(h => h.remove())
-        h2.then(h => h.remove())
-        h3.then(h => h.remove())
-        h4.then(h => h.remove())
-      }
-    }).catch(() => {})
-
-    return () => { cleanup?.() }
-  }, [])
   const [sendingLocation, setSendingLocation] = useState(false)
   const [closed, setClosed] = useState(isClosed)
   const [showRating, setShowRating] = useState(isClosed)
@@ -542,7 +481,7 @@ export default function ChatClient({
       </header>
 
       {/* Messages */}
-      <div className={`px-4 py-3 flex-1 ${kbOpen ? 'pb-14' : 'pb-24'}`} data-tour="chat-messages"
+      <div className="px-4 py-3 flex-1 pb-24" data-tour="chat-messages"
         style={{ background: isDark ? wallpaper.dark : wallpaper.light }}>
         {messages.length === 0 && (
           <div className="text-center py-12">
@@ -881,7 +820,7 @@ export default function ChatClient({
           </div>
         )
       ) : (
-        <div ref={composerRef} className="glass-bottom px-3 fixed left-0 right-0 max-w-[480px] mx-auto z-20 overflow-hidden" style={{ bottom: 0, paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
+        <div className="glass-bottom px-3 fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-20" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
           {/* Reply preview bar */}
           {replyingTo && (
             <div className="flex items-center gap-2 px-1 pt-2 pb-1">
