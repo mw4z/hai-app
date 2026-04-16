@@ -280,16 +280,16 @@ html.dark body::before {
   padding-bottom: calc(6rem + env(safe-area-inset-bottom)) !important;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 4px;
+/* Hide scrollbar on mobile — users scroll by touch. On desktop
+   (min-width 768px) show a thin custom scrollbar. */
+@media (max-width: 767px) {
+  ::-webkit-scrollbar { display: none; }
+  * { scrollbar-width: none; }
 }
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-::-webkit-scrollbar-thumb {
-  background: #16a34a;
-  border-radius: 2px;
+@media (min-width: 768px) {
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #f1f1f1; }
+  ::-webkit-scrollbar-thumb { background: #16a34a; border-radius: 2px; }
 }
 
 @layer components {
