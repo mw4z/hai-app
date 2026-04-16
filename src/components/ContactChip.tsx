@@ -52,7 +52,7 @@ export default function ContactChip({ name, phone, variant = 'light' }: Props) {
 
   return (
     <div
-      className={`flex flex-col gap-2 rounded-2xl px-5 py-3 my-1.5 w-full ${
+      className={`flex flex-col gap-2 rounded-2xl px-3 py-3 my-1.5 w-full overflow-hidden ${
         onGreen
           ? 'bg-white/15 border border-white/20'
           : 'bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800'
@@ -74,30 +74,30 @@ export default function ContactChip({ name, phone, variant = 'light' }: Props) {
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-1.5">
         <button
           onClick={handleCall}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold active:scale-[0.97] transition-transform ${
+          className={`flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl text-[11px] font-bold active:scale-[0.97] transition-transform min-w-0 ${
             onGreen ? 'bg-white/25 text-white' : 'bg-primary-600 text-white'
           }`}
         >
-          <FiPhone className="w-3.5 h-3.5" />
+          <FiPhone className="w-3.5 h-3.5 flex-shrink-0" />
           {lang === 'en' ? 'Call' : lang === 'ur' ? 'کال' : 'اتصال'}
         </button>
         <button
           onClick={handleCopy}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold active:scale-[0.97] transition-transform ${
+          className={`flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl text-[11px] font-bold active:scale-[0.97] transition-transform min-w-0 ${
             onGreen ? 'bg-white/15 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
           }`}
         >
-          <FiCopy className="w-3.5 h-3.5" />
+          <FiCopy className="w-3.5 h-3.5 flex-shrink-0" />
           {lang === 'en' ? 'Copy' : lang === 'ur' ? 'کاپی' : 'نسخ'}
         </button>
         <button
           onClick={handleWhatsApp}
-          className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-[#25D366] text-white rounded-xl text-xs font-bold active:scale-[0.97] transition-transform"
+          className="flex-1 flex items-center justify-center gap-1 py-2.5 bg-[#25D366] text-white rounded-xl text-[11px] font-bold active:scale-[0.97] transition-transform min-w-0"
         >
-          <WhatsAppIcon className="w-3.5 h-3.5" />
+          <WhatsAppIcon className="w-3.5 h-3.5 flex-shrink-0" />
           {lang === 'en' ? 'WhatsApp' : 'واتساب'}
         </button>
       </div>
