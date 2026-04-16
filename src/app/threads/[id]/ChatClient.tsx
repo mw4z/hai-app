@@ -141,22 +141,34 @@ export default function ChatClient({
       // whole time. When Capacitor resizes the viewport, bottom-0
       // is already at the correct position — just clear the
       // transform. No frame where bottom + transform double-offset.
+      let resizeRaf = 0
       const h1 = Keyboard.addListener('keyboardWillShow', (info) => {
         const c = el()
         if (!c) return
+        // Animate up via transform (bottom stays 0)
         c.style.transition = 'transform 280ms cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
         c.style.transform = `translateY(${-info.keyboardHeight}px)`
         c.style.paddingBottom = '10px'
+
+        // Poll every frame until viewport actually resizes, then
+        // clear the transform in that SAME frame — no intermediate
+        // painted frame with double offset.
+        const startH = window.innerHeight
+        cancelAnimationFrame(resizeRaf)
+        const poll = () => {
+          if (window.innerHeight !== startH) {
+            const cc = el()
+            if (cc) {
+              cc.style.transition = 'none'
+              cc.style.transform = 'none'
+            }
+            return
+          }
+          resizeRaf = requestAnimationFrame(poll)
+        }
+        resizeRaf = requestAnimationFrame(poll)
       })
-      const h2 = Keyboard.addListener('keyboardDidShow', () => {
-        const c = el()
-        if (!c) return
-        // Viewport shrunk — bottom:0 is now above keyboard.
-        // Clear transform so it doesn't stack on top.
-        c.style.transition = 'none'
-        c.style.transform = 'none'
-        c.style.paddingBottom = '10px'
-      })
+      // keyboardDidShow not needed — the rAF poll handles the handoff
       const h3 = Keyboard.addListener('keyboardWillHide', () => {
         const c = el()
         if (!c) return
