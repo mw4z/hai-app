@@ -919,7 +919,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
               </div>
             ) : (
               <p className="text-[15px] leading-relaxed selectable-text">
-                <SmartText text={msg.text || ''} />
+                <SmartText text={msg.text || ''} variant={isMe ? 'onGreen' : 'light'} />
                 {msg.edited && (
                   <span className={`text-[10px] italic ml-1 ${isMe ? 'text-primary-200' : 'text-gray-400 dark:text-gray-500'}`}>
                     {lang === 'en' ? '(edited)' : '(معدّل)'}

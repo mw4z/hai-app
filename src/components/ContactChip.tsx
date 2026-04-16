@@ -18,6 +18,7 @@ function WhatsAppIcon({ className }: { className?: string }) {
 interface Props {
   name: string
   phone: string
+  variant?: 'light' | 'onGreen'
 }
 
 /**
@@ -25,8 +26,9 @@ interface Props {
  * `📱 Name — +phone` snippet is detected. Shows the contact info with
  * three quick-action buttons: Call, Copy, WhatsApp.
  */
-export default function ContactChip({ name, phone }: Props) {
+export default function ContactChip({ name, phone, variant = 'light' }: Props) {
   const { lang } = useLanguage()
+  const onGreen = variant === 'onGreen'
 
   const cleanPhone = phone.replace(/[^\d+]/g, '')
 
@@ -50,18 +52,24 @@ export default function ContactChip({ name, phone }: Props) {
 
   return (
     <div
-      className="flex flex-col gap-2 bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800 rounded-2xl px-5 py-3 my-1.5 w-full"
+      className={`flex flex-col gap-2 rounded-2xl px-5 py-3 my-1.5 w-full ${
+        onGreen
+          ? 'bg-white/15 border border-white/20'
+          : 'bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800'
+      }`}
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center gap-2 min-w-0">
-        <div className="w-9 h-9 rounded-full bg-primary-100 dark:bg-primary-800/60 flex items-center justify-center flex-shrink-0">
+        <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+          onGreen ? 'bg-white/20' : 'bg-primary-100 dark:bg-primary-800/60'
+        }`}>
           <span className="text-base">📱</span>
         </div>
         <div className="min-w-0 flex-1">
           {name && (
-            <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{name}</p>
+            <p className={`text-sm font-bold truncate ${onGreen ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{name}</p>
           )}
-          <p className="text-xs text-primary-700 dark:text-primary-300 font-semibold tabular-nums" dir="ltr">
+          <p className={`text-xs font-semibold tabular-nums ${onGreen ? 'text-white/80' : 'text-primary-700 dark:text-primary-300'}`} dir="ltr">
             {phone}
           </p>
         </div>
@@ -69,14 +77,18 @@ export default function ContactChip({ name, phone }: Props) {
       <div className="flex items-center gap-2.5">
         <button
           onClick={handleCall}
-          className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-primary-600 text-white rounded-xl text-xs font-bold active:scale-[0.97] transition-transform"
+          className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold active:scale-[0.97] transition-transform ${
+            onGreen ? 'bg-white/25 text-white' : 'bg-primary-600 text-white'
+          }`}
         >
           <FiPhone className="w-3.5 h-3.5" />
           {lang === 'en' ? 'Call' : lang === 'ur' ? 'کال' : 'اتصال'}
         </button>
         <button
           onClick={handleCopy}
-          className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold active:scale-[0.97] transition-transform"
+          className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold active:scale-[0.97] transition-transform ${
+            onGreen ? 'bg-white/15 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+          }`}
         >
           <FiCopy className="w-3.5 h-3.5" />
           {lang === 'en' ? 'Copy' : lang === 'ur' ? 'کاپی' : 'نسخ'}
