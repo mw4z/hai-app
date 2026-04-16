@@ -94,6 +94,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         id: true, type: true, text: true, lat: true, lng: true,
         imageUrl: true, senderId: true, createdAt: true,
         deliveredAt: true, readAt: true, edited: true, reactions: true,
+        replyToId: true,
+        replyTo: { select: { id: true, text: true, senderId: true, type: true } },
       },
       take: 100,
     })
@@ -148,7 +150,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     let body: any
     try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid request' }, { status: 400 }) }
-    const { type, text, lat, lng } = body
+    const { type, text, lat, lng, replyToId } = body
+
+    // Validate replyToId belongs to this thread
+    const replyData = replyToId ? { replyToId: String(replyToId) } : {}
 
     let message
     if (type === 'LOCATION') {
@@ -162,7 +167,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           type: 'LOCATION',
           text: `https://maps.google.com/?q=${lat},${lng}`,
           lat, lng,
+          ...replyData,
         },
+        include: { replyTo: { select: { id: true, text: true, senderId: true, type: true } } },
       })
     } else if (type === 'IMAGE') {
       const { imageUrl } = body
@@ -174,12 +181,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           type: 'IMAGE',
           text: '📷',
           imageUrl,
+          ...replyData,
         },
+        include: { replyTo: { select: { id: true, text: true, senderId: true, type: true } } },
       })
     } else {
       if (!text?.trim()) return NextResponse.json({ error: 'Empty message' }, { status: 400 })
       if (text.length > 1000) return NextResponse.json({ error: 'Too long' }, { status: 400 })
-      // Censor profanity in chat (don't block — just censor)
       const mod = moderateContent(text.trim())
       message = await db.message.create({
         data: {
@@ -187,7 +195,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           senderId: session.userId,
           type: 'TEXT',
           text: mod.censored,
+          ...replyData,
         },
+        include: { replyTo: { select: { id: true, text: true, senderId: true, type: true } } },
       })
     }
 

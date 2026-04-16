@@ -15,6 +15,13 @@ import { useAttachContact } from '@/hooks/useAttachContact'
 import { playSend } from '@/lib/sound'
 import SmartText from '@/components/SmartText'
 
+interface ReplyTo {
+  id: string
+  text: string | null
+  senderId: string
+  type: string
+}
+
 interface Msg {
   id: string
   type: string
@@ -28,6 +35,8 @@ interface Msg {
   readAt?: string | null
   edited?: boolean
   reactions?: { emoji: string; userId: string }[]
+  replyToId?: string | null
+  replyTo?: ReplyTo | null
 }
 
 function WhatsAppCheck({ double, read }: { double: boolean; read: boolean }) {
@@ -118,6 +127,7 @@ export default function ChatClient({
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [kbOpen, setKbOpen] = useState(false)
+  const [replyingTo, setReplyingTo] = useState<Msg | null>(null)
   const composerRef = useRef<HTMLDivElement>(null)
   const textInputRef = useRef<HTMLInputElement>(null)
 
@@ -319,13 +329,15 @@ export default function ChatClient({
     textInputRef.current?.focus()
     hapticLight()
     const body = text.trim()
+    const replyId = replyingTo?.id || null
     setText('')
+    setReplyingTo(null)
     setSending(true)
     try {
       const res = await fetch(`/api/threads/${threadId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'TEXT', text: body }),
+        body: JSON.stringify({ type: 'TEXT', text: body, replyToId: replyId }),
       })
       if (res.ok) {
         const msg = await res.json()
@@ -589,9 +601,12 @@ export default function ChatClient({
               onCancelEdit={() => { setEditingMsg(null); setEditText('') }}
               onLongPress={() => setSelectedMsg(msg.id)}
               onDoubleTap={() => reactToMessage(msg.id, '❤️')}
+              onReply={() => { setReplyingTo(msg); textInputRef.current?.focus() }}
               selectedMsg={selectedMsg}
               showUnreadDivider={msg.id === unreadDividerId}
               t={t}
+              currentUserId={currentUserId}
+              otherName={other.name || (lang === 'en' ? 'Neighbor' : 'جار')}
             />
           )
         })}
@@ -883,8 +898,26 @@ export default function ChatClient({
           </div>
         )
       ) : (
-        <div ref={composerRef} className="glass-bottom px-3 py-2.5 fixed left-0 right-0 max-w-[480px] mx-auto z-20 overflow-hidden" style={{ bottom: 0, paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
-          <div className="flex items-center gap-2">
+        <div ref={composerRef} className="glass-bottom px-3 fixed left-0 right-0 max-w-[480px] mx-auto z-20 overflow-hidden" style={{ bottom: 0, paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
+          {/* Reply preview bar */}
+          {replyingTo && (
+            <div className="flex items-center gap-2 px-1 pt-2 pb-1">
+              <div className="flex-1 min-w-0 border-s-2 border-primary-500 ps-2.5 py-0.5">
+                <p className="text-[10px] font-bold text-primary-600 dark:text-primary-400">
+                  {replyingTo.senderId === currentUserId
+                    ? (lang === 'en' ? 'You' : lang === 'ur' ? 'آپ' : 'أنت')
+                    : (other.name || (lang === 'en' ? 'Neighbor' : 'جار'))}
+                </p>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                  {replyingTo.type === 'IMAGE' ? '📷' : replyingTo.type === 'LOCATION' ? '📍' : (replyingTo.text || '').slice(0, 80)}
+                </p>
+              </div>
+              <button onClick={() => setReplyingTo(null)} className="p-1 text-gray-400 active:scale-90">
+                <FiX className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          <div className="flex items-center gap-2 py-2.5">
             <input ref={imgInputRef} type="file" accept="image/*" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) sendImage(f) }} />
             <div className="flex items-center gap-1">
@@ -930,15 +963,89 @@ export default function ChatClient({
 }
 
 // Separate bubble component for long-press handling
-function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dateLabel, timeStr, lang, editingMsg, editText, setEditText, editInputRef, onSaveEdit, onCancelEdit, onLongPress, onDoubleTap, selectedMsg, showUnreadDivider, t }: {
+function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dateLabel, timeStr, lang, editingMsg, editText, setEditText, editInputRef, onSaveEdit, onCancelEdit, onLongPress, onDoubleTap, onReply, selectedMsg, showUnreadDivider, t, currentUserId, otherName }: {
   msg: Msg; isMe: boolean; isLastInGroup: boolean; isFirstInGroup: boolean; showDate: boolean; dateLabel: string; timeStr: string; lang: string
   editingMsg: string | null; editText: string; setEditText: (v: string) => void; editInputRef: React.RefObject<HTMLInputElement>
-  onSaveEdit: () => void; onCancelEdit: () => void; onLongPress: () => void; onDoubleTap: () => void; selectedMsg: string | null; showUnreadDivider: boolean; t: (k: any) => string
+  onSaveEdit: () => void; onCancelEdit: () => void; onLongPress: () => void; onDoubleTap: () => void; onReply: () => void; selectedMsg: string | null; showUnreadDivider: boolean; t: (k: any) => string
+  currentUserId: string; otherName: string
 }) {
   const longPress = useLongPress(onLongPress, onDoubleTap, 400)
+  const rowRef = useRef<HTMLDivElement>(null)
+  const swipeRef = useRef<{ startX: number; dx: number; active: boolean } | null>(null)
+  const REPLY_THRESHOLD = 50
+
+  // Swipe-to-reply gesture — swipe the message row to trigger reply
+  useEffect(() => {
+    const row = rowRef.current
+    if (!row || msg.type === 'DELETED') return
+
+    function onTouchStart(e: TouchEvent) {
+      if (e.touches.length !== 1) return
+      swipeRef.current = { startX: e.touches[0].clientX, dx: 0, active: false }
+    }
+    function onTouchMove(e: TouchEvent) {
+      const s = swipeRef.current
+      if (!s || e.touches.length !== 1) return
+      const dx = e.touches[0].clientX - s.startX
+      // Only allow swipe in one direction: left in LTR, right in RTL
+      const isRTL = document.documentElement.getAttribute('dir') === 'rtl'
+      const progress = isRTL ? dx : -dx
+      if (progress < 0) { s.dx = 0; return }
+      if (progress > 8 && !s.active) { s.active = true }
+      if (!s.active) return
+      e.preventDefault()
+      const clamped = Math.min(progress, 80)
+      s.dx = clamped
+      const translate = isRTL ? clamped : -clamped
+      if (row) {
+        row.style.transform = `translateX(${translate}px)`
+        row.style.transition = 'none'
+      }
+    }
+    function onTouchEnd() {
+      const s = swipeRef.current
+      if (!s) return
+      if (row) {
+        row.style.transition = 'transform 200ms ease-out'
+        row.style.transform = ''
+      }
+      if (s.dx >= REPLY_THRESHOLD) hapticLight()
+      if (s.dx >= REPLY_THRESHOLD) {
+        onReply()
+      }
+      swipeRef.current = null
+    }
+
+    row.addEventListener('touchstart', onTouchStart, { passive: true })
+    row.addEventListener('touchmove', onTouchMove, { passive: false })
+    row.addEventListener('touchend', onTouchEnd)
+    row.addEventListener('touchcancel', onTouchEnd)
+    return () => {
+      row.removeEventListener('touchstart', onTouchStart)
+      row.removeEventListener('touchmove', onTouchMove)
+      row.removeEventListener('touchend', onTouchEnd)
+      row.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [msg.type, onReply])
+
+  // Render reply quote above the bubble
+  const replyQuote = msg.replyTo ? (
+    <div className={`mb-1 px-2.5 py-1.5 rounded-lg border-s-2 ${
+      isMe ? 'bg-primary-700/40 border-white/40' : 'bg-gray-100 dark:bg-gray-700/60 border-primary-500'
+    }`}>
+      <p className={`text-[10px] font-bold ${isMe ? 'text-primary-100' : 'text-primary-600 dark:text-primary-400'}`}>
+        {msg.replyTo.senderId === currentUserId
+          ? (lang === 'en' ? 'You' : lang === 'ur' ? 'آپ' : 'أنت')
+          : otherName}
+      </p>
+      <p className={`text-[11px] truncate ${isMe ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'}`}>
+        {msg.replyTo.type === 'IMAGE' ? '📷' : msg.replyTo.type === 'LOCATION' ? '📍' : (msg.replyTo.text || '').slice(0, 60)}
+      </p>
+    </div>
+  ) : null
 
   return (
-    <div>
+    <div ref={rowRef} style={{ willChange: 'transform' }}>
       {showUnreadDivider && (
         <div id="unread-divider" className="flex items-center gap-3 my-4">
           <div className="flex-1 h-px bg-primary-400/50" />
@@ -992,6 +1099,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
           <div {...longPress} data-msg-id={msg.id} className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 shadow-sm select-none ${
             isMe ? `bg-primary-600 text-white ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
           } ${selectedMsg === msg.id ? 'relative z-[52] ring-2 ring-white/50' : ''}`}>
+            {replyQuote}
             {msg.type === 'LOCATION' ? (
               <div>
                 <div className={`flex items-center gap-1.5 mb-1 ${isMe ? 'text-primary-100' : 'text-primary-600 dark:text-primary-400'}`}>

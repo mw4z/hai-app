@@ -726,11 +726,15 @@ model Message {
   imageUrl    String?
   edited      Boolean     @default(false)
   reactions   Json        @default("[]")  // [{emoji, userId}]
+  replyToId   String?
+  replyTo     Message?    @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies     Message[]   @relation("MessageReplies")
   deliveredAt DateTime?   // set when recipient's client fetches messages
   readAt      DateTime?   // set when recipient views the chat
   createdAt   DateTime    @default(now())
 
   @@index([threadId, createdAt])
+  @@index([replyToId])
 }
 
 enum MessageType {

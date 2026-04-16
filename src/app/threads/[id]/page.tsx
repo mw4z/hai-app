@@ -43,6 +43,8 @@ export default async function ThreadPage({ params }: { params: { id: string } })
       id: true, type: true, text: true, lat: true, lng: true,
       imageUrl: true, senderId: true, createdAt: true,
       deliveredAt: true, readAt: true, edited: true, reactions: true,
+      replyToId: true,
+      replyTo: { select: { id: true, text: true, senderId: true, type: true } },
     },
     take: 100,
   })
