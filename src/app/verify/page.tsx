@@ -127,6 +127,7 @@ function VerifyForm() {
               opacity: 0,
               zIndex: 10,
               fontSize: '16px',
+              caretColor: 'transparent',
             }}
           />
           {/* Visual boxes */}
