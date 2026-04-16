@@ -162,6 +162,9 @@ export default function ChatClient({
               cc.style.transition = 'none'
               cc.style.transform = 'none'
             }
+            // Scroll to bottom so the last message stays visible
+            // above the keyboard + composer
+            bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
             return
           }
           resizeRaf = requestAnimationFrame(poll)
