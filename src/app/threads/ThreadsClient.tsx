@@ -73,7 +73,7 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
   }, [])
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 pb-24">
+    <div className="bg-white dark:bg-gray-900 pb-24" style={{ minHeight: 'calc(100vh - env(safe-area-inset-top, 0px))' }}>
       {/* Header */}
       <header className="glass sticky top-0 z-10 px-5 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('thread_title')}</h1>
