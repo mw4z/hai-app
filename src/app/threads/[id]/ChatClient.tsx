@@ -119,26 +119,61 @@ export default function ChatClient({
   const [sending, setSending] = useState(false)
   const composerRef = useRef<HTMLDivElement>(null)
 
-  // Track the visual viewport to move the composer in sync with the
-  // iOS keyboard animation. visualViewport fires resize/scroll events
-  // frame-by-frame during the animation, unlike the viewport resize
-  // which only fires at the end.
+  // Smooth keyboard tracking for the composer bar.
+  //
+  // keyboardWillShow fires at animation START with the target height →
+  // we CSS-transition the composer up to match the keyboard.
+  // keyboardDidShow fires AFTER animation when Capacitor resizes the
+  // viewport → we snap bottom to 0 (the viewport bottom is now above
+  // the keyboard, so 0 is the correct position). No double-offset.
   useEffect(() => {
-    const vv = typeof window !== 'undefined' ? window.visualViewport : null
-    if (!vv) return
-    function update() {
-      if (!composerRef.current || !vv) return
-      const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
-      composerRef.current.style.bottom = `${offset}px`
-      // When keyboard is up, safe-area is covered by the keyboard
-      composerRef.current.style.paddingBottom = offset > 0 ? '10px' : ''
-    }
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-    }
+    if (typeof window === 'undefined') return
+    if (!(window as any).Capacitor?.isNativePlatform?.()) return
+
+    let cleanup: (() => void) | null = null
+
+    import('@capacitor/keyboard').then(({ Keyboard }) => {
+      const el = () => composerRef.current
+
+      const h1 = Keyboard.addListener('keyboardWillShow', (info) => {
+        const c = el()
+        if (!c) return
+        c.style.transition = 'bottom 280ms cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
+        c.style.bottom = `${info.keyboardHeight}px`
+        c.style.paddingBottom = '10px'
+      })
+      const h2 = Keyboard.addListener('keyboardDidShow', () => {
+        const c = el()
+        if (!c) return
+        // Viewport has now shrunk — bottom:0 = above keyboard. Snap without transition.
+        c.style.transition = 'none'
+        c.style.bottom = '0px'
+        c.style.paddingBottom = '10px'
+      })
+      const h3 = Keyboard.addListener('keyboardWillHide', () => {
+        const c = el()
+        if (!c) return
+        c.style.transition = 'bottom 280ms cubic-bezier(0.4, 0, 0.2, 1), padding-bottom 280ms cubic-bezier(0.4, 0, 0.2, 1)'
+        c.style.bottom = '0px'
+        c.style.paddingBottom = ''
+      })
+      const h4 = Keyboard.addListener('keyboardDidHide', () => {
+        const c = el()
+        if (!c) return
+        c.style.transition = 'none'
+        c.style.bottom = '0px'
+        c.style.paddingBottom = ''
+      })
+
+      cleanup = () => {
+        h1.then(h => h.remove())
+        h2.then(h => h.remove())
+        h3.then(h => h.remove())
+        h4.then(h => h.remove())
+      }
+    }).catch(() => {})
+
+    return () => { cleanup?.() }
   }, [])
   const [sendingLocation, setSendingLocation] = useState(false)
   const [closed, setClosed] = useState(isClosed)
