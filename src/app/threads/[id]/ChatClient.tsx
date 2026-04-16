@@ -14,6 +14,7 @@ import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useAttachContact } from '@/hooks/useAttachContact'
 import { playSend } from '@/lib/sound'
 import SmartText from '@/components/SmartText'
+import ImageLightbox from '@/components/ImageLightbox'
 
 interface ReplyTo {
   id: string
@@ -128,6 +129,7 @@ export default function ChatClient({
   const [sending, setSending] = useState(false)
   const [kbOpen, setKbOpen] = useState(false)
   const [replyingTo, setReplyingTo] = useState<Msg | null>(null)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const composerRef = useRef<HTMLDivElement>(null)
   const textInputRef = useRef<HTMLInputElement>(null)
 
@@ -352,6 +354,8 @@ export default function ChatClient({
     if (sendingImage) return
     if (!file.type.startsWith('image/')) { toast.error(lang === 'en' ? 'Images only' : 'صور فقط'); return }
     if (file.size > 5 * 1024 * 1024) { toast.error(lang === 'en' ? 'Max 5MB' : 'الحد الأقصى 5 ميقا'); return }
+    const replyId = replyingTo?.id || null
+    setReplyingTo(null)
     setSendingImage(true)
     try {
       const urls = await uploadFiles([file])
@@ -359,7 +363,7 @@ export default function ChatClient({
       const res = await fetch(`/api/threads/${threadId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'IMAGE', imageUrl: urls[0] }),
+        body: JSON.stringify({ type: 'IMAGE', imageUrl: urls[0], replyToId: replyId }),
       })
       if (res.ok) { const msg = await res.json(); setMessages(prev => [...prev, msg]) }
     } catch { toast.error(t('common_error')) }
@@ -580,6 +584,7 @@ export default function ChatClient({
               onLongPress={() => setSelectedMsg(msg.id)}
               onDoubleTap={() => reactToMessage(msg.id, '❤️')}
               onReply={() => { setReplyingTo(msg); textInputRef.current?.focus() }}
+              onImageTap={(url) => setLightboxUrl(url)}
               selectedMsg={selectedMsg}
               showUnreadDivider={msg.id === unreadDividerId}
               t={t}
@@ -936,15 +941,23 @@ export default function ChatClient({
           </div>
         </div>
       )}
+
+      {/* In-app image lightbox */}
+      <ImageLightbox
+        images={lightboxUrl ? [lightboxUrl] : []}
+        initialIndex={0}
+        open={lightboxUrl !== null}
+        onClose={() => setLightboxUrl(null)}
+      />
     </div>
   )
 }
 
 // Separate bubble component for long-press handling
-function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dateLabel, timeStr, lang, editingMsg, editText, setEditText, editInputRef, onSaveEdit, onCancelEdit, onLongPress, onDoubleTap, onReply, selectedMsg, showUnreadDivider, t, currentUserId, otherName }: {
+function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dateLabel, timeStr, lang, editingMsg, editText, setEditText, editInputRef, onSaveEdit, onCancelEdit, onLongPress, onDoubleTap, onReply, onImageTap, selectedMsg, showUnreadDivider, t, currentUserId, otherName }: {
   msg: Msg; isMe: boolean; isLastInGroup: boolean; isFirstInGroup: boolean; showDate: boolean; dateLabel: string; timeStr: string; lang: string
   editingMsg: string | null; editText: string; setEditText: (v: string) => void; editInputRef: React.RefObject<HTMLInputElement>
-  onSaveEdit: () => void; onCancelEdit: () => void; onLongPress: () => void; onDoubleTap: () => void; onReply: () => void; selectedMsg: string | null; showUnreadDivider: boolean; t: (k: any) => string
+  onSaveEdit: () => void; onCancelEdit: () => void; onLongPress: () => void; onDoubleTap: () => void; onReply: () => void; onImageTap: (url: string) => void; selectedMsg: string | null; showUnreadDivider: boolean; t: (k: any) => string
   currentUserId: string; otherName: string
 }) {
   const longPress = useLongPress(onLongPress, onDoubleTap, 400)
@@ -1044,9 +1057,10 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
       <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} ${isLastInGroup ? 'mb-2' : 'mb-[3px]'} ${isFirstInGroup && !showDate ? 'mt-3' : ''}`}>
         {msg.type === 'IMAGE' && msg.imageUrl ? (
           <div className={`max-w-[70%]`} data-msg-id={msg.id} {...longPress}>
-            <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="block">
+            {replyQuote && <div className="mb-1">{replyQuote}</div>}
+            <div onClick={() => msg.imageUrl && onImageTap(msg.imageUrl)} className="cursor-pointer">
               <img src={msg.imageUrl} alt="" className={`rounded-2xl max-h-52 object-cover shadow-sm ${isLastInGroup ? (isMe ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : 'ltr:rounded-bl-sm rtl:rounded-br-sm') : ''}`} />
-            </a>
+            </div>
             <p className={`text-[10px] mt-1 px-1 flex items-center gap-0.5 ${isMe ? 'text-gray-400 justify-start' : 'text-gray-400 justify-end'}`}>
               {timeStr}
               <MsgStatus msg={msg} isMe={isMe} />
