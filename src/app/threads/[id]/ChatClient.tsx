@@ -280,6 +280,25 @@ export default function ChatClient({
     bottomRef.current?.scrollIntoView()
   }, [messages.length])
 
+  // When the reply preview appears the composer grows. Browsers don't
+  // know the composer overlays the viewport, so scrollIntoView won't
+  // help on its own — compute the scroll manually so the replied-to
+  // message clears the (now-taller) composer.
+  useEffect(() => {
+    if (!replyingTo) return
+    const id = setTimeout(() => {
+      const el = document.querySelector(`[data-msg-id="${replyingTo.id}"]`) as HTMLElement | null
+      const composer = composerRef.current
+      if (!el || !composer) return
+      const safeBottom = window.innerHeight - composer.offsetHeight - 16
+      const rect = el.getBoundingClientRect()
+      if (rect.bottom > safeBottom) {
+        window.scrollBy({ top: rect.bottom - safeBottom, behavior: 'smooth' })
+      }
+    }, 60)
+    return () => clearTimeout(id)
+  }, [replyingTo])
+
   useEffect(() => {
     if (closed) return
     const interval = setInterval(async () => {
