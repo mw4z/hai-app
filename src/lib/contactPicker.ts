@@ -26,10 +26,14 @@ function normalizePhone(raw: string): string {
   return plus + digits
 }
 
-function pickBestPhone(phones: Array<{ number?: string | null } | null | undefined> | null | undefined): string {
-  if (!phones || !phones.length) return ''
+function pickBestPhone(phones: any): string {
+  if (!phones || !Array.isArray(phones) || phones.length === 0) return ''
   for (const p of phones) {
-    if (p?.number) return normalizePhone(p.number)
+    if (!p) continue
+    // Different plugins use different keys — try all known shapes
+    const raw = p.number || p.value || p.phoneNumber || p.stringValue || ''
+    const normalized = normalizePhone(typeof raw === 'string' ? raw : String(raw))
+    if (normalized && normalized.replace(/\D/g, '').length >= 7) return normalized
   }
   return ''
 }
