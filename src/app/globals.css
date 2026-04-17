@@ -232,33 +232,21 @@ body {
 }
 
 /* ── Responsive app container ────────────────────────────────────────────
-   The app is a phone-first vertical layout. On iPad / larger screens we
-   widen the centered container modestly — enough to use the extra space
-   without stretching chat bubbles, buttons or forms to awkward widths.
+   Phone-first layout. On iPad the container grows so it actually fills
+   the screen instead of floating in the middle with huge empty margins.
 
-   Mobile (< 768px): 480px — unchanged iPhone layout.
-   Tablet portrait (768-1024px): 600px.
-   Tablet landscape / iPad Pro (1024+): 680px.
-
-   A subtle shadow frames the container on tablet so the centered column
-   looks intentional instead of a narrow iPhone mirror.                 */
+   Mobile (< 768px): 480px — iPhone, UNCHANGED.
+   iPad portrait (768-1023px): 760px — uses most of the iPad's 820-834pt width.
+   iPad landscape / 12.9" (1024+): 920px — wide enough for landscape without
+     making chat bubbles, buttons, or forms feel bloated.                */
 :root { --app-max-width: 480px; }
 
 @media (min-width: 768px) {
-  :root { --app-max-width: 600px; }
-  body {
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 12px 48px rgba(0, 0, 0, 0.06);
-  }
-  html {
-    background-color: #f3f4f6;
-  }
-  html.dark {
-    background-color: #020617;
-  }
+  :root { --app-max-width: 760px; }
 }
 
 @media (min-width: 1024px) {
-  :root { --app-max-width: 680px; }
+  :root { --app-max-width: 920px; }
 }
 
 /* Fixed bottom bars (BottomNav, composer, etc.) use Tailwind's
