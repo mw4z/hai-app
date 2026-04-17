@@ -10,7 +10,7 @@ import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, Fi
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
 import { uploadFiles } from '@/lib/upload'
-import { pickImageOrFallback } from '@/lib/imagePicker'
+import { pickImagesOrFallback } from '@/lib/imagePicker'
 import { useAttachContact } from '@/hooks/useAttachContact'
 import { playSend } from '@/lib/sound'
 import SmartText from '@/components/SmartText'
@@ -409,6 +409,53 @@ export default function ChatClient({
       })
       if (res.ok) { const msg = await res.json(); setMessages(prev => [...prev, msg]) }
       else { await showApiError(res, lang as 'ar' | 'en' | 'ur') }
+    } catch { toast.error(t('common_error')) }
+    finally { setSendingImage(false); if (imgInputRef.current) imgInputRef.current.value = '' }
+  }
+
+  // Send multiple images in order. Each one becomes its own IMAGE
+  // message (matches how the thread model and reply/lightbox features
+  // expect one imageUrl per message). The reply target, if any, is
+  // attached only to the first image — subsequent ones are plain.
+  async function sendImages(files: File[]) {
+    if (sendingImage || files.length === 0) return
+    const valid = files.filter((f) => {
+      if (!f.type.startsWith('image/')) return false
+      if (f.size > 5 * 1024 * 1024) return false
+      return true
+    })
+    const dropped = files.length - valid.length
+    if (dropped > 0) {
+      toast.error(lang === 'en'
+        ? `${dropped} image${dropped > 1 ? 's' : ''} skipped (max 5MB / images only)`
+        : `${dropped} صورة تم تجاهلها (الحد 5 ميقا / صور فقط)`)
+    }
+    if (valid.length === 0) return
+    const replyId = replyingTo?.id || null
+    setReplyingTo(null)
+    setSendingImage(true)
+    try {
+      const urls = await uploadFiles(valid)
+      for (let i = 0; i < urls.length; i++) {
+        const imageUrl = urls[i]
+        if (!imageUrl) continue
+        const res = await fetch(`/api/threads/${threadId}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'IMAGE',
+            imageUrl,
+            replyToId: i === 0 ? replyId : null,
+          }),
+        })
+        if (res.ok) {
+          const msg = await res.json()
+          setMessages((prev) => [...prev, msg])
+        } else {
+          await showApiError(res, lang as 'ar' | 'en' | 'ur')
+          break
+        }
+      }
     } catch { toast.error(t('common_error')) }
     finally { setSendingImage(false); if (imgInputRef.current) imgInputRef.current.value = '' }
   }
@@ -945,12 +992,15 @@ export default function ChatClient({
             </div>
           )}
           <div className="flex items-center gap-2 py-2.5">
-            <input ref={imgInputRef} type="file" accept="image/*" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) sendImage(f) }} />
+            <input ref={imgInputRef} type="file" accept="image/*" multiple className="hidden"
+              onChange={e => {
+                const files = Array.from(e.target.files || [])
+                if (files.length > 0) sendImages(files)
+              }} />
             <div className="flex items-center gap-1">
               <button onClick={async () => {
-                  const f = await pickImageOrFallback(lang as 'ar' | 'en' | 'ur', imgInputRef)
-                  if (f) sendImage(f)
+                  const files = await pickImagesOrFallback(10, imgInputRef)
+                  if (files.length > 0) sendImages(files)
                 }} disabled={sendingImage}
                 className="p-2.5 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50">
                 <FiCamera className={`w-5 h-5 ${sendingImage ? 'animate-pulse' : ''}`} />
