@@ -275,14 +275,14 @@ export default function ChatClient({
   }, [messages.length])
 
   // Tap on a reply quote → scroll the original into view and flash a
-  // brief highlight so the user sees what was replied to. Mirrors
-  // WhatsApp's behavior.
+  // full-width horizontal highlight across its row that fades out.
+  // Mirrors WhatsApp's behavior.
   function jumpToMessage(id: string) {
-    const el = document.querySelector(`[data-msg-id="${id}"]`) as HTMLElement | null
-    if (!el) return
-    el.scrollIntoView({ block: 'center', behavior: 'smooth' })
-    el.classList.add('msg-jump-highlight')
-    setTimeout(() => el.classList.remove('msg-jump-highlight'), 1600)
+    const row = document.querySelector(`[data-msg-row="${id}"]`) as HTMLElement | null
+    if (!row) return
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    row.classList.add('msg-jump-highlight')
+    setTimeout(() => row.classList.remove('msg-jump-highlight'), 1600)
   }
 
   // When replying to a message, make sure it stays visible after the
@@ -1077,7 +1077,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
   ) : null
 
   return (
-    <div ref={rowRef} style={{ willChange: 'transform' }}>
+    <div ref={rowRef} data-msg-row={msg.id} style={{ willChange: 'transform' }}>
       {showUnreadDivider && (
         <div id="unread-divider" className="flex items-center gap-3 my-4">
           <div className="flex-1 h-px bg-primary-400/50" />
