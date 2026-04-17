@@ -64,7 +64,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       where: { id: params.commentId },
       data: { body: mod.censored, editedAt: new Date() },
       include: {
-        author: { select: { id: true, name: true, reputation: true, accountType: true } },
+        author: { select: { id: true, name: true, reputation: true, accountType: true, providerStatus: true } },
         likes: { select: { userId: true } },
         _count: { select: { likes: true } },
       },

@@ -13,12 +13,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const comments = await db.comment.findMany({
     where: { postId: params.id, parentId: null },
     include: {
-      author: { select: { id: true, name: true, reputation: true, accountType: true, avatarUrl: true } },
+      author: { select: { id: true, name: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true } },
       likes: { select: { userId: true } },
       _count: { select: { likes: true } },
       replies: {
         include: {
-          author: { select: { id: true, name: true, reputation: true, accountType: true, avatarUrl: true } },
+          author: { select: { id: true, name: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true } },
           likes: { select: { userId: true } },
           _count: { select: { likes: true } },
         },
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       parentId: parentId || null,
     },
     include: {
-      author: { select: { id: true, name: true, reputation: true, accountType: true, avatarUrl: true } },
+      author: { select: { id: true, name: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true } },
       replies: { include: { author: { select: { id: true, name: true, reputation: true } } } },
     },
   })

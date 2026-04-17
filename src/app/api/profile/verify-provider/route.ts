@@ -12,12 +12,20 @@ export async function POST(req: NextRequest) {
 
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { accountType: true, createdAt: true },
+    select: { accountType: true, providerStatus: true, createdAt: true },
   })
 
   // Must be SERVICE_PROVIDER
   if (user?.accountType !== 'SERVICE_PROVIDER') {
     return NextResponse.json({ error: 'يجب أن تكون مقدم خدمة أولاً' }, { status: 400 })
+  }
+
+  // Must have cleared the quality gate before asking for verification
+  if (user.providerStatus !== 'ACTIVE') {
+    return NextResponse.json(
+      { error: 'provider_not_active', message: 'أكمل ملف مقدم الخدمة أولاً (وصف الخدمة، الموقع، العنوان)' },
+      { status: 400 },
+    )
   }
 
   // Account age check

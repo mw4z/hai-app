@@ -570,7 +570,7 @@ export default function AdminClient({ role, adminName }: { role: string; adminNa
                   <p className="text-xs text-gray-400 mb-1">{u.phone} · {u.role}{u.email ? ` · ${u.email}` : ''}</p>
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     {(() => {
-                      const p = getPrimaryBadge(u.accountType || 'NORMAL')
+                      const p = getPrimaryBadge(u.accountType || 'NORMAL', (u as any).providerStatus)
                       const s = getSecondaryBadge(u.reputation || 0)
                       return (
                         <>

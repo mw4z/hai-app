@@ -113,6 +113,11 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // Onboarding users who picked SERVICE_PROVIDER haven't filled the service
+    // fields yet — put them in PENDING so they're not visible publicly until
+    // they complete their profile (description + location + address).
+    const providerStatus = validAccountType === 'SERVICE_PROVIDER' ? 'PENDING' : 'NONE'
+
     await db.user.update({
       where: { id: session.userId },
       data: {
@@ -120,6 +125,7 @@ export async function POST(req: NextRequest) {
         lastName: lastName?.trim() || null,
         gender: gender as any,
         accountType: validAccountType,
+        providerStatus,
         neighborhoodId,
         addressVerified,
       },

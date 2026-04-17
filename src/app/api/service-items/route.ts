@@ -4,12 +4,22 @@ import { getSession } from '@/lib/auth'
 import { log } from '@/lib/logger'
 import { getLimits } from '@/lib/capabilities'
 
-/** GET — get service items for a user */
+/** GET — get service items for a user (hidden if the provider isn't publicly visible) */
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const userId = searchParams.get('userId')
     if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
+
+    // Only expose the catalog when the provider has cleared the status gate.
+    // Pending/NONE providers' items stay invisible to the public.
+    const owner = await db.user.findUnique({
+      where: { id: userId },
+      select: { providerStatus: true },
+    })
+    if (!owner || (owner.providerStatus !== 'ACTIVE' && owner.providerStatus !== 'VERIFIED')) {
+      return NextResponse.json([])
+    }
 
     const items = await db.serviceItem.findMany({
       where: { userId, active: true },

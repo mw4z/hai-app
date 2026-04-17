@@ -44,7 +44,7 @@ interface Reply {
   body: string
   imageUrl?: string | null
   createdAt: string
-  author: { id: string; name: string | null; reputation: number; accountType?: string }
+  author: { id: string; name: string | null; reputation: number; accountType?: string; providerStatus?: string | null }
   likeCount?: number
   isLiked?: boolean
 }
@@ -54,7 +54,7 @@ interface Comment {
   body: string
   imageUrl?: string | null
   createdAt: string
-  author: { id: string; name: string | null; reputation: number; accountType?: string }
+  author: { id: string; name: string | null; reputation: number; accountType?: string; providerStatus?: string | null }
   likeCount?: number
   isLiked?: boolean
   replies: Reply[]
@@ -80,6 +80,7 @@ interface Post {
     name: string | null
     reputation: number
     accountType?: string
+    providerStatus?: string | null
     role?: string
     avatarUrl?: string | null
     coverUrl?: string | null
@@ -545,7 +546,7 @@ export default function PostCard({
           <div>
             <div className="flex items-center">
               <span className="text-sm font-medium text-gray-800">{post.author.name || t('post_neighbor')}</span>
-              <UserBadgeDisplay accountType={post.author.accountType} reputation={post.author.reputation} role={post.author.role} />
+              <UserBadgeDisplay accountType={post.author.accountType} providerStatus={post.author.providerStatus} reputation={post.author.reputation} role={post.author.role} />
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-gray-400">{timeAgo(post.createdAt)}</span>
@@ -957,7 +958,7 @@ export default function PostCard({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 mb-0.5">
                       <span className="text-[13px] font-semibold text-gray-800 dark:text-gray-200">{c.author.name || t('post_neighbor')}</span>
-                      <UserBadgeDisplay accountType={c.author.accountType} reputation={c.author.reputation} />
+                      <UserBadgeDisplay accountType={c.author.accountType} providerStatus={c.author.providerStatus} reputation={c.author.reputation} />
                       <span className="text-[10px] text-gray-400 dark:text-gray-500">
                         {(() => {
                           const mins = Math.floor((Date.now() - new Date(c.createdAt).getTime()) / 60000)
@@ -1044,7 +1045,7 @@ export default function PostCard({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 mb-0.5">
                             <span className="text-[12px] font-semibold text-gray-700 dark:text-gray-300">{reply.author.name || t('post_neighbor')}</span>
-                            <UserBadgeDisplay accountType={reply.author.accountType} reputation={reply.author.reputation} />
+                            <UserBadgeDisplay accountType={reply.author.accountType} providerStatus={reply.author.providerStatus} reputation={reply.author.reputation} />
                           </div>
                           {reply.body && <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-relaxed selectable-text"><SmartText text={reply.body} /></p>}
                           {reply.imageUrl && (
@@ -1259,7 +1260,7 @@ export default function PostCard({
 
                 {/* Identity badges (verification, role) */}
                 <div className="flex items-center gap-1.5 mt-1">
-                  <UserBadgeDisplay accountType={post.author.accountType} reputation={rep} role={post.author.role} showLabel />
+                  <UserBadgeDisplay accountType={post.author.accountType} providerStatus={post.author.providerStatus} reputation={rep} role={post.author.role} showLabel />
                 </div>
 
                 {/* Tier pill (reputation) */}
@@ -1304,8 +1305,9 @@ export default function PostCard({
                     </div>
                   )}
 
-                  {/* Account type */}
-                  {post.author.accountType && post.author.accountType !== 'NORMAL' && (
+                  {/* Account type — only shown publicly when the provider passed the status gate */}
+                  {post.author.accountType && post.author.accountType !== 'NORMAL' &&
+                    (post.author.providerStatus === 'ACTIVE' || post.author.providerStatus === 'VERIFIED') && (
                     <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-gray-700 rounded-xl">
                       <span className="text-xs text-gray-500 dark:text-gray-400">{lang !== 'en' ? 'نوع الحساب' : 'Account'}</span>
                       <span className="text-sm font-medium text-gray-800 dark:text-white">
@@ -1323,8 +1325,8 @@ export default function PostCard({
                   )}
                 </div>
 
-                {/* Bio + Service — unified card */}
-                {(post.author.bio || (post.author.accountType && post.author.accountType !== 'NORMAL' && (post.author.serviceDescription || post.author.serviceAddress || post.author.serviceLat))) && (
+                {/* Bio + Service — unified card. Service block only shows for visible providers (ACTIVE/VERIFIED). */}
+                {(post.author.bio || (post.author.accountType && post.author.accountType !== 'NORMAL' && (post.author.providerStatus === 'ACTIVE' || post.author.providerStatus === 'VERIFIED') && (post.author.serviceDescription || post.author.serviceAddress || post.author.serviceLat))) && (
                   <div className="mt-4 w-full rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700">
 
                     {/* Bio section */}
@@ -1336,7 +1338,7 @@ export default function PostCard({
                     )}
 
                     {/* Service section */}
-                    {post.author.accountType && post.author.accountType !== 'NORMAL' && (post.author.serviceDescription || post.author.serviceAddress || post.author.serviceLat) && (
+                    {post.author.accountType && post.author.accountType !== 'NORMAL' && (post.author.providerStatus === 'ACTIVE' || post.author.providerStatus === 'VERIFIED') && (post.author.serviceDescription || post.author.serviceAddress || post.author.serviceLat) && (
                       <div className={`px-4 py-3 bg-green-50 dark:bg-green-900/20 ${post.author.bio ? 'border-t border-gray-100 dark:border-gray-700' : ''}`}>
                         <p className="text-[10px] font-semibold text-green-700 dark:text-green-400 uppercase tracking-wide mb-1.5">
                           {lang !== 'en' ? 'الخدمة' : 'Service'}

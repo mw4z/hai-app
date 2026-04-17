@@ -91,6 +91,17 @@ export const translations = {
   profile_service_loc_hint: { ar: 'اختياري — حدد موقع محلك أو مكان تقديم الخدمة', en: 'Optional — set your shop or service location', ur: 'اختیاری — اپنی دکان یا خدمت کا مقام مقرر کریں' },
   profile_no_bio:        { ar: 'لم يضف نبذة بعد',    en: 'No bio yet',        ur: 'ابھی تک کوئی تعارف نہیں' },
 
+  profile_become_provider_title: { ar: 'أصبح مقدم خدمة', en: 'Become a Service Provider', ur: 'سروس پرووائیڈر بنیں' },
+  profile_become_provider_hint:  { ar: 'قدّم خدمتك لجيرانك — سباكة، كهرباء، توصيل، تنظيف...', en: 'Offer your service to neighbors — plumbing, electrical, delivery, cleaning...', ur: 'پڑوسیوں کو اپنی خدمت پیش کریں — پلمبنگ، بجلی، ڈیلیوری، صفائی...' },
+  profile_become_provider_cta:   { ar: 'ابدأ الآن',    en: 'Get started',      ur: 'شروع کریں' },
+  profile_provider_apply_title:  { ar: 'تفاصيل الخدمة', en: 'Service Details',  ur: 'خدمت کی تفصیل' },
+  profile_provider_apply_submit: { ar: 'تفعيل حساب مقدم خدمة', en: 'Activate provider account', ur: 'سروس پرووائیڈر فعال کریں' },
+  profile_provider_active:       { ar: 'أنت مقدم خدمة', en: 'You are a service provider', ur: 'آپ سروس پرووائیڈر ہیں' },
+  profile_provider_pending:      { ar: 'ملف الخدمة قيد المراجعة', en: 'Your provider profile is under review', ur: 'آپ کی پروفائل زیر جائزہ ہے' },
+  profile_provider_pending_hint: { ar: 'أكمل الوصف والموقع والعنوان لتفعيل حسابك تلقائياً.', en: 'Complete your description, location, and address to auto-activate your account.', ur: 'خود کار فعالیت کیلئے تفصیل، مقام، اور پتہ مکمل کریں۔' },
+  profile_provider_verified:     { ar: 'مقدم خدمة موثّق', en: 'Verified service provider', ur: 'تصدیق شدہ سروس پرووائیڈر' },
+  profile_provider_apply_ok:     { ar: 'تم إرسال طلبك', en: 'Application submitted', ur: 'درخواست جمع کرا دی گئی' },
+
   // ── Onboarding ──────────────────────────────────────────────────────────────
   onboard_hello:        { ar: 'مرحباً!',            en: 'Welcome!'          , ur: 'خوش آمدید!' },
   onboard_your_name:    { ar: 'ما اسمك؟',          en: "What's your name?" , ur: 'آپ کا نام کیا ہے؟' },

@@ -45,6 +45,7 @@ export default async function ProfilePage() {
         notifyReplies: user.notifyReplies,
         notifyLookingFor: user.notifyLookingFor,
         accountType: user.accountType,
+        providerStatus: user.providerStatus,
         bio: user.bio,
         serviceDescription: user.serviceDescription,
         serviceLat: user.serviceLat,

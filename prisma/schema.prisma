@@ -62,6 +62,7 @@ model User {
   addressProofUrl  String?       // uploaded lease/utility bill photo
   reputation       Int           @default(0)
   accountType      AccountType   @default(NORMAL)
+  providerStatus   ProviderStatus @default(NONE)  // visibility gate for provider listings (separate from accountType)
   role             UserRole      @default(RESIDENT)
   status           UserStatus    @default(ACTIVE)
   neighborhood     Neighborhood? @relation(fields: [neighborhoodId], references: [id])
@@ -192,6 +193,13 @@ enum AccountType {
   NORMAL
   SERVICE_PROVIDER
   VERIFIED_PROVIDER
+}
+
+enum ProviderStatus {
+  NONE      // not a provider
+  PENDING   // applied but quality gate not yet met
+  ACTIVE    // meets the quality gate — visible in public provider listings
+  VERIFIED  // admin-verified provider
 }
 
 enum Gender {

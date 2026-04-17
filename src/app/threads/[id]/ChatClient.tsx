@@ -852,8 +852,8 @@ export default function ChatClient({
                     <p className="text-sm text-gray-600 dark:text-gray-300 text-center mb-4 px-4">{profileData.bio}</p>
                   )}
 
-                  {/* Account type badge */}
-                  {profileData.accountType === 'SERVICE_PROVIDER' && (
+                  {/* Account type badge — only for publicly visible providers */}
+                  {profileData.accountType === 'SERVICE_PROVIDER' && (profileData.providerStatus === 'ACTIVE' || profileData.providerStatus === 'VERIFIED') && (
                     <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-full text-xs font-medium mb-4">
                       <span>🛠</span>
                       {lang === 'en' ? 'Service Provider' : 'مقدم خدمة'}

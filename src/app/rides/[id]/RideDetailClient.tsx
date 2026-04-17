@@ -504,7 +504,7 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
                               <span className="font-semibold text-sm text-gray-900 dark:text-white">{d.name || (lang !== 'en' ? 'شخص' : 'Person')}</span>
-                              <UserBadgeDisplay accountType={d.accountType} reputation={d.reputation} />
+                              <UserBadgeDisplay accountType={d.accountType} providerStatus={(d as any).providerStatus} reputation={d.reputation} />
                             </div>
                             <div className="flex items-center gap-3 mt-0.5 text-[11px] text-gray-400">
                               {d.driverRatingAvg > 0 && <span className="flex items-center gap-0.5"><FiStar className="w-3 h-3 text-amber-500" /> {d.driverRatingAvg}</span>}

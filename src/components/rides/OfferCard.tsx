@@ -63,7 +63,7 @@ export default function OfferCard({ offer, badge, isRequester, rideStatus, onSel
           {/* Driver name + badges */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-semibold text-sm text-gray-900 dark:text-white">{d.name || '—'}</span>
-            <UserBadgeDisplay accountType={d.accountType} reputation={d.reputation} />
+            <UserBadgeDisplay accountType={d.accountType} providerStatus={(d as any).providerStatus} reputation={d.reputation} />
           </div>
 
           {/* Stats row */}

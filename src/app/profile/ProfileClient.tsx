@@ -48,6 +48,7 @@ interface Props {
     notifyReplies?: boolean
     notifyLookingFor?: boolean
     accountType?: string
+    providerStatus?: string | null
     bio?: string | null
     serviceDescription?: string | null
     serviceLat?: number | null
@@ -114,7 +115,17 @@ export default function ProfileClient({ user, postCount }: Props) {
   const [tempServiceAddress, setTempServiceAddress] = useState('')
   const [serviceLat, setServiceLat] = useState(user.serviceLat || null)
   const [serviceLng, setServiceLng] = useState(user.serviceLng || null)
-  const isProvider = user.accountType === 'SERVICE_PROVIDER' || user.accountType === 'VERIFIED_PROVIDER'
+  const [accountType, setAccountType] = useState(user.accountType || 'NORMAL')
+  const [providerStatus, setProviderStatus] = useState<string>(user.providerStatus || 'NONE')
+  const isProvider = accountType === 'SERVICE_PROVIDER' || accountType === 'VERIFIED_PROVIDER'
+
+  // Become-a-provider apply form (only shown to NORMAL users)
+  const [applyOpen, setApplyOpen] = useState(false)
+  const [applyDesc, setApplyDesc] = useState('')
+  const [applyAddress, setApplyAddress] = useState('')
+  const [applyLat, setApplyLat] = useState<number | null>(null)
+  const [applyLng, setApplyLng] = useState<number | null>(null)
+  const [applySaving, setApplySaving] = useState(false)
 
   useEffect(() => {
     setTheme((localStorage.getItem('hai_theme') as Theme) || 'system')
@@ -411,7 +422,7 @@ export default function ProfileClient({ user, postCount }: Props) {
           {!(user.role === 'RESIDENT' && isProvider) && (
             <p className="text-white/90 text-sm">{t(`role_${user.role}` as any) || t('role_RESIDENT')}</p>
           )}
-          <UserBadgeDisplay accountType={user.accountType} reputation={user.reputation} role={user.role} showLabel lightText />
+          <UserBadgeDisplay accountType={accountType} providerStatus={providerStatus} reputation={user.reputation} role={user.role} showLabel lightText />
         </div>
         {user.neighborhood && (
           <p className="relative z-10 text-white/80 text-xs mt-1.5 flex items-center justify-center gap-1 profile-header-text">
@@ -803,6 +814,170 @@ export default function ProfileClient({ user, postCount }: Props) {
         )}
       </div>
       </AccordionSection>
+
+      {/* ═══ Become a Service Provider (NORMAL users only) ═══ */}
+      {accountType === 'NORMAL' && (
+        <div className="mx-4 mt-4">
+          {!applyOpen ? (
+            <button
+              onClick={() => setApplyOpen(true)}
+              className="w-full flex items-center gap-3 px-4 py-3.5 bg-white dark:bg-gray-800 rounded-2xl border border-primary-200 dark:border-primary-800 active:bg-gray-50 dark:active:bg-gray-700 transition-colors"
+            >
+              <span className="text-primary-600 dark:text-primary-400"><FiSettings className="w-4 h-4" /></span>
+              <span className="flex-1 text-start">
+                <span className="block text-sm font-semibold text-gray-800 dark:text-gray-100">{t('profile_become_provider_title')}</span>
+                <span className="block text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">{t('profile_become_provider_hint')}</span>
+              </span>
+              {lang === 'en' ? <FiChevronLeft className="w-4 h-4 text-gray-400 rotate-180" /> : <FiChevronLeft className="w-4 h-4 text-gray-400" />}
+            </button>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-primary-200 dark:border-primary-800 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{t('profile_provider_apply_title')}</h3>
+                <button
+                  onClick={() => setApplyOpen(false)}
+                  className="text-gray-400 p-1"
+                  aria-label="close"
+                >
+                  <FiX className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-primary-600">{t('profile_service_desc')}</label>
+                <textarea
+                  value={applyDesc}
+                  onChange={(e) => setApplyDesc(e.target.value)}
+                  className="input-field text-sm resize-none mt-1"
+                  placeholder={t('profile_service_hint')}
+                  maxLength={500}
+                  rows={3}
+                />
+                <span className="text-[10px] text-gray-400">{applyDesc.length}/500</span>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-primary-600">{t('profile_service_loc')}</label>
+                <input
+                  type="text"
+                  value={applyAddress}
+                  onChange={(e) => setApplyAddress(e.target.value)}
+                  className="input-field text-sm mt-1"
+                  placeholder={lang === 'en' ? 'e.g. Al-Malaz, Riyadh' : 'مثال: الملز، الرياض'}
+                  maxLength={200}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!navigator.geolocation) { toast.error(lang === 'en' ? 'Location not supported' : 'الموقع غير مدعوم'); return }
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        setApplyLat(pos.coords.latitude)
+                        setApplyLng(pos.coords.longitude)
+                        toast.success(lang === 'en' ? 'Location captured' : 'تم تحديد الموقع')
+                      },
+                      () => toast.error(lang === 'en' ? 'Could not get location' : 'تعذر تحديد الموقع'),
+                      { enableHighAccuracy: true }
+                    )
+                  }}
+                  className="mt-2 w-full flex items-center justify-center gap-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl py-2.5 text-xs font-medium text-gray-600 dark:text-gray-300 active:scale-95 transition-transform"
+                >
+                  <FiMapPin className="w-3.5 h-3.5" />
+                  {applyLat ? (lang === 'en' ? 'Update Location' : 'تحديث الموقع') : (lang === 'en' ? 'Use My Location' : 'استخدم موقعي')}
+                </button>
+                {applyLat && applyLng && (
+                  <p className="text-[10px] text-green-600 mt-1">
+                    {lang === 'en' ? 'Location set' : 'تم تحديد الموقع'} ({applyLat.toFixed(4)}, {applyLng.toFixed(4)})
+                  </p>
+                )}
+              </div>
+
+              <button
+                disabled={applySaving}
+                onClick={async () => {
+                  if (applyDesc.trim().length < 10) {
+                    toast.error(lang === 'en' ? 'Please describe your service (at least 10 characters)' : 'اشرح خدمتك (10 أحرف على الأقل)')
+                    return
+                  }
+                  if (!applyAddress.trim()) {
+                    toast.error(lang === 'en' ? 'Service address is required' : 'عنوان الخدمة مطلوب')
+                    return
+                  }
+                  if (applyLat == null || applyLng == null) {
+                    toast.error(lang === 'en' ? 'Please set your service location' : 'يرجى تحديد موقع الخدمة')
+                    return
+                  }
+                  setApplySaving(true)
+                  try {
+                    const res = await fetch('/api/provider/apply', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        serviceDescription: applyDesc.trim(),
+                        serviceAddress: applyAddress.trim(),
+                        serviceLat: applyLat,
+                        serviceLng: applyLng,
+                      }),
+                    })
+                    const data = await res.json().catch(() => ({}))
+                    if (!res.ok) {
+                      toast.error(data.message || data.error || (lang === 'en' ? 'Error' : 'خطأ'))
+                      return
+                    }
+                    // Flip UI to provider mode without a reload. Use the
+                    // status returned by the server so pending vs active is
+                    // reflected correctly based on the quality gate.
+                    setAccountType('SERVICE_PROVIDER')
+                    setProviderStatus(data.user?.providerStatus || 'PENDING')
+                    setServiceDescription(applyDesc.trim())
+                    setServiceAddress(applyAddress.trim())
+                    setServiceLat(applyLat)
+                    setServiceLng(applyLng)
+                    setApplyOpen(false)
+                    toast.success(t('profile_provider_apply_ok'))
+                  } catch {
+                    toast.error(lang === 'en' ? 'Network error' : 'خطأ في الاتصال')
+                  } finally {
+                    setApplySaving(false)
+                  }
+                }}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold text-white bg-primary-600 disabled:opacity-50"
+              >
+                {applySaving ? t('profile_saving') : t('profile_provider_apply_submit')}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ Provider status indicator (branches on providerStatus) ═══ */}
+      {accountType !== 'NORMAL' && providerStatus === 'PENDING' && (
+        <div className="mx-4 mt-4">
+          <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-200 dark:border-amber-800">
+            <span className="text-base leading-none mt-0.5">⏳</span>
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">{t('profile_provider_pending')}</p>
+              <p className="text-[11px] text-amber-700/80 dark:text-amber-300/80 mt-0.5 leading-snug">{t('profile_provider_pending_hint')}</p>
+            </div>
+          </div>
+        </div>
+      )}
+      {accountType === 'SERVICE_PROVIDER' && providerStatus === 'ACTIVE' && (
+        <div className="mx-4 mt-4">
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-primary-50 dark:bg-primary-900/20 rounded-2xl border border-primary-100 dark:border-primary-800">
+            <FiCheck className="w-4 h-4 text-primary-600 flex-shrink-0" />
+            <span className="text-xs font-medium text-primary-700 dark:text-primary-300">{t('profile_provider_active')}</span>
+          </div>
+        </div>
+      )}
+      {accountType === 'VERIFIED_PROVIDER' && (
+        <div className="mx-4 mt-4">
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800">
+            <span className="text-base leading-none">🛡</span>
+            <span className="text-xs font-medium text-blue-700 dark:text-blue-300">{t('profile_provider_verified')}</span>
+          </div>
+        </div>
+      )}
 
       {/* ═══ Service Catalog (providers only) ═══ */}
       {isProvider && (

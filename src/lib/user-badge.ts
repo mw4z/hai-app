@@ -14,9 +14,15 @@ export interface UserBadge {
   ur: string
 }
 
-export function getPrimaryBadge(accountType: string): UserBadge | null {
+export function getPrimaryBadge(accountType: string, providerStatus?: string | null): UserBadge | null {
+  // Verified admin approval wins regardless of providerStatus drift
   if (accountType === 'VERIFIED_PROVIDER') return { emoji: '🛡', ar: 'موثّق', en: 'Verified', ur: 'تصدیق شدہ' }
-  if (accountType === 'SERVICE_PROVIDER') return { emoji: '🛠', ar: 'مقدم خدمة', en: 'Provider', ur: 'خدمت گزار' }
+  // Only show the "Provider" badge publicly when the status gate allows it.
+  // PENDING providers stay invisible in listings and badges until they pass
+  // the quality gate — matches the gating applied in API routes.
+  if (accountType === 'SERVICE_PROVIDER' && (providerStatus === 'ACTIVE' || providerStatus === 'VERIFIED')) {
+    return { emoji: '🛠', ar: 'مقدم خدمة', en: 'Provider', ur: 'خدمت گزار' }
+  }
   return null
 }
 

@@ -21,7 +21,7 @@ export async function GET(
             select: {
               id: true, name: true, avatarUrl: true,
               driverRatingAvg: true, driverTripsCount: true, driverCancelCount: true,
-              reputation: true, accountType: true,
+              reputation: true, accountType: true, providerStatus: true,
             },
           },
         },

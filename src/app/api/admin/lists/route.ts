@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
           ...userNbhdFilter,
           ...(q ? { OR: [{ name: { contains: q } }, { phone: { contains: q } }, { email: { contains: q } }] } : {}),
         },
-        select: { id: true, name: true, phone: true, email: true, role: true, status: true, neighborhoodId: true, reputation: true, accountType: true },
+        select: { id: true, name: true, phone: true, email: true, role: true, status: true, neighborhoodId: true, reputation: true, accountType: true, providerStatus: true },
         orderBy: { createdAt: 'desc' },
         take: 50,
       })

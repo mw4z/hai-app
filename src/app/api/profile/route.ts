@@ -22,6 +22,7 @@ export async function GET() {
         email: true,
         emailVerified: true,
         accountType: true,
+        providerStatus: true,
         bio: true,
         serviceDescription: true,
         serviceLat: true,

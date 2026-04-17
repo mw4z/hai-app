@@ -16,7 +16,7 @@ export async function GET() {
           select: {
             id: true, title: true, body: true, category: true, status: true,
             createdAt: true, imageUrls: true,
-            author: { select: { id: true, name: true, reputation: true, accountType: true, avatarUrl: true, neighborhood: { select: { name: true, nameEn: true } } } },
+            author: { select: { id: true, name: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true, neighborhood: { select: { name: true, nameEn: true } } } },
             reactions: { select: { emoji: true, userId: true } },
             _count: { select: { comments: true, reactions: true } },
           },

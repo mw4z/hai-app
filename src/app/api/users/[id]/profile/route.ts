@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { cached } from '@/lib/cache'
+import { isProviderVisible } from '@/lib/provider'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -19,6 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
           bio: true,
           reputation: true,
           accountType: true,
+          providerStatus: true,
           serviceDescription: true,
           createdAt: true,
           neighborhood: { select: { name: true, nameEn: true } },
@@ -26,6 +28,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         },
       })
       if (!user) return null
+      // Hide provider-facing fields from the public when the account hasn't
+      // cleared the status gate (PENDING / NONE). The account itself isn't
+      // hidden — only the provider-specific surface area.
+      const visibleAsProvider = isProviderVisible(user.providerStatus)
       return {
         id: user.id,
         name: user.name,
@@ -33,8 +39,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         avatarUrl: user.avatarUrl,
         bio: user.bio,
         reputation: user.reputation,
-        accountType: user.accountType,
-        serviceDescription: user.serviceDescription,
+        accountType: visibleAsProvider ? user.accountType : 'NORMAL',
+        providerStatus: visibleAsProvider ? user.providerStatus : 'NONE',
+        serviceDescription: visibleAsProvider ? user.serviceDescription : null,
         createdAt: user.createdAt,
         neighborhood: user.neighborhood,
         postCount: user._count.posts,

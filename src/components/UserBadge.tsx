@@ -19,12 +19,14 @@ function VerifyCheck({ className }: { className?: string }) {
  */
 export default function UserBadgeDisplay({
   accountType,
+  providerStatus,
   reputation,
   role,
   showLabel = false,
   lightText = false,
 }: {
   accountType?: string
+  providerStatus?: string | null
   reputation: number
   role?: string
   showLabel?: boolean
@@ -32,7 +34,7 @@ export default function UserBadgeDisplay({
 }) {
   const { lang } = useLanguage()
   const roleBadge = getRoleBadge(role || '')
-  const primary = getPrimaryBadge(accountType || 'NORMAL')
+  const primary = getPrimaryBadge(accountType || 'NORMAL', providerStatus)
 
   // Identity badges only — no tier in this component
   if (!roleBadge && !primary) return null
