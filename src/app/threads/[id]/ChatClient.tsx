@@ -722,7 +722,12 @@ export default function ChatClient({
 
           return (
             <MessageBubble
-              key={msg.id}
+              // Use the blob preview URL as the stable key for photos we just
+              // sent, so React keeps the same <img> element when the message
+              // id swaps from "pending-xxx" to the real server id. Otherwise
+              // the bubble unmounts+remounts and the image flashes blank
+              // while it re-decodes.
+              key={(msg as any).localPreview || msg.id}
               msg={msg}
               isMe={isMe}
               isLastInGroup={isLastInGroup}
@@ -747,6 +752,7 @@ export default function ChatClient({
               t={t}
               currentUserId={currentUserId}
               otherName={other.name || (lang === 'en' ? 'Neighbor' : 'جار')}
+              onPendingImageLoad={() => bottomRef.current?.scrollIntoView({ block: 'end' })}
             />
           )
         })}
@@ -1176,11 +1182,12 @@ export default function ChatClient({
 }
 
 // Separate bubble component for long-press handling
-function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dateLabel, timeStr, lang, editingMsg, editText, setEditText, editInputRef, onSaveEdit, onCancelEdit, onLongPress, onDoubleTap, onReply, onImageTap, onJumpToReply, selectedMsg, showUnreadDivider, t, currentUserId, otherName }: {
+function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dateLabel, timeStr, lang, editingMsg, editText, setEditText, editInputRef, onSaveEdit, onCancelEdit, onLongPress, onDoubleTap, onReply, onImageTap, onJumpToReply, selectedMsg, showUnreadDivider, t, currentUserId, otherName, onPendingImageLoad }: {
   msg: Msg; isMe: boolean; isLastInGroup: boolean; isFirstInGroup: boolean; showDate: boolean; dateLabel: string; timeStr: string; lang: string
   editingMsg: string | null; editText: string; setEditText: (v: string) => void; editInputRef: React.RefObject<HTMLInputElement>
   onSaveEdit: () => void; onCancelEdit: () => void; onLongPress: () => void; onDoubleTap: () => void; onReply: () => void; onImageTap: (url: string) => void; onJumpToReply: (id: string) => void; selectedMsg: string | null; showUnreadDivider: boolean; t: (k: any) => string
   currentUserId: string; otherName: string
+  onPendingImageLoad?: () => void
 }) {
   const longPress = useLongPress(onLongPress, onDoubleTap, 400)
   const rowRef = useRef<HTMLDivElement>(null)
@@ -1290,10 +1297,10 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
               <img
                 src={(msg as any).localPreview || msg.imageUrl || ''}
                 alt=""
-                onLoad={(e) => {
-                  if ((msg as any).pending) {
-                    (e.currentTarget as HTMLImageElement).scrollIntoView({ block: 'end' })
-                  }
+                onLoad={() => {
+                  // Delegate to parent so the scroll lands on the real
+                  // bottom sentinel (past any padding/composer offset).
+                  if ((msg as any).pending) onPendingImageLoad?.()
                 }}
                 className={`rounded-2xl max-h-52 object-cover shadow-sm ${(msg as any).pending ? 'opacity-60' : ''} ${isLastInGroup ? (isMe ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : 'ltr:rounded-bl-sm rtl:rounded-br-sm') : ''}`}
               />
