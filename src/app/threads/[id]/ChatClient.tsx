@@ -453,6 +453,12 @@ export default function ChatClient({
       pending: true as const,
     }))
     setMessages((prev) => [...prev, ...pendingPlaceholders as any])
+    // Jump to the bottom right after inserting the pending bubbles.
+    // The useEffect on messages.length handles most cases, but images may
+    // have zero height until the blob URL loads — so we re-scroll below on
+    // each <img> onLoad (see the bubble render) to stick to the bottom as
+    // the photo's intrinsic dimensions resolve.
+    requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }))
 
     try {
       const urls = await uploadFiles(valid)
@@ -1278,6 +1284,13 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
                   ? ((msg as any).localPreview || msg.imageUrl)
                   : (msg.imageUrl || (msg as any).localPreview)}
                 alt=""
+                onLoad={(e) => {
+                  // If this image is still pending (user just sent it), keep
+                  // the view pinned to the bottom as the bubble reflows.
+                  if ((msg as any).pending || (msg as any).remoteReady === false) {
+                    (e.currentTarget as HTMLImageElement).scrollIntoView({ block: 'end' })
+                  }
+                }}
                 onError={(e) => {
                   const preview = (msg as any).localPreview
                   if (preview && (e.currentTarget as HTMLImageElement).src !== preview) {
