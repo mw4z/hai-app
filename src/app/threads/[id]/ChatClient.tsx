@@ -274,6 +274,17 @@ export default function ChatClient({
     bottomRef.current?.scrollIntoView()
   }, [messages.length])
 
+  // Tap on a reply quote → scroll the original into view and flash a
+  // brief highlight so the user sees what was replied to. Mirrors
+  // WhatsApp's behavior.
+  function jumpToMessage(id: string) {
+    const el = document.querySelector(`[data-msg-id="${id}"]`) as HTMLElement | null
+    if (!el) return
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    el.classList.add('msg-jump-highlight')
+    setTimeout(() => el.classList.remove('msg-jump-highlight'), 1600)
+  }
+
   // When replying to a message, make sure it stays visible after the
   // composer grows to show the reply preview. The messages container
   // is the scroll root now, so scrollIntoView works cleanly.
@@ -611,6 +622,7 @@ export default function ChatClient({
               onDoubleTap={() => reactToMessage(msg.id, '❤️')}
               onReply={() => { setReplyingTo(msg); textInputRef.current?.focus() }}
               onImageTap={(url) => setLightboxUrl(url)}
+              onJumpToReply={jumpToMessage}
               selectedMsg={selectedMsg}
               showUnreadDivider={msg.id === unreadDividerId}
               t={t}
@@ -980,10 +992,10 @@ export default function ChatClient({
 }
 
 // Separate bubble component for long-press handling
-function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dateLabel, timeStr, lang, editingMsg, editText, setEditText, editInputRef, onSaveEdit, onCancelEdit, onLongPress, onDoubleTap, onReply, onImageTap, selectedMsg, showUnreadDivider, t, currentUserId, otherName }: {
+function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dateLabel, timeStr, lang, editingMsg, editText, setEditText, editInputRef, onSaveEdit, onCancelEdit, onLongPress, onDoubleTap, onReply, onImageTap, onJumpToReply, selectedMsg, showUnreadDivider, t, currentUserId, otherName }: {
   msg: Msg; isMe: boolean; isLastInGroup: boolean; isFirstInGroup: boolean; showDate: boolean; dateLabel: string; timeStr: string; lang: string
   editingMsg: string | null; editText: string; setEditText: (v: string) => void; editInputRef: React.RefObject<HTMLInputElement>
-  onSaveEdit: () => void; onCancelEdit: () => void; onLongPress: () => void; onDoubleTap: () => void; onReply: () => void; onImageTap: (url: string) => void; selectedMsg: string | null; showUnreadDivider: boolean; t: (k: any) => string
+  onSaveEdit: () => void; onCancelEdit: () => void; onLongPress: () => void; onDoubleTap: () => void; onReply: () => void; onImageTap: (url: string) => void; onJumpToReply: (id: string) => void; selectedMsg: string | null; showUnreadDivider: boolean; t: (k: any) => string
   currentUserId: string; otherName: string
 }) {
   const longPress = useLongPress(onLongPress, onDoubleTap, 400)
@@ -1045,11 +1057,14 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
     }
   }, [msg.type, onReply])
 
-  // Render reply quote above the bubble
+  // Render reply quote above the bubble. Tapping it jumps to the
+  // original message and flashes a fading highlight (WhatsApp-style).
   const replyQuote = msg.replyTo ? (
-    <div className={`mb-1 px-2.5 py-1.5 rounded-lg border-s-2 ${
-      isMe ? 'bg-primary-700/40 border-white/40' : 'bg-gray-100 dark:bg-gray-700/60 border-primary-500'
-    }`}>
+    <button type="button"
+      onClick={(e) => { e.stopPropagation(); if (msg.replyTo) onJumpToReply(msg.replyTo.id) }}
+      className={`mb-1 w-full text-start px-2.5 py-1.5 rounded-lg border-s-2 active:opacity-70 transition-opacity ${
+        isMe ? 'bg-primary-700/40 border-white/40' : 'bg-gray-100 dark:bg-gray-700/60 border-primary-500'
+      }`}>
       <p className={`text-[10px] font-bold ${isMe ? 'text-primary-100' : 'text-primary-600 dark:text-primary-400'}`}>
         {msg.replyTo.senderId === currentUserId
           ? (lang === 'en' ? 'You' : lang === 'ur' ? 'آپ' : 'أنت')
@@ -1058,7 +1073,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
       <p className={`text-[11px] truncate ${isMe ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'}`}>
         {msg.replyTo.type === 'IMAGE' ? '📷' : msg.replyTo.type === 'LOCATION' ? '📍' : (msg.replyTo.text || '').slice(0, 60)}
       </p>
-    </div>
+    </button>
   ) : null
 
   return (
