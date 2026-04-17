@@ -14,6 +14,7 @@ import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useAttachContact } from '@/hooks/useAttachContact'
 import ImageLightbox from './ImageLightbox'
 import SmartText from './SmartText'
+import { showApiError } from '@/lib/apiError'
 import type { TranslationKey } from '@/lib/i18n'
 import { canStartPrivateThread } from '@/lib/thread-rules'
 import { getRepLevel } from '@/lib/reputation-levels'
@@ -326,7 +327,7 @@ export default function PostCard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body: commentText, imageUrl }),
       })
-      if (!res.ok) { toast.error(t('common_error')); return }
+      if (!res.ok) { await showApiError(res, lang); return }
       const comment = await res.json()
       playSend()
       setComments(prev => [...prev, { ...comment, replies: comment.replies || [] }])
@@ -356,7 +357,7 @@ export default function PostCard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body: replyText, parentId: replyingTo.id, imageUrl }),
       })
-      if (!res.ok) { toast.error(t('common_error')); return }
+      if (!res.ok) { await showApiError(res, lang); return }
       const reply = await res.json()
       playSend()
       setComments(prev =>

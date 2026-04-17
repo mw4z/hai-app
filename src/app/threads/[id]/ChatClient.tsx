@@ -15,6 +15,7 @@ import { useAttachContact } from '@/hooks/useAttachContact'
 import { playSend } from '@/lib/sound'
 import SmartText from '@/components/SmartText'
 import ImageLightbox from '@/components/ImageLightbox'
+import { showApiError } from '@/lib/apiError'
 
 interface ReplyTo {
   id: string
@@ -360,6 +361,9 @@ export default function ChatClient({
         const msg = await res.json()
         playSend()
         setMessages(prev => [...prev, msg])
+      } else {
+        await showApiError(res, lang as 'ar' | 'en' | 'ur')
+        setText(body)
       }
     } catch { toast.error(t('common_error')); setText(body) }
     finally { setSending(false) }
@@ -379,6 +383,7 @@ export default function ChatClient({
             body: JSON.stringify({ type: 'LOCATION', lat: pos.coords.latitude, lng: pos.coords.longitude }),
           })
           if (res.ok) { const msg = await res.json(); setMessages(prev => [...prev, msg]) }
+          else { await showApiError(res, lang as 'ar' | 'en' | 'ur') }
         } catch { toast.error(t('common_error')) }
         finally { setSendingLocation(false) }
       },
@@ -403,6 +408,7 @@ export default function ChatClient({
         body: JSON.stringify({ type: 'IMAGE', imageUrl: urls[0], replyToId: replyId }),
       })
       if (res.ok) { const msg = await res.json(); setMessages(prev => [...prev, msg]) }
+      else { await showApiError(res, lang as 'ar' | 'en' | 'ur') }
     } catch { toast.error(t('common_error')) }
     finally { setSendingImage(false); if (imgInputRef.current) imgInputRef.current.value = '' }
   }

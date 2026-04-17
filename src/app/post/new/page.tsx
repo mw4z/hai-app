@@ -6,6 +6,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { FiArrowRight, FiArrowLeft } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import { translateApiError } from '@/lib/apiError'
 import BackButton from '@/components/BackButton'
 import RiyalIcon from '@/components/RiyalIcon'
 import { uploadFiles } from '@/lib/upload'
@@ -162,7 +163,7 @@ export default function NewPostPage() {
 
       if (!res.ok) {
         playError()
-        toast.error(typeof data.error === 'string' ? data.error : data.error?.message || 'فشل نشر المنشور')
+        toast.error(translateApiError(data, lang as 'ar' | 'en' | 'ur'))
         return
       }
 
