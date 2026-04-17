@@ -119,13 +119,21 @@ export default function ProfileClient({ user, postCount }: Props) {
   const [providerStatus, setProviderStatus] = useState<string>(user.providerStatus || 'NONE')
   const isProvider = accountType === 'SERVICE_PROVIDER' || accountType === 'VERIFIED_PROVIDER'
 
-  // Become-a-provider apply form (only shown to NORMAL users)
+  // Become-a-provider apply form (only shown to NORMAL users).
+  // Service address/coordinates are locked to the user's neighborhood on the
+  // server, so the client only tracks the description.
   const [applyOpen, setApplyOpen] = useState(false)
   const [applyDesc, setApplyDesc] = useState('')
-  const [applyAddress, setApplyAddress] = useState('')
-  const [applyLat, setApplyLat] = useState<number | null>(null)
-  const [applyLng, setApplyLng] = useState<number | null>(null)
   const [applySaving, setApplySaving] = useState(false)
+
+  // Default service address = user's own neighborhood + city, localized.
+  // Pre-filled when opening the apply form or the bio editor if nothing is set yet.
+  function defaultServiceAddress(): string {
+    const nb = dn(user.neighborhood, user.neighborhoodEn)
+    const ct = dn(user.city, user.cityEn)
+    if (nb && ct) return `${nb}, ${ct}`
+    return nb || ct || ''
+  }
 
   useEffect(() => {
     setTheme((localStorage.getItem('hai_theme') as Theme) || 'system')
@@ -685,7 +693,8 @@ export default function ProfileClient({ user, postCount }: Props) {
               <span className="text-[10px] text-gray-400">{tempBio.length}/300</span>
             </div>
 
-            {/* Service Description (providers only) */}
+            {/* Service Description (providers only). Address/location is locked
+                to the user's own neighborhood — no input shown. */}
             {isProvider && (
               <>
                 <div className="border-t border-gray-100 dark:border-gray-700 pt-3 mt-2">
@@ -703,39 +712,15 @@ export default function ProfileClient({ user, postCount }: Props) {
 
                 <div className="border-t border-gray-100 dark:border-gray-700 pt-3 mt-2">
                   <label className="text-xs font-medium text-primary-600">{t('profile_service_loc')}</label>
-                  <p className="text-[10px] text-gray-400 mb-2">{t('profile_service_loc_hint')}</p>
-                  <input
-                    type="text"
-                    value={tempServiceAddress}
-                    onChange={e => setTempServiceAddress(e.target.value)}
-                    className="input-field text-sm"
-                    placeholder={lang === 'en' ? 'e.g. Al-Malaz, Riyadh' : 'مثال: الملز، الرياض'}
-                    maxLength={200}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!navigator.geolocation) { toast.error(lang === 'en' ? 'Location not supported' : 'الموقع غير مدعوم'); return }
-                      navigator.geolocation.getCurrentPosition(
-                        (pos) => {
-                          setServiceLat(pos.coords.latitude)
-                          setServiceLng(pos.coords.longitude)
-                          toast.success(lang === 'en' ? 'Location captured' : 'تم تحديد الموقع')
-                        },
-                        () => toast.error(lang === 'en' ? 'Could not get location' : 'تعذر تحديد الموقع'),
-                        { enableHighAccuracy: true }
-                      )
-                    }}
-                    className="mt-2 w-full flex items-center justify-center gap-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl py-2.5 text-xs font-medium text-gray-600 dark:text-gray-300 active:scale-95 transition-transform"
-                  >
-                    <FiMapPin className="w-3.5 h-3.5" />
-                    {serviceLat ? (lang === 'en' ? 'Update Location' : 'تحديث الموقع') : (lang === 'en' ? 'Use My Location' : 'استخدم موقعي')}
-                  </button>
-                  {serviceLat && serviceLng && (
-                    <p className="text-[10px] text-green-600 mt-1">
-                      {lang === 'en' ? 'Location set' : 'تم تحديد الموقع'} ({Number(serviceLat).toFixed(4)}, {Number(serviceLng).toFixed(4)})
-                    </p>
-                  )}
+                  <div className="mt-1 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600">
+                    <FiMapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                    <span className="text-sm text-gray-700 dark:text-gray-300 truncate">{defaultServiceAddress() || '—'}</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1.5">
+                    {lang === 'en'
+                      ? 'Service area is set to your neighborhood and cannot be changed here.'
+                      : 'منطقة الخدمة مربوطة بحيّك ولا يمكن تغييرها من هنا.'}
+                  </p>
                 </div>
               </>
             )}
@@ -751,11 +736,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                     const payload: Record<string, any> = { bio: tempBio }
                     if (isProvider) {
                       payload.serviceDescription = tempServiceDesc
-                      payload.serviceAddress = tempServiceAddress
-                      if (serviceLat && serviceLng) {
-                        payload.serviceLat = serviceLat
-                        payload.serviceLng = serviceLng
-                      }
+                      // Address/coords are not editable — backend derives from neighborhood.
                     }
                     const res = await fetch('/api/profile', {
                       method: 'PATCH',
@@ -765,7 +746,6 @@ export default function ProfileClient({ user, postCount }: Props) {
                     if (res.ok) {
                       setBio(tempBio)
                       setServiceDescription(tempServiceDesc)
-                      setServiceAddress(tempServiceAddress)
                       setEditingBio(false)
                       toast.success(t('profile_save'))
                     } else {
@@ -783,7 +763,7 @@ export default function ProfileClient({ user, postCount }: Props) {
           </div>
         ) : (
           <button
-            onClick={() => { setTempBio(bio); setTempServiceDesc(serviceDescription); setTempServiceAddress(serviceAddress); setEditingBio(true) }}
+            onClick={() => { setTempBio(bio); setTempServiceDesc(serviceDescription); setTempServiceAddress(serviceAddress || (isProvider ? defaultServiceAddress() : '')); setEditingBio(true) }}
             className="w-full p-4 text-right"
           >
             {bio ? (
@@ -858,38 +838,15 @@ export default function ProfileClient({ user, postCount }: Props) {
 
               <div>
                 <label className="text-xs font-medium text-primary-600">{t('profile_service_loc')}</label>
-                <input
-                  type="text"
-                  value={applyAddress}
-                  onChange={(e) => setApplyAddress(e.target.value)}
-                  className="input-field text-sm mt-1"
-                  placeholder={lang === 'en' ? 'e.g. Al-Malaz, Riyadh' : 'مثال: الملز، الرياض'}
-                  maxLength={200}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!navigator.geolocation) { toast.error(lang === 'en' ? 'Location not supported' : 'الموقع غير مدعوم'); return }
-                    navigator.geolocation.getCurrentPosition(
-                      (pos) => {
-                        setApplyLat(pos.coords.latitude)
-                        setApplyLng(pos.coords.longitude)
-                        toast.success(lang === 'en' ? 'Location captured' : 'تم تحديد الموقع')
-                      },
-                      () => toast.error(lang === 'en' ? 'Could not get location' : 'تعذر تحديد الموقع'),
-                      { enableHighAccuracy: true }
-                    )
-                  }}
-                  className="mt-2 w-full flex items-center justify-center gap-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl py-2.5 text-xs font-medium text-gray-600 dark:text-gray-300 active:scale-95 transition-transform"
-                >
-                  <FiMapPin className="w-3.5 h-3.5" />
-                  {applyLat ? (lang === 'en' ? 'Update Location' : 'تحديث الموقع') : (lang === 'en' ? 'Use My Location' : 'استخدم موقعي')}
-                </button>
-                {applyLat && applyLng && (
-                  <p className="text-[10px] text-green-600 mt-1">
-                    {lang === 'en' ? 'Location set' : 'تم تحديد الموقع'} ({applyLat.toFixed(4)}, {applyLng.toFixed(4)})
-                  </p>
-                )}
+                <div className="mt-1 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600">
+                  <FiMapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                  <span className="text-sm text-gray-700 dark:text-gray-300 truncate">{defaultServiceAddress() || '—'}</span>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1.5">
+                  {lang === 'en'
+                    ? 'Service area is locked to your neighborhood.'
+                    : 'منطقة الخدمة ثابتة على حيّك.'}
+                </p>
               </div>
 
               <button
@@ -899,25 +856,12 @@ export default function ProfileClient({ user, postCount }: Props) {
                     toast.error(lang === 'en' ? 'Please describe your service (at least 10 characters)' : 'اشرح خدمتك (10 أحرف على الأقل)')
                     return
                   }
-                  if (!applyAddress.trim()) {
-                    toast.error(lang === 'en' ? 'Service address is required' : 'عنوان الخدمة مطلوب')
-                    return
-                  }
-                  if (applyLat == null || applyLng == null) {
-                    toast.error(lang === 'en' ? 'Please set your service location' : 'يرجى تحديد موقع الخدمة')
-                    return
-                  }
                   setApplySaving(true)
                   try {
                     const res = await fetch('/api/provider/apply', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        serviceDescription: applyDesc.trim(),
-                        serviceAddress: applyAddress.trim(),
-                        serviceLat: applyLat,
-                        serviceLng: applyLng,
-                      }),
+                      body: JSON.stringify({ serviceDescription: applyDesc.trim() }),
                     })
                     const data = await res.json().catch(() => ({}))
                     if (!res.ok) {
@@ -925,14 +869,13 @@ export default function ProfileClient({ user, postCount }: Props) {
                       return
                     }
                     // Flip UI to provider mode without a reload. Use the
-                    // status returned by the server so pending vs active is
-                    // reflected correctly based on the quality gate.
+                    // status + server-resolved address/coords from the response.
                     setAccountType('SERVICE_PROVIDER')
                     setProviderStatus(data.user?.providerStatus || 'PENDING')
                     setServiceDescription(applyDesc.trim())
-                    setServiceAddress(applyAddress.trim())
-                    setServiceLat(applyLat)
-                    setServiceLng(applyLng)
+                    if (data.user?.serviceAddress) setServiceAddress(data.user.serviceAddress)
+                    if (typeof data.user?.serviceLat === 'number') setServiceLat(data.user.serviceLat)
+                    if (typeof data.user?.serviceLng === 'number') setServiceLng(data.user.serviceLng)
                     setApplyOpen(false)
                     toast.success(t('profile_provider_apply_ok'))
                   } catch {

@@ -97,8 +97,8 @@ export const translations = {
   profile_provider_apply_title:  { ar: 'تفاصيل الخدمة', en: 'Service Details',  ur: 'خدمت کی تفصیل' },
   profile_provider_apply_submit: { ar: 'تفعيل حساب مقدم خدمة', en: 'Activate provider account', ur: 'سروس پرووائیڈر فعال کریں' },
   profile_provider_active:       { ar: 'أنت مقدم خدمة', en: 'You are a service provider', ur: 'آپ سروس پرووائیڈر ہیں' },
-  profile_provider_pending:      { ar: 'ملف الخدمة قيد المراجعة', en: 'Your provider profile is under review', ur: 'آپ کی پروفائل زیر جائزہ ہے' },
-  profile_provider_pending_hint: { ar: 'أكمل الوصف والموقع والعنوان لتفعيل حسابك تلقائياً.', en: 'Complete your description, location, and address to auto-activate your account.', ur: 'خود کار فعالیت کیلئے تفصیل، مقام، اور پتہ مکمل کریں۔' },
+  profile_provider_pending:      { ar: 'أكمل ملف الخدمة للتفعيل', en: 'Finish your provider profile to activate', ur: 'ایکٹیویشن کیلئے پروفائل مکمل کریں' },
+  profile_provider_pending_hint: { ar: 'اكتب وصفاً لخدمتك (20 حرفاً على الأقل) ليتم تفعيل حسابك تلقائياً. لا تحتاج موافقة من أحد.', en: 'Add a service description (at least 20 characters) and your account activates automatically — no approval needed.', ur: 'خدمت کی تفصیل لکھیں (کم از کم 20 حروف) — اکاؤنٹ خود بخود فعال ہو جائے گا، کسی منظوری کی ضرورت نہیں۔' },
   profile_provider_verified:     { ar: 'مقدم خدمة موثّق', en: 'Verified service provider', ur: 'تصدیق شدہ سروس پرووائیڈر' },
   profile_provider_apply_ok:     { ar: 'تم إرسال طلبك', en: 'Application submitted', ur: 'درخواست جمع کرا دی گئی' },
 

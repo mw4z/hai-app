@@ -48,10 +48,12 @@ export async function POST(req: NextRequest) {
       select: {
         id: true,
         hidden: true,
+        name: true,
         lat: true,
         lng: true,
         boundary: true,
         bbox: true,
+        city: { select: { name: true } },
       },
     })
     if (!neighborhood || neighborhood.hidden) {
@@ -113,10 +115,20 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Onboarding users who picked SERVICE_PROVIDER haven't filled the service
-    // fields yet — put them in PENDING so they're not visible publicly until
-    // they complete their profile (description + location + address).
-    const providerStatus = validAccountType === 'SERVICE_PROVIDER' ? 'PENDING' : 'NONE'
+    // Onboarding users who picked SERVICE_PROVIDER haven't written a service
+    // description yet — land them in PENDING. Pre-populate address + coords
+    // from their own neighborhood so when they add a description later, the
+    // quality gate can auto-flip them to ACTIVE. (Service location is always
+    // the user's neighborhood — never user-chosen.)
+    const isProvider = validAccountType === 'SERVICE_PROVIDER'
+    const providerStatus = isProvider ? 'PENDING' : 'NONE'
+    const providerFields = isProvider
+      ? {
+          serviceAddress: `${neighborhood.name}, ${neighborhood.city.name}`,
+          serviceLat: neighborhood.lat,
+          serviceLng: neighborhood.lng,
+        }
+      : {}
 
     await db.user.update({
       where: { id: session.userId },
@@ -128,6 +140,7 @@ export async function POST(req: NextRequest) {
         providerStatus,
         neighborhoodId,
         addressVerified,
+        ...providerFields,
       },
     })
 

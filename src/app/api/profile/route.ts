@@ -81,28 +81,14 @@ export async function PATCH(req: NextRequest) {
       data.bio = bio || null
     }
 
-    // Service description — only for service providers (max 500 chars)
+    // Service description — only for service providers (max 500 chars).
+    // Address + coordinates are NOT user-editable — they are locked to the
+    // user's own neighborhood and set by /api/provider/apply. Any
+    // serviceAddress / serviceLat / serviceLng in the body is ignored.
     if (body.serviceDescription !== undefined) {
       const desc = typeof body.serviceDescription === 'string' ? body.serviceDescription.trim() : ''
       if (desc.length > 500) return NextResponse.json({ error: 'وصف الخدمة طويل جداً (500 حرف كحد أقصى)' }, { status: 400 })
       data.serviceDescription = desc || null
-    }
-
-    // Service location — optional lat/lng/address
-    if (body.serviceAddress !== undefined) {
-      data.serviceAddress = typeof body.serviceAddress === 'string' ? body.serviceAddress.trim() || null : null
-    }
-    if (body.serviceLat !== undefined && body.serviceLng !== undefined) {
-      const lat = Number(body.serviceLat)
-      const lng = Number(body.serviceLng)
-      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-        data.serviceLat = lat
-        data.serviceLng = lng
-      } else {
-        // Clear location if invalid
-        data.serviceLat = null
-        data.serviceLng = null
-      }
     }
 
     if (Object.keys(data).length === 0) {
@@ -114,11 +100,9 @@ export async function PATCH(req: NextRequest) {
     // enforced by /api/provider/apply. VERIFIED_PROVIDER is admin-controlled
     // and deliberately left untouched; NORMAL users can't have service fields
     // change their status because we only flip it for SERVICE_PROVIDER.
-    const touchedServiceFields =
-      data.serviceDescription !== undefined ||
-      data.serviceAddress     !== undefined ||
-      data.serviceLat         !== undefined ||
-      data.serviceLng         !== undefined
+    // Address/coords are locked to the user's neighborhood, so the only
+    // PATCH-mutable field that affects providerStatus is the description.
+    const touchedServiceFields = data.serviceDescription !== undefined
 
     if (touchedServiceFields) {
       const current = await db.user.findUnique({

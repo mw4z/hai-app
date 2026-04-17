@@ -6,9 +6,10 @@ import { computeProviderStatus, isValidCoord } from '@/lib/provider'
 
 /**
  * POST /api/provider/apply
- * Turns a NORMAL user into a SERVICE_PROVIDER. providerStatus starts at
- * PENDING and auto-promotes to ACTIVE when the submitted fields pass the
- * quality gate (description ≥ 20 chars, valid lat/lng, non-empty address).
+ * Promotes a NORMAL user to SERVICE_PROVIDER. The service location is always
+ * the user's own registered neighborhood — not user-chosen — so the body only
+ * needs a description. Address + centroid coords are derived from the
+ * Neighborhood record server-side.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -19,7 +20,12 @@ export async function POST(req: NextRequest) {
 
     const user = await db.user.findUnique({
       where: { id: session.userId },
-      select: { accountType: true, providerStatus: true },
+      select: {
+        accountType: true,
+        neighborhood: {
+          select: { name: true, nameEn: true, lat: true, lng: true, city: { select: { name: true, nameEn: true } } },
+        },
+      },
     })
     if (!user) {
       return NextResponse.json({ error: 'المستخدم غير موجود' }, { status: 404 })
@@ -30,6 +36,18 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       )
     }
+    if (!user.neighborhood) {
+      return NextResponse.json(
+        { error: 'no_neighborhood', message: 'يجب تحديد الحي أولاً' },
+        { status: 400 },
+      )
+    }
+    if (!isValidCoord(user.neighborhood.lat, user.neighborhood.lng)) {
+      return NextResponse.json(
+        { error: 'neighborhood_missing_coords', message: 'الحي لا يحتوي على إحداثيات صالحة' },
+        { status: 500 },
+      )
+    }
 
     let body: any
     try { body = await req.json() } catch {
@@ -37,10 +55,6 @@ export async function POST(req: NextRequest) {
     }
 
     const serviceDescription = typeof body.serviceDescription === 'string' ? body.serviceDescription.trim() : ''
-    const serviceAddress = typeof body.serviceAddress === 'string' ? body.serviceAddress.trim() : ''
-    const serviceLat = typeof body.serviceLat === 'number' ? body.serviceLat : Number(body.serviceLat)
-    const serviceLng = typeof body.serviceLng === 'number' ? body.serviceLng : Number(body.serviceLng)
-
     if (!serviceDescription) {
       return NextResponse.json(
         { error: 'service_description_required', message: 'اشرح خدمتك' },
@@ -53,18 +67,11 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       )
     }
-    if (!serviceAddress) {
-      return NextResponse.json(
-        { error: 'service_address_required', message: 'عنوان الخدمة مطلوب' },
-        { status: 400 },
-      )
-    }
-    if (!isValidCoord(serviceLat, serviceLng)) {
-      return NextResponse.json(
-        { error: 'service_location_required', message: 'موقع الخدمة مطلوب (إحداثيات غير صالحة)' },
-        { status: 400 },
-      )
-    }
+
+    // Service location = user's own neighborhood (label + centroid). Locked.
+    const serviceAddress = `${user.neighborhood.name}, ${user.neighborhood.city.name}`
+    const serviceLat = user.neighborhood.lat!
+    const serviceLng = user.neighborhood.lng!
 
     const providerStatus = computeProviderStatus({
       serviceDescription,
