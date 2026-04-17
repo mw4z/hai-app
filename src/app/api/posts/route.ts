@@ -8,6 +8,7 @@ import { getPostLimit } from '@/lib/reputation'
 import { getLimits } from '@/lib/capabilities'
 import { cacheDeletePrefix } from '@/lib/cache'
 import { moderateContent } from '@/lib/moderation'
+import { requireVerified } from '@/lib/requireVerified'
 
 const DEFAULT_POST_LIMIT = 5
 const POST_COOLDOWN_SECONDS = 60
@@ -19,6 +20,9 @@ export async function POST(req: NextRequest) {
     if (!session) {
       return NextResponse.json(apiError('يجب تسجيل الدخول', 401), { status: 401 })
     }
+
+    const gate = await requireVerified(session.userId)
+    if (gate) return gate
 
     const user = await db.user.findUnique({
       where: { id: session.userId },

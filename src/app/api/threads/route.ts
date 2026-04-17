@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { canStartPrivateThread } from '@/lib/thread-rules'
 import { log } from '@/lib/logger'
 import { getBlockedUserIds } from '@/lib/blocks'
+import { requireVerified } from '@/lib/requireVerified'
 
 // GET /api/threads — list user's threads
 export async function GET() {
@@ -80,6 +81,9 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const gate = await requireVerified(session.userId)
+    if (gate) return gate
 
     log.api('POST', '/api/threads', session.userId)
 

@@ -175,6 +175,7 @@ export default async function FeedPage({
       bookmarkedIds={bookmarkedIds || []}
       unreadNotifCount={unreadNotifCount}
       hasNeighborhoodMod={true}
+      addressVerified={!!user.addressVerified}
     />
   )
 }

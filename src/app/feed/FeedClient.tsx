@@ -12,6 +12,7 @@ import InviteLeaderboardCard from '@/components/InviteLeaderboardCard'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import QuickAskSheet from '@/components/QuickAskSheet'
 import NeighborhoodSheet from '@/components/NeighborhoodSheet'
+import GuestBanner from '@/components/GuestBanner'
 import { FiBell, FiPlus, FiMapPin, FiX, FiSearch, FiFilter, FiCheck } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import type { TranslationKey } from '@/lib/i18n'
@@ -78,6 +79,7 @@ interface Props {
   bookmarkedIds?: string[]
   unreadNotifCount: number
   hasNeighborhoodMod?: boolean
+  addressVerified?: boolean
 }
 
 export default function FeedClient({
@@ -90,6 +92,7 @@ export default function FeedClient({
   bookmarkedIds = [],
   unreadNotifCount,
   hasNeighborhoodMod,
+  addressVerified,
 }: Props) {
   const router = useRouter()
   const { t, lang } = useLanguage()
@@ -284,6 +287,9 @@ export default function FeedClient({
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
+      {/* Guest mode banner — only for users with addressVerified=false */}
+      <GuestBanner show={addressVerified === false} />
+
       {/* Read-only banner */}
       {isReadOnly && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between">

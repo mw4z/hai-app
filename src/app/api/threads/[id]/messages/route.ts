@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { log } from '@/lib/logger'
 import { moderateContent } from '@/lib/moderation'
+import { requireVerified } from '@/lib/requireVerified'
 
 // GET /api/threads/[id]/messages
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -130,6 +131,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   try {
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const gate = await requireVerified(session.userId)
+    if (gate) return gate
 
     log.api('POST', '/api/threads/[id]/messages', session.userId)
 

@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { createNotification } from '@/lib/notifications'
 import { addReputation, REP_POINTS } from '@/lib/reputation'
+import { requireVerified } from '@/lib/requireVerified'
 
 function isValidEmoji(str: string) {
   return typeof str === 'string' && str.trim().length > 0 && str.length <= 8
@@ -11,6 +12,9 @@ function isValidEmoji(str: string) {
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
+
+  const gate = await requireVerified(session.userId)
+  if (gate) return gate
 
   const { emoji } = await req.json()
   if (!isValidEmoji(emoji)) {

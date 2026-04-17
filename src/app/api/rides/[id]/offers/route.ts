@@ -5,6 +5,7 @@ import { validateOfferPrice } from '@/lib/rides/pricing'
 import { logRideEvent } from '@/lib/rides/events'
 import { notifyNewOffer } from '@/lib/rides/notify'
 import { log } from '@/lib/logger'
+import { requireVerified } from '@/lib/requireVerified'
 
 const MIN_ACCOUNT_AGE_DAYS = 0 // TODO: set back to 3 for production
 const MAX_OFFERS_PER_HOUR = 10
@@ -17,6 +18,9 @@ export async function POST(
   try {
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const gate = await requireVerified(session.userId)
+    if (gate) return gate
 
     log.api('POST', '/api/rides/[id]/offers', session.userId)
 

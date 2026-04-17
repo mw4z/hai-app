@@ -6,6 +6,7 @@ import { estimatePrice } from '@/lib/rides/pricing'
 import { logRideEvent } from '@/lib/rides/events'
 import { log } from '@/lib/logger'
 import { getLimits } from '@/lib/capabilities'
+import { requireVerified } from '@/lib/requireVerified'
 
 const REQUESTS_PER_HOUR = 3
 const IMMEDIATE_EXPIRY_HOURS = 2
@@ -15,6 +16,9 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const gate = await requireVerified(session.userId)
+    if (gate) return gate
 
     log.api('POST', '/api/rides', session.userId)
 

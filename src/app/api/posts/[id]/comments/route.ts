@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { createNotification } from '@/lib/notifications'
 import { apiError } from '@/lib/validation'
 import { moderateContent } from '@/lib/moderation'
+import { requireVerified } from '@/lib/requireVerified'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
@@ -47,6 +48,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
+
+  const gate = await requireVerified(session.userId)
+  if (gate) return gate
 
   const user = await db.user.findUnique({
     where: { id: session.userId },

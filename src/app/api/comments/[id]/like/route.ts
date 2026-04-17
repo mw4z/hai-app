@@ -3,11 +3,15 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { addReputation, REP_POINTS } from '@/lib/reputation'
 import { createNotification } from '@/lib/notifications'
+import { requireVerified } from '@/lib/requireVerified'
 
 // POST /api/comments/[id]/like — toggle like on a comment/reply
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const gate = await requireVerified(session.userId)
+  if (gate) return gate
 
   const comment = await db.comment.findUnique({
     where: { id: params.id },
