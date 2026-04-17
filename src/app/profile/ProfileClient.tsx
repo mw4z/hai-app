@@ -491,6 +491,7 @@ export default function ProfileClient({ user, postCount }: Props) {
       <AccordionSection
         icon={<FiUser className="w-4 h-4" />}
         label={t('profile_account')}
+        hint={lang === 'en' ? 'Name, phone, email' : lang === 'ur' ? 'نام، فون، ای میل' : 'الاسم والجوال والبريد'}
         sectionKey="account"
         openSection={openSection}
         setOpenSection={setOpenSection}
@@ -702,6 +703,7 @@ export default function ProfileClient({ user, postCount }: Props) {
       <AccordionSection
         icon={<FiEdit2 className="w-4 h-4" />}
         label={t('profile_bio')}
+        hint={lang === 'en' ? 'Tell your neighbors about yourself' : lang === 'ur' ? 'اپنے بارے میں پڑوسیوں کو بتائیں' : 'عرّف عن نفسك لجيرانك'}
         sectionKey="bio"
         openSection={openSection}
         setOpenSection={setOpenSection}
@@ -871,7 +873,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                 <span className="block text-sm font-semibold text-gray-800 dark:text-gray-100">{t('profile_become_provider_title')}</span>
                 <span className="block text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">{t('profile_become_provider_hint')}</span>
               </span>
-              {lang === 'en' ? <FiChevronLeft className="w-4 h-4 text-gray-400 rotate-180" /> : <FiChevronLeft className="w-4 h-4 text-gray-400" />}
+              <FiChevronDown className="w-4 h-4 text-gray-400" />
             </button>
           ) : (
             <div className="bg-white dark:bg-gray-800 rounded-2xl border border-primary-200 dark:border-primary-800 p-4 space-y-3">
@@ -1008,6 +1010,7 @@ export default function ProfileClient({ user, postCount }: Props) {
       <AccordionSection
         icon={<FiAward className="w-4 h-4" />}
         label={t('rep_title')}
+        hint={lang === 'en' ? 'Your standing in the neighborhood' : lang === 'ur' ? 'محلے میں آپ کا مقام' : 'مكانتك في الحي'}
         sectionKey="reputation"
         openSection={openSection}
         setOpenSection={setOpenSection}
@@ -1020,6 +1023,7 @@ export default function ProfileClient({ user, postCount }: Props) {
       <AccordionSection
         icon={<FiBookmark className="w-4 h-4" />}
         label={lang === 'en' ? 'Saved Posts' : 'المحفوظات'}
+        hint={lang === 'en' ? 'Posts you bookmarked' : lang === 'ur' ? 'آپ کی محفوظ شدہ پوسٹس' : 'المنشورات التي حفظتها'}
         sectionKey="bookmarks"
         openSection={openSection}
         setOpenSection={setOpenSection}
@@ -1032,6 +1036,7 @@ export default function ProfileClient({ user, postCount }: Props) {
       <AccordionSection
         icon={<FiBell className="w-4 h-4" />}
         label={lang === 'en' ? 'Notifications' : lang === 'ur' ? 'اطلاعات' : 'الإشعارات'}
+        hint={lang === 'en' ? 'Choose what alerts you' : lang === 'ur' ? 'اطلاعات کی ترجیحات' : 'اختر ما يصلك من تنبيهات'}
         sectionKey="notifications"
         openSection={openSection}
         setOpenSection={setOpenSection}
@@ -1087,6 +1092,7 @@ export default function ProfileClient({ user, postCount }: Props) {
       <AccordionSection
         icon={<FiSettings className="w-4 h-4" />}
         label={t('profile_settings')}
+        hint={lang === 'en' ? 'Theme, sounds, language' : lang === 'ur' ? 'تھیم، آوازیں، زبان' : 'المظهر والأصوات واللغة'}
         sectionKey="settings"
         openSection={openSection}
         setOpenSection={setOpenSection}
@@ -1192,6 +1198,7 @@ export default function ProfileClient({ user, postCount }: Props) {
       <AccordionSection
         icon={<FiShield className="w-4 h-4" />}
         label={lang === 'en' ? 'Privacy' : lang === 'ur' ? 'رازداری' : 'الخصوصية'}
+        hint={lang === 'en' ? 'Who sees your status and gender' : lang === 'ur' ? 'آپ کی آن لائن اسٹیٹس اور صنف' : 'من يرى حالتك وجنسك'}
         sectionKey="privacy"
         openSection={openSection}
         setOpenSection={setOpenSection}
@@ -1205,6 +1212,7 @@ export default function ProfileClient({ user, postCount }: Props) {
       <AccordionSection
         icon={<FiShare2 className="w-4 h-4" />}
         label={lang === 'en' ? 'Invite Neighbors' : 'ادعُ جيرانك'}
+        hint={lang === 'en' ? 'Share Hai with nearby residents' : lang === 'ur' ? 'پڑوسیوں کو Hai پر مدعو کریں' : 'شارك حي مع سكان الحي'}
         sectionKey="invite"
         openSection={openSection}
         setOpenSection={setOpenSection}
@@ -1217,6 +1225,7 @@ export default function ProfileClient({ user, postCount }: Props) {
       <AccordionSection
         icon={<FiHelpCircle className="w-4 h-4" />}
         label={lang === 'en' ? 'Help & More' : lang === 'ur' ? 'مدد اور مزید' : 'المساعدة والمزيد'}
+        hint={lang === 'en' ? 'FAQ, support, and about' : lang === 'ur' ? 'عمومی سوالات، سپورٹ، اور تعارف' : 'الأسئلة الشائعة والدعم'}
         sectionKey="help"
         openSection={openSection}
         setOpenSection={setOpenSection}
@@ -1928,10 +1937,11 @@ function PrivacySettings({ lang }: { lang: string }) {
 }
 
 function AccordionSection({
-  icon, label, sectionKey, openSection, setOpenSection, children
+  icon, label, hint, sectionKey, openSection, setOpenSection, children
 }: {
   icon: React.ReactNode
   label: string
+  hint?: string
   sectionKey: string
   openSection: string | null
   setOpenSection: (s: string | null) => void
@@ -1942,10 +1952,13 @@ function AccordionSection({
     <div className="mx-4 mt-4">
       <button
         onClick={() => setOpenSection(isOpen ? null : sectionKey)}
-        className="w-full flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 active:bg-gray-50 dark:active:bg-gray-700 transition-colors"
+        className="w-full flex items-center gap-3 px-4 py-3.5 bg-white dark:bg-gray-800 rounded-2xl border border-primary-200 dark:border-primary-800 active:bg-gray-50 dark:active:bg-gray-700 transition-colors"
       >
         <span className="text-primary-600 dark:text-primary-400">{icon}</span>
-        <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex-1 text-start">{label}</span>
+        <span className="flex-1 text-start">
+          <span className="block text-sm font-semibold text-gray-800 dark:text-gray-100">{label}</span>
+          {hint && <span className="block text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">{hint}</span>}
+        </span>
         <FiChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
       {isOpen && (
