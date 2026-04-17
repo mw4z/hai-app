@@ -153,6 +153,16 @@ export default function ChatClient({
       bottomRef.current?.scrollIntoView({ block: 'end' })
     }
 
+    // The composer's safe-area-inset-bottom padding is only needed when
+    // the home-indicator area is visible. When the keyboard is up it
+    // covers that area, so the extra space shows as a ~1s phantom gap
+    // under the input until iOS finally updates the inset. Override
+    // the padding manually in sync with the keyboard events.
+    const safePad = 'calc(env(safe-area-inset-bottom, 0px) + 10px)'
+    const setComposerPad = (pad: string) => {
+      if (composerRef.current) composerRef.current.style.paddingBottom = pad
+    }
+
     setHeight(vv.height)
     const onVV = () => setHeight(vv.height)
     vv.addEventListener('resize', onVV)
@@ -163,9 +173,11 @@ export default function ChatClient({
       import('@capacitor/keyboard').then(({ Keyboard }) => {
         const h1 = Keyboard.addListener('keyboardWillShow', (info) => {
           setHeight(window.innerHeight - info.keyboardHeight)
+          setComposerPad('10px')
         })
         const h2 = Keyboard.addListener('keyboardWillHide', () => {
           setHeight(window.innerHeight)
+          setComposerPad(safePad)
         })
         cleanupKb = () => {
           h1.then(x => x.remove())
