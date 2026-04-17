@@ -105,6 +105,16 @@ input, textarea, [contenteditable="true"] {
   border-color: rgba(255, 255, 255, 0.06);
 }
 
+/* Tap-to-jump highlight on a message bubble (WhatsApp-style flash) */
+@keyframes msg-jump-flash {
+  0%   { background-color: rgba(34, 197, 94, 0.45); }
+  100% { background-color: rgba(34, 197, 94, 0); }
+}
+.msg-jump-highlight {
+  animation: msg-jump-flash 1.6s ease-out;
+  border-radius: 1rem;
+}
+
 /* Glass bottom bar */
 .glass-bottom {
   background: #ffffff !important;
