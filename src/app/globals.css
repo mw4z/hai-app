@@ -242,11 +242,16 @@ body {
 :root { --app-max-width: 480px; }
 
 @media (min-width: 768px) {
-  :root { --app-max-width: 760px; }
+  :root { --app-max-width: 820px; }
 }
 
 @media (min-width: 1024px) {
-  :root { --app-max-width: 920px; }
+  :root { --app-max-width: 1100px; }
+}
+
+/* iPad Pro 12.9" / very wide screens — fill the viewport with gentle padding */
+@media (min-width: 1366px) {
+  :root { --app-max-width: min(92vw, 1300px); }
 }
 
 /* Fixed bottom bars (BottomNav, composer, etc.) use Tailwind's
