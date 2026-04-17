@@ -198,6 +198,35 @@ async function imageUrlToJpegFile(src: string, index: number): Promise<File> {
   })
 }
 
+/**
+ * Single-shot image from the device camera. Native only — on web, the
+ * caller should fall back to the hidden file input with `capture="environment"`.
+ */
+export async function pickImageFromCamera(): Promise<File> {
+  if (!isNative()) throw new Error('web_unsupported')
+
+  const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera')
+
+  const photo = await Camera.getPhoto({
+    quality: 85,
+    allowEditing: false,
+    resultType: CameraResultType.Base64,
+    source: CameraSource.Camera,
+    correctOrientation: true,
+  })
+
+  if (!photo.base64String) throw new Error('no_image')
+
+  const mime = photo.format === 'png' ? 'image/png' : photo.format === 'webp' ? 'image/webp' : 'image/jpeg'
+  const byteString = atob(photo.base64String)
+  const bytes = new Uint8Array(byteString.length)
+  for (let i = 0; i < byteString.length; i++) bytes[i] = byteString.charCodeAt(i)
+  const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg'
+  const file = new File([bytes], `photo-${Date.now()}.${ext}`, { type: mime })
+  if (file.size > MAX_SIZE_MB * 1024 * 1024) throw new Error('size_too_large')
+  return file
+}
+
 export async function pickImageFilesMulti(
   limit: number,
 ): Promise<File[]> {

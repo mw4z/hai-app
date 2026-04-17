@@ -10,7 +10,7 @@ import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, Fi
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
 import { uploadFiles } from '@/lib/upload'
-import { pickImagesOrFallback } from '@/lib/imagePicker'
+import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import { useAttachContact } from '@/hooks/useAttachContact'
 import { playSend } from '@/lib/sound'
 import SmartText from '@/components/SmartText'
@@ -232,7 +232,9 @@ export default function ChatClient({
   const [profileData, setProfileData] = useState<any>(null)
   const [loadingProfile, setLoadingProfile] = useState(false)
   const imgInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
+  const [showImageSheet, setShowImageSheet] = useState(false)
 
   // Find the first unread message from the other person on initial load
   const [unreadDividerId, setUnreadDividerId] = useState(() => {
@@ -434,11 +436,36 @@ export default function ChatClient({
     const replyId = replyingTo?.id || null
     setReplyingTo(null)
     setSendingImage(true)
+
+    // Optimistic preview: insert a pending bubble per image immediately so
+    // the user sees their photo uploading instead of a silent wait.
+    const pendingPlaceholders = valid.map((file, i) => ({
+      id: `pending-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}`,
+      localPreview: URL.createObjectURL(file),
+      senderId: currentUserId,
+      type: 'IMAGE' as const,
+      imageUrl: null as string | null,
+      text: null,
+      createdAt: new Date().toISOString(),
+      readAt: null,
+      replyToId: i === 0 ? replyId : null,
+      replyTo: null,
+      pending: true as const,
+    }))
+    setMessages((prev) => [...prev, ...pendingPlaceholders as any])
+
     try {
       const urls = await uploadFiles(valid)
       for (let i = 0; i < urls.length; i++) {
         const imageUrl = urls[i]
-        if (!imageUrl) continue
+        const tempId = pendingPlaceholders[i]?.id
+        const localPreview = pendingPlaceholders[i]?.localPreview
+        if (!imageUrl || !tempId) {
+          // Upload failed for this slot — drop the pending placeholder
+          if (tempId) setMessages((prev) => prev.filter((m: any) => m.id !== tempId))
+          if (localPreview) URL.revokeObjectURL(localPreview)
+          continue
+        }
         const res = await fetch(`/api/threads/${threadId}/messages`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -450,13 +477,23 @@ export default function ChatClient({
         })
         if (res.ok) {
           const msg = await res.json()
-          setMessages((prev) => [...prev, msg])
+          setMessages((prev: any[]) => prev.map((m) => (m.id === tempId ? msg : m)))
+          if (localPreview) URL.revokeObjectURL(localPreview)
         } else {
+          // Drop pending placeholders for this and the rest of the batch
+          setMessages((prev: any[]) => prev.filter((m) => !pendingPlaceholders.slice(i).some(p => p.id === m.id)))
+          pendingPlaceholders.slice(i).forEach(p => p.localPreview && URL.revokeObjectURL(p.localPreview))
           await showApiError(res, lang as 'ar' | 'en' | 'ur')
           break
         }
       }
-    } catch { toast.error(t('common_error')) }
+    } catch {
+      // Drop all pending placeholders on catastrophic failure
+      const ids = new Set(pendingPlaceholders.map(p => p.id))
+      setMessages((prev: any[]) => prev.filter((m) => !ids.has(m.id)))
+      pendingPlaceholders.forEach(p => p.localPreview && URL.revokeObjectURL(p.localPreview))
+      toast.error(t('common_error'))
+    }
     finally { setSendingImage(false); if (imgInputRef.current) imgInputRef.current.value = '' }
   }
 
@@ -997,11 +1034,14 @@ export default function ChatClient({
                 const files = Array.from(e.target.files || [])
                 if (files.length > 0) sendImages(files)
               }} />
+            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden"
+              onChange={e => {
+                const files = Array.from(e.target.files || [])
+                if (files.length > 0) sendImages(files)
+                if (cameraInputRef.current) cameraInputRef.current.value = ''
+              }} />
             <div className="flex items-center gap-1">
-              <button onClick={async () => {
-                  const files = await pickImagesOrFallback(10, imgInputRef)
-                  if (files.length > 0) sendImages(files)
-                }} disabled={sendingImage}
+              <button onClick={() => setShowImageSheet(true)} disabled={sendingImage}
                 className="p-2.5 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50">
                 <FiCamera className={`w-5 h-5 ${sendingImage ? 'animate-pulse' : ''}`} />
               </button>
@@ -1043,6 +1083,65 @@ export default function ChatClient({
         open={lightboxUrl !== null}
         onClose={() => setLightboxUrl(null)}
       />
+
+      {/* Camera/Gallery chooser sheet */}
+      {showImageSheet && (
+        <div
+          className="fixed inset-0 z-[1000] bg-black/40 flex items-end justify-center"
+          onClick={() => setShowImageSheet(false)}
+        >
+          <div
+            className="w-full max-w-[480px] bg-white dark:bg-gray-800 rounded-t-3xl p-4 pb-6 space-y-2 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+          >
+            <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-3" />
+            <button
+              onClick={async () => {
+                setShowImageSheet(false)
+                const isNative = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
+                if (isNative) {
+                  try {
+                    const file = await pickImageFromCamera()
+                    sendImages([file])
+                  } catch (err: any) {
+                    if (!err?.message?.toLowerCase?.().includes('cancel') && err?.message !== 'no_image') {
+                      console.warn('[chat] camera failed', err)
+                    }
+                  }
+                } else {
+                  cameraInputRef.current?.click()
+                }
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 active:scale-[0.98] transition-transform"
+            >
+              <FiCamera className="w-5 h-5 text-primary-600" />
+              <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                {lang === 'en' ? 'Take Photo' : lang === 'ur' ? 'تصویر لیں' : 'التقاط صورة'}
+              </span>
+            </button>
+            <button
+              onClick={async () => {
+                setShowImageSheet(false)
+                const files = await pickImagesOrFallback(10, imgInputRef)
+                if (files.length > 0) sendImages(files)
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 active:scale-[0.98] transition-transform"
+            >
+              <FiImage className="w-5 h-5 text-primary-600" />
+              <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                {lang === 'en' ? 'From Gallery' : lang === 'ur' ? 'لائبریری سے' : 'من المعرض'}
+              </span>
+            </button>
+            <button
+              onClick={() => setShowImageSheet(false)}
+              className="w-full py-3 mt-2 rounded-xl text-sm font-medium text-gray-500 dark:text-gray-400"
+            >
+              {t('profile_cancel')}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1152,11 +1251,23 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
       )}
 
       <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} ${isLastInGroup ? 'mb-2' : 'mb-[3px]'} ${isFirstInGroup && !showDate ? 'mt-3' : ''}`}>
-        {msg.type === 'IMAGE' && msg.imageUrl ? (
+        {msg.type === 'IMAGE' && (msg.imageUrl || (msg as any).localPreview) ? (
           <div className={`max-w-[70%]`} data-msg-id={msg.id} {...longPress}>
             {replyQuote && <div className="mb-1">{replyQuote}</div>}
-            <div onClick={() => msg.imageUrl && onImageTap(msg.imageUrl)} className="cursor-pointer">
-              <img src={msg.imageUrl} alt="" className={`rounded-2xl max-h-52 object-cover shadow-sm ${isLastInGroup ? (isMe ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : 'ltr:rounded-bl-sm rtl:rounded-br-sm') : ''}`} />
+            <div onClick={() => msg.imageUrl && onImageTap(msg.imageUrl)} className={`relative ${msg.imageUrl ? 'cursor-pointer' : ''}`}>
+              <img
+                src={msg.imageUrl || (msg as any).localPreview}
+                alt=""
+                className={`rounded-2xl max-h-52 object-cover shadow-sm ${(msg as any).pending ? 'opacity-60' : ''} ${isLastInGroup ? (isMe ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : 'ltr:rounded-bl-sm rtl:rounded-br-sm') : ''}`}
+              />
+              {(msg as any).pending && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/25">
+                  <div className="flex items-center gap-2 bg-black/55 text-white text-[11px] font-medium px-3 py-1.5 rounded-full">
+                    <span className="w-3.5 h-3.5 border-2 border-white/70 border-t-transparent rounded-full animate-spin" />
+                    {lang === 'en' ? 'Uploading…' : lang === 'ur' ? 'اپ لوڈ ہو رہا ہے…' : 'جاري الإرسال…'}
+                  </div>
+                </div>
+              )}
             </div>
             <p className={`text-[10px] mt-1 px-1 flex items-center gap-0.5 ${isMe ? 'text-gray-400 justify-start' : 'text-gray-400 justify-end'}`}>
               {timeStr}
