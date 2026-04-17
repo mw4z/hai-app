@@ -135,6 +135,18 @@ export default function ChatClient({
   const bottomRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const textInputRef = useRef<HTMLInputElement>(null)
+  const blobUrlsRef = useRef<Set<string>>(new Set())
+
+  // Revoke any blob URLs created for sent-photo previews when the chat
+  // unmounts so they don't leak. Blob URLs are alive only while this
+  // component is mounted; the remote imageUrl is the source of truth
+  // for persistence.
+  useEffect(() => {
+    return () => {
+      blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
+      blobUrlsRef.current.clear()
+    }
+  }, [])
 
   // Size the chat root to the visible viewport (keyboard-aware).
   //
@@ -439,19 +451,23 @@ export default function ChatClient({
 
     // Optimistic preview: insert a pending bubble per image immediately so
     // the user sees their photo uploading instead of a silent wait.
-    const pendingPlaceholders = valid.map((file, i) => ({
-      id: `pending-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}`,
-      localPreview: URL.createObjectURL(file),
-      senderId: currentUserId,
-      type: 'IMAGE' as const,
-      imageUrl: null as string | null,
-      text: null,
-      createdAt: new Date().toISOString(),
-      readAt: null,
-      replyToId: i === 0 ? replyId : null,
-      replyTo: null,
-      pending: true as const,
-    }))
+    const pendingPlaceholders = valid.map((file, i) => {
+      const preview = URL.createObjectURL(file)
+      blobUrlsRef.current.add(preview)
+      return {
+        id: `pending-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}`,
+        localPreview: preview,
+        senderId: currentUserId,
+        type: 'IMAGE' as const,
+        imageUrl: null as string | null,
+        text: null,
+        createdAt: new Date().toISOString(),
+        readAt: null,
+        replyToId: i === 0 ? replyId : null,
+        replyTo: null,
+        pending: true as const,
+      }
+    })
     setMessages((prev) => [...prev, ...pendingPlaceholders as any])
     // Jump to the bottom right after inserting the pending bubbles.
     // The useEffect on messages.length handles most cases, but images may
@@ -483,23 +499,15 @@ export default function ChatClient({
         })
         if (res.ok) {
           const msg = await res.json()
-          // First swap: insert the real message but KEEP the blob URL so the
-          // bubble keeps showing the local preview while we wait for the
-          // remote image to fully decode. This avoids a blank flash.
+          // Keep the blob URL as the rendered src for the lifetime of this
+          // component — never swap it out. msg.imageUrl is still set for
+          // persistence (replies/lightbox/other viewers/refresh), but the
+          // visible <img> stays on the already-decoded local preview so
+          // the bubble never flashes to blank. Blob URLs are cleaned up
+          // on unmount (see the effect at the top of this component).
           setMessages((prev: any[]) => prev.map((m) => (
-            m.id === tempId ? { ...msg, localPreview, remoteReady: false } : m
+            m.id === tempId ? { ...msg, localPreview } : m
           )))
-          // Preload + fully decode in the background
-          const pre = new Image()
-          pre.src = imageUrl
-          try { await pre.decode() } catch { /* keep going; onError in img will fall back */ }
-          // Second swap: remote is decoded, flip the render flag so the img
-          // switches to the remote URL. Revoke blob after a tick so any
-          // in-flight render finishes first.
-          setMessages((prev: any[]) => prev.map((m) => (
-            m.id === msg.id ? { ...m, remoteReady: true, localPreview: undefined } : m
-          )))
-          if (localPreview) setTimeout(() => URL.revokeObjectURL(localPreview), 500)
         } else {
           // Drop pending placeholders for this and the rest of the batch
           setMessages((prev: any[]) => prev.filter((m) => !pendingPlaceholders.slice(i).some(p => p.id === m.id)))
@@ -1276,25 +1284,15 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
           <div className={`max-w-[70%]`} data-msg-id={msg.id} {...longPress}>
             {replyQuote && <div className="mb-1">{replyQuote}</div>}
             <div onClick={() => msg.imageUrl && onImageTap(msg.imageUrl)} className={`relative ${msg.imageUrl ? 'cursor-pointer' : ''}`}>
-              {/* While the remote URL isn't decoded yet, keep showing the
-                  blob preview. Once remoteReady flips, switch to the real
-                  URL. onError falls back to the preview if the remote fails. */}
+              {/* Render the blob preview whenever we have one (sent in this
+                  session). The remote imageUrl is only used for messages
+                  fetched from the server (replies, refreshes, peers). */}
               <img
-                src={(msg as any).pending || (msg as any).remoteReady === false
-                  ? ((msg as any).localPreview || msg.imageUrl)
-                  : (msg.imageUrl || (msg as any).localPreview)}
+                src={(msg as any).localPreview || msg.imageUrl || ''}
                 alt=""
                 onLoad={(e) => {
-                  // If this image is still pending (user just sent it), keep
-                  // the view pinned to the bottom as the bubble reflows.
-                  if ((msg as any).pending || (msg as any).remoteReady === false) {
+                  if ((msg as any).pending) {
                     (e.currentTarget as HTMLImageElement).scrollIntoView({ block: 'end' })
-                  }
-                }}
-                onError={(e) => {
-                  const preview = (msg as any).localPreview
-                  if (preview && (e.currentTarget as HTMLImageElement).src !== preview) {
-                    (e.currentTarget as HTMLImageElement).src = preview
                   }
                 }}
                 className={`rounded-2xl max-h-52 object-cover shadow-sm ${(msg as any).pending ? 'opacity-60' : ''} ${isLastInGroup ? (isMe ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : 'ltr:rounded-bl-sm rtl:rounded-br-sm') : ''}`}
