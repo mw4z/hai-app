@@ -132,28 +132,32 @@ export default function ChatClient({
   const composerRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const textInputRef = useRef<HTMLInputElement>(null)
 
-  // Keep the latest message visible as the keyboard opens. With native
-  // keyboard resize mode (set in CapacitorBridge) the WKWebView shrinks
-  // in sync with the keyboard animation, so scrolling on
-  // keyboardWillShow lands the message right above the composer as the
-  // keyboard rises — no post-animation jump.
+  // Size the chat root to the visual viewport (keyboard-aware) in real
+  // time. On iOS WKWebView, 100dvh does NOT shrink when the keyboard
+  // opens, so the composer ends up below the keyboard. visualViewport
+  // fires resize events throughout the keyboard animation with the
+  // current visible height — setting the root height from that keeps
+  // the composer pinned above the keyboard in sync with the animation.
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (!(window as any).Capacitor?.isNativePlatform?.()) return
-
-    let cleanup: (() => void) | null = null
-    import('@capacitor/keyboard').then(({ Keyboard }) => {
-      const scroll = () => bottomRef.current?.scrollIntoView({ block: 'end' })
-      const h1 = Keyboard.addListener('keyboardWillShow', scroll)
-      const h2 = Keyboard.addListener('keyboardDidShow', scroll)
-      cleanup = () => {
-        h1.then(x => x.remove())
-        h2.then(x => x.remove())
-      }
-    }).catch(() => {})
-    return () => { cleanup?.() }
+    const vv = window.visualViewport
+    const root = rootRef.current
+    if (!vv || !root) return
+    const apply = () => {
+      root.style.height = `calc(${vv.height}px - env(safe-area-inset-top, 0px))`
+      // Keep the last message visible as the viewport shrinks.
+      bottomRef.current?.scrollIntoView({ block: 'end' })
+    }
+    apply()
+    vv.addEventListener('resize', apply)
+    vv.addEventListener('scroll', apply)
+    return () => {
+      vv.removeEventListener('resize', apply)
+      vv.removeEventListener('scroll', apply)
+    }
   }, [])
   const [sendingLocation, setSendingLocation] = useState(false)
   const [closed, setClosed] = useState(isClosed)
@@ -471,7 +475,7 @@ export default function ChatClient({
   let lastDate = ''
 
   return (
-    <div className="flex flex-col bg-gray-100 dark:bg-gray-950" style={{ height: 'calc(100dvh - env(safe-area-inset-top, 0px))' }}>
+    <div ref={rootRef} className="flex flex-col bg-gray-100 dark:bg-gray-950" style={{ height: 'calc(100dvh - env(safe-area-inset-top, 0px))' }}>
       {/* Header */}
       <header className="glass px-4 py-2.5 flex items-center gap-3 z-10 shadow-sm flex-shrink-0">
         <Link href="/threads" className="text-gray-500 dark:text-gray-400 p-1">
