@@ -79,8 +79,35 @@ export async function GET() {
   const request = await db.verificationRequest.findFirst({
     where: { userId: session.userId },
     orderBy: { createdAt: 'desc' },
-    select: { status: true, createdAt: true },
+    select: { id: true, status: true, createdAt: true },
   })
 
   return NextResponse.json({ request })
+}
+
+// DELETE — user revokes their own pending verification request.
+// Sets status='revoked' (preserves audit history). Only allowed while still
+// pending — once an admin approves or rejects, the decision stands.
+export async function DELETE() {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const pending = await db.verificationRequest.findFirst({
+    where: { userId: session.userId, status: 'pending' },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true },
+  })
+  if (!pending) {
+    return NextResponse.json(
+      { error: 'no_pending_request', message: 'لا يوجد طلب توثيق معلّق' },
+      { status: 404 },
+    )
+  }
+
+  await db.verificationRequest.update({
+    where: { id: pending.id },
+    data: { status: 'revoked' },
+  })
+
+  return NextResponse.json({ success: true })
 }
