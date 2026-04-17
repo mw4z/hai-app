@@ -135,31 +135,49 @@ export default function ChatClient({
   const rootRef = useRef<HTMLDivElement>(null)
   const textInputRef = useRef<HTMLInputElement>(null)
 
-  // Size the chat root to the visual viewport (keyboard-aware) in real
-  // time. visualViewport resize events on iOS only fire a couple of
-  // times per animation (often once with the final height), which
-  // makes the composer snap up ahead of the keyboard. A CSS transition
-  // on height smooths that jump over the ~250ms iOS keyboard animation
-  // so the composer rides up in sync.
+  // Size the chat root to the visual viewport (keyboard-aware). On
+  // iOS, visualViewport.resize fires at the end of the keyboard
+  // animation, so using it alone makes the composer wait a full beat
+  // behind. Drive the height change off Capacitor's keyboardWillShow
+  // instead — that event fires at the start of the animation, so we
+  // can shrink the root immediately and let the composer ride up at
+  // the same instant the keyboard starts rising.
   useEffect(() => {
     if (typeof window === 'undefined') return
     const vv = window.visualViewport
     const root = rootRef.current
     if (!vv || !root) return
-    // iOS keyboard animation is a short spring (~180ms) with fast
-    // initial movement. Matching duration + easing makes the composer
-    // feel glued to the keyboard rather than chasing it.
-    root.style.transition = 'height 180ms cubic-bezier(0.25, 0.1, 0.25, 1)'
-    const apply = () => {
-      root.style.height = `calc(${vv.height}px - env(safe-area-inset-top, 0px))`
+
+    const setHeight = (visibleHeight: number) => {
+      root.style.height = `calc(${visibleHeight}px - env(safe-area-inset-top, 0px))`
       bottomRef.current?.scrollIntoView({ block: 'end' })
     }
-    apply()
-    vv.addEventListener('resize', apply)
-    vv.addEventListener('scroll', apply)
+
+    setHeight(vv.height)
+    const onVV = () => setHeight(vv.height)
+    vv.addEventListener('resize', onVV)
+    vv.addEventListener('scroll', onVV)
+
+    let cleanupKb: (() => void) | null = null
+    if ((window as any).Capacitor?.isNativePlatform?.()) {
+      import('@capacitor/keyboard').then(({ Keyboard }) => {
+        const h1 = Keyboard.addListener('keyboardWillShow', (info) => {
+          setHeight(window.innerHeight - info.keyboardHeight)
+        })
+        const h2 = Keyboard.addListener('keyboardWillHide', () => {
+          setHeight(window.innerHeight)
+        })
+        cleanupKb = () => {
+          h1.then(x => x.remove())
+          h2.then(x => x.remove())
+        }
+      }).catch(() => {})
+    }
+
     return () => {
-      vv.removeEventListener('resize', apply)
-      vv.removeEventListener('scroll', apply)
+      vv.removeEventListener('resize', onVV)
+      vv.removeEventListener('scroll', onVV)
+      cleanupKb?.()
     }
   }, [])
   const [sendingLocation, setSendingLocation] = useState(false)
