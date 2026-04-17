@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getValidatedSession as getSession } from '@/lib/auth-server'
 import { log } from '@/lib/logger'
+import { computeProviderStatus } from '@/lib/provider'
 
 export async function GET() {
   try {
@@ -106,6 +107,43 @@ export async function PATCH(req: NextRequest) {
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: 'لا يوجد بيانات للتحديث' }, { status: 400 })
+    }
+
+    // If any service field was touched, recompute providerStatus so the
+    // lifecycle (PENDING ↔ ACTIVE) stays consistent with the quality gate
+    // enforced by /api/provider/apply. VERIFIED_PROVIDER is admin-controlled
+    // and deliberately left untouched; NORMAL users can't have service fields
+    // change their status because we only flip it for SERVICE_PROVIDER.
+    const touchedServiceFields =
+      data.serviceDescription !== undefined ||
+      data.serviceAddress     !== undefined ||
+      data.serviceLat         !== undefined ||
+      data.serviceLng         !== undefined
+
+    if (touchedServiceFields) {
+      const current = await db.user.findUnique({
+        where: { id: session.userId },
+        select: {
+          accountType: true,
+          serviceDescription: true,
+          serviceAddress: true,
+          serviceLat: true,
+          serviceLng: true,
+        },
+      })
+      if (current?.accountType === 'SERVICE_PROVIDER') {
+        // `undefined` means "not sent in this PATCH" (keep current);
+        // `null` means "user cleared the field" (honor the clear).
+        const pick = <T,>(next: unknown, prev: T | null): T | null =>
+          next === undefined ? prev : (next as T | null)
+        const merged = {
+          serviceDescription: pick<string>(data.serviceDescription, current.serviceDescription),
+          serviceAddress:     pick<string>(data.serviceAddress,     current.serviceAddress),
+          serviceLat:         pick<number>(data.serviceLat,         current.serviceLat),
+          serviceLng:         pick<number>(data.serviceLng,         current.serviceLng),
+        }
+        data.providerStatus = computeProviderStatus(merged)
+      }
     }
 
     await db.user.update({
