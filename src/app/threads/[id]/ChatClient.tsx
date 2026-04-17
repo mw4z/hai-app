@@ -135,47 +135,60 @@ export default function ChatClient({
   const rootRef = useRef<HTMLDivElement>(null)
   const textInputRef = useRef<HTMLInputElement>(null)
 
-  // Size the chat root to the visual viewport (keyboard-aware). On
-  // iOS, visualViewport.resize fires at the end of the keyboard
-  // animation, so using it alone makes the composer wait a full beat
-  // behind. Drive the height change off Capacitor's keyboardWillShow
-  // instead — that event fires at the start of the animation, so we
-  // can shrink the root immediately and let the composer ride up at
-  // the same instant the keyboard starts rising.
+  // Size the chat root to the visible viewport (keyboard-aware).
+  //
+  // On Capacitor native, Keyboard.willShow/willHide are the source of
+  // truth — they fire at the start of the keyboard animation with the
+  // exact keyboardHeight, so the composer snaps to its final position
+  // the instant the keyboard starts rising.
+  //
+  // visualViewport is a fallback for web, and also covers orientation
+  // changes on native. It's intentionally NOT used during a native
+  // keyboard transition, because WKWebView's visualViewport.resize
+  // fires at the end of the animation with a slightly different height
+  // than info.keyboardHeight — the difference shows as the composer
+  // nudging a couple pixels a beat after it had already settled.
   useEffect(() => {
     if (typeof window === 'undefined') return
     const vv = window.visualViewport
     const root = rootRef.current
     if (!vv || !root) return
 
+    const isNative = !!(window as any).Capacitor?.isNativePlatform?.()
+    let keyboardOpen = false
+
     const setHeight = (visibleHeight: number) => {
       root.style.height = `calc(${visibleHeight}px - env(safe-area-inset-top, 0px))`
       bottomRef.current?.scrollIntoView({ block: 'end' })
     }
 
-    // The composer's safe-area-inset-bottom padding is only needed when
-    // the home-indicator area is visible. When the keyboard is up it
-    // covers that area, so the extra space shows as a ~1s phantom gap
-    // under the input until iOS finally updates the inset. Override
-    // the padding manually in sync with the keyboard events.
     const safePad = 'calc(env(safe-area-inset-bottom, 0px) + 10px)'
     const setComposerPad = (pad: string) => {
       if (composerRef.current) composerRef.current.style.paddingBottom = pad
     }
 
     setHeight(vv.height)
-    const onVV = () => setHeight(vv.height)
+    const onVV = () => {
+      // On native, the keyboard events own the height while the
+      // keyboard is up — ignore visualViewport so we don't overwrite
+      // the correct keyboardHeight-based sizing with a slightly
+      // different vv.height.
+      if (isNative && keyboardOpen) return
+      setHeight(vv.height)
+    }
     vv.addEventListener('resize', onVV)
     vv.addEventListener('scroll', onVV)
 
     let cleanupKb: (() => void) | null = null
-    if ((window as any).Capacitor?.isNativePlatform?.()) {
+    if (isNative) {
       import('@capacitor/keyboard').then(({ Keyboard }) => {
         const h1 = Keyboard.addListener('keyboardWillShow', (info) => {
+          keyboardOpen = true
           setHeight(window.innerHeight - info.keyboardHeight)
           setComposerPad('10px')
         })
         const h2 = Keyboard.addListener('keyboardWillHide', () => {
+          keyboardOpen = false
           setHeight(window.innerHeight)
           setComposerPad(safePad)
         })
