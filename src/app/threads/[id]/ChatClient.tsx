@@ -136,19 +136,19 @@ export default function ChatClient({
   const textInputRef = useRef<HTMLInputElement>(null)
 
   // Size the chat root to the visual viewport (keyboard-aware) in real
-  // time. On iOS WKWebView, 100dvh does NOT shrink when the keyboard
-  // opens, so the composer ends up below the keyboard. visualViewport
-  // fires resize events throughout the keyboard animation with the
-  // current visible height — setting the root height from that keeps
-  // the composer pinned above the keyboard in sync with the animation.
+  // time. visualViewport resize events on iOS only fire a couple of
+  // times per animation (often once with the final height), which
+  // makes the composer snap up ahead of the keyboard. A CSS transition
+  // on height smooths that jump over the ~250ms iOS keyboard animation
+  // so the composer rides up in sync.
   useEffect(() => {
     if (typeof window === 'undefined') return
     const vv = window.visualViewport
     const root = rootRef.current
     if (!vv || !root) return
+    root.style.transition = 'height 250ms cubic-bezier(0.33, 1, 0.68, 1)'
     const apply = () => {
       root.style.height = `calc(${vv.height}px - env(safe-area-inset-top, 0px))`
-      // Keep the last message visible as the viewport shrinks.
       bottomRef.current?.scrollIntoView({ block: 'end' })
     }
     apply()
