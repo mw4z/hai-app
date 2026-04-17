@@ -48,7 +48,8 @@ export default function BottomNav({ active }: { active: string }) {
             <Link
               key={item.key}
               href={item.href}
-              className={`flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors ${
+              onClick={() => { hapticMedium(); playTap() }}
+              className={`flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors active:scale-[0.92] active:opacity-80 ${
                 isActive ? 'text-primary-600' : 'text-gray-400'
               }`}
             >
@@ -88,7 +89,8 @@ export default function BottomNav({ active }: { active: string }) {
               key={item.key}
               href={item.href}
               data-tour={item.key === 'profile' ? 'profile-tab' : undefined}
-              className={`flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors ${
+              onClick={() => { hapticMedium(); playTap() }}
+              className={`flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors active:scale-[0.92] active:opacity-80 ${
                 isActive ? 'text-primary-600' : 'text-gray-400'
               }`}
             >

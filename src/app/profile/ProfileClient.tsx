@@ -179,6 +179,43 @@ export default function ProfileClient({ user, postCount }: Props) {
     }
   }, [])
 
+  // Background sync of account status (accountType / providerStatus).
+  // Catches admin actions that changed the user's status while they were
+  // sitting on this screen — no refresh needed. Polls every 60s while the
+  // tab is visible, and re-syncs immediately on focus/visibility change.
+  useEffect(() => {
+    let cancelled = false
+    async function sync() {
+      if (cancelled) return
+      try {
+        const res = await fetch('/api/profile', { cache: 'no-store' })
+        if (!res.ok) return
+        const me = await res.json()
+        if (cancelled || !me) return
+        if (me.accountType && me.accountType !== accountType) {
+          setAccountType(me.accountType)
+        }
+        if (me.providerStatus && me.providerStatus !== providerStatus) {
+          setProviderStatus(me.providerStatus)
+        }
+      } catch { /* ignore network errors — next poll retries */ }
+    }
+    function onVisible() {
+      if (document.visibilityState === 'visible') sync()
+    }
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') sync()
+    }, 60_000)
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', sync)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', sync)
+    }
+  }, [accountType, providerStatus])
+
   function applyTheme(t: Theme) {
     setTheme(t)
     localStorage.setItem('hai_theme', t)

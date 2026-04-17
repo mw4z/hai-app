@@ -6,6 +6,7 @@ import RepToast from '@/components/RepToast'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import AppSplash from '@/components/AppSplash'
 import RouteTransition from '@/components/RouteTransition'
+import PageTransition from '@/components/PageTransition'
 import ArrivalAlert from '@/components/ArrivalAlert'
 import CapacitorBridge from '@/components/CapacitorBridge'
 import PushRegistration from '@/components/PushRegistration'
@@ -121,7 +122,7 @@ export default function RootLayout({
           <NeighborhoodTravelOverlay />
           <RepToast />
           <ErrorBoundary>
-              {children}
+              <PageTransition>{children}</PageTransition>
           </ErrorBoundary>
           <ScrollReset />
           <ArrivalAlert />
