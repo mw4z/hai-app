@@ -242,7 +242,7 @@ export async function POST(req: NextRequest) {
 
     case 'remove_provider': {
       if (!isSuper) return NextResponse.json({ error: 'متاح فقط للمدير العام' }, { status: 403 })
-      await db.user.update({ where: { id: targetId }, data: { accountType: 'NORMAL', providerStatus: 'NONE' } })
+      await db.user.update({ where: { id: targetId }, data: { accountType: 'NORMAL', providerStatus: 'NONE', providerStatusChangedAt: new Date() } })
       await logAction(session.userId, admin.name, 'remove_provider', 'user', targetId)
       return NextResponse.json({ success: true })
     }
@@ -250,7 +250,7 @@ export async function POST(req: NextRequest) {
     case 'approve_verification': {
       const vr = await db.verificationRequest.findUnique({ where: { id: targetId } })
       if (!vr || vr.status !== 'pending') return NextResponse.json({ error: 'Not found' }, { status: 404 })
-      await db.user.update({ where: { id: vr.userId }, data: { accountType: 'VERIFIED_PROVIDER', providerStatus: 'VERIFIED' } })
+      await db.user.update({ where: { id: vr.userId }, data: { accountType: 'VERIFIED_PROVIDER', providerStatus: 'VERIFIED', providerStatusChangedAt: new Date() } })
       await db.verificationRequest.update({ where: { id: targetId }, data: { status: 'approved', reviewedBy: session.userId, reviewedAt: new Date() } })
       await logAction(session.userId, admin.name, 'approve_verification', 'request', targetId)
       return NextResponse.json({ success: true })

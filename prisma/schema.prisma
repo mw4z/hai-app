@@ -62,7 +62,8 @@ model User {
   addressProofUrl  String?       // uploaded lease/utility bill photo
   reputation       Int           @default(0)
   accountType      AccountType   @default(NORMAL)
-  providerStatus   ProviderStatus @default(NONE)  // visibility gate for provider listings (separate from accountType)
+  providerStatus           ProviderStatus @default(NONE)  // visibility gate for provider listings (separate from accountType)
+  providerStatusChangedAt  DateTime?      // last time providerStatus transitioned between NONE/PENDING/ACTIVE/VERIFIED — used to enforce 24h cooldown on apply/cancel
   role             UserRole      @default(RESIDENT)
   status           UserStatus    @default(ACTIVE)
   neighborhood     Neighborhood? @relation(fields: [neighborhoodId], references: [id])

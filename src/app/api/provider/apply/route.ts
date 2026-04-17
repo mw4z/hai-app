@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getValidatedSession as getSession } from '@/lib/auth-server'
 import { log } from '@/lib/logger'
-import { computeProviderStatus, isValidCoord } from '@/lib/provider'
+import { computeProviderStatus, isValidCoord, providerCooldownRemainingMs } from '@/lib/provider'
 
 /**
  * POST /api/provider/apply
@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
       where: { id: session.userId },
       select: {
         accountType: true,
+        providerStatusChangedAt: true,
         neighborhood: {
           select: { name: true, nameEn: true, lat: true, lng: true, city: { select: { name: true, nameEn: true } } },
         },
@@ -34,6 +35,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'already_provider', message: 'حسابك مقدم خدمة بالفعل' },
         { status: 400 },
+      )
+    }
+    const cooldownLeft = providerCooldownRemainingMs(user.providerStatusChangedAt)
+    if (cooldownLeft > 0) {
+      const hoursLeft = Math.ceil(cooldownLeft / 3_600_000)
+      return NextResponse.json(
+        {
+          error: 'cooldown_active',
+          message: `يمكنك تغيير حالة مقدم الخدمة بعد ${hoursLeft} ساعة`,
+          remainingMs: cooldownLeft,
+        },
+        { status: 429 },
       )
     }
     if (!user.neighborhood) {
@@ -85,6 +98,7 @@ export async function POST(req: NextRequest) {
       data: {
         accountType: 'SERVICE_PROVIDER',
         providerStatus,
+        providerStatusChangedAt: new Date(),
         serviceDescription,
         serviceAddress,
         serviceLat,
@@ -126,7 +140,7 @@ export async function DELETE() {
 
     const user = await db.user.findUnique({
       where: { id: session.userId },
-      select: { accountType: true, providerStatus: true },
+      select: { accountType: true, providerStatus: true, providerStatusChangedAt: true },
     })
     if (!user) {
       return NextResponse.json({ error: 'المستخدم غير موجود' }, { status: 404 })
@@ -143,6 +157,18 @@ export async function DELETE() {
         { status: 400 },
       )
     }
+    const cooldownLeft = providerCooldownRemainingMs(user.providerStatusChangedAt)
+    if (cooldownLeft > 0) {
+      const hoursLeft = Math.ceil(cooldownLeft / 3_600_000)
+      return NextResponse.json(
+        {
+          error: 'cooldown_active',
+          message: `يمكنك تغيير حالة مقدم الخدمة بعد ${hoursLeft} ساعة`,
+          remainingMs: cooldownLeft,
+        },
+        { status: 429 },
+      )
+    }
 
     await db.$transaction([
       db.user.update({
@@ -150,6 +176,7 @@ export async function DELETE() {
         data: {
           accountType: 'NORMAL',
           providerStatus: 'NONE',
+          providerStatusChangedAt: new Date(),
           serviceDescription: null,
           serviceAddress: null,
           serviceLat: null,

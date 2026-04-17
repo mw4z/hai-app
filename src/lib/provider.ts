@@ -6,6 +6,20 @@ export const LAT_MAX = 90
 export const LNG_MIN = -180
 export const LNG_MAX = 180
 
+/** Cooldown between user-initiated provider status transitions (apply/cancel). */
+export const PROVIDER_STATUS_COOLDOWN_MS = 24 * 60 * 60 * 1000
+
+/**
+ * If the last provider-status change was within the cooldown window, return
+ * the remaining milliseconds. Otherwise return 0 (caller may proceed).
+ */
+export function providerCooldownRemainingMs(lastChangedAt: Date | null | undefined): number {
+  if (!lastChangedAt) return 0
+  const elapsed = Date.now() - new Date(lastChangedAt).getTime()
+  if (elapsed >= PROVIDER_STATUS_COOLDOWN_MS) return 0
+  return PROVIDER_STATUS_COOLDOWN_MS - elapsed
+}
+
 /** True if the provider should be visible in public listings/badges. */
 export function isProviderVisible(status?: ProviderStatus | null): boolean {
   return status === 'ACTIVE' || status === 'VERIFIED'
