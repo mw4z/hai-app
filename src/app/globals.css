@@ -226,9 +226,48 @@ body {
   background-color: var(--bg);
   color: var(--text);
   min-height: 100dvh;
-  max-width: 480px;
+  max-width: var(--app-max-width, 480px);
   margin: 0 auto;
   position: relative;
+}
+
+/* ── Responsive app container ────────────────────────────────────────────
+   The app is a phone-first vertical layout. On iPad / larger screens we
+   widen the centered container modestly — enough to use the extra space
+   without stretching chat bubbles, buttons or forms to awkward widths.
+
+   Mobile (< 768px): 480px — unchanged iPhone layout.
+   Tablet portrait (768-1024px): 600px.
+   Tablet landscape / iPad Pro (1024+): 680px.
+
+   A subtle shadow frames the container on tablet so the centered column
+   looks intentional instead of a narrow iPhone mirror.                 */
+:root { --app-max-width: 480px; }
+
+@media (min-width: 768px) {
+  :root { --app-max-width: 600px; }
+  body {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 12px 48px rgba(0, 0, 0, 0.06);
+  }
+  html {
+    background-color: #f3f4f6;
+  }
+  html.dark {
+    background-color: #020617;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root { --app-max-width: 680px; }
+}
+
+/* Fixed bottom bars (BottomNav, composer, etc.) use Tailwind's
+   max-w-[480px] arbitrary-value class. Override it to follow the
+   container width on tablet/desktop so they don't stay narrow. */
+@media (min-width: 768px) {
+  .max-w-\[480px\] {
+    max-width: var(--app-max-width) !important;
+  }
 }
 
 /* Smooth scrolling */
