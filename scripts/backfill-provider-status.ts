@@ -19,11 +19,35 @@
  *   npx tsx scripts/backfill-provider-status.ts --dry-run # preview only
  */
 
+import fs from 'fs'
+import path from 'path'
+import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
 import type { ProviderStatus } from '@prisma/client'
 import { computeProviderStatus } from '../src/lib/provider'
 
-const db = new PrismaClient()
+// Load env from .env.local / .env so DATABASE_URL is available when run via tsx
+function loadEnvFile(p: string) {
+  if (!fs.existsSync(p)) return
+  for (const raw of fs.readFileSync(p, 'utf-8').split('\n')) {
+    const line = raw.trim()
+    if (!line || line.startsWith('#')) continue
+    const eq = line.indexOf('=')
+    if (eq === -1) continue
+    const key = line.slice(0, eq).trim()
+    let val = line.slice(eq + 1).trim()
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1)
+    }
+    if (!process.env[key]) process.env[key] = val
+  }
+}
+loadEnvFile(path.resolve(process.cwd(), '.env.local'))
+loadEnvFile(path.resolve(process.cwd(), '.env'))
+
+const db = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
+} as any)
 const BATCH_SIZE = 200
 const DRY_RUN = process.argv.includes('--dry-run')
 
