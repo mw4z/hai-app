@@ -146,7 +146,10 @@ export default function ChatClient({
     const vv = window.visualViewport
     const root = rootRef.current
     if (!vv || !root) return
-    root.style.transition = 'height 250ms cubic-bezier(0.33, 1, 0.68, 1)'
+    // iOS keyboard animation is a short spring (~180ms) with fast
+    // initial movement. Matching duration + easing makes the composer
+    // feel glued to the keyboard rather than chasing it.
+    root.style.transition = 'height 180ms cubic-bezier(0.25, 0.1, 0.25, 1)'
     const apply = () => {
       root.style.height = `calc(${vv.height}px - env(safe-area-inset-top, 0px))`
       bottomRef.current?.scrollIntoView({ block: 'end' })
