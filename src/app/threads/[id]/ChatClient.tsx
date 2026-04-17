@@ -477,6 +477,16 @@ export default function ChatClient({
         })
         if (res.ok) {
           const msg = await res.json()
+          // Preload the uploaded image so the browser already has it decoded
+          // before we swap the blob URL out. Without this, there's a brief
+          // flash where the bubble goes blank between revoking the preview
+          // and the remote URL loading.
+          await new Promise<void>((resolve) => {
+            const pre = new Image()
+            pre.onload = () => resolve()
+            pre.onerror = () => resolve() // don't block the swap on failed preload
+            pre.src = imageUrl
+          })
           setMessages((prev: any[]) => prev.map((m) => (m.id === tempId ? msg : m)))
           if (localPreview) URL.revokeObjectURL(localPreview)
         } else {
