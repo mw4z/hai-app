@@ -324,7 +324,25 @@ export default function ChatClient({
             setShowRating(true)
             clearInterval(interval)
           } else {
-            setMessages(data.messages || data)
+            // Merge server data with local state instead of replacing.
+            // Preserves:
+            //   - localPreview (blob URL) on messages we just sent this
+            //     session, so the <img> doesn't flash to the remote URL
+            //   - pending placeholders whose upload hasn't returned yet
+            //     (their id is still the temp "pending-…")
+            const serverMsgs: any[] = data.messages || data || []
+            const serverIds = new Set(serverMsgs.map((m: any) => m.id))
+            setMessages((prev: any[]) => {
+              const merged = serverMsgs.map((serverMsg: any) => {
+                const existing = prev.find((m: any) => m.id === serverMsg.id)
+                if (existing?.localPreview) {
+                  return { ...serverMsg, localPreview: existing.localPreview }
+                }
+                return serverMsg
+              })
+              const localOnly = prev.filter((m: any) => !serverIds.has(m.id) && m.pending)
+              return [...merged, ...localOnly]
+            })
           }
         }
       } catch { /* ignore */ }
