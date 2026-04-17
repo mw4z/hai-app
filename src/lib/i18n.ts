@@ -101,6 +101,9 @@ export const translations = {
   profile_provider_pending_hint: { ar: 'اكتب وصفاً لخدمتك (20 حرفاً على الأقل) ليتم تفعيل حسابك تلقائياً. لا تحتاج موافقة من أحد.', en: 'Add a service description (at least 20 characters) and your account activates automatically — no approval needed.', ur: 'خدمت کی تفصیل لکھیں (کم از کم 20 حروف) — اکاؤنٹ خود بخود فعال ہو جائے گا، کسی منظوری کی ضرورت نہیں۔' },
   profile_provider_verified:     { ar: 'مقدم خدمة موثّق', en: 'Verified service provider', ur: 'تصدیق شدہ سروس پرووائیڈر' },
   profile_provider_apply_ok:     { ar: 'تم إرسال طلبك', en: 'Application submitted', ur: 'درخواست جمع کرا دی گئی' },
+  profile_provider_cancel:       { ar: 'إلغاء كوني مقدم خدمة', en: 'Cancel being a service provider', ur: 'سروس پرووائیڈر منسوخ کریں' },
+  profile_provider_cancel_confirm: { ar: 'هل أنت متأكد؟ سيتم إخفاء كتالوج خدماتك حتى تعود كمقدم خدمة مرة أخرى.', en: 'Are you sure? Your catalog will be hidden until you become a provider again.', ur: 'کیا آپ پکا ہیں؟ آپ کا کیٹلاگ دوبارہ سروس پرووائیڈر بننے تک چھپا دیا جائے گا۔' },
+  profile_provider_cancel_ok:    { ar: 'تم إلغاء حسابك كمقدم خدمة', en: 'Provider status cancelled', ur: 'سروس پرووائیڈر اسٹیٹس منسوخ ہو گیا' },
 
   // ── Onboarding ──────────────────────────────────────────────────────────────
   onboard_hello:        { ar: 'مرحباً!',            en: 'Welcome!'          , ur: 'خوش آمدید!' },

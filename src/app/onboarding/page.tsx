@@ -457,7 +457,7 @@ export default function OnboardingPage() {
           <div className="space-y-3 mb-8">
             <button
               onClick={() => setAccountType('NORMAL')}
-              className={`w-full p-4 rounded-2xl border-2 text-right transition-all ${
+              className={`w-full p-4 rounded-2xl border-2 text-start transition-all ${
                 accountType === 'NORMAL' ? 'border-primary-600 bg-primary-600 text-white' : 'border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white'
               }`}
             >
@@ -469,7 +469,7 @@ export default function OnboardingPage() {
             </button>
             <button
               onClick={() => setAccountType('SERVICE_PROVIDER')}
-              className={`w-full p-4 rounded-2xl border-2 text-right transition-all ${
+              className={`w-full p-4 rounded-2xl border-2 text-start transition-all ${
                 accountType === 'SERVICE_PROVIDER' ? 'border-primary-600 bg-primary-600 text-white' : 'border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white'
               }`}
             >

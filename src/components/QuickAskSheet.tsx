@@ -85,7 +85,7 @@ export default function QuickAskSheet({ onClose }: { onClose: () => void }) {
               value={text}
               onChange={e => setText(e.target.value)}
               placeholder="مثال: أبحث عن سباك موثوق في الحي..."
-              className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-right focus:outline-none focus:ring-2 focus:ring-sky-400 resize-none leading-relaxed"
+              className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-start focus:outline-none focus:ring-2 focus:ring-sky-400 resize-none leading-relaxed"
               rows={2}
               maxLength={200}
               autoFocus

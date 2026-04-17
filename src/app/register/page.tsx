@@ -72,7 +72,7 @@ export default function RegisterPage() {
               placeholder="5xxxxxxxx"
               value={phone}
               onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-              className="flex-1 px-3 py-3 text-right bg-transparent focus:outline-none text-base"
+              className="flex-1 px-3 py-3 text-start bg-transparent focus:outline-none text-base"
               maxLength={10}
               required
               dir="ltr"

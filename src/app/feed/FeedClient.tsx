@@ -462,7 +462,7 @@ export default function FeedClient({
             className="w-full flex items-center gap-3 bg-white border border-sky-100 rounded-2xl px-4 py-3 shadow-sm hover:shadow-md transition-shadow"
           >
             <span className="text-lg">🔎</span>
-            <span className="flex-1 text-right text-sm text-gray-400">{t('feed_ask_placeholder')}</span>
+            <span className="flex-1 text-start text-sm text-gray-400">{t('feed_ask_placeholder')}</span>
             <span className="text-xs bg-sky-600 text-white px-3 py-1 rounded-full font-medium flex-shrink-0">{t('feed_quick_ask_btn')}</span>
           </button>
         </div>

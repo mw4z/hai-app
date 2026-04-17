@@ -107,3 +107,67 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'خطأ في الخادم' }, { status: 500 })
   }
 }
+
+/**
+ * DELETE /api/provider/apply
+ * Reverts a SERVICE_PROVIDER (PENDING or ACTIVE) back to NORMAL. Clears the
+ * service profile fields and auto-revokes any pending verification request.
+ * VERIFIED_PROVIDER is admin-controlled and cannot self-demote via this route.
+ * Catalog items (ServiceItem) are intentionally kept — they're simply hidden
+ * from public listings while providerStatus=NONE, and become visible again
+ * if the user re-applies.
+ */
+export async function DELETE() {
+  try {
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: session.userId },
+      select: { accountType: true, providerStatus: true },
+    })
+    if (!user) {
+      return NextResponse.json({ error: 'المستخدم غير موجود' }, { status: 404 })
+    }
+    if (user.accountType === 'NORMAL') {
+      return NextResponse.json(
+        { error: 'not_a_provider', message: 'لست مقدم خدمة' },
+        { status: 400 },
+      )
+    }
+    if (user.accountType === 'VERIFIED_PROVIDER') {
+      return NextResponse.json(
+        { error: 'verified_cannot_self_demote', message: 'الحسابات الموثّقة لا يمكن إلغاؤها ذاتياً' },
+        { status: 400 },
+      )
+    }
+
+    await db.$transaction([
+      db.user.update({
+        where: { id: session.userId },
+        data: {
+          accountType: 'NORMAL',
+          providerStatus: 'NONE',
+          serviceDescription: null,
+          serviceAddress: null,
+          serviceLat: null,
+          serviceLng: null,
+        },
+      }),
+      // Auto-revoke any pending verification request so it doesn't sit in the
+      // admin queue for a user who is no longer a provider.
+      db.verificationRequest.updateMany({
+        where: { userId: session.userId, status: 'pending' },
+        data: { status: 'revoked' },
+      }),
+    ])
+
+    log.api('DELETE', '/api/provider/apply', session.userId)
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    log.error('Handler failed', error, { route: '/api/provider/apply DELETE' })
+    return NextResponse.json({ error: 'خطأ في الخادم' }, { status: 500 })
+  }
+}

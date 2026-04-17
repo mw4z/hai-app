@@ -9,6 +9,7 @@ import UserBadgeDisplay from '@/components/UserBadge'
 import EmergencyRequestSheet from '@/components/EmergencyRequestSheet'
 import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useLanguage, LANGUAGE_CHANGE_EVENT } from '@/hooks/useLanguage'
+import { useConfirm } from '@/components/ConfirmProvider'
 import {
   FiMapPin, FiStar, FiFileText, FiLogOut, FiCamera,
   FiUser, FiPhone, FiMail, FiGlobe, FiSun, FiMoon,
@@ -63,6 +64,7 @@ export default function ProfileClient({ user, postCount }: Props) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { t, lang } = useLanguage()
+  const confirm = useConfirm()
   const dn = (ar?: string, en?: string) => (lang === 'en' && en) ? en : (ar || '')
 
   // Local state
@@ -133,6 +135,35 @@ export default function ProfileClient({ user, postCount }: Props) {
     const ct = dn(user.city, user.cityEn)
     if (nb && ct) return `${nb}, ${ct}`
     return nb || ct || ''
+  }
+
+  // Cancel provider status — PENDING or ACTIVE → NORMAL. Catalog is kept
+  // but hidden. VERIFIED can't self-demote; the button isn't rendered for them.
+  async function handleCancelProvider() {
+    const ok = await confirm({
+      message: t('profile_provider_cancel_confirm'),
+      confirmText: t('profile_provider_cancel'),
+      cancelText: t('profile_cancel'),
+      variant: 'danger',
+    })
+    if (!ok) return
+    try {
+      const res = await fetch('/api/provider/apply', { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.message || data.error || (lang === 'en' ? 'Error' : 'خطأ'))
+        return
+      }
+      setAccountType('NORMAL')
+      setProviderStatus('NONE')
+      setServiceDescription('')
+      setServiceAddress('')
+      setServiceLat(null)
+      setServiceLng(null)
+      toast.success(t('profile_provider_cancel_ok'))
+    } catch {
+      toast.error(lang === 'en' ? 'Network error' : 'خطأ في الاتصال')
+    }
   }
 
   useEffect(() => {
@@ -762,35 +793,67 @@ export default function ProfileClient({ user, postCount }: Props) {
             </div>
           </div>
         ) : (
-          <button
-            onClick={() => { setTempBio(bio); setTempServiceDesc(serviceDescription); setTempServiceAddress(serviceAddress || (isProvider ? defaultServiceAddress() : '')); setEditingBio(true) }}
-            className="w-full p-4 text-right"
-          >
-            {bio ? (
-              <div>
-                <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">{bio}</p>
-                {isProvider && serviceDescription && (
-                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-                    <p className="text-[10px] font-semibold text-primary-600 mb-1">{t('profile_service_desc')}</p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap">{serviceDescription}</p>
-                  </div>
+          <div className="p-4 space-y-3">
+            {/* ─── Bio block ─── */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{t('profile_bio')}</p>
+                {bio ? (
+                  <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">{bio}</p>
+                ) : (
+                  <p className="text-xs text-gray-400 italic">{t('profile_no_bio')}</p>
                 )}
-                {isProvider && serviceAddress && (
-                  <div className="mt-2">
-                    <p className="text-[10px] text-gray-400 flex items-center gap-1">
-                      <FiMapPin className="w-3 h-3" /> {serviceAddress}
-                    </p>
-                  </div>
-                )}
-                <p className="text-[10px] text-primary-500 mt-2">{lang === 'en' ? 'Tap to edit' : 'اضغط للتعديل'}</p>
               </div>
-            ) : (
-              <div className="text-center py-4">
-                <p className="text-sm text-gray-400">{t('profile_no_bio')}</p>
-                <p className="text-xs text-primary-500 mt-1">{lang === 'en' ? 'Tap to add' : 'اضغط للإضافة'}</p>
+              <button
+                onClick={() => { setTempBio(bio); setTempServiceDesc(serviceDescription); setTempServiceAddress(serviceAddress || (isProvider ? defaultServiceAddress() : '')); setEditingBio(true) }}
+                className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-primary-600 bg-primary-50 dark:bg-primary-900/30 rounded-lg active:scale-95 transition-transform"
+              >
+                <FiEdit2 className="w-3 h-3" />
+                {bio
+                  ? (lang === 'en' ? 'Edit' : 'تعديل')
+                  : (lang === 'en' ? 'Add' : 'إضافة')}
+              </button>
+            </div>
+
+            {/* ─── Service description block (providers only) ─── */}
+            {isProvider && (
+              <div className="pt-3 border-t border-gray-100 dark:border-gray-700">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-semibold text-primary-600 uppercase tracking-wide mb-1">{t('profile_service_desc')}</p>
+                    {serviceDescription ? (
+                      <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">{serviceDescription}</p>
+                    ) : (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        {lang === 'en'
+                          ? 'No description yet — add at least 20 characters to activate your profile.'
+                          : 'لا يوجد وصف — أضف 20 حرفاً على الأقل لتفعيل ملفك.'}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => { setTempBio(bio); setTempServiceDesc(serviceDescription); setTempServiceAddress(serviceAddress || defaultServiceAddress()); setEditingBio(true) }}
+                    className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-primary-600 bg-primary-50 dark:bg-primary-900/30 rounded-lg active:scale-95 transition-transform"
+                  >
+                    <FiEdit2 className="w-3 h-3" />
+                    {serviceDescription
+                      ? (lang === 'en' ? 'Edit' : 'تعديل')
+                      : (lang === 'en' ? 'Add' : 'إضافة')}
+                  </button>
+                </div>
               </div>
             )}
-          </button>
+
+            {/* ─── Service area (read-only, providers only) ─── */}
+            {isProvider && (serviceAddress || defaultServiceAddress()) && (
+              <div className="pt-3 border-t border-gray-100 dark:border-gray-700">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{t('profile_service_loc')}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                  <FiMapPin className="w-3 h-3 flex-shrink-0" /> {serviceAddress || defaultServiceAddress()}
+                </p>
+              </div>
+            )}
+          </div>
         )}
       </div>
       </AccordionSection>
@@ -903,6 +966,9 @@ export default function ProfileClient({ user, postCount }: Props) {
               <p className="text-[11px] text-amber-700/80 dark:text-amber-300/80 mt-0.5 leading-snug">{t('profile_provider_pending_hint')}</p>
             </div>
           </div>
+          <button onClick={handleCancelProvider} className="mt-2 w-full text-center py-2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline">
+            {t('profile_provider_cancel')}
+          </button>
         </div>
       )}
       {accountType === 'SERVICE_PROVIDER' && providerStatus === 'ACTIVE' && (
@@ -911,6 +977,9 @@ export default function ProfileClient({ user, postCount }: Props) {
             <FiCheck className="w-4 h-4 text-primary-600 flex-shrink-0" />
             <span className="text-xs font-medium text-primary-700 dark:text-primary-300">{t('profile_provider_active')}</span>
           </div>
+          <button onClick={handleCancelProvider} className="mt-2 w-full text-center py-2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline">
+            {t('profile_provider_cancel')}
+          </button>
         </div>
       )}
       {accountType === 'VERIFIED_PROVIDER' && (
@@ -1344,7 +1413,7 @@ export default function ProfileClient({ user, postCount }: Props) {
       <div className="mx-4 mt-4">
         <button
           onClick={handleLogout}
-          className="w-full bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 rounded-xl py-3 px-4 text-right font-medium text-red-600 dark:text-red-400 flex items-center gap-2"
+          className="w-full bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 rounded-xl py-3 px-4 text-start font-medium text-red-600 dark:text-red-400 flex items-center gap-2"
         >
           <FiLogOut className="w-4 h-4" />
           <span>{t('profile_logout')}</span>
@@ -1383,7 +1452,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                 <div className="w-10 h-10 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center flex-shrink-0">
                   <FiUpload className="w-5 h-5 text-gray-600 dark:text-gray-300" />
                 </div>
-                <div className="text-right flex-1">
+                <div className="text-start flex-1">
                   <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
                     {lang === 'en' ? 'Upload Image' : 'ارفع صورة'}
                   </p>
@@ -1440,7 +1509,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                 <div className="w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
                   <FiUpload className="w-5 h-5 text-white" />
                 </div>
-                <div className="text-right flex-1">
+                <div className="text-start flex-1">
                   <p className="text-sm font-semibold text-primary-800 dark:text-primary-300">
                     {lang === 'en' ? 'Upload Photo' : 'ارفع صورة'}
                   </p>
@@ -1669,7 +1738,7 @@ function BookmarkedPosts({ lang, currentUserId }: { lang: string; currentUserId:
               {post.author?.name?.[0] || '؟'}
             </div>
           )}
-          <button onClick={() => router.push('/feed')} className="flex-1 min-w-0 text-right">
+          <button onClick={() => router.push('/feed')} className="flex-1 min-w-0 text-start">
             <div className="flex items-center gap-1.5 mb-0.5">
               <span className="text-[13px] font-semibold text-gray-800 dark:text-gray-200">{post.author?.name}</span>
               <span className="text-[10px] text-gray-400">

@@ -599,7 +599,7 @@ export default function ChatClient({
               {other.name?.[0] || '؟'}
             </div>
           )}
-          <div className="min-w-0 text-right">
+          <div className="min-w-0 text-start">
             <h1 className="text-[15px] font-semibold text-gray-900 dark:text-white truncate">
               {other.name || (lang === 'en' ? 'Neighbor' : 'جار')}
             </h1>

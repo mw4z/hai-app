@@ -220,7 +220,7 @@ export default function NewPostPage() {
                         if (cat.key === 'RIDE_REQUEST') { router.push('/rides/new'); return }
                         setCategory(cat.key); setStep('content')
                       }}
-                      className={`w-full flex items-center gap-3 p-3.5 rounded-xl border active:scale-[0.98] transition-transform text-right ${
+                      className={`w-full flex items-center gap-3 p-3.5 rounded-xl border active:scale-[0.98] transition-transform text-start ${
                         cat.highlight
                           ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20'
                           : 'border-gray-200 dark:border-gray-700'
@@ -357,7 +357,7 @@ export default function NewPostPage() {
                         placeholder="0"
                         value={price}
                         onChange={(e) => setPrice(e.target.value)}
-                        className="flex-1 px-3 py-3 bg-transparent focus:outline-none text-right text-gray-900 dark:text-white"
+                        className="flex-1 px-3 py-3 bg-transparent focus:outline-none text-start text-gray-900 dark:text-white"
                         dir="ltr"
                       />
                     </div>

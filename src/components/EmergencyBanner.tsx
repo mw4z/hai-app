@@ -92,7 +92,7 @@ export default function EmergencyBanner() {
                   setExpanded(isOpen ? null : alert.id)
                 }
               }}
-              className="w-full text-right px-4 py-3 pe-10 flex items-start gap-3 active:opacity-90 cursor-pointer"
+              className="w-full text-start px-4 py-3 pe-10 flex items-start gap-3 active:opacity-90 cursor-pointer"
             >
               <div className="flex-shrink-0 mt-0.5">
                 <FiAlertTriangle className="w-5 h-5" />

@@ -570,7 +570,7 @@ export default function PostCard({
                 {/* Owner: edit + delete */}
                 {post.author.id === currentUserId && (
                   <>
-                    <button onClick={() => { setEditing(true); setShowMenu(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 w-full text-right">
+                    <button onClick={() => { setEditing(true); setShowMenu(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 w-full text-start">
                       <FiEdit2 className="w-3.5 h-3.5" />
                       {lang === 'en' ? 'Edit' : lang === 'ur' ? 'ترمیم' : 'تعديل'}
                     </button>
@@ -590,7 +590,7 @@ export default function PostCard({
                         toast.error(lang === 'en' ? 'Delete failed' : lang === 'ur' ? 'حذف ناکام' : 'فشل الحذف')
                       }
                       setShowMenu(false)
-                    }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 w-full text-right">
+                    }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 w-full text-start">
                       <FiTrash2 className="w-3.5 h-3.5" />
                       {lang !== 'en' ? 'حذف' : 'Delete'}
                     </button>
@@ -598,26 +598,26 @@ export default function PostCard({
                 )}
                 {/* Admin actions */}
                 {isAdmin && post.status !== 'HIDDEN' && (
-                  <button onClick={() => { handleAdminAction('hide_post'); setShowMenu(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 w-full text-right">
+                  <button onClick={() => { handleAdminAction('hide_post'); setShowMenu(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 w-full text-start">
                     <FiFlag className="w-3.5 h-3.5" />
                     {lang !== 'en' ? 'إخفاء' : 'Hide'}
                   </button>
                 )}
                 {currentUserRole === 'SUPER_ADMIN' && (
-                  <button onClick={() => { handleAdminAction('remove_post'); setShowMenu(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 w-full text-right">
+                  <button onClick={() => { handleAdminAction('remove_post'); setShowMenu(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 w-full text-start">
                     <FiFlag className="w-3.5 h-3.5" />
                     {lang !== 'en' ? 'حذف نهائي' : 'Remove'}
                   </button>
                 )}
                 {isAdmin && post.status === 'HIDDEN' && (
-                  <button onClick={() => { handleAdminAction('restore_post'); setShowMenu(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 w-full text-right">
+                  <button onClick={() => { handleAdminAction('restore_post'); setShowMenu(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 w-full text-start">
                     <FiFlag className="w-3.5 h-3.5" />
                     {lang !== 'en' ? 'استعادة' : 'Restore'}
                   </button>
                 )}
                 {/* Report */}
                 {post.author.id !== currentUserId && (
-                  <button onClick={handleReport} disabled={reported} className="flex items-center gap-2 px-3 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 w-full text-right">
+                  <button onClick={handleReport} disabled={reported} className="flex items-center gap-2 px-3 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 w-full text-start">
                     <FiFlag className="w-3.5 h-3.5" />
                     {reported ? t('post_reported') : t('post_report')}
                   </button>
@@ -877,7 +877,7 @@ export default function PostCard({
         if (!top) return null
         return (
           <div className="mt-2 pt-2 border-t border-gray-100/50 dark:border-white/[0.04]">
-            <button onClick={toggleComments} className="w-full text-right">
+            <button onClick={toggleComments} className="w-full text-start">
               <div className="flex items-start gap-2">
                 {top.author.avatarUrl ? (
                   <img src={top.author.avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0 mt-0.5" />
@@ -1099,7 +1099,7 @@ export default function PostCard({
                         onChange={e => setReplyText(e.target.value)}
                         placeholder={`${t('post_reply')}...`}
                         autoFocus
-                        className="flex-1 bg-gray-50 border border-primary-200 rounded-full px-3 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        className="flex-1 bg-gray-50 border border-primary-200 rounded-full px-3 py-1.5 text-xs text-start focus:outline-none focus:ring-2 focus:ring-primary-400"
                         maxLength={500}
                       />
                       <input type="file" accept="image/*" ref={replyImgRef} onChange={e => handleCommentImageSelect(e, 'reply')} className="hidden" />
@@ -1451,7 +1451,7 @@ function ServiceCatalog({ userId, lang }: { userId: string; lang: string }) {
           <button
             key={item.id}
             onClick={() => setSelected(item)}
-            className="bg-gray-50 dark:bg-gray-700/50 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-600 text-right active:scale-[0.97] transition-transform"
+            className="bg-gray-50 dark:bg-gray-700/50 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-600 text-start active:scale-[0.97] transition-transform"
           >
             {item.imageUrl ? (
               <img src={item.imageUrl} alt="" className="w-full h-24 object-cover" />
