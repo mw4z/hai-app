@@ -201,6 +201,11 @@ async function imageUrlToJpegFile(src: string, index: number): Promise<File> {
 /**
  * Single-shot image from the device camera. Native only — on web, the
  * caller should fall back to the hidden file input with `capture="environment"`.
+ *
+ * Width/height are clamped so iPhone/Pixel high-res captures don't blow
+ * past the chat upload's 5MB hard limit. Pipeline is:
+ *   1. Camera.getPhoto at 1600px max edge (plugin handles scaling natively).
+ *   2. If the result still comes in large, re-encode via canvas at 0.8 JPEG.
  */
 export async function pickImageFromCamera(): Promise<File> {
   if (!isNative()) throw new Error('web_unsupported')
@@ -208,11 +213,13 @@ export async function pickImageFromCamera(): Promise<File> {
   const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera')
 
   const photo = await Camera.getPhoto({
-    quality: 85,
+    quality: 80,
     allowEditing: false,
     resultType: CameraResultType.Base64,
     source: CameraSource.Camera,
     correctOrientation: true,
+    width: 1600,
+    height: 1600,
   })
 
   if (!photo.base64String) throw new Error('no_image')
@@ -222,8 +229,37 @@ export async function pickImageFromCamera(): Promise<File> {
   const bytes = new Uint8Array(byteString.length)
   for (let i = 0; i < byteString.length; i++) bytes[i] = byteString.charCodeAt(i)
   const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg'
-  const file = new File([bytes], `photo-${Date.now()}.${ext}`, { type: mime })
-  if (file.size > MAX_SIZE_MB * 1024 * 1024) throw new Error('size_too_large')
+  let file = new File([bytes], `photo-${Date.now()}.${ext}`, { type: mime })
+
+  // Chat's filter is 5MB. Re-encode if we're still above 4.5MB (leaving a
+  // small safety margin). This triggers on rare devices that ignore the
+  // width/height hint (or on newer iPhones with huge sensor output).
+  if (file.size > 4.5 * 1024 * 1024) {
+    try {
+      const url = URL.createObjectURL(file)
+      try {
+        const img = new Image()
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve()
+          img.onerror = () => reject(new Error('decode_failed'))
+          img.src = url
+        })
+        const maxEdge = 1600
+        const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.round(img.naturalWidth * scale)
+        canvas.height = Math.round(img.naturalHeight * scale)
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+          const blob = await new Promise<Blob | null>((r) => canvas.toBlob((b) => r(b), 'image/jpeg', 0.8))
+          if (blob) file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' })
+        }
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+    } catch { /* keep original file; chat will throw its own size error */ }
+  }
   return file
 }
 

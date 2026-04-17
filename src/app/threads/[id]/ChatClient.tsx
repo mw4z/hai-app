@@ -477,18 +477,23 @@ export default function ChatClient({
         })
         if (res.ok) {
           const msg = await res.json()
-          // Preload the uploaded image so the browser already has it decoded
-          // before we swap the blob URL out. Without this, there's a brief
-          // flash where the bubble goes blank between revoking the preview
-          // and the remote URL loading.
-          await new Promise<void>((resolve) => {
-            const pre = new Image()
-            pre.onload = () => resolve()
-            pre.onerror = () => resolve() // don't block the swap on failed preload
-            pre.src = imageUrl
-          })
-          setMessages((prev: any[]) => prev.map((m) => (m.id === tempId ? msg : m)))
-          if (localPreview) URL.revokeObjectURL(localPreview)
+          // First swap: insert the real message but KEEP the blob URL so the
+          // bubble keeps showing the local preview while we wait for the
+          // remote image to fully decode. This avoids a blank flash.
+          setMessages((prev: any[]) => prev.map((m) => (
+            m.id === tempId ? { ...msg, localPreview, remoteReady: false } : m
+          )))
+          // Preload + fully decode in the background
+          const pre = new Image()
+          pre.src = imageUrl
+          try { await pre.decode() } catch { /* keep going; onError in img will fall back */ }
+          // Second swap: remote is decoded, flip the render flag so the img
+          // switches to the remote URL. Revoke blob after a tick so any
+          // in-flight render finishes first.
+          setMessages((prev: any[]) => prev.map((m) => (
+            m.id === msg.id ? { ...m, remoteReady: true, localPreview: undefined } : m
+          )))
+          if (localPreview) setTimeout(() => URL.revokeObjectURL(localPreview), 500)
         } else {
           // Drop pending placeholders for this and the rest of the batch
           setMessages((prev: any[]) => prev.filter((m) => !pendingPlaceholders.slice(i).some(p => p.id === m.id)))
@@ -1265,9 +1270,20 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
           <div className={`max-w-[70%]`} data-msg-id={msg.id} {...longPress}>
             {replyQuote && <div className="mb-1">{replyQuote}</div>}
             <div onClick={() => msg.imageUrl && onImageTap(msg.imageUrl)} className={`relative ${msg.imageUrl ? 'cursor-pointer' : ''}`}>
+              {/* While the remote URL isn't decoded yet, keep showing the
+                  blob preview. Once remoteReady flips, switch to the real
+                  URL. onError falls back to the preview if the remote fails. */}
               <img
-                src={msg.imageUrl || (msg as any).localPreview}
+                src={(msg as any).pending || (msg as any).remoteReady === false
+                  ? ((msg as any).localPreview || msg.imageUrl)
+                  : (msg.imageUrl || (msg as any).localPreview)}
                 alt=""
+                onError={(e) => {
+                  const preview = (msg as any).localPreview
+                  if (preview && (e.currentTarget as HTMLImageElement).src !== preview) {
+                    (e.currentTarget as HTMLImageElement).src = preview
+                  }
+                }}
                 className={`rounded-2xl max-h-52 object-cover shadow-sm ${(msg as any).pending ? 'opacity-60' : ''} ${isLastInGroup ? (isMe ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : 'ltr:rounded-bl-sm rtl:rounded-br-sm') : ''}`}
               />
               {(msg as any).pending && (
