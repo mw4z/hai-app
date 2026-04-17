@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     const user = await db.user.findUnique({
       where: { id: session.userId },
-      select: { id: true, name: true, neighborhoodId: true, status: true, gender: true, reputation: true, role: true, plan: true },
+      select: { id: true, name: true, neighborhoodId: true, status: true, gender: true, reputation: true, role: true, plan: true, providerStatus: true },
     })
 
     if (!user?.neighborhoodId) {
@@ -63,6 +63,12 @@ export async function POST(req: NextRequest) {
     // Women-only check
     if (category === 'WOMEN_ONLY' && user.gender !== 'FEMALE') {
       return NextResponse.json(apiError('هذا القسم للنساء فقط', 403), { status: 403 })
+    }
+
+    // SERVICES is reserved for publicly-visible providers. NORMAL users and
+    // PENDING providers can't post there even if they bypass the client.
+    if (category === 'SERVICES' && user.providerStatus !== 'ACTIVE' && user.providerStatus !== 'VERIFIED') {
+      return NextResponse.json(apiError('هذا القسم متاح فقط لمقدمي الخدمات', 403), { status: 403 })
     }
 
     // Contests — admin only

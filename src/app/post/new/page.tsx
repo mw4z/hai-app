@@ -63,10 +63,15 @@ export default function NewPostPage() {
   const [step, setStep] = useState<'category' | 'content'>('category')
   const [category, setCategory] = useState('')
   const [isFemale, setIsFemale] = useState(false)
+  // Only visible providers (ACTIVE/VERIFIED) may post in the SERVICES category.
+  const [canPostServices, setCanPostServices] = useState(false)
 
   useEffect(() => {
     fetch('/api/profile').then(r => r.json()).then(d => {
       if (d.gender === 'FEMALE') setIsFemale(true)
+      if (d.providerStatus === 'ACTIVE' || d.providerStatus === 'VERIFIED') {
+        setCanPostServices(true)
+      }
     }).catch(() => {})
   }, [])
   const [title, setTitle] = useState('')
@@ -78,8 +83,17 @@ export default function NewPostPage() {
   const [location, setLocation] = useState<{ lat: number; lng: number; name: string } | null>(null)
   const [detectingLocation, setDetectingLocation] = useState(false)
 
-  const allItems = isFemale ? [...ALL_ITEMS, ...WOMEN_ONLY_GROUP.items] : ALL_ITEMS
-  const categoryGroups = isFemale ? [...CATEGORIES, WOMEN_ONLY_GROUP] : CATEGORIES
+  // SERVICES is hidden from NORMAL users (and PENDING providers) — posting in
+  // SERVICES is reserved for publicly-visible providers (ACTIVE/VERIFIED).
+  const hideServices = !canPostServices
+  const baseCategories = hideServices
+    ? CATEGORIES.map(g => ({ ...g, items: g.items.filter(i => i.key !== 'SERVICES') }))
+                .filter(g => g.items.length > 0)
+    : CATEGORIES
+  const baseItems = baseCategories.flatMap(g => g.items)
+
+  const allItems = isFemale ? [...baseItems, ...WOMEN_ONLY_GROUP.items] : baseItems
+  const categoryGroups = isFemale ? [...baseCategories, WOMEN_ONLY_GROUP] : baseCategories
   const selected = allItems.find(i => i.key === category)
   const isLookingFor = category === 'LOOKING_FOR'
   const showPrice = ['MARKETPLACE', 'REAL_ESTATE', 'FOOD_HOME'].includes(category)

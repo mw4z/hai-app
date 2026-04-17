@@ -777,8 +777,14 @@ export default function ProfileClient({ user, postCount }: Props) {
                       body: JSON.stringify(payload),
                     })
                     if (res.ok) {
+                      const data = await res.json().catch(() => ({}))
                       setBio(tempBio)
                       setServiceDescription(tempServiceDesc)
+                      // Sync accountType + providerStatus from the server's
+                      // response so the banners (PENDING / ACTIVE / VERIFIED)
+                      // update immediately without a refresh.
+                      if (data.user?.accountType) setAccountType(data.user.accountType)
+                      if (data.user?.providerStatus) setProviderStatus(data.user.providerStatus)
                       setEditingBio(false)
                       toast.success(t('profile_save'))
                     } else {

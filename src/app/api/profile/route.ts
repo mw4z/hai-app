@@ -130,12 +130,21 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    await db.user.update({
+    const updated = await db.user.update({
       where: { id: session.userId },
       data,
+      select: {
+        accountType: true,
+        providerStatus: true,
+        serviceDescription: true,
+        serviceAddress: true,
+        serviceLat: true,
+        serviceLng: true,
+        bio: true,
+      },
     })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, user: updated })
   } catch (error) {
     log.error('Handler failed', error, { route: '/api/profile PATCH' })
     return NextResponse.json({ error: 'خطأ في الخادم' }, { status: 500 })
