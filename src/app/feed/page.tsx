@@ -15,13 +15,12 @@ export default async function FeedPage({
   const session = await getSession()
   if (!session) redirect('/login')
 
-  // Cache user for 2 minutes — avoids re-fetching on every tab switch
-  const user = await cached(`user:${session.userId}`, 120_000, () =>
-    db.user.findUnique({
-      where: { id: session.userId },
-      include: { neighborhood: { include: { city: true } } },
-    })
-  )
+  // Always fetch fresh — caching here caused an onboarding loop on Vercel
+  // when a stale row with neighborhoodId=null survived across instances.
+  const user = await db.user.findUnique({
+    where: { id: session.userId },
+    include: { neighborhood: { include: { city: true } } },
+  })
 
   if (!user?.neighborhoodId) redirect('/onboarding')
 

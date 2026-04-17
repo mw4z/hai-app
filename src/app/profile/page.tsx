@@ -9,12 +9,10 @@ export default async function ProfilePage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const user = await cached(`user:${session.userId}`, 120_000, () =>
-    db.user.findUnique({
-      where: { id: session.userId },
-      include: { neighborhood: { include: { city: true } } },
-    })
-  )
+  const user = await db.user.findUnique({
+    where: { id: session.userId },
+    include: { neighborhood: { include: { city: true } } },
+  })
   if (!user) redirect('/login')
 
   const postCount = await cached(`postcount:${user.id}`, 60_000, () =>
