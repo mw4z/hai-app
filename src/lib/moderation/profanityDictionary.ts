@@ -31,6 +31,18 @@ export const PROFANITY_DICTIONARY: ProfanityEntry[] = [
   { word: 'زنا', language: 'ar', severity: 3, variations: ['زاني', 'زانيه'] },
   { word: 'كس امك', language: 'ar', severity: 3, variations: ['كس أمك', 'كسمك', 'كس اختك', 'كس ابوك'] },
   { word: 'كس', language: 'ar', severity: 3 },
+  // Root نيك (Arabic sexual slur, past/imperative/noun forms + common misspellings
+  // with letter doubling). The normalizer collapses 3+ repeats, so these explicit
+  // doubled variants catch the 2-letter repeat bypass (e.g. ناكك, نااك, نيييك).
+  { word: 'نيك', language: 'ar', severity: 3, variations: [
+    'ناك', 'انيك', 'انيكك', 'نياك', 'نيكك', 'ناكك', 'نااك', 'ناااك',
+    'نيوك', 'منيوك', 'منيوكه', 'منيوكة', 'منيوكين',
+    'نياكه', 'نياكة', 'نياكين', 'نياكي',
+    'نيكها', 'ناكها', 'نيكتك', 'نيكك', 'نيكو',
+    'ينيك', 'ينيكك', 'انيكك', 'انيككم',
+    // Franco-Arabic
+    'neek', 'naak', 'neik', 'nayek', 'manyook', 'manyouk', 'manyuk',
+  ]},
   { word: 'خول', language: 'ar', severity: 3, variations: ['مخول'] },
   { word: 'ديوث', language: 'ar', severity: 3 },
   { word: 'اخس', language: 'ar', severity: 2, variations: ['خسيس', 'خسه'] },

@@ -161,6 +161,8 @@ export interface ModerationAction {
   reputationPenalty: number
   reason?: string
   censored: string
+  /** Words that triggered the block/censor — shown to the user so they know what to remove. */
+  offensiveWords?: string[]
 }
 
 /**
@@ -168,9 +170,24 @@ export interface ModerationAction {
  */
 export function getModerationAction(result: ContentCheckResult): ModerationAction {
   const { score, censored, matches } = result
+  const offensiveWords = Array.from(new Set(matches.map(m => m.word).filter(Boolean)))
 
   if (score === 0) {
     return { action: 'allow', reputationPenalty: 0, censored }
+  }
+
+  // Any severity-3 match (severe slurs, sexual words, threats) blocks
+  // outright — no silent censoring. The user sees exactly which words
+  // triggered it so they can edit and retry.
+  const hasSevere = matches.some(m => m.severity === 3)
+  if (hasSevere) {
+    return {
+      action: 'block',
+      reputationPenalty: -10,
+      reason: 'المحتوى يحتوي على كلمات مسيئة',
+      censored,
+      offensiveWords,
+    }
   }
 
   if (score < THRESHOLDS.WARNING) {
@@ -178,41 +195,32 @@ export function getModerationAction(result: ContentCheckResult): ModerationActio
   }
 
   if (score < THRESHOLDS.PENALTY_SMALL) {
-    // Mild offense — warn + censor, no penalty
     return {
       action: 'censor',
       reputationPenalty: 0,
       reason: 'محتوى غير لائق — تم تعديله تلقائياً',
       censored,
+      offensiveWords,
     }
   }
 
   if (score < THRESHOLDS.PENALTY_LARGE) {
-    // Moderate offense — censor + small penalty
     return {
       action: 'censor',
       reputationPenalty: -5,
       reason: 'محتوى مسيء — تم تعديله وخصم سمعة',
       censored,
+      offensiveWords,
     }
   }
 
-  if (score < THRESHOLDS.BLOCK) {
-    // Severe offense — censor + large penalty
-    return {
-      action: 'censor',
-      reputationPenalty: -15,
-      reason: 'محتوى مسيء جداً',
-      censored,
-    }
-  }
-
-  // Extreme — block entirely
+  // Moderate+ accumulation without a severe term → still block but softer wording
   return {
     action: 'block',
-    reputationPenalty: -25,
-    reason: 'تم حظر المحتوى لمخالفته الشروط',
+    reputationPenalty: -15,
+    reason: 'المحتوى غير مناسب للنشر',
     censored,
+    offensiveWords,
   }
 }
 

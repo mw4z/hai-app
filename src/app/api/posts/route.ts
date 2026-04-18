@@ -118,11 +118,20 @@ export async function POST(req: NextRequest) {
     const titleMod = moderateContent(title.trim())
     const bodyMod = moderateContent(body.trim())
 
-    // Block if either title or body is extremely offensive
+    // Block if either title or body is flagged. Return the specific words
+    // that triggered so the user knows exactly what to remove.
     if (titleMod.action === 'block' || bodyMod.action === 'block') {
-      console.log(`[MODERATION] Blocked post: user=${user.id}, title="${title.trim().slice(0, 50)}"`)
+      const words = Array.from(new Set([
+        ...(titleMod.offensiveWords || []),
+        ...(bodyMod.offensiveWords || []),
+      ])).filter(Boolean)
+      console.log(`[MODERATION] Blocked post: user=${user.id}, words=${words.join(',')}`)
       return NextResponse.json(
-        apiError(titleMod.reason || bodyMod.reason || 'تم حظر المحتوى', 403, 'CONTENT_BLOCKED'),
+        {
+          error: 'CONTENT_BLOCKED',
+          message: titleMod.reason || bodyMod.reason,
+          offensiveWords: words,
+        },
         { status: 403 }
       )
     }
