@@ -110,7 +110,10 @@ export async function POST(req: NextRequest) {
     for (const p of recentUserPosts) {
       if (isSimilar(title.trim(), p.title) || isSimilar(body.trim(), p.body)) {
         console.log(`[SPAM] duplicate detected: user=${user.id}`)
-        return NextResponse.json(apiError('لديك منشور مشابه بالفعل', 409), { status: 409 })
+        return NextResponse.json(
+          { error: 'DUPLICATE_POST' },
+          { status: 409 },
+        )
       }
     }
 

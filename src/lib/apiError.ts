@@ -81,6 +81,13 @@ export function translateApiError(body: any, lang: Lang): string {
           ? 'آپ کی پوسٹ میں نامناسب الفاظ ہیں۔ درست کر کے دوبارہ کوشش کریں۔'
           : 'المنشور يحتوي على كلمات غير لائقة. يرجى تعديله والمحاولة مرة أخرى.'
 
+    case 'DUPLICATE_POST':
+      return lang === 'en'
+        ? 'You\'ve already posted something similar in the last 3 hours. Please rephrase or wait a bit before posting again.'
+        : lang === 'ur'
+          ? 'آپ نے پچھلے 3 گھنٹوں میں ملتی جلتی پوسٹ کر دی ہے۔ متن تبدیل کریں یا تھوڑی دیر بعد دوبارہ کوشش کریں۔'
+          : 'لديك منشور مشابه خلال آخر 3 ساعات. غيّر الصياغة أو انتظر قليلاً قبل النشر مرة أخرى.'
+
     default:
       // Server provided a human-readable message? Use it.
       if (serverMsg) return serverMsg
