@@ -96,6 +96,93 @@ export const PROFANITY_DICTIONARY: ProfanityEntry[] = [
   { word: '5anzeir', language: 'ar', severity: 3, variations: ['5anzer', 'khanzeir'] },
   { word: 'toz', language: 'ar', severity: 1 },
   { word: 'kosomak', language: 'ar', severity: 3, variations: ['kos omak', 'kos', 'kosomk'] },
+
+  // ── Saudi dialect expansion (v4 dictionary, 2026-04) ──────────────────
+  // خفيف → severity 1 (warn). متوسط → severity 2 (block). قوي → severity 3 (block).
+
+  // Animal insults (خفيف/متوسط → warn → block on accumulation)
+  { word: 'حيوان', language: 'ar', severity: 2, variations: ['حيوانات', 'بهيم', 'بهايم'] },
+  { word: 'تيس', language: 'ar', severity: 2, variations: ['تيوس'] },
+  { word: 'جحش', language: 'ar', severity: 2 },
+
+  // Character insults (متوسط → block)
+  { word: 'اهبل', language: 'ar', severity: 2, variations: ['هبل', 'هبله', 'هبيل', 'اهبال'] },
+  { word: 'بليد', language: 'ar', severity: 2 },
+  { word: 'سطل', language: 'ar', severity: 2, variations: ['يا سطل'] },
+  { word: 'ابله', language: 'ar', severity: 2 },
+  { word: 'اجدب', language: 'ar', severity: 2 },
+  { word: 'جبان', language: 'ar', severity: 2, variations: ['جبانه'] },
+  { word: 'فاشل', language: 'ar', severity: 1, variations: ['فاشله', 'فاشلين'] },
+  { word: 'رخم', language: 'ar', severity: 1, variations: ['رخمه'] },
+  { word: 'قذر', language: 'ar', severity: 2, variations: ['قذره'] },
+  { word: 'رخيص', language: 'ar', severity: 2, variations: ['رخيصه'] },
+  { word: 'زفت', language: 'ar', severity: 2, variations: ['زبالة', 'زباله'] },
+  { word: 'جزمة', language: 'ar', severity: 2, variations: ['جزمه'] },
+  { word: 'فاجر', language: 'ar', severity: 3, variations: ['فاجره', 'فاجرين'] },
+  { word: 'فاسق', language: 'ar', severity: 3, variations: ['فاسقه', 'فاسقين'] },
+  { word: 'ساقط', language: 'ar', severity: 3, variations: ['ساقطه', 'ساقطين'] },
+
+  // Body / sexual (قوي → block)
+  { word: 'خرا', language: 'ar', severity: 3, variations: ['خرى', 'كول خرا', 'خرا عليك', 'خرا في وجهك'] },
+  { word: 'طيز', language: 'ar', severity: 3, variations: ['طيزك', 'طيزه', 'طيز أمك', 'طيز امك'] },
+  { word: 'تيز', language: 'ar', severity: 3, variations: ['تيزك', 'تيزه', 'تيز أمك', 'تيز امك'] },
+  { word: 'مكوه', language: 'ar', severity: 3, variations: ['مكوهك', 'مكوه امك', 'مكوه أمك'] },
+  { word: 'زب', language: 'ar', severity: 3, variations: ['زبي', 'زبك', 'زبه', 'زبوب'] },
+  { word: 'اير', language: 'ar', severity: 3, variations: ['أير', 'أيري', 'ايري', 'اير الكلب', 'اير الحمار', 'اير الجحش'] },
+  { word: 'عير', language: 'ar', severity: 3, variations: ['عيري', 'عيرة', 'عيره'] },
+  { word: 'فشخ', language: 'ar', severity: 3, variations: ['فشخك', 'فشخ طيزك', 'فشخ كسك'] },
+  { word: 'مص', language: 'ar', severity: 3, variations: ['مص زبي', 'مص أيري', 'مص ايري', 'مص طيزي', 'مص زب أمك'] },
+  { word: 'لحس', language: 'ar', severity: 3, variations: ['تلحس', 'تلحس طيزي', 'تلحس تيزي', 'تلحس أيري', 'تلحس زبي'] },
+  { word: 'متناك', language: 'ar', severity: 3, variations: ['متناكة', 'متناكه', 'ابن المتناكة', 'ابن المتناكه'] },
+  { word: 'مومس', language: 'ar', severity: 3, variations: ['مومسه', 'مومسة'] },
+  { word: 'داعر', language: 'ar', severity: 3, variations: ['داعره', 'داعرة', 'دعاره'] },
+  { word: 'مهتوك', language: 'ar', severity: 3, variations: ['مهتوكه', 'مهتوكة'] },
+  { word: 'شلكه', language: 'ar', severity: 3, variations: ['شلكة'] },
+
+  // Slurs for gay men (قوي → block)
+  { word: 'زامل', language: 'ar', severity: 3 },
+  { word: 'خنيث', language: 'ar', severity: 3, variations: ['مخنث', 'مخنثين'] },
+  { word: 'بزرنجي', language: 'ar', severity: 3 },
+  { word: 'قواد', language: 'ar', severity: 3, variations: ['قوادين'] },
+  { word: 'جرار', language: 'ar', severity: 3, variations: ['جرارين'] },
+
+  // Compound sexual phrases — substring scan will catch these even when
+  // users insert spaces/punctuation/diacritics (normalizer strips them).
+  { word: 'كس امك', language: 'ar', severity: 3, variations: [
+    'كسمك', 'كسامك', 'كس امك اللي جابتك', 'كس أم اللي جابك',
+    'كس اختك', 'كسختك', 'كس بنتك', 'كس طيزك', 'كسك',
+    'يلعن كس امك', 'يلعن كس أمك', 'كس امك وأيري فيك',
+  ]},
+  { word: 'نيك امك', language: 'ar', severity: 3, variations: [
+    'نيك أمك', 'نيك اختك', 'نيك أختك', 'نيك طيزك', 'نيك كسك',
+    'نيك مكوهك', 'نيك طيز امك', 'نيك في طيزك',
+  ]},
+  { word: 'اير فيك', language: 'ar', severity: 3, variations: [
+    'أيري فيك', 'ايري فيك', 'عيري فيك', 'عير فيك',
+    'أير في امك', 'أيري في امك', 'أيري في اختك', 'أيري في طيزك',
+    'أيري في مكوهك', 'أيري في كس امك', 'أيري في طيز امك',
+    'عير في امك', 'عير في اختك', 'أيري باللي جابك',
+  ]},
+  { word: 'ابن القحبه', language: 'ar', severity: 3, variations: [
+    'ابن القحبة', 'ابن قحبه', 'ابن قحبة', 'ابن الشرموطه', 'ابن الشرموطة',
+    'ابن العاهره', 'ابن العاهرة', 'ابن الزانيه', 'ابن الزانية',
+    'ابن المنيوك', 'ابن المنيوكه', 'ابن الديوث', 'ابن الجرار', 'ابن المكوه',
+  ]},
+  { word: 'ملعون ابوك', language: 'ar', severity: 3, variations: [
+    'يلعن ابوك', 'يلعن أبوك', 'الله يلعن ابوك', 'الله يلعن أبوك',
+    'الله يلعن أمك', 'الله يلعن امك', 'الله يلعن اختك', 'الله يلعن أختك',
+    'يلعن أمك وأختك', 'يلعن امك واختك', 'يخرب بيتك', 'يخرب بيت امك',
+    'الله ياخذك', 'الله ياخذ امك', 'الله يعميك', 'الله يعمي امك',
+  ]},
+  { word: 'كول خرا', language: 'ar', severity: 3, variations: ['كول زفت', 'كل خرا', 'كل زفت'] },
+
+  // Franco-Arabic expansions of the new additions
+  { word: 'tiz', language: 'ar', severity: 3, variations: ['tez', '6iz', '6ez', 'tizak', 'tezak'] },
+  { word: 'zeb', language: 'ar', severity: 3, variations: ['zob', 'zobi', 'zby'] },
+  { word: 'ayr', language: 'ar', severity: 3, variations: ['3yr', 'ayri', '3yri', 'ayr fek', '3yr fyk', 'ayr feek'] },
+  { word: 'fshkh', language: 'ar', severity: 3, variations: ['fshkhk', 'f4kh'] },
+  { word: 'diyouth', language: 'ar', severity: 3, variations: ['dayouth', 'dayoot'] },
+  { word: 'koss omak', language: 'ar', severity: 3, variations: ['kos omak', 'kosomak', 'kusumk', 'ksumk', 'kes omak'] },
 ]
 
 // ── Build lookup sets for fast O(1) matching ─────────────────────────────

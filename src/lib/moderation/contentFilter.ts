@@ -176,14 +176,15 @@ export function getModerationAction(result: ContentCheckResult): ModerationActio
     return { action: 'allow', reputationPenalty: 0, censored }
   }
 
-  // Any severity-3 match (severe slurs, sexual words, threats) blocks
-  // outright — no silent censoring. The user sees exactly which words
-  // triggered it so they can edit and retry.
-  const hasSevere = matches.some(m => m.severity === 3)
-  if (hasSevere) {
+  // Any severity-2 or severity-3 match blocks outright — no silent
+  // censoring. The user sees exactly which words triggered it. Severity-1
+  // (mild / common dialect fillers like طز) is still allowed with a warning.
+  const hasBlockable = matches.some(m => m.severity >= 2)
+  if (hasBlockable) {
+    const maxSev = Math.max(...matches.map(m => m.severity))
     return {
       action: 'block',
-      reputationPenalty: -10,
+      reputationPenalty: maxSev === 3 ? -10 : -5,
       reason: 'المحتوى يحتوي على كلمات مسيئة',
       censored,
       offensiveWords,
