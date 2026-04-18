@@ -126,12 +126,11 @@ export async function POST(req: NextRequest) {
         ...(bodyMod.offensiveWords || []),
       ])).filter(Boolean)
       console.log(`[MODERATION] Blocked post: user=${user.id}, words=${words.join(',')}`)
+      // Don't echo the matched words back to the client — just a generic
+      // "inappropriate content" error. The server-side log retains them
+      // for admin review without exposing them in UI.
       return NextResponse.json(
-        {
-          error: 'CONTENT_BLOCKED',
-          message: titleMod.reason || bodyMod.reason,
-          offensiveWords: words,
-        },
+        { error: 'CONTENT_BLOCKED' },
         { status: 403 }
       )
     }

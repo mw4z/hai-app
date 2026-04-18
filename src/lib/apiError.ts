@@ -74,22 +74,12 @@ export function translateApiError(body: any, lang: Lang): string {
           ? 'تصویر درست نہیں یا اپ لوڈ نہیں ہو سکی۔'
           : 'الصورة غير صالحة أو لم يتم رفعها.'
 
-    case 'CONTENT_BLOCKED': {
-      const words: string[] = Array.isArray(body?.offensiveWords) ? body.offensiveWords : []
-      const base = lang === 'en'
-        ? 'Your post contains words that aren\'t allowed'
+    case 'CONTENT_BLOCKED':
+      return lang === 'en'
+        ? 'Your post contains inappropriate language. Please edit it and try again.'
         : lang === 'ur'
-          ? 'آپ کی پوسٹ میں ممنوع الفاظ ہیں'
-          : 'المنشور يحتوي على كلمات غير مسموح بها'
-      if (words.length === 0) return base
-      const joiner = lang === 'en' ? ', ' : '، '
-      const suffix = lang === 'en'
-        ? `Remove: ${words.join(joiner)}`
-        : lang === 'ur'
-          ? `ہٹائیں: ${words.join(joiner)}`
-          : `احذف: ${words.join(joiner)}`
-      return `${base} — ${suffix}`
-    }
+          ? 'آپ کی پوسٹ میں نامناسب الفاظ ہیں۔ درست کر کے دوبارہ کوشش کریں۔'
+          : 'المنشور يحتوي على كلمات غير لائقة. يرجى تعديله والمحاولة مرة أخرى.'
 
     default:
       // Server provided a human-readable message? Use it.
