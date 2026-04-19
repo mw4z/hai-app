@@ -193,9 +193,17 @@ export default function NewPostPage() {
   }
 
   return (
-    <main className="h-[100dvh] overflow-hidden bg-white dark:bg-gray-900 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-gray-100 dark:border-gray-700">
+    <main
+      className="bg-white dark:bg-gray-900 flex flex-col overflow-hidden"
+      style={{
+        height: '100dvh',
+        maxHeight: '100dvh',
+        // Fallback for older WebView versions where dvh isn't supported
+        minHeight: 'stretch',
+      }}
+    >
+      {/* Header — fixed at top, never scrolls */}
+      <div className="flex-shrink-0 flex items-center gap-3 px-4 py-4 border-b border-gray-100 dark:border-gray-700">
         {step === 'content' ? (
           <button onClick={() => setStep('category')} className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 py-1">
             {lang !== 'en' ? <FiArrowRight className="w-5 h-5" /> : <FiArrowLeft className="w-5 h-5" />}
