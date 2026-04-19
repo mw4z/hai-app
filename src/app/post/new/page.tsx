@@ -216,7 +216,7 @@ export default function NewPostPage() {
         )}
       </div>
 
-      <div className="flex-1 px-4 py-4 overflow-y-auto">
+      <div className="flex-1 px-4 py-4 overflow-y-auto overscroll-contain">
 
         {/* Step 1: Category */}
         {step === 'category' && (

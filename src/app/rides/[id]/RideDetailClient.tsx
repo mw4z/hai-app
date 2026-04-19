@@ -340,7 +340,7 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
       </header>
 
       {/* ═══ SECTION B: Primary Action Area (state-driven) ════════════════════ */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overscroll-contain">
         <div className="px-4 pt-4 pb-32 space-y-4">
 
         {/* ── Phase: OFFERS ──────────────────────────────────────────────────── */}

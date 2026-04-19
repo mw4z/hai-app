@@ -636,7 +636,7 @@ export default function OnboardingPage() {
                 </div>
               ) : (
                 <>
-                  <div className="space-y-2 mb-6 flex-1 overflow-y-auto">
+                  <div className="space-y-2 mb-6 flex-1 overflow-y-auto overscroll-contain">
                     {nearbyList.map(n => (
                       <button
                         key={n.id}
@@ -768,7 +768,7 @@ export default function OnboardingPage() {
                       className="flex-1 bg-transparent text-sm focus:outline-none text-gray-800 dark:text-gray-100 placeholder:text-gray-400"
                     />
                   </div>
-                  <div className="space-y-2 mb-6 flex-1 overflow-y-auto" style={{ maxHeight: '40vh' }}>
+                  <div className="space-y-2 mb-6 flex-1 overflow-y-auto overscroll-contain" style={{ maxHeight: '40vh' }}>
                     {allNeighborhoods
                       .filter(n => {
                         if (!manualSearch.trim()) return true

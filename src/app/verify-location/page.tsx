@@ -210,7 +210,7 @@ export default function VerifyLocationPage() {
             <p className="text-sm text-gray-500 mb-4">
               {lang === 'en' ? 'Pick from the neighborhoods near your current location.' : 'اختر من الأحياء القريبة من موقعك.'}
             </p>
-            <div className="space-y-2 mb-6 flex-1 overflow-y-auto">
+            <div className="space-y-2 mb-6 flex-1 overflow-y-auto overscroll-contain">
               {nearbyList.map(n => (
                 <button
                   key={n.id}

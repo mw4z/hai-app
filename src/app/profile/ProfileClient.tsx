@@ -1832,7 +1832,7 @@ function BookmarkedPosts({ lang, currentUserId }: { lang: string; currentUserId:
             </div>
 
             {/* Posts list */}
-            <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-2">
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-6 space-y-2">
               {filtered.length === 0 ? (
                 <p className="text-center text-sm text-gray-400 py-8">{lang === 'en' ? 'No results' : 'لا توجد نتائج'}</p>
               ) : (
