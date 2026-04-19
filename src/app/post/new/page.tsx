@@ -195,7 +195,14 @@ export default function NewPostPage() {
   return (
     <main
       className="bg-white dark:bg-gray-900"
-      style={{ height: '100dvh', overflowY: 'auto', overscrollBehavior: 'contain' }}
+      style={{
+        // body has padding-top: env(safe-area-inset-top) applied globally,
+        // so subtract it here so the main fits exactly in the viewport
+        // instead of extending below it and forcing scroll.
+        height: 'calc(100dvh - env(safe-area-inset-top, 0px))',
+        overflowY: 'auto',
+        overscrollBehavior: 'contain',
+      }}
     >
       {/* Header — sticky, pinned to the top of the scroll container. */}
       <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 flex items-center gap-3 px-4 py-4 border-b border-gray-100 dark:border-gray-700">
