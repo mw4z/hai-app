@@ -193,7 +193,7 @@ export default function NewPostPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white dark:bg-gray-900 flex flex-col">
+    <main className="h-[100dvh] overflow-hidden bg-white dark:bg-gray-900 flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-4 border-b border-gray-100 dark:border-gray-700">
         {step === 'content' ? (
