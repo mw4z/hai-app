@@ -49,7 +49,11 @@ function clearDraft() {
 }
 function draftHasContent(d: PostDraft | null): boolean {
   if (!d) return false
-  return !!(d.category || d.title.trim() || d.body.trim() || d.price || d.location || (d.imageUrls && d.imageUrls.length > 0))
+  // Category selection alone doesn't count — user must have actually written
+  // something (title/body/price) or attached media/location for the draft
+  // prompt to be useful. Otherwise tapping a category and backing out would
+  // incorrectly trigger the save/discard sheet.
+  return !!(d.title.trim() || d.body.trim() || d.price || d.location || (d.imageUrls && d.imageUrls.length > 0))
 }
 
 const CATEGORIES = [
