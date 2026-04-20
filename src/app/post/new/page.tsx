@@ -322,6 +322,37 @@ export default function NewPostPage() {
 
       <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
 
+        {/* Draft-restore banner — inline at the top of the scroll area so it
+            sits above the list without overlapping. Shown on mount if an
+            unsaved draft exists. */}
+        {draftAvailable && (
+          <div className="mb-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 px-4 py-3 flex items-start gap-3">
+            <span className="text-base leading-none mt-0.5">📝</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-1">
+                {lang === 'en' ? 'You have a saved draft' : lang === 'ur' ? 'آپ کا محفوظ شدہ مسودہ ہے' : 'لديك مسودة محفوظة'}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => restoreDraft(draftAvailable)}
+                  className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold active:scale-95 transition-transform"
+                >
+                  {lang === 'en' ? 'Restore' : lang === 'ur' ? 'بحال کریں' : 'استرجاع'}
+                </button>
+                <button
+                  onClick={() => { clearDraft(); setDraftAvailable(null) }}
+                  className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800 text-amber-700 dark:text-amber-300 text-xs font-medium border border-amber-200 dark:border-amber-700 active:scale-95 transition-transform"
+                >
+                  {lang === 'en' ? 'Discard' : lang === 'ur' ? 'ہٹا دیں' : 'تجاهل'}
+                </button>
+              </div>
+            </div>
+            <button onClick={() => setDraftAvailable(null)} className="text-amber-700/70 dark:text-amber-300/70 p-0.5" aria-label="dismiss">
+              <FiX className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Step 1: Category */}
         {step === 'category' && (
           <div className="space-y-5 pb-24" data-tour="post-categories" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
@@ -583,35 +614,6 @@ export default function NewPostPage() {
           </div>
         )}
       </div>
-
-      {/* Draft-restore banner — shown on mount if an unsaved draft exists */}
-      {draftAvailable && (
-        <div className="absolute top-[calc(env(safe-area-inset-top,0px)+4rem)] left-3 right-3 z-30 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 px-4 py-3 shadow-lg flex items-start gap-3">
-          <span className="text-base leading-none mt-0.5">📝</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-1">
-              {lang === 'en' ? 'You have a saved draft' : lang === 'ur' ? 'آپ کا محفوظ شدہ مسودہ ہے' : 'لديك مسودة محفوظة'}
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => restoreDraft(draftAvailable)}
-                className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold active:scale-95 transition-transform"
-              >
-                {lang === 'en' ? 'Restore' : lang === 'ur' ? 'بحال کریں' : 'استرجاع'}
-              </button>
-              <button
-                onClick={() => { clearDraft(); setDraftAvailable(null) }}
-                className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800 text-amber-700 dark:text-amber-300 text-xs font-medium border border-amber-200 dark:border-amber-700 active:scale-95 transition-transform"
-              >
-                {lang === 'en' ? 'Discard' : lang === 'ur' ? 'ہٹا دیں' : 'تجاهل'}
-              </button>
-            </div>
-          </div>
-          <button onClick={() => setDraftAvailable(null)} className="text-amber-700/70 dark:text-amber-300/70 p-0.5" aria-label="dismiss">
-            <FiX className="w-4 h-4" />
-          </button>
-        </div>
-      )}
 
       {/* Leave-page sheet — save draft or discard */}
       {showLeaveSheet && (
