@@ -7,11 +7,50 @@ import toast from 'react-hot-toast'
 import { FiArrowRight, FiArrowLeft } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { translateApiError } from '@/lib/apiError'
-import BackButton from '@/components/BackButton'
 import RiyalIcon from '@/components/RiyalIcon'
 import { uploadFiles } from '@/lib/upload'
 import { pickImagesOrFallback } from '@/lib/imagePicker'
 import { playSuccess, playError } from '@/lib/sound'
+import { FiX } from 'react-icons/fi'
+
+// ── Draft storage ──────────────────────────────────────────────────────
+// Saved to localStorage so the user's work survives closing the page.
+// Raw File objects aren't serializable; only previously-uploaded image
+// URLs are persisted.
+const DRAFT_KEY = 'hai_post_draft'
+
+interface PostDraft {
+  category: string
+  title: string
+  body: string
+  price: string
+  location: { lat: number; lng: number; name: string } | null
+  imageUrls: string[]
+  savedAt: number
+}
+
+function loadDraft(): PostDraft | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    if (!raw) return null
+    const d = JSON.parse(raw) as PostDraft
+    if (!d || typeof d !== 'object') return null
+    return d
+  } catch { return null }
+}
+function saveDraft(d: PostDraft) {
+  if (typeof window === 'undefined') return
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)) } catch {}
+}
+function clearDraft() {
+  if (typeof window === 'undefined') return
+  try { localStorage.removeItem(DRAFT_KEY) } catch {}
+}
+function draftHasContent(d: PostDraft | null): boolean {
+  if (!d) return false
+  return !!(d.category || d.title.trim() || d.body.trim() || d.price || d.location || (d.imageUrls && d.imageUrls.length > 0))
+}
 
 const CATEGORIES = [
   {
@@ -82,6 +121,64 @@ export default function NewPostPage() {
   const [loading, setLoading] = useState(false)
   const [location, setLocation] = useState<{ lat: number; lng: number; name: string } | null>(null)
   const [detectingLocation, setDetectingLocation] = useState(false)
+
+  // Draft state — if a saved draft exists, offer to restore it on mount.
+  const [draftAvailable, setDraftAvailable] = useState<PostDraft | null>(null)
+  const [showLeaveSheet, setShowLeaveSheet] = useState(false)
+
+  useEffect(() => {
+    const d = loadDraft()
+    if (draftHasContent(d)) setDraftAvailable(d)
+  }, [])
+
+  function restoreDraft(d: PostDraft) {
+    setCategory(d.category || '')
+    setTitle(d.title || '')
+    setBody(d.body || '')
+    setPrice(d.price || '')
+    setLocation(d.location || null)
+    // Rehydrate images from uploaded URLs only — raw File objects can't
+    // be persisted, so previews from the previous session are lost.
+    setImages(
+      (d.imageUrls || []).map((url) => ({
+        file: new File([], 'restored'),
+        preview: url,
+        url,
+      })),
+    )
+    if (d.category) setStep('content')
+    setDraftAvailable(null)
+  }
+
+  function currentDraft(): PostDraft {
+    return {
+      category,
+      title,
+      body,
+      price,
+      location,
+      imageUrls: images.map(i => i.url).filter((u): u is string => !!u),
+      savedAt: Date.now(),
+    }
+  }
+  function hasUnsavedContent(): boolean {
+    return draftHasContent(currentDraft())
+  }
+
+  function handleBack() {
+    if (!hasUnsavedContent()) { router.push('/feed'); return }
+    setShowLeaveSheet(true)
+  }
+  function handleSaveAndLeave() {
+    saveDraft(currentDraft())
+    setShowLeaveSheet(false)
+    router.push('/feed')
+  }
+  function handleDiscardAndLeave() {
+    clearDraft()
+    setShowLeaveSheet(false)
+    router.push('/feed')
+  }
 
   // SERVICES is hidden from NORMAL users (and PENDING providers) — posting in
   // SERVICES is reserved for publicly-visible providers (ACTIVE/VERIFIED).
@@ -183,6 +280,7 @@ export default function NewPostPage() {
 
       playSuccess()
       toast.success('تم نشر منشورك!')
+      clearDraft()
       sessionStorage.setItem('hai_feed_refresh', '1')
       router.push('/feed')
     } catch {
@@ -205,7 +303,10 @@ export default function NewPostPage() {
             <span className="text-sm font-medium">{lang === 'en' ? 'Back' : lang === 'ur' ? 'واپس' : 'رجوع'}</span>
           </button>
         ) : (
-          <BackButton href="/feed" label={lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء'} />
+          <button onClick={handleBack} className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 py-1">
+            {lang !== 'en' ? <FiArrowRight className="w-5 h-5" /> : <FiArrowLeft className="w-5 h-5" />}
+            <span className="text-sm font-medium">{lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء'}</span>
+          </button>
         )}
         <h1 className="flex-1 text-center font-bold text-gray-900 dark:text-white">منشور جديد</h1>
         {step === 'content' && (
@@ -482,6 +583,75 @@ export default function NewPostPage() {
           </div>
         )}
       </div>
+
+      {/* Draft-restore banner — shown on mount if an unsaved draft exists */}
+      {draftAvailable && (
+        <div className="absolute top-[calc(env(safe-area-inset-top,0px)+4rem)] left-3 right-3 z-30 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 px-4 py-3 shadow-lg flex items-start gap-3">
+          <span className="text-base leading-none mt-0.5">📝</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-1">
+              {lang === 'en' ? 'You have a saved draft' : lang === 'ur' ? 'آپ کا محفوظ شدہ مسودہ ہے' : 'لديك مسودة محفوظة'}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => restoreDraft(draftAvailable)}
+                className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold active:scale-95 transition-transform"
+              >
+                {lang === 'en' ? 'Restore' : lang === 'ur' ? 'بحال کریں' : 'استرجاع'}
+              </button>
+              <button
+                onClick={() => { clearDraft(); setDraftAvailable(null) }}
+                className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800 text-amber-700 dark:text-amber-300 text-xs font-medium border border-amber-200 dark:border-amber-700 active:scale-95 transition-transform"
+              >
+                {lang === 'en' ? 'Discard' : lang === 'ur' ? 'ہٹا دیں' : 'تجاهل'}
+              </button>
+            </div>
+          </div>
+          <button onClick={() => setDraftAvailable(null)} className="text-amber-700/70 dark:text-amber-300/70 p-0.5" aria-label="dismiss">
+            <FiX className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Leave-page sheet — save draft or discard */}
+      {showLeaveSheet && (
+        <div
+          className="fixed inset-0 z-[1000] bg-black/40 flex items-end justify-center"
+          onClick={() => setShowLeaveSheet(false)}
+        >
+          <div
+            className="w-full max-w-[480px] bg-white dark:bg-gray-800 rounded-t-3xl p-4 space-y-2 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+          >
+            <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-3" />
+            <p className="text-center text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">
+              {lang === 'en' ? 'Save your changes?' : lang === 'ur' ? 'تبدیلیاں محفوظ کریں؟' : 'هل تريد حفظ التعديلات؟'}
+            </p>
+            <p className="text-center text-[11px] text-gray-500 dark:text-gray-400 mb-3 px-2 leading-snug">
+              {lang === 'en' ? 'Your work will be available next time you open the new post screen.' : lang === 'ur' ? 'اگلی بار یہاں آنے پر آپ کا کام دستیاب ہوگا۔' : 'ستجد ما كتبت عند فتح المنشور الجديد مرة أخرى.'}
+            </p>
+            <button
+              onClick={handleSaveAndLeave}
+              className="w-full py-3 rounded-xl bg-primary-600 text-white text-sm font-semibold active:scale-95 transition-transform"
+            >
+              {lang === 'en' ? 'Save as draft' : lang === 'ur' ? 'مسودے میں محفوظ کریں' : 'حفظ كمسودة'}
+            </button>
+            <button
+              onClick={handleDiscardAndLeave}
+              className="w-full py-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-semibold active:scale-95 transition-transform"
+            >
+              {lang === 'en' ? 'Discard changes' : lang === 'ur' ? 'تبدیلیاں ہٹائیں' : 'تجاهل التعديلات'}
+            </button>
+            <button
+              onClick={() => setShowLeaveSheet(false)}
+              className="w-full py-3 rounded-xl text-sm font-medium text-gray-500 dark:text-gray-400"
+            >
+              {lang === 'en' ? 'Continue editing' : lang === 'ur' ? 'ترمیم جاری رکھیں' : 'متابعة التعديل'}
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
