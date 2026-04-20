@@ -193,19 +193,12 @@ export default function NewPostPage() {
   }
 
   return (
-    <main
-      className="bg-white dark:bg-gray-900"
-      style={{
-        // body has padding-top: env(safe-area-inset-top) applied globally,
-        // so subtract it here so the main fits exactly in the viewport
-        // instead of extending below it and forcing scroll.
-        height: 'calc(100dvh - env(safe-area-inset-top, 0px))',
-        overflowY: 'auto',
-        overscrollBehavior: 'contain',
-      }}
-    >
-      {/* Header — sticky, pinned to the top of the scroll container. */}
-      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 flex items-center gap-3 px-4 py-4 border-b border-gray-100 dark:border-gray-700">
+    <main className="fixed inset-0 flex flex-col bg-white dark:bg-gray-900 z-10">
+      {/* Header — first flex child, naturally fixed at top; content area
+          below it scrolls. fixed inset-0 on main ignores body's global
+          safe-area padding so the page owns the full viewport. */}
+      <div className="flex-shrink-0 flex items-center gap-3 px-4 py-4 border-b border-gray-100 dark:border-gray-700"
+           style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
         {step === 'content' ? (
           <button onClick={() => setStep('category')} className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 py-1">
             {lang !== 'en' ? <FiArrowRight className="w-5 h-5" /> : <FiArrowLeft className="w-5 h-5" />}
@@ -226,7 +219,7 @@ export default function NewPostPage() {
         )}
       </div>
 
-      <div className="px-4 py-4">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
 
         {/* Step 1: Category */}
         {step === 'category' && (
