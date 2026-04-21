@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiX, FiSend } from 'react-icons/fi'
+import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 
 const SUGGESTIONS = [
   { label: 'سباك',         icon: '🔧' },
@@ -17,6 +18,7 @@ const SUGGESTIONS = [
 ]
 
 export default function QuickAskSheet({ onClose }: { onClose: () => void }) {
+  const drag = useDragToDismiss<HTMLDivElement, HTMLDivElement>({ open: true, onDismiss: onClose })
   const router = useRouter()
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
@@ -47,17 +49,19 @@ export default function QuickAskSheet({ onClose }: { onClose: () => void }) {
     <>
       <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
 
-      <div className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white rounded-t-3xl shadow-2xl" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <div className="px-4 pt-3 pb-8">
+      <div ref={drag.sheetRef} className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white rounded-t-3xl shadow-2xl" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div ref={drag.handleRef} className="px-4 pt-3 touch-none">
           {/* Handle */}
-          <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
+          <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
 
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between">
             <h2 className="font-bold text-gray-900 text-base">🔎 اسأل جيرانك</h2>
             <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-100">
               <FiX className="w-5 h-5 text-gray-400" />
             </button>
           </div>
+        </div>
+        <div className="px-4 pt-2 pb-8">
 
           {/* Suggestion chips */}
           <p className="text-xs text-gray-400 mb-2">اختر من الشائع أو اكتب طلبك:</p>
