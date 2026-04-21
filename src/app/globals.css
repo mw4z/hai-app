@@ -260,35 +260,22 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Smoother scrolling on mobile WebView. overscroll-behavior: contain
-   allows iOS rubber-band inside the body (and any scroll container)
-   while still preventing the scroll from chaining up past it.
-   Must be set on html too — on iOS WKWebView the viewport scrolling
-   element is document.documentElement, so the html-level setting is
-   what actually controls top/bottom rubber-band on body-scrolled
-   screens (feed, market, threads, profile). */
-html {
-  overscroll-behavior-y: contain;
-}
-body {
+/* Smoother scrolling on mobile WebView.
+   overscroll-behavior defaults to 'auto', which is what actually
+   produces the iOS rubber-band bounce at scroll boundaries. Previously
+   this rule set 'contain' — that STOPS the bounce (it's designed to
+   only kill scroll chaining, but as a side-effect WKWebView disables
+   the overscroll animation). Leaving it unset so the OS-native
+   rubber-band shows everywhere — html/body and nested scrollers alike.
+   -webkit-overflow-scrolling: touch stays for momentum on legacy iOS. */
+html, body {
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
 }
-
-/* Rubber-band / momentum on every scroll container across the app —
-   feed, messages list, market, profile, sheets, etc. Tailwind's
-   overflow-y-auto / overflow-y-scroll by themselves produce the
-   default overscroll-behavior: auto, but on some iOS WKWebView
-   versions momentum needs the legacy -webkit-overflow-scrolling and
-   the chain prevention has to be explicit. overscroll-behavior:
-   contain keeps the bounce inside each scroller and stops scroll
-   chaining past its edges. */
 .overflow-y-auto,
 .overflow-y-scroll,
 .overflow-auto,
 .overflow-scroll {
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
 }
 
 /* Reduce paint on scroll — promote fixed/sticky elements to own layer */
