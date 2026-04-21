@@ -225,17 +225,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--bg);
   color: var(--text);
-  /* Body is a fixed-height scroll container so iOS produces the native
-     rubber-band bounce. Three settings matter together:
-       - height: 100dvh   → bound the scroll region to the visible viewport
-       - overflow-y: scroll (NOT auto) → WKWebView only bounces when the
-         scroller always has scroll semantics; auto falls back to no-bounce
-         when content fits exactly
-       - -webkit-overflow-scrolling: touch → preserves momentum flick +
-         bounce on older iOS versions where the modern fling isn't default. */
+  /* Body itself is NOT the scroll container — a dedicated #__hai_scroll
+     div inside layout.tsx handles scrolling. Why: position:fixed children
+     of a scrolling body are not reliably viewport-fixed on WKWebView
+     (they scroll with the body), which was letting content bleed through
+     the status-bar cover. Keeping body static + a separate inner scroll
+     host makes the fixed top-cover actually stay pinned. */
   height: 100dvh;
-  overflow-y: scroll;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
   max-width: var(--app-max-width, 480px);
   margin: 0 auto;
   position: relative;
@@ -315,7 +312,9 @@ html {
 
 /* ── iOS safe area — universal approach ──────────────────────── */
 /* env() = 0 on web (no-op), ~47px on iOS native                 */
-body {
+/* The safe-area padding goes on the scroll host, not body, so the top
+   inset is part of the scrolled content's offset. */
+#__hai_scroll {
   padding-top: env(safe-area-inset-top, 0px);
 }
 /* Safe-area cover is now rendered as #__hai_safe_top in layout.tsx —

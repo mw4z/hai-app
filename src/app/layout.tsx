@@ -131,7 +131,16 @@ export default function RootLayout({
           <NeighborhoodTravelOverlay />
           <RepToast />
           <ErrorBoundary>
-              {children}
+              <div
+                id="__hai_scroll"
+                style={{
+                  height: '100dvh',
+                  overflowY: 'scroll',
+                  WebkitOverflowScrolling: 'touch' as any,
+                }}
+              >
+                {children}
+              </div>
           </ErrorBoundary>
           <ScrollReset />
           <ArrivalAlert />
