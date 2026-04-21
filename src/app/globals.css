@@ -260,8 +260,16 @@ body {
   }
 }
 
-/* Smooth scrolling */
+/* Make body the single canonical scroll container. html itself is locked
+   to 100dvh with overflow: hidden so WKWebView doesn't try to scroll the
+   document element — instead all scrolling happens on body, which we set
+   to overflow-y: scroll so its native rubber-band bounce always fires.
+   Without this, iOS was giving the body's scroll back to the html element
+   and silently disabling bounce.
+   scroll-behavior: smooth stays so in-app anchor jumps still animate. */
 html {
+  height: 100dvh;
+  overflow: hidden;
   scroll-behavior: smooth;
 }
 
