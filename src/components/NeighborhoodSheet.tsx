@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FiMapPin, FiSearch, FiX, FiNavigation, FiCornerUpLeft } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { hapticLight } from '@/lib/haptic'
@@ -124,6 +124,27 @@ export default function NeighborhoodSheet({
         n.cityNameEn.toLowerCase().includes(q),
     )
   }, [withDistance, query])
+
+  // Incremental rendering. Rendering ~1k buttons synchronously when
+  // the sheet opens is what was making the tap feel sluggish. Show
+  // the first PAGE nearest (already sorted by distance) and reveal
+  // more as the user scrolls toward the bottom.
+  const PAGE = 40
+  const [visibleCount, setVisibleCount] = useState(PAGE)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { setVisibleCount(PAGE) }, [query, open])
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) {
+        setVisibleCount((c) => Math.min(c + PAGE, filtered.length))
+      }
+    }, { rootMargin: '400px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [filtered.length])
+  const visibleItems = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount])
 
   if (!open) return null
 
@@ -303,7 +324,7 @@ export default function NeighborhoodSheet({
               </div>
             ) : (
               <div className="space-y-1.5">
-                {filtered.map((n, idx) => {
+                {visibleItems.map((n) => {
                   const isBrowsing = browseNeighborhoodId === n.id
                   return (
                     <button
@@ -316,12 +337,11 @@ export default function NeighborhoodSheet({
                           isHome: false,
                         })
                       }}
-                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-start transition-all active:scale-[0.98] animate-fade-in-up ${
+                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-start active:scale-[0.98] transition-transform ${
                         isBrowsing
                           ? 'bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800'
                           : 'bg-gray-50 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-800 border border-transparent'
                       }`}
-                      style={{ animationDelay: `${Math.min(idx * 18, 260)}ms` }}
                     >
                       <div
                         className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
@@ -360,6 +380,11 @@ export default function NeighborhoodSheet({
                     </button>
                   )
                 })}
+                {visibleCount < filtered.length && (
+                  <div ref={sentinelRef} className="py-3 text-center text-[11px] text-gray-400">
+                    …
+                  </div>
+                )}
               </div>
             )}
           </section>
