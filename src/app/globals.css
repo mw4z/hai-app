@@ -318,18 +318,23 @@ html {
 body {
   padding-top: env(safe-area-inset-top, 0px);
 }
-body::before {
+/* Opaque cover for the iOS status-bar area. Rendered on html (not body)
+   because body is the scroll container now — position: fixed inside a
+   scroll container can miscontextualize on WKWebView and expose the
+   scrolling content through the safe area. html is locked (overflow:
+   hidden) so its ::before stays put at the very top of the viewport. */
+html::before {
   content: '';
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   height: env(safe-area-inset-top, 0px);
-  z-index: 50;
+  z-index: 100;
   pointer-events: none;
   background: #ffffff;
 }
-html.dark body::before {
+html.dark::before {
   background: #0f172a;
 }
 .sticky.top-0 {
