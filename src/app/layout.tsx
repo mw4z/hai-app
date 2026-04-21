@@ -123,6 +123,23 @@ export default function RootLayout({
           <NeighborhoodTravelOverlay />
           <RepToast />
           <ErrorBoundary>
+              {/* TEMP: deploy-verification banner — delete me */}
+              <div style={{
+                position: 'fixed',
+                top: 'env(safe-area-inset-top, 0px)',
+                left: 0,
+                right: 0,
+                zIndex: 99998,
+                background: '#dc2626',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: 13,
+                textAlign: 'center',
+                padding: '6px 10px',
+                letterSpacing: 0.3,
+              }}>
+                🧪 CLAUDE TEST BUILD — 4 UX FIXES 🧪
+              </div>
               {children}
           </ErrorBoundary>
           <ScrollReset />
