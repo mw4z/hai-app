@@ -262,7 +262,14 @@ html {
 
 /* Smoother scrolling on mobile WebView. overscroll-behavior: contain
    allows iOS rubber-band inside the body (and any scroll container)
-   while still preventing the scroll from chaining up past it. */
+   while still preventing the scroll from chaining up past it.
+   Must be set on html too — on iOS WKWebView the viewport scrolling
+   element is document.documentElement, so the html-level setting is
+   what actually controls top/bottom rubber-band on body-scrolled
+   screens (feed, market, threads, profile). */
+html {
+  overscroll-behavior-y: contain;
+}
 body {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
