@@ -11,6 +11,7 @@ import {
   FiSlash,
 } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 
 /**
  * User-facing emergency alert request sheet.
@@ -44,6 +45,7 @@ interface Props {
 export default function EmergencyRequestSheet({ open, onClose }: Props) {
   const { lang } = useLanguage()
   const dn = (ar: string, en: string) => (lang === 'en' ? en : ar)
+  const drag = useDragToDismiss<HTMLDivElement, HTMLDivElement>({ open, onDismiss: onClose })
 
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -131,23 +133,28 @@ export default function EmergencyRequestSheet({ open, onClose }: Props) {
       onClick={() => !submitting && onClose()}
     >
       <div
-        className="bg-white dark:bg-gray-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 max-h-[90vh] overflow-y-auto"
+        ref={drag.sheetRef}
+        className="bg-white dark:bg-gray-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
         style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-gray-900 dark:text-white text-lg flex items-center gap-2">
-            <FiAlertTriangle className="w-5 h-5 text-red-600" />
-            {dn('الإبلاغ عن حالة طارئة', 'Report an emergency')}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"
-          >
-            <FiX className="w-5 h-5" />
-          </button>
+        <div ref={drag.handleRef} className="px-5 pt-3 touch-none">
+          <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-3" />
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-bold text-gray-900 dark:text-white text-lg flex items-center gap-2">
+              <FiAlertTriangle className="w-5 h-5 text-red-600" />
+              {dn('الإبلاغ عن حالة طارئة', 'Report an emergency')}
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"
+            >
+              <FiX className="w-5 h-5" />
+            </button>
+          </div>
         </div>
+        <div className="px-5 pb-5">
 
         {/* Info banner */}
         <div className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40 rounded-xl p-3 mb-4 leading-relaxed">
@@ -250,6 +257,7 @@ export default function EmergencyRequestSheet({ open, onClose }: Props) {
             )}
           </div>
         )}
+        </div>
       </div>
     </div>
   )

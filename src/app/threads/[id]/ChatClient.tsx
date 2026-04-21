@@ -12,6 +12,7 @@ import { hapticLight } from '@/lib/haptic'
 import { uploadFiles } from '@/lib/upload'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
+import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import { useAttachContact } from '@/hooks/useAttachContact'
 import { playSend } from '@/lib/sound'
 import SmartText from '@/components/SmartText'
@@ -248,6 +249,15 @@ export default function ChatClient({
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
   const [showImageSheet, setShowImageSheet] = useState(false)
+
+  const profileSheetDrag = useDragToDismiss<HTMLDivElement, HTMLDivElement>({
+    open: showProfile,
+    onDismiss: () => setShowProfile(false),
+  })
+  const wallpaperSheetDrag = useDragToDismiss<HTMLDivElement, HTMLDivElement>({
+    open: showWallpaperPicker,
+    onDismiss: () => setShowWallpaperPicker(false),
+  })
 
   // Find the first unread message from the other person on initial load
   const [unreadDividerId, setUnreadDividerId] = useState(() => {
@@ -885,9 +895,11 @@ export default function ChatClient({
       {showProfile && (
         <>
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={() => setShowProfile(false)} />
-          <div className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl" style={{ maxHeight: '70vh' }}>
-            <div className="px-5 pt-3 pb-5">
-              <div className="w-10 h-1 bg-gray-200 dark:bg-gray-600 rounded-full mx-auto mb-5" />
+          <div ref={profileSheetDrag.sheetRef} className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl" style={{ maxHeight: '70vh' }}>
+            <div ref={profileSheetDrag.handleRef} className="px-5 pt-3 pb-3 touch-none">
+              <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto" />
+            </div>
+            <div className="px-5 pb-5">
 
               {loadingProfile ? (
                 <div className="flex flex-col items-center py-8 gap-3">
@@ -971,12 +983,14 @@ export default function ChatClient({
       {showWallpaperPicker && (
         <>
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={() => setShowWallpaperPicker(false)} />
-          <div className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl">
-            <div className="px-5 pt-3 pb-6">
-              <div className="w-10 h-1 bg-gray-200 dark:bg-gray-600 rounded-full mx-auto mb-4" />
-              <h3 className="font-bold text-gray-900 dark:text-white text-center mb-4">
+          <div ref={wallpaperSheetDrag.sheetRef} className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl">
+            <div ref={wallpaperSheetDrag.handleRef} className="px-5 pt-3 pb-3 touch-none">
+              <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-2" />
+              <h3 className="font-bold text-gray-900 dark:text-white text-center">
                 {lang === 'en' ? 'Chat Wallpaper' : 'خلفية المحادثة'}
               </h3>
+            </div>
+            <div className="px-5 pb-6">
               <div className="grid grid-cols-4 gap-3">
                 {CHAT_WALLPAPERS.map(wp => (
                   <button
