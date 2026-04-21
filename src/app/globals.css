@@ -260,10 +260,12 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Smoother scrolling on mobile WebView */
+/* Smoother scrolling on mobile WebView. overscroll-behavior: contain
+   allows iOS rubber-band inside the body (and any scroll container)
+   while still preventing the scroll from chaining up past it. */
 body {
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: none;
+  overscroll-behavior-y: contain;
 }
 
 /* Reduce paint on scroll — promote fixed/sticky elements to own layer */
