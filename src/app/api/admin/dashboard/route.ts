@@ -26,15 +26,18 @@ export async function GET() {
   // Male mods don't see WOMEN_ONLY posts in counts
   const womenOnlyFilter = admin.gender !== 'FEMALE' ? { category: { not: 'WOMEN_ONLY' as any } } : {}
 
-  // Active users = real humans who actually passed OTP verification, are
-  // still active, and aren't seed/phantom imports. The isSeed flag catches
-  // the sanctioned seed pool, and isVerified=true excludes any historical
-  // phantom imports that were loaded without going through OTP.
+  // Active users = real humans who completed the full onboarding flow
+  // (OTP + neighborhood verification). This is tighter than just
+  // isVerified=true because historical test/phantom accounts were marked
+  // OTP-verified but never made it through neighborhood verification.
+  // addressVerified becomes true only when /api/auth/complete-profile
+  // accepts a matched GPS-to-neighborhood assignment.
   const activeUserFilter = {
     ...(nbhdFilter.neighborhoodId ? { neighborhoodId: nbhdFilter.neighborhoodId } : {}),
     deletedAt: null,
     isSeed: false,
     isVerified: true,
+    addressVerified: true,
     status: { notIn: [UserStatus.BANNED_TEMP, UserStatus.BANNED_PERM] },
   }
 
@@ -53,13 +56,13 @@ export async function GET() {
     db.post.count({ where: { ...nbhdFilter, ...womenOnlyFilter, status: 'HIDDEN' } }),
     db.post.count({ where: { ...nbhdFilter, ...womenOnlyFilter, status: 'REMOVED' } }),
     db.user.count({ where: activeUserFilter }),
-    db.user.count({ where: { status: { in: ['BANNED_TEMP', 'BANNED_PERM'] }, deletedAt: null, isSeed: false, isVerified: true, ...(nbhdFilter.neighborhoodId ? { neighborhoodId: nbhdFilter.neighborhoodId } : {}) } }),
+    db.user.count({ where: { status: { in: ['BANNED_TEMP', 'BANNED_PERM'] }, deletedAt: null, isSeed: false, isVerified: true, addressVerified: true, ...(nbhdFilter.neighborhoodId ? { neighborhoodId: nbhdFilter.neighborhoodId } : {}) } }),
     // Pull enough metadata to run the JS-side expiry check — matches what
     // users actually see in the feed (expired/archived posts are excluded).
     db.post.findMany({
       // Exclude seed-authored posts — the dashboard is for tracking real
       // user activity, not the background pool.
-      where: { ...nbhdFilter, status: { in: ['ACTIVE', 'IN_PROGRESS'] }, author: { isSeed: false } },
+      where: { ...nbhdFilter, status: { in: ['ACTIVE', 'IN_PROGRESS'] }, author: { isSeed: false, isVerified: true, addressVerified: true } },
       select: {
         id: true,
         category: true,
