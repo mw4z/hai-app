@@ -10,6 +10,7 @@ import { translateApiError } from '@/lib/apiError'
 import RiyalIcon from '@/components/RiyalIcon'
 import { uploadFiles } from '@/lib/upload'
 import { pickImagesOrFallback } from '@/lib/imagePicker'
+import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { playSuccess, playError } from '@/lib/sound'
 import { FiX } from 'react-icons/fi'
 
@@ -570,21 +571,21 @@ export default function NewPostPage() {
                     <div className="flex gap-2">
                       <button type="button" onClick={async () => {
                         setDetectingLocation(true)
-                        navigator.geolocation.getCurrentPosition(
-                          async (pos) => {
-                            const { latitude: lat, longitude: lng } = pos.coords
-                            let name = `${lat.toFixed(4)}, ${lng.toFixed(4)}`
-                            try {
-                              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=${lang}&addressdetails=1`)
-                              const data = await res.json()
-                              name = data.address?.suburb || data.address?.neighbourhood || data.address?.road || data.display_name?.split(',')[0] || name
-                            } catch { /* */ }
-                            setLocation({ lat, lng, name })
-                            setDetectingLocation(false)
-                          },
-                          () => { toast.error(lang === 'en' ? 'Allow location access' : lang === 'ur' ? 'براہ کرم مقام کی اجازت دیں' : 'يرجى السماح بالوصول للموقع'); setDetectingLocation(false) },
-                          { enableHighAccuracy: true, timeout: 10000 }
-                        )
+                        try {
+                          const pos = await getCurrentPositionSafe({ enableHighAccuracy: true, timeout: 10000 })
+                          const { latitude: lat, longitude: lng } = pos.coords
+                          let name = `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+                          try {
+                            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=${lang}&addressdetails=1`)
+                            const data = await res.json()
+                            name = data.address?.suburb || data.address?.neighbourhood || data.address?.road || data.display_name?.split(',')[0] || name
+                          } catch { /* */ }
+                          setLocation({ lat, lng, name })
+                        } catch {
+                          toast.error(lang === 'en' ? 'Allow location access' : lang === 'ur' ? 'براہ کرم مقام کی اجازت دیں' : 'يرجى السماح بالوصول للموقع')
+                        } finally {
+                          setDetectingLocation(false)
+                        }
                       }} disabled={detectingLocation}
                         className="flex-1 flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 rounded-xl py-2.5 text-sm text-gray-600 dark:text-gray-300 hover:border-primary-400 transition-colors">
                         {detectingLocation ? <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" /> : '📍'}

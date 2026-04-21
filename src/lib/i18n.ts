@@ -200,7 +200,7 @@ export const translations = {
 
   // ── Verify ───────────────────────────────────────────────────────────────────
   verify_title:        { ar: 'رمز التحقق',                          en: 'Verification Code'               , ur: 'تصدیقی کوڈ' },
-  verify_subtitle:     { ar: 'أرسلنا رمزاً مكوناً من 6 أرقام إلى', en: 'We sent a 6-digit code to'       , ur: 'ہم نے 6 ہندسوں کا کوڈ بھیجا' },
+  verify_subtitle:     { ar: 'أرسلنا رمزاً مكوناً من 4 أرقام إلى', en: 'We sent a 4-digit code to'       , ur: 'ہم نے 4 ہندسوں کا کوڈ بھیجا' },
   verify_confirm:      { ar: 'تأكيد',                               en: 'Confirm'                         , ur: 'تصدیق' },
   verify_verifying:    { ar: 'جاري التحقق...',                      en: 'Verifying...'                    , ur: 'تصدیق ہو رہی ہے...' },
   verify_resend_after: { ar: 'إعادة الإرسال بعد',                   en: 'Resend in'                       , ur: 'دوبارہ بھیجیں' },
@@ -208,7 +208,7 @@ export const translations = {
   verify_resend:       { ar: 'إعادة إرسال الرمز',                   en: 'Resend Code'                     , ur: 'دوبارہ بھیجیں' },
   verify_resent:       { ar: 'تم إعادة الإرسال',                    en: 'Code resent'                     , ur: 'دوبارہ بھیج دیا' },
   verify_invalid:      { ar: 'رمز التحقق غير صحيح',                 en: 'Invalid verification code'       , ur: 'غلط کوڈ' },
-  verify_enter_code:   { ar: 'أدخل رمز التحقق المكون من 6 أرقام',  en: 'Enter the 6-digit code'          , ur: 'کوڈ درج کریں' },
+  verify_enter_code:   { ar: 'أدخل رمز التحقق المكون من 4 أرقام',  en: 'Enter the 4-digit code'          , ur: '4 ہندسوں کا کوڈ درج کریں' },
 
   // ── Onboarding (additional) ──────────────────────────────────────────────────
   onboard_gender_subtitle: { ar: 'يُستخدم لإظهار المحتوى المناسب',                      en: 'Used to show appropriate content'                              , ur: 'آپ کی جنس منتخب کریں' },

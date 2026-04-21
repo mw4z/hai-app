@@ -129,12 +129,7 @@ export default function OnboardingPage() {
     requestLocation()
   }
 
-  async function enterManualPicker() {
-    setManualLoading(true)
-    setLocationStep('manual')
-    setUserLat(null)
-    setUserLng(null)
-    setUserAccuracy(null)
+  async function loadAllNeighborhoods() {
     try {
       const res = await fetch('/api/neighborhoods/all')
       const data = await res.json()
@@ -153,6 +148,31 @@ export default function OnboardingPage() {
       setManualLoading(false)
     }
   }
+
+  function enterManualPicker() {
+    setLocationStep('manual')
+    setUserLat(null)
+    setUserLng(null)
+    setUserAccuracy(null)
+    // If prefetch hasn't finished yet, show spinner; otherwise the
+    // list is already populated and the switch feels instant.
+    if (allNeighborhoods.length === 0) {
+      setManualLoading(true)
+      loadAllNeighborhoods()
+    }
+  }
+
+  // Prefetch the full neighborhood list as soon as the user lands on
+  // any screen where manual picking is an option (denied / timeout /
+  // low-accuracy nearby) — so the "browse neighborhoods" button
+  // responds instantly instead of waiting on a fetch.
+  useEffect(() => {
+    if (!['denied', 'timeout', 'nearby'].includes(locationStep)) return
+    if (allNeighborhoods.length > 0) return
+    setManualLoading(true)
+    loadAllNeighborhoods()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationStep])
 
   // Ultimate fallback: plain browser geolocation, low accuracy allowed
   function tryDirectGeolocation() {
@@ -722,13 +742,14 @@ export default function OnboardingPage() {
               </div>
               <button
                 onClick={enterManualPicker}
-                className="text-sm text-gray-400 dark:text-gray-500 underline mt-4"
+                className="w-full flex items-center justify-center gap-2 mt-3 border-2 border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 font-semibold py-3 rounded-xl active:scale-95 transition-transform"
               >
+                <FiSearch className="w-4 h-4" />
                 {lang === 'en'
-                  ? 'Or continue choosing a neighborhood (limited access)'
+                  ? 'Browse neighborhoods (limited access)'
                   : lang === 'ur'
-                    ? 'یا محلہ منتخب کریں (محدود رسائی)'
-                    : 'أو تابع باختيار الحي (وصول محدود)'}
+                    ? 'محلے دیکھیں (محدود رسائی)'
+                    : 'تصفّح الأحياء (وصول محدود)'}
               </button>
             </div>
           )}
@@ -758,14 +779,14 @@ export default function OnboardingPage() {
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-2.5 mb-3 border border-gray-100 dark:border-gray-700">
-                    <FiSearch className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 rounded-2xl px-4 py-3.5 mb-3 border border-gray-200 dark:border-gray-700 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-200 dark:focus-within:ring-primary-900/40 transition-all">
+                    <FiSearch className="w-5 h-5 text-gray-400 flex-shrink-0" />
                     <input
                       type="text"
                       value={manualSearch}
                       onChange={(e) => setManualSearch(e.target.value)}
                       placeholder={lang === 'en' ? 'Search neighborhood...' : lang === 'ur' ? 'محلہ تلاش کریں...' : 'ابحث عن حي...'}
-                      className="flex-1 bg-transparent text-sm focus:outline-none text-gray-800 dark:text-gray-100 placeholder:text-gray-400"
+                      className="flex-1 bg-transparent text-base focus:outline-none text-gray-800 dark:text-gray-100 placeholder:text-gray-400"
                     />
                   </div>
                   <div className="space-y-2 mb-6 flex-1 overflow-y-auto overscroll-contain" style={{ maxHeight: '40vh' }}>
