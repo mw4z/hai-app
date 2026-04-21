@@ -26,10 +26,12 @@ export async function GET() {
   // Male mods don't see WOMEN_ONLY posts in counts
   const womenOnlyFilter = admin.gender !== 'FEMALE' ? { category: { not: 'WOMEN_ONLY' as any } } : {}
 
-  // Active users = not soft-deleted, not banned. Matches what end users actually see.
+  // Active users = real (non-seed), not soft-deleted, not banned.
+  // Matches what end users actually see and use the app.
   const activeUserFilter = {
     ...(nbhdFilter.neighborhoodId ? { neighborhoodId: nbhdFilter.neighborhoodId } : {}),
     deletedAt: null,
+    isSeed: false,
     status: { notIn: [UserStatus.BANNED_TEMP, UserStatus.BANNED_PERM] },
   }
 
@@ -48,11 +50,13 @@ export async function GET() {
     db.post.count({ where: { ...nbhdFilter, ...womenOnlyFilter, status: 'HIDDEN' } }),
     db.post.count({ where: { ...nbhdFilter, ...womenOnlyFilter, status: 'REMOVED' } }),
     db.user.count({ where: activeUserFilter }),
-    db.user.count({ where: { status: { in: ['BANNED_TEMP', 'BANNED_PERM'] }, deletedAt: null, ...(nbhdFilter.neighborhoodId ? { neighborhoodId: nbhdFilter.neighborhoodId } : {}) } }),
+    db.user.count({ where: { status: { in: ['BANNED_TEMP', 'BANNED_PERM'] }, deletedAt: null, isSeed: false, ...(nbhdFilter.neighborhoodId ? { neighborhoodId: nbhdFilter.neighborhoodId } : {}) } }),
     // Pull enough metadata to run the JS-side expiry check — matches what
     // users actually see in the feed (expired/archived posts are excluded).
     db.post.findMany({
-      where: { ...nbhdFilter, status: { in: ['ACTIVE', 'IN_PROGRESS'] } },
+      // Exclude seed-authored posts — the dashboard is for tracking real
+      // user activity, not the background pool.
+      where: { ...nbhdFilter, status: { in: ['ACTIVE', 'IN_PROGRESS'] }, author: { isSeed: false } },
       select: {
         id: true,
         category: true,
