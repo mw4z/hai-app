@@ -69,12 +69,37 @@ export default function AdminClient({ role, adminName }: { role: string; adminNa
 
   const isSuper = role === 'SUPER_ADMIN'
 
+  // Refresh dashboard stats + recent logs live: fetch immediately on mount,
+  // then every 15s while the overview tab is open and the page is visible,
+  // and again whenever the user focuses the tab or returns from background.
   useEffect(() => {
-    fetch('/api/admin/dashboard').then(r => r.json()).then(d => {
-      setStats(d.stats)
-      setLogs(d.recentLogs || [])
-    }).catch(() => {})
-  }, [])
+    let cancelled = false
+    async function refresh() {
+      try {
+        const res = await fetch('/api/admin/dashboard', { cache: 'no-store' })
+        if (!res.ok) return
+        const d = await res.json()
+        if (cancelled) return
+        setStats(d.stats)
+        setLogs(d.recentLogs || [])
+      } catch { /* ignore */ }
+    }
+    refresh()
+    const interval = setInterval(() => {
+      if (tab === 'overview' && document.visibilityState === 'visible') refresh()
+    }, 15_000)
+    function onVisible() {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', refresh)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [tab])
 
   useEffect(() => {
     if (tab === 'reports') fetchList('reported_posts', setReports)
