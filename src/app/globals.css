@@ -225,14 +225,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--bg);
   color: var(--text);
-  /* Body itself is NOT the scroll container — a dedicated #__hai_scroll
-     div inside layout.tsx handles scrolling. Why: position:fixed children
-     of a scrolling body are not reliably viewport-fixed on WKWebView
-     (they scroll with the body), which was letting content bleed through
-     the status-bar cover. Keeping body static + a separate inner scroll
-     host makes the fixed top-cover actually stay pinned. */
-  height: 100dvh;
-  overflow: hidden;
+  min-height: 100dvh;
   max-width: var(--app-max-width, 480px);
   margin: 0 auto;
   position: relative;
@@ -257,16 +250,7 @@ body {
   }
 }
 
-/* Make body the single canonical scroll container. html itself is locked
-   to 100dvh with overflow: hidden so WKWebView doesn't try to scroll the
-   document element — instead all scrolling happens on body, which we set
-   to overflow-y: scroll so its native rubber-band bounce always fires.
-   Without this, iOS was giving the body's scroll back to the html element
-   and silently disabling bounce.
-   scroll-behavior: smooth stays so in-app anchor jumps still animate. */
 html {
-  height: 100dvh;
-  overflow: hidden;
   scroll-behavior: smooth;
 }
 
@@ -312,10 +296,22 @@ html {
 
 /* ── iOS safe area — universal approach ──────────────────────── */
 /* env() = 0 on web (no-op), ~47px on iOS native                 */
-/* The safe-area padding goes on the scroll host, not body, so the top
-   inset is part of the scrolled content's offset. */
-#__hai_scroll {
+body {
   padding-top: env(safe-area-inset-top, 0px);
+}
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 50;
+  pointer-events: none;
+  background: #ffffff;
+}
+html.dark body::before {
+  background: #0f172a;
 }
 /* Safe-area cover is now rendered as #__hai_safe_top in layout.tsx —
    a real DOM node paints reliably across WKWebView versions. */

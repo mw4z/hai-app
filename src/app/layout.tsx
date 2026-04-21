@@ -85,16 +85,6 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning>
-        {/* Opaque cover over the iOS status-bar / dynamic-island area so the
-            body's scroll doesn't reveal content behind it. A real fixed DOM
-            node paints reliably across WKWebView versions where html::before
-            pseudo-elements sometimes don't. Height tracks env(safe-area-inset-top). */}
-        <div id="__hai_safe_top" aria-hidden style={{
-          position: 'fixed', top: 0, left: 0, right: 0,
-          height: 'env(safe-area-inset-top, 0px)',
-          zIndex: 10000, pointerEvents: 'none',
-          background: 'var(--bg)',
-        }} />
         {/* Blank cover — prevents content flash before AppSplash renders */}
         <div id="__hai_preload" style={{
           position: 'fixed', inset: 0, zIndex: 99999,
@@ -131,16 +121,7 @@ export default function RootLayout({
           <NeighborhoodTravelOverlay />
           <RepToast />
           <ErrorBoundary>
-              <div
-                id="__hai_scroll"
-                style={{
-                  height: '100dvh',
-                  overflowY: 'scroll',
-                  WebkitOverflowScrolling: 'touch' as any,
-                }}
-              >
-                {children}
-              </div>
+              {children}
           </ErrorBoundary>
           <ScrollReset />
           <ArrivalAlert />
