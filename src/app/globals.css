@@ -268,6 +268,22 @@ body {
   overscroll-behavior-y: contain;
 }
 
+/* Rubber-band / momentum on every scroll container across the app —
+   feed, messages list, market, profile, sheets, etc. Tailwind's
+   overflow-y-auto / overflow-y-scroll by themselves produce the
+   default overscroll-behavior: auto, but on some iOS WKWebView
+   versions momentum needs the legacy -webkit-overflow-scrolling and
+   the chain prevention has to be explicit. overscroll-behavior:
+   contain keeps the bounce inside each scroller and stops scroll
+   chaining past its edges. */
+.overflow-y-auto,
+.overflow-y-scroll,
+.overflow-auto,
+.overflow-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
 /* Reduce paint on scroll — promote fixed/sticky elements to own layer */
 .glass, .glass-bottom, .fixed, [class*="sticky"] {
   will-change: transform;
