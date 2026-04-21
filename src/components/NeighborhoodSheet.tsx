@@ -173,22 +173,22 @@ export default function NeighborhoodSheet({
           </div>
 
           {/* Search */}
-          <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-2.5 border border-gray-100 dark:border-gray-700 focus-within:border-primary-400 dark:focus-within:border-primary-600 transition-colors">
-            <FiSearch className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 rounded-2xl px-4 py-3.5 border border-gray-200 dark:border-gray-700 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-200 dark:focus-within:ring-primary-900/40 transition-all">
+            <FiSearch className="w-5 h-5 text-gray-400 flex-shrink-0" />
             <input
               type="text"
               placeholder={t('feed_search_area')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 bg-transparent text-sm focus:outline-none text-gray-800 dark:text-gray-100 placeholder:text-gray-400"
+              className="flex-1 bg-transparent text-base focus:outline-none text-gray-800 dark:text-gray-100 placeholder:text-gray-400"
             />
             {query && (
               <button
                 onClick={() => setQuery('')}
-                className="text-gray-400 active:scale-90"
+                className="text-gray-400 active:scale-90 p-0.5"
                 aria-label="Clear"
               >
-                <FiX className="w-3.5 h-3.5" />
+                <FiX className="w-4 h-4" />
               </button>
             )}
           </div>
