@@ -13,7 +13,7 @@ import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import QuickAskSheet from '@/components/QuickAskSheet'
 import NeighborhoodSheet from '@/components/NeighborhoodSheet'
 import GuestBanner from '@/components/GuestBanner'
-import { FiBell, FiPlus, FiMapPin, FiX, FiSearch, FiFilter, FiCheck } from 'react-icons/fi'
+import { FiBell, FiPlus, FiMapPin, FiX, FiSearch, FiFilter, FiCheck, FiChevronDown } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import type { TranslationKey } from '@/lib/i18n'
 
@@ -228,6 +228,40 @@ export default function FeedClient({
   const [lazyNeighborhoods, setLazyNeighborhoods] = useState<NeighborhoodItem[]>([])
   const [loadingNeighborhoods, setLoadingNeighborhoods] = useState(false)
 
+  // Prefetch the neighborhood list on idle after the feed loads, so
+  // opening the browse sheet feels instant instead of waiting on the
+  // /api/neighborhoods/all round-trip.
+  useEffect(() => {
+    if (lazyNeighborhoods.length > 0 || loadingNeighborhoods) return
+    const run = () => {
+      setLoadingNeighborhoods(true)
+      fetch('/api/neighborhoods/all')
+        .then(r => r.json())
+        .then((data: NeighborhoodItem[]) => {
+          const mine = data.find(n => n.id === user.neighborhoodId)
+          if (mine?.lat && mine?.lng) {
+            const myLat = mine.lat, myLng = mine.lng
+            data.sort((a, b) => {
+              const dA = Math.pow((a.lat || 0) - myLat, 2) + Math.pow((a.lng || 0) - myLng, 2)
+              const dB = Math.pow((b.lat || 0) - myLat, 2) + Math.pow((b.lng || 0) - myLng, 2)
+              return dA - dB
+            })
+          }
+          setLazyNeighborhoods(data)
+        })
+        .catch(() => {})
+        .finally(() => setLoadingNeighborhoods(false))
+    }
+    const ric = (window as any).requestIdleCallback
+    if (typeof ric === 'function') {
+      const id = ric(run, { timeout: 2000 })
+      return () => (window as any).cancelIdleCallback?.(id)
+    }
+    const t = setTimeout(run, 1200)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const currentNeighborhood = isReadOnly && browseNeighborhood
     ? { ...browseNeighborhood, displayName: dn(browseNeighborhood.name, browseNeighborhood.nameEn), displayCity: dn(browseNeighborhood.cityName, browseNeighborhood.cityNameEn) }
     : { id: user.neighborhoodId, displayName: dn(user.neighborhood, user.neighborhoodEn), displayCity: dn(user.city, user.cityEn) }
@@ -327,33 +361,12 @@ export default function FeedClient({
               <span data-tour="feed-title" className="text-xl font-bold text-primary-600 flex-shrink-0">{t('feed_title')}</span>
               <span className="text-gray-400 text-sm flex-shrink-0">·</span>
               <button
-                onClick={() => {
-                  setShowNeighborhoodPicker(true)
-                  if (lazyNeighborhoods.length === 0 && !loadingNeighborhoods) {
-                    setLoadingNeighborhoods(true)
-                    fetch('/api/neighborhoods/all')
-                      .then(r => r.json())
-                      .then((data: NeighborhoodItem[]) => {
-                        // Sort by distance from user's neighborhood
-                        const mine = data.find(n => n.id === user.neighborhoodId)
-                        if (mine?.lat && mine?.lng) {
-                          const myLat = mine.lat, myLng = mine.lng
-                          data.sort((a, b) => {
-                            const dA = Math.pow((a.lat || 0) - myLat, 2) + Math.pow((a.lng || 0) - myLng, 2)
-                            const dB = Math.pow((b.lat || 0) - myLat, 2) + Math.pow((b.lng || 0) - myLng, 2)
-                            return dA - dB
-                          })
-                        }
-                        setLazyNeighborhoods(data)
-                      })
-                      .catch(() => {})
-                      .finally(() => setLoadingNeighborhoods(false))
-                  }
-                }}
-                className="flex items-center gap-1 text-gray-700 text-sm font-medium hover:text-primary-600 transition-colors min-w-0 max-w-[45vw]"
+                onClick={() => setShowNeighborhoodPicker(true)}
+                className="flex items-center gap-1 text-sm font-medium text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800 rounded-full px-2.5 py-1 hover:bg-primary-100 dark:hover:bg-primary-900/50 active:scale-95 transition-all min-w-0 max-w-[45vw]"
               >
-                <FiMapPin className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" />
+                <FiMapPin className="w-3.5 h-3.5 text-primary-600 flex-shrink-0" />
                 <span className="truncate">{currentNeighborhood.displayName}</span>
+                <FiChevronDown className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" />
               </button>
             </div>
             <p className="text-gray-400 text-xs">{currentNeighborhood.displayCity}</p>
