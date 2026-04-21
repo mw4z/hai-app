@@ -11,6 +11,7 @@ import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
 import { uploadFiles } from '@/lib/upload'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
+import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { useAttachContact } from '@/hooks/useAttachContact'
 import { playSend } from '@/lib/sound'
 import SmartText from '@/components/SmartText'
@@ -403,25 +404,26 @@ export default function ChatClient({
 
   async function sendLocation() {
     if (sendingLocation) return
-    if (!navigator.geolocation) { toast.error(t('thread_location_fail')); return }
     setSendingLocation(true)
     setShowLocationConfirm(false)
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const res = await fetch(`/api/threads/${threadId}/messages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'LOCATION', lat: pos.coords.latitude, lng: pos.coords.longitude }),
-          })
-          if (res.ok) { const msg = await res.json(); setMessages(prev => [...prev, msg]) }
-          else { await showApiError(res, lang as 'ar' | 'en' | 'ur') }
-        } catch { toast.error(t('common_error')) }
-        finally { setSendingLocation(false) }
-      },
-      () => { toast.error(t('thread_location_fail')); setSendingLocation(false) },
-      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 }
-    )
+    try {
+      const pos = await getCurrentPositionSafe({
+        enableHighAccuracy: false,
+        timeout: 10_000,
+        maximumAge: 60_000,
+      })
+      const res = await fetch(`/api/threads/${threadId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'LOCATION', lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      })
+      if (res.ok) { const msg = await res.json(); setMessages(prev => [...prev, msg]) }
+      else { await showApiError(res, lang as 'ar' | 'en' | 'ur') }
+    } catch {
+      toast.error(t('thread_location_fail'))
+    } finally {
+      setSendingLocation(false)
+    }
   }
 
   async function sendImage(file: File) {

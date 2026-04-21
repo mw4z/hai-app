@@ -38,7 +38,7 @@ function VerifyForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (code.length !== 6) {
+    if (code.length !== 4) {
       toast.error(t('verify_enter_code'))
       return
     }
