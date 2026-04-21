@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { cookies } from 'next/headers'
 import { Toaster } from 'react-hot-toast'
-import PullToRefresh from '@/components/PullToRefresh'
 import RepToast from '@/components/RepToast'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import AppSplash from '@/components/AppSplash'
@@ -117,7 +116,6 @@ export default function RootLayout({
               duration: 3000,
             }}
           />
-          <PullToRefresh />
           <SwipeBack />
           <AndroidBackButton />
           <NeighborhoodTravelOverlay />
