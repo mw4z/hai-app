@@ -10,6 +10,7 @@ import ArrivalAlert from '@/components/ArrivalAlert'
 import CapacitorBridge from '@/components/CapacitorBridge'
 import PushRegistration from '@/components/PushRegistration'
 import SwipeBack from '@/components/SwipeBack'
+import AndroidBackButton from '@/components/AndroidBackButton'
 import NeighborhoodTravelOverlay from '@/components/NeighborhoodTravelOverlay'
 import { ConfirmProvider } from '@/components/ConfirmProvider'
 import ScrollReset from '@/components/ScrollReset'
@@ -118,6 +119,7 @@ export default function RootLayout({
           />
           <PullToRefresh />
           <SwipeBack />
+          <AndroidBackButton />
           <NeighborhoodTravelOverlay />
           <RepToast />
           <ErrorBoundary>
