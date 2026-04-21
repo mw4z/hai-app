@@ -225,7 +225,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--bg);
   color: var(--text);
-  min-height: 100dvh;
+  /* Make the body itself a fixed-height scroll container. On iOS WKWebView,
+     rubber-band bounce only fires reliably on explicit scroll regions — the
+     default html/body scroll on long pages doesn't always bounce when
+     content is near the viewport height. Pinning body to 100dvh with
+     overflow-y: auto mirrors the pattern chat uses (which does bounce)
+     and gives every body-scrolled page the same native stretch. */
+  height: 100dvh;
+  overflow-y: auto;
   max-width: var(--app-max-width, 480px);
   margin: 0 auto;
   position: relative;
