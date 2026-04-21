@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { FiMapPin, FiSearch, FiX, FiNavigation, FiCornerUpLeft } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { hapticLight } from '@/lib/haptic'
+import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 
 type NeighborhoodItem = {
   id: string
@@ -146,6 +147,8 @@ export default function NeighborhoodSheet({
   }, [filtered.length])
   const visibleItems = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount])
 
+  const { sheetRef, handleRef } = useDragToDismiss<HTMLDivElement, HTMLDivElement>({ open, onDismiss: onClose })
+
   if (!open) return null
 
   return (
@@ -158,6 +161,7 @@ export default function NeighborhoodSheet({
         }`}
       />
       <div
+        ref={sheetRef}
         data-overlay="true"
         className={`fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-[61] bg-white dark:bg-gray-900 rounded-t-3xl shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
           entered ? 'translate-y-0' : 'translate-y-full'
@@ -169,7 +173,10 @@ export default function NeighborhoodSheet({
       >
         {/* Header */}
         <div className="flex-shrink-0 px-5 pt-3 pb-4 border-b border-gray-100 dark:border-gray-800">
-          <div className="w-10 h-1 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto mb-4" />
+          {/* Grab handle + title row — this area triggers drag-to-dismiss.
+              Search input below is excluded so typing still works. */}
+          <div ref={handleRef} className="touch-none">
+            <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4" />
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-md shadow-primary-500/30">
@@ -191,6 +198,7 @@ export default function NeighborhoodSheet({
             >
               <FiX className="w-4 h-4 text-gray-500 dark:text-gray-400" />
             </button>
+          </div>
           </div>
 
           {/* Search */}
