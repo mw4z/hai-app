@@ -225,12 +225,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--bg);
   color: var(--text);
-  /* Body is locked to the viewport. Each root page's <main> becomes
-     its own scroll container — that lets WKWebView fire the native
-     rubber-band stretch per page AND keeps body's fixed children
-     (status-bar cover, bottom nav) pinned to the viewport. */
-  height: 100dvh;
-  overflow: hidden;
+  min-height: 100dvh;
   max-width: var(--app-max-width, 480px);
   margin: 0 auto;
   position: relative;
@@ -301,14 +296,7 @@ html {
 
 /* ── iOS safe area — universal approach ──────────────────────── */
 /* env() = 0 on web (no-op), ~47px on iOS native                 */
-/* Every root <main> gets the safe-area top offset + becomes a scroll
-   container so iOS rubber-band triggers per-page. overflow-y: scroll
-   (not auto) is needed — WKWebView only bounces when a scroller has
-   unconditional scroll semantics. */
-main {
-  height: 100dvh;
-  overflow-y: scroll;
-  -webkit-overflow-scrolling: touch;
+body {
   padding-top: env(safe-area-inset-top, 0px);
 }
 body::before {
