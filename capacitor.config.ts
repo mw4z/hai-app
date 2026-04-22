@@ -15,7 +15,12 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      launchAutoHide: false,
+      // Hide the Capacitor native splash immediately on launch. The
+      // native launch storyboard (branded "حي") stays up until the JS
+      // AppSplash is ready, so we don't need a second native splash
+      // layer in between.
+      launchShowDuration: 0,
+      launchAutoHide: true,
       backgroundColor: '#f0fdf4',
       showSpinner: false,
       androidSplashResourceName: 'splash',
