@@ -21,8 +21,14 @@
     </style>
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <!-- Pre-Android 12 fallback -->
         <item name="android:background">@drawable/splash</item>
-        <item name="android:statusBarColor">#ffffff</item>
-        <item name="android:navigationBarColor">#ffffff</item>
+        <!-- Android 12+ system splash API. Match @color/splash_bg so
+             the launch screen matches Capacitor's JS splash color
+             (#f0fdf4 light, #0f172a dark) and the handoff is seamless. -->
+        <item name="windowSplashScreenBackground">@color/splash_bg</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+        <item name="android:statusBarColor">@color/splash_bg</item>
+        <item name="android:navigationBarColor">@color/splash_bg</item>
     </style>
 </resources>
