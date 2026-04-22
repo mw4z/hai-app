@@ -7,6 +7,7 @@ import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus } from 'react-ic
 import { useLanguage } from '@/hooks/useLanguage'
 import { hapticMedium } from '@/lib/haptic'
 import { playTap } from '@/lib/sound'
+import { useConfirm } from '@/components/ConfirmProvider'
 import type { TranslationKey } from '@/lib/i18n'
 
 const NAV_ITEMS: { key: string; href: string; icon: React.ComponentType<{ className?: string }>; tKey: TranslationKey; badgeKey?: 'messages' | 'other' }[] = [
@@ -17,10 +18,37 @@ const NAV_ITEMS: { key: string; href: string; icon: React.ComponentType<{ classN
   { key: 'profile', href: '/profile', icon: FiUser,          tKey: 'nav_profile' },
 ]
 
-export default function BottomNav({ active }: { active: string }) {
-  const { t } = useLanguage()
+export default function BottomNav({ active, isReadOnly = false }: { active: string; isReadOnly?: boolean }) {
+  const { t, lang } = useLanguage()
   const router = useRouter()
+  const confirm = useConfirm()
   const [msgCount, setMsgCount] = useState(0)
+
+  async function handleNewPost() {
+    hapticMedium()
+    playTap()
+    if (isReadOnly) {
+      // Browsing another neighborhood — posting belongs to your own.
+      // Prompt and offer to go back to the user's home feed.
+      const ok = await confirm({
+        title: lang === 'en'
+          ? 'Not your neighborhood'
+          : lang === 'ur'
+            ? 'آپ کا محلہ نہیں'
+            : 'هذا ليس حيّك',
+        message: lang === 'en'
+          ? "You're browsing another neighborhood. Posts can only be created in your own. Go back to your neighborhood?"
+          : lang === 'ur'
+            ? 'آپ کسی دوسرے محلے کو دیکھ رہے ہیں۔ پوسٹ صرف اپنے محلے میں بنائی جا سکتی ہے۔ کیا واپس اپنے محلے پر جائیں؟'
+            : 'أنت تتصفح حياً آخر. لا يمكن إنشاء منشور إلا في حيّك. الرجوع إلى حيّك؟',
+        confirmText: lang === 'en' ? 'Go to my neighborhood' : lang === 'ur' ? 'اپنے محلے پر جائیں' : 'الرجوع إلى حيّي',
+        cancelText: lang === 'en' ? 'Stay here' : lang === 'ur' ? 'یہیں رہیں' : 'البقاء هنا',
+      })
+      if (ok) router.push('/feed')
+      return
+    }
+    router.push('/post/new')
+  }
 
   useEffect(() => {
     async function check() {
@@ -63,7 +91,7 @@ export default function BottomNav({ active }: { active: string }) {
         {/* Center FAB */}
         <div className="flex-1 flex justify-center" style={{ marginTop: -20 }}>
           <button
-            onClick={() => { hapticMedium(); playTap(); router.push('/post/new') }}
+            onClick={handleNewPost}
             className="fab-glow relative w-[58px] h-[58px] rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"
             style={{
               background: 'radial-gradient(circle at 30% 30%, #34d399 0%, #16a34a 50%, #14532d 100%)',

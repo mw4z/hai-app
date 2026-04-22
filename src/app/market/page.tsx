@@ -6,6 +6,7 @@ import { PostCategory } from '@prisma/client'
 import BottomNav from '@/components/BottomNav'
 import PostCard from '@/components/PostCard'
 import Link from 'next/link'
+import MarketTab from './MarketTab'
 
 const ALL_MARKET_CATEGORIES = [
   PostCategory.MARKETPLACE,
@@ -80,18 +81,13 @@ export default async function MarketPage({
         </div>
         <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-hide">
           {tabs.map((t) => (
-            <Link
+            <MarketTab
               key={t.key}
               href={`/market?tab=${t.key}`}
-              className={`flex items-center gap-1.5 whitespace-nowrap px-3.5 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${
-                tab === t.key
-                  ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/25 glow-tab'
-                  : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 border border-gray-200 dark:border-white/[0.08]'
-              }`}
-            >
-              <span>{t.icon}</span>
-              <span>{t.label}</span>
-            </Link>
+              active={tab === t.key}
+              icon={t.icon}
+              label={t.label}
+            />
           ))}
         </div>
       </header>

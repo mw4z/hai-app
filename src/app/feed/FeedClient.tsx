@@ -10,6 +10,7 @@ import BottomNav from '@/components/BottomNav'
 import EmergencyBanner from '@/components/EmergencyBanner'
 import InviteLeaderboardCard from '@/components/InviteLeaderboardCard'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
+import { hapticLight } from '@/lib/haptic'
 import QuickAskSheet from '@/components/QuickAskSheet'
 import NeighborhoodSheet from '@/components/NeighborhoodSheet'
 import GuestBanner from '@/components/GuestBanner'
@@ -267,6 +268,7 @@ export default function FeedClient({
     : { id: user.neighborhoodId, displayName: dn(user.neighborhood, user.neighborhoodEn), displayCity: dn(user.city, user.cityEn) }
 
   function handleCategoryChange(cat: string) {
+    if (cat !== selectedCategory) hapticLight()
     const nParam = isReadOnly && browseNeighborhood ? `&neighborhood=${browseNeighborhood.id}` : ''
     router.push(`/feed?category=${cat}${nParam}`)
   }
@@ -677,7 +679,7 @@ export default function FeedClient({
         )}
       </div>
 
-      <BottomNav active="feed" />
+      <BottomNav active="feed" isReadOnly={isReadOnly} />
 
       {showAsk && <QuickAskSheet onClose={() => setShowAsk(false)} />}
 
