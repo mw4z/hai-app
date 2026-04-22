@@ -8,30 +8,21 @@
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <scenes>
-        <!-- Launch screen = branded Hai splash so there's no visible
-             handoff between Apple's native launch and the JS AppSplash.
-             Background matches globals (#f0fdf4) and the Arabic "حي"
-             sits near the same spot the animated JS logo appears. -->
+        <!-- Launch screen = bare background that matches AppSplash's
+             starting gradient. No logo or text here — the animated
+             JS AppSplash is the ONLY visible intro. Apple requires a
+             launch storyboard to exist; this is the minimum viable
+             one. Background is #f0fdf4 (same as AppSplash's outer
+             radial gradient stop) so there's no color flash when
+             handoff happens. -->
         <scene sceneID="EHf-IW-A2E">
             <objects>
                 <viewController id="01J-lp-oVM" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="snD-IY-ifK">
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                        <subviews>
-                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="حي" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="lbl-hai-01">
-                                <rect key="frame" x="140" y="308" width="95" height="68"/>
-                                <fontDescription key="fontDescription" name="HelveticaNeue-Bold" family="Helvetica Neue" pointSize="56"/>
-                                <color key="textColor" red="0.082352941176470587" green="0.501960784313725" blue="0.278431372549019" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                <nil key="highlightedColor"/>
-                            </label>
-                        </subviews>
                         <color key="backgroundColor" red="0.94117647058823528" green="0.99215686274509807" blue="0.95686274509803926" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <viewLayoutGuide key="safeArea" id="safe-01"/>
-                        <constraints>
-                            <constraint firstItem="lbl-hai-01" firstAttribute="centerX" secondItem="snD-IY-ifK" secondAttribute="centerX" id="cx-01"/>
-                            <constraint firstItem="lbl-hai-01" firstAttribute="centerY" secondItem="snD-IY-ifK" secondAttribute="centerY" id="cy-01"/>
-                        </constraints>
                     </view>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>

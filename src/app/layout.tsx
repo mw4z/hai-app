@@ -85,33 +85,20 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning>
-        {/* Blank cover — bridges between the native launch storyboard
-            (static "حي") and the animated JS AppSplash so there's no
-            un-branded frame in between. Keeps the exact same Arabic
-            wordmark visible the whole time the app is booting. */}
+        {/* Blank cover — matches AppSplash's background gradient exactly
+            so the handoff from native launch storyboard → preload → JS
+            AppSplash shows no color flash. No logo or text here; the
+            animated AppSplash is the only visible intro. */}
         <div id="__hai_preload" style={{
           position: 'fixed', inset: 0, zIndex: 99999,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #f0fdf4 40%, #fff 100%)',
-        }}>
-          <span style={{
-            fontFamily: "'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, sans-serif",
-            fontSize: 56,
-            fontWeight: 700,
-            color: '#15803d',
-            lineHeight: 1,
-          }}>حي</span>
-        </div>
+        }} />
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){
             var d = document.documentElement.classList.contains('dark');
             if (d) {
               var el = document.getElementById('__hai_preload');
-              if (el) {
-                el.style.background = 'radial-gradient(ellipse at 50% 42%, #0d2818 0%, #0f1a14 40%, #0a0f0c 100%)';
-                var mark = el.querySelector('span');
-                if (mark) mark.style.color = '#86efac';
-              }
+              if (el) el.style.background = 'radial-gradient(ellipse at 50% 42%, #0d2818 0%, #0f1a14 40%, #0a0f0c 100%)';
             }
           })();
         `}} />
