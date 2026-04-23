@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import crypto from 'crypto'
 import { loadFcmCredentials } from '@/lib/fcm'
+import { loadApnsCredentials, sendApnsBatch } from '@/lib/apns'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -51,7 +52,8 @@ export async function GET() {
     }),
   ])
 
-  const creds = loadFcmCredentials()
+  const fcmCreds = loadFcmCredentials()
+  const apnsCreds = loadApnsCredentials()
 
   return NextResponse.json({
     ok: true,
@@ -69,9 +71,16 @@ export async function GET() {
       tokenLength: t.token.length,
     })),
     fcm: {
-      configured: !!creds,
-      source: creds?.source ?? null,
-      projectId: creds?.projectId ?? null,
+      configured: !!fcmCreds,
+      source: fcmCreds?.source ?? null,
+      projectId: fcmCreds?.projectId ?? null,
+    },
+    apns: {
+      configured: !!apnsCreds,
+      keyId: apnsCreds?.keyId ?? null,
+      teamId: apnsCreds?.teamId ?? null,
+      bundleId: apnsCreds?.bundleId ?? null,
+      env: apnsCreds?.env ?? null,
     },
     notifJobsLast24h: jobsByStatus.map((g) => ({
       status: g.status,
@@ -82,8 +91,11 @@ export async function GET() {
         tokens.length === 0
           ? 'No device tokens registered. Open the native app with notifications permission granted so PushRegistration can POST /api/devices/register.'
           : null,
-      fcmHint: !creds
+      fcmHint: !fcmCreds
         ? 'FCM credentials missing. Set FCM_SERVICE_ACCOUNT_BASE64 (or FCM_PROJECT_ID/_CLIENT_EMAIL/_PRIVATE_KEY) in Vercel env.'
+        : null,
+      apnsHint: !apnsCreds && tokens.some((t) => t.platform === 'ios')
+        ? 'APNs credentials missing. Set APNS_KEY_BASE64 / APNS_KEY_ID / APNS_TEAM_ID / APNS_BUNDLE_ID in Vercel env to push to iOS directly (no FCM-iOS required).'
         : null,
       cronHint:
         jobsByStatus.find((g) => g.status === 'pending')?._count._all
@@ -97,24 +109,15 @@ export async function POST(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-  const creds = loadFcmCredentials()
-  if (!creds) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: 'fcm_not_configured',
-        hint: 'Set FCM_SERVICE_ACCOUNT_BASE64 in Vercel environment variables.',
-      },
-      { status: 500 },
-    )
-  }
+  const fcmCreds = loadFcmCredentials()
+  const apnsCreds = loadApnsCredentials()
 
   const body = (await req.json().catch(() => ({}))) as {
     title?: string
     body?: string
   }
   const title = (body.title || 'اختبار حي').slice(0, 60)
-  const text = (body.body || 'Test push — if you see this, FCM is wired correctly.').slice(0, 160)
+  const text = (body.body || 'Test push — if you see this, notifications are wired correctly.').slice(0, 160)
 
   const tokens = await db.deviceToken.findMany({
     where: { userId: session.userId },
@@ -131,50 +134,9 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Mint an FCM OAuth access token on the fly.
-  let accessToken: string
-  try {
-    const nowSec = Math.floor(Date.now() / 1000)
-    const header = { alg: 'RS256', typ: 'JWT' }
-    const claim = {
-      iss: creds.clientEmail,
-      scope: 'https://www.googleapis.com/auth/firebase.messaging',
-      aud: 'https://oauth2.googleapis.com/token',
-      iat: nowSec,
-      exp: nowSec + 3600,
-    }
-    const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url')
-    const toSign = `${enc(header)}.${enc(claim)}`
-    const signer = crypto.createSign('RSA-SHA256')
-    signer.update(toSign)
-    const signature = signer.sign(creds.privateKey).toString('base64url')
-    const jwt = `${toSign}.${signature}`
-
-    const oauthRes = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        assertion: jwt,
-      }),
-    })
-    if (!oauthRes.ok) {
-      const t = await oauthRes.text().catch(() => '')
-      return NextResponse.json(
-        { ok: false, error: 'fcm_oauth_failed', detail: `${oauthRes.status} ${t.slice(0, 200)}` },
-        { status: 500 },
-      )
-    }
-    const data = (await oauthRes.json()) as { access_token: string }
-    accessToken = data.access_token
-  } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: 'fcm_oauth_exception', detail: err?.message || String(err) },
-      { status: 500 },
-    )
-  }
-
-  const url = `https://fcm.googleapis.com/v1/projects/${creds.projectId}/messages:send`
+  // ── Split by platform: iOS → APNs-direct, everything else → FCM ──
+  const iosTokens = tokens.filter((t) => t.platform === 'ios')
+  const otherTokens = tokens.filter((t) => t.platform !== 'ios')
   const results: Array<{
     tokenId: string
     platform: string
@@ -182,61 +144,79 @@ export async function POST(req: NextRequest) {
     status: number
     ok: boolean
     error?: string
+    channel: 'apns' | 'fcm'
   }> = []
 
-  for (const t of tokens) {
-    const payload = {
-      message: {
-        token: t.token,
-        notification: { title, body: text },
-        data: { type: 'debug_test', ts: String(Date.now()) },
-        android: {
-          priority: 'HIGH',
-          notification: { sound: 'default' },
-        },
-        apns: {
-          headers: { 'apns-priority': '10' },
-          payload: { aps: { sound: 'default' } },
-        },
-      },
-    }
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
-      if (res.ok) {
+  // ── iOS via APNs direct (no Firebase iOS SDK needed) ──
+  if (iosTokens.length > 0) {
+    if (!apnsCreds) {
+      for (const t of iosTokens) {
         results.push({
           tokenId: t.id,
           platform: t.platform,
           tokenPrefix: t.token.slice(0, 18) + '…',
-          status: res.status,
-          ok: true,
-        })
-      } else {
-        const err = await res.json().catch(() => null) as any
-        results.push({
-          tokenId: t.id,
-          platform: t.platform,
-          tokenPrefix: t.token.slice(0, 18) + '…',
-          status: res.status,
+          status: 0,
           ok: false,
-          error: err?.error?.message || `HTTP ${res.status}`,
+          error: 'apns_not_configured — set APNS_KEY_BASE64 / APNS_KEY_ID / APNS_TEAM_ID / APNS_BUNDLE_ID in Vercel env',
+          channel: 'apns',
         })
       }
-    } catch (err: any) {
-      results.push({
-        tokenId: t.id,
-        platform: t.platform,
-        tokenPrefix: t.token.slice(0, 18) + '…',
-        status: 0,
-        ok: false,
-        error: err?.message || String(err),
-      })
+    } else {
+      const apnsOut = await sendApnsBatch(
+        iosTokens.map((t) => t.token),
+        {
+          title,
+          body: text,
+          priority: 'high',
+          data: { type: 'debug_test', ts: String(Date.now()) },
+        },
+        apnsCreds,
+      )
+      for (const t of iosTokens) {
+        const per = apnsOut.perToken.find((p) => p.token === t.token)
+        results.push({
+          tokenId: t.id,
+          platform: t.platform,
+          tokenPrefix: t.token.slice(0, 18) + '…',
+          status: per?.status ?? 0,
+          ok: per?.ok ?? false,
+          error: per?.ok ? undefined : per?.reason,
+          channel: 'apns',
+        })
+      }
+    }
+  }
+
+  // ── Non-iOS via FCM v1 (original path) ──
+  if (otherTokens.length > 0) {
+    if (!fcmCreds) {
+      for (const t of otherTokens) {
+        results.push({
+          tokenId: t.id,
+          platform: t.platform,
+          tokenPrefix: t.token.slice(0, 18) + '…',
+          status: 0,
+          ok: false,
+          error: 'fcm_not_configured — set FCM_SERVICE_ACCOUNT_BASE64 in Vercel env',
+          channel: 'fcm',
+        })
+      }
+    } else {
+      const creds = fcmCreds // narrow for the rest of this block
+      // (FCM OAuth mint + send kept inline to preserve the pre-existing flow.)
+      const fcmOut = await sendFcmTokens(creds, otherTokens.map((t) => t.token), title, text)
+      for (const t of otherTokens) {
+        const per = fcmOut.perToken.find((p) => p.token === t.token)
+        results.push({
+          tokenId: t.id,
+          platform: t.platform,
+          tokenPrefix: t.token.slice(0, 18) + '…',
+          status: per?.status ?? 0,
+          ok: per?.ok ?? false,
+          error: per?.ok ? undefined : per?.error,
+          channel: 'fcm',
+        })
+      }
     }
   }
 
@@ -247,8 +227,82 @@ export async function POST(req: NextRequest) {
     delivered: results.filter((r) => r.ok).length,
     failed: results.filter((r) => !r.ok).length,
     results,
+    channels: {
+      apns: iosTokens.length,
+      fcm: otherTokens.length,
+    },
     hint: anyOk
       ? 'At least one device got the push. If the phone still shows nothing, check OS notification permission for the Hai app.'
-      : 'No device got it. Check /api/debug/fcm-check and re-register the device token.',
+      : 'No device got it. See the per-token `error` above for the specific reason.',
   })
 }
+
+/* Pull the old FCM-inline flow into a tidy helper so the POST body is
+   readable. Same behavior as before: mint OAuth token, send to v1 endpoint. */
+async function sendFcmTokens(
+  creds: NonNullable<ReturnType<typeof loadFcmCredentials>>,
+  tokens: string[],
+  title: string,
+  text: string,
+): Promise<{ perToken: Array<{ token: string; ok: boolean; status: number; error?: string }> }> {
+  const nowSec = Math.floor(Date.now() / 1000)
+  const header = { alg: 'RS256', typ: 'JWT' }
+  const claim = {
+    iss: creds.clientEmail,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: nowSec,
+    exp: nowSec + 3600,
+  }
+  const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url')
+  const toSign = `${enc(header)}.${enc(claim)}`
+  const signer = crypto.createSign('RSA-SHA256')
+  signer.update(toSign)
+  const signature = signer.sign(creds.privateKey).toString('base64url')
+  const jwt = `${toSign}.${signature}`
+
+  const oauthRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
+  })
+  if (!oauthRes.ok) {
+    const t = await oauthRes.text().catch(() => '')
+    const err = `oauth_failed ${oauthRes.status} ${t.slice(0, 160)}`
+    return { perToken: tokens.map((tk) => ({ token: tk, ok: false, status: oauthRes.status, error: err })) }
+  }
+  const data = (await oauthRes.json()) as { access_token: string }
+  const url = `https://fcm.googleapis.com/v1/projects/${creds.projectId}/messages:send`
+  const perToken: Array<{ token: string; ok: boolean; status: number; error?: string }> = []
+
+  await Promise.all(tokens.map(async (token) => {
+    const payload = {
+      message: {
+        token,
+        notification: { title, body: text },
+        data: { type: 'debug_test', ts: String(Date.now()) },
+        android: { priority: 'HIGH', notification: { sound: 'default' } },
+      },
+    }
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${data.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (res.ok) {
+        perToken.push({ token, ok: true, status: res.status })
+      } else {
+        const errBody = (await res.json().catch(() => null)) as any
+        perToken.push({ token, ok: false, status: res.status, error: errBody?.error?.message || `HTTP ${res.status}` })
+      }
+    } catch (err: any) {
+      perToken.push({ token, ok: false, status: 0, error: err?.message || String(err) })
+    }
+  }))
+  return { perToken }
+}
+

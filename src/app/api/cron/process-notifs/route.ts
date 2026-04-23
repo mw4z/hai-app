@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import crypto from 'crypto'
 import { loadFcmCredentials } from '@/lib/fcm'
+import { loadApnsCredentials, sendApnsBatch } from '@/lib/apns'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -90,6 +91,51 @@ interface NotificationContent {
   androidChannel?: string
 }
 
+/**
+ * Cross-platform send. Pass tokens tagged with their platform so iOS
+ * ('ios') goes to Apple's APNs HTTP/2 directly (no Firebase iOS SDK
+ * required) and everything else goes through FCM v1.
+ */
+async function sendPushBatch(
+  tokens: Array<{ token: string; platform: string }>,
+  content: NotificationContent,
+): Promise<FcmSendResult> {
+  const iosTokens = tokens.filter((t) => t.platform === 'ios').map((t) => t.token)
+  const otherTokens = tokens.filter((t) => t.platform !== 'ios').map((t) => t.token)
+
+  const combined: FcmSendResult = { success: 0, failed: 0, invalidTokens: [] }
+
+  if (iosTokens.length > 0) {
+    const apnsCreds = loadApnsCredentials()
+    if (!apnsCreds) {
+      // No APNs key on the server — skip rather than fail the whole job.
+      combined.failed += iosTokens.length
+      if (!combined.firstError) combined.firstError = 'apns_not_configured'
+    } else {
+      const apns = await sendApnsBatch(iosTokens, {
+        title: content.title,
+        body: content.body,
+        priority: content.priority === 'high' ? 'high' : 'normal',
+        data: content.data,
+      }, apnsCreds)
+      combined.success += apns.success
+      combined.failed += apns.failed
+      combined.invalidTokens.push(...apns.invalidTokens)
+      if (!combined.firstError && apns.firstError) combined.firstError = apns.firstError
+    }
+  }
+
+  if (otherTokens.length > 0) {
+    const fcm = await sendFcmBatch(otherTokens, content)
+    combined.success += fcm.success
+    combined.failed += fcm.failed
+    combined.invalidTokens.push(...fcm.invalidTokens)
+    if (!combined.firstError && fcm.firstError) combined.firstError = fcm.firstError
+  }
+
+  return combined
+}
+
 async function sendFcmBatch(
   tokens: string[],
   content: NotificationContent,
@@ -168,8 +214,9 @@ async function sendFcmBatch(
 }
 
 // ── Token resolvers ──────────────────────────────────────────────────────
+interface TokenWithPlatform { token: string; platform: string }
 interface ResolvedTokens {
-  tokens: string[]
+  tokens: TokenWithPlatform[]
   recipientUserCount: number
 }
 
@@ -190,7 +237,7 @@ async function resolveNewPostTokens(
     },
     select: {
       id: true,
-      deviceTokens: { select: { token: true } },
+      deviceTokens: { select: { token: true, platform: true } },
       notifPreference: {
         select: {
           newPostInNbhd: true,
@@ -201,7 +248,7 @@ async function resolveNewPostTokens(
     },
   })
 
-  const tokens: string[] = []
+  const tokens: TokenWithPlatform[] = []
   let recipientUserCount = 0
   for (const u of users) {
     const pref = u.notifPreference
@@ -209,7 +256,7 @@ async function resolveNewPostTokens(
     if (pref && isInQuietHours(pref.quietStartHr, pref.quietEndHr)) continue
     if (!u.deviceTokens.length) continue
     recipientUserCount++
-    for (const dt of u.deviceTokens) tokens.push(dt.token)
+    for (const dt of u.deviceTokens) tokens.push({ token: dt.token, platform: dt.platform || "android" })
   }
   return { tokens, recipientUserCount }
 }
@@ -224,13 +271,13 @@ type SingleUserPrefKey =
 async function resolveUserTokens(
   userId: string,
   prefKey: SingleUserPrefKey,
-): Promise<{ tokens: string[]; userExists: boolean }> {
+): Promise<{ tokens: TokenWithPlatform[]; userExists: boolean }> {
   const user = await db.user.findUnique({
     where: { id: userId },
     select: {
       id: true,
       status: true,
-      deviceTokens: { select: { token: true } },
+      deviceTokens: { select: { token: true, platform: true } },
       notifPreference: {
         select: {
           commentOnYours: true,
@@ -245,18 +292,18 @@ async function resolveUserTokens(
     },
   })
 
-  if (!user) return { tokens: [], userExists: false }
+  if (!user) return { tokens: [] as TokenWithPlatform[], userExists: false }
   if (user.status === 'BANNED_TEMP' || user.status === 'BANNED_PERM') {
-    return { tokens: [], userExists: true }
+    return { tokens: [] as TokenWithPlatform[], userExists: true }
   }
   const pref = user.notifPreference
-  if (pref && pref[prefKey] === false) return { tokens: [], userExists: true }
+  if (pref && pref[prefKey] === false) return { tokens: [] as TokenWithPlatform[], userExists: true }
   if (pref && isInQuietHours(pref.quietStartHr, pref.quietEndHr)) {
-    return { tokens: [], userExists: true }
+    return { tokens: [] as TokenWithPlatform[], userExists: true }
   }
-  if (!user.deviceTokens.length) return { tokens: [], userExists: true }
+  if (!user.deviceTokens.length) return { tokens: [] as TokenWithPlatform[], userExists: true }
 
-  return { tokens: user.deviceTokens.map((dt) => dt.token), userExists: true }
+  return { tokens: user.deviceTokens.map((dt) => ({ token: dt.token, platform: dt.platform || "android" })), userExists: true }
 }
 
 async function resolveEmergencyTokens(
@@ -269,22 +316,22 @@ async function resolveEmergencyTokens(
     },
     select: {
       id: true,
-      deviceTokens: { select: { token: true } },
+      deviceTokens: { select: { token: true, platform: true } },
     },
   })
 
-  const tokens: string[] = []
+  const tokens: TokenWithPlatform[] = []
   let recipientUserCount = 0
   for (const u of users) {
     if (!u.deviceTokens.length) continue
     recipientUserCount++
-    for (const dt of u.deviceTokens) tokens.push(dt.token)
+    for (const dt of u.deviceTokens) tokens.push({ token: dt.token, platform: dt.platform || "android" })
   }
   return { tokens, recipientUserCount }
 }
 
 async function cleanupInvalidTokens(
-  tokens: string[],
+  tokens: string[],  // raw invalid token strings returned by FCM/APNs
   jobId: string,
   type: string,
 ): Promise<void> {
@@ -380,7 +427,7 @@ async function processNewPost(job: JobRow): Promise<JobOutcome> {
   const pushTitle = catLabel ? `${author} · ${catLabel}` : author
   const pushBody = title.slice(0, 180)
 
-  const result = await sendFcmBatch(tokens, {
+  const result = await sendPushBatch(tokens, {
     title: pushTitle,
     body: pushBody,
     priority: 'normal',
@@ -450,7 +497,7 @@ async function processCommentOnPost(job: JobRow): Promise<JobOutcome> {
   const pushTitle = `${actor} علّق على منشورك`
   const pushBody = (snippet || '').trim().slice(0, 180) || 'اضغط للعرض'
 
-  const result = await sendFcmBatch(tokens, {
+  const result = await sendPushBatch(tokens, {
     title: pushTitle,
     body: pushBody,
     priority: 'normal',
@@ -535,7 +582,7 @@ async function processReplyToComment(job: JobRow): Promise<JobOutcome> {
   const pushTitle = `${actor} رد على تعليقك`
   const pushBody = (snippet || '').trim().slice(0, 180) || 'اضغط للعرض'
 
-  const result = await sendFcmBatch(tokens, {
+  const result = await sendPushBatch(tokens, {
     title: pushTitle,
     body: pushBody,
     priority: 'normal',
@@ -606,7 +653,7 @@ async function processReactionOnPost(job: JobRow): Promise<JobOutcome> {
   }
   const pushBody = 'اضغط للعرض'
 
-  const result = await sendFcmBatch(tokens, {
+  const result = await sendPushBatch(tokens, {
     title: pushTitle,
     body: pushBody,
     priority: 'normal',
@@ -693,7 +740,7 @@ async function processWeeklyDigest(job: JobRow): Promise<JobOutcome> {
     pushBody = 'نشاط جديد في الحي خلال الأسبوع الماضي'
   }
 
-  const result = await sendFcmBatch(tokens, {
+  const result = await sendPushBatch(tokens, {
     title: pushTitle,
     body: pushBody,
     priority: 'normal',
@@ -752,7 +799,7 @@ async function processEmergencyAlert(job: JobRow): Promise<JobOutcome> {
   const pushTitle = '🚨 تنبيه عاجل'
   const pushBody = (alert.title || alert.body || '').slice(0, 180)
 
-  const result = await sendFcmBatch(tokens, {
+  const result = await sendPushBatch(tokens, {
     title: pushTitle,
     body: pushBody,
     priority: 'high',
