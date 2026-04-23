@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import toast from 'react-hot-toast'
 
 /**
  * Handles FCM/APNs registration on native platforms only.
@@ -116,12 +117,13 @@ export default function PushRegistration() {
               notification?.data?.type,
             )
             try {
-              const { default: toast } = require('react-hot-toast') as typeof import('react-hot-toast')
               const title = notification?.title || (notification?.data as any)?.title
               const body = notification?.body || (notification?.data as any)?.body
               const text = [title, body].filter(Boolean).join(' — ')
               if (text) toast(text, { duration: 5000, icon: '🔔' })
-            } catch { /* toast not available yet — ignore */ }
+            } catch (err) {
+              console.error('[PUSH] foreground toast failed:', err)
+            }
           },
         )
 
