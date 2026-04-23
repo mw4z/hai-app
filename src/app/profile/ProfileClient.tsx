@@ -1090,6 +1090,9 @@ export default function ProfileClient({ user, postCount }: Props) {
           lang={lang}
           onToggle={toggleNotifPref}
         />
+
+        {/* ── Diagnostic: live test push ── */}
+        <PushTestButton lang={lang} />
       </div>
 
       </AccordionSection>
@@ -1938,6 +1941,158 @@ function PrivacySettings({ lang }: { lang: string }) {
           <div className={`w-5 h-5 bg-white rounded-full shadow absolute top-0.5 transition-all ${showGender ? 'right-0.5' : 'left-0.5'}`} />
         </button>
       </div>
+    </div>
+  )
+}
+
+/**
+ * PushTestButton — in-app diagnostic for "why aren't push notifs arriving?".
+ *
+ * On click: hits GET /api/debug/push-test first to summarise state
+ * (device-token count, FCM status, 24h NotifJob breakdown), then POST
+ * to send a live FCM push to EVERY device registered to this account,
+ * bypassing the NotifJob queue. The result shows up in-card so the
+ * user can see which link of the chain is broken without leaving the
+ * app. Arabic default, English/Urdu translations available.
+ */
+function PushTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<null | {
+    ok: boolean
+    summary: string
+    detail?: string
+  }>(null)
+
+  async function run() {
+    setLoading(true)
+    setResult(null)
+    try {
+      // 1. Status snapshot
+      const infoRes = await fetch('/api/debug/push-test')
+      const info = await infoRes.json().catch(() => null) as any
+
+      if (!info) {
+        setResult({ ok: false, summary: lang === 'en' ? 'Server did not respond.' : lang === 'ur' ? 'سرور نے جواب نہیں دیا۔' : 'لم يستجب الخادم.' })
+        return
+      }
+
+      const tokens = Array.isArray(info.deviceTokens) ? info.deviceTokens.length : 0
+      const fcmOk = !!info?.fcm?.configured
+
+      if (!fcmOk) {
+        setResult({
+          ok: false,
+          summary: lang === 'en'
+            ? 'FCM credentials missing on the server.'
+            : lang === 'ur' ? 'سرور پر FCM اسناد موجود نہیں۔'
+            : 'بيانات FCM غير مضبوطة على الخادم.',
+          detail: lang === 'en'
+            ? 'Ask the admin to set FCM_SERVICE_ACCOUNT_BASE64 in Vercel env.'
+            : 'اطلب من المسؤول إضافة FCM_SERVICE_ACCOUNT_BASE64 في متغيرات Vercel.',
+        })
+        return
+      }
+      if (tokens === 0) {
+        setResult({
+          ok: false,
+          summary: lang === 'en'
+            ? 'No device tokens registered for this account.'
+            : lang === 'ur' ? 'اس اکاؤنٹ کے لیے کوئی ڈیوائس ٹوکن رجسٹرڈ نہیں۔'
+            : 'لا توجد أجهزة مسجّلة لهذا الحساب.',
+          detail: lang === 'en'
+            ? 'Make sure notifications permission is granted, then reopen the app.'
+            : 'تأكد من السماح بالإشعارات ثم أعد فتح التطبيق.',
+        })
+        return
+      }
+
+      // 2. Live send
+      const sendRes = await fetch('/api/debug/push-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: lang === 'en' ? 'Hai test push' : lang === 'ur' ? 'حی ٹیسٹ پش' : 'اختبار إشعار حي',
+          body: lang === 'en' ? 'If you see this, push notifications are working.' : lang === 'ur' ? 'یہ نظر آئے تو پش نوٹیفیکیشنز کام کر رہی ہیں۔' : 'إذا رأيت هذا، الإشعارات تعمل.',
+        }),
+      })
+      const send = await sendRes.json().catch(() => null) as any
+      if (!send) {
+        setResult({ ok: false, summary: lang === 'en' ? 'Send failed with no response.' : 'فشل الإرسال بدون استجابة.' })
+        return
+      }
+      if (send.ok) {
+        setResult({
+          ok: true,
+          summary: lang === 'en'
+            ? `Sent to ${send.delivered} of ${send.totalDevices} devices.`
+            : lang === 'ur' ? `${send.totalDevices} میں سے ${send.delivered} ڈیوائسز پر بھیجا گیا۔`
+            : `تم الإرسال إلى ${send.delivered} من ${send.totalDevices} أجهزة.`,
+          detail: lang === 'en'
+            ? 'If nothing shows on your lock screen, check OS notification permission for Hai.'
+            : 'إذا لم يصل شيء، تحقق من إذن الإشعارات للتطبيق في إعدادات الجهاز.',
+        })
+      } else {
+        const firstErr = Array.isArray(send.results)
+          ? (send.results.find((r: any) => !r.ok)?.error ?? send.error ?? 'unknown')
+          : (send.error ?? 'unknown')
+        setResult({
+          ok: false,
+          summary: lang === 'en'
+            ? `FCM rejected the push: ${firstErr}`
+            : `رفض FCM الإشعار: ${firstErr}`,
+          detail: firstErr.includes('UNREGISTERED') || firstErr.includes('NOT_FOUND')
+            ? (lang === 'en' ? 'The device token is stale. Reinstall or re-register.' : 'ٹوکن پرانا ہے۔ ایپ دوبارہ انسٹال کریں۔')
+            : undefined,
+        })
+      }
+    } catch (err: any) {
+      setResult({
+        ok: false,
+        summary: lang === 'en' ? `Request failed: ${err?.message || err}` : `فشل الطلب: ${err?.message || err}`,
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="hai-card hai-mt-3 hai-stack-2">
+      <div className="hai-stack-1">
+        <p className="hai-body-strong">
+          {lang === 'en' ? 'Push delivery check' : lang === 'ur' ? 'پش ڈیلیوری چیک' : 'اختبار وصول الإشعارات'}
+        </p>
+        <p className="hai-caption">
+          {lang === 'en'
+            ? "Sends a test notification to every device on your account. If it doesn't arrive, we'll show why."
+            : lang === 'ur'
+            ? 'آپ کے اکاؤنٹ کی ہر ڈیوائس پر ٹیسٹ نوٹیفیکیشن بھیجتا ہے۔ اگر نہ پہنچے تو وجہ بتائی جائے گی۔'
+            : 'يرسل تنبيهاً تجريبياً إلى كل جهاز مسجّل. إذا لم يصل، نعرض لك السبب.'}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={run}
+        disabled={loading}
+        className="hai-btn-primary hai-btn-block"
+      >
+        {loading
+          ? (lang === 'en' ? 'Sending…' : lang === 'ur' ? 'بھیجا جا رہا ہے…' : 'جاري الإرسال…')
+          : (lang === 'en' ? 'Send test notification' : lang === 'ur' ? 'ٹیسٹ نوٹیفیکیشن بھیجیں' : 'أرسل إشعاراً تجريبياً')}
+      </button>
+      {result && (
+        <div
+          className="hai-callout"
+          data-state={result.ok ? 'open' : 'flagged'}
+          style={{
+            background: result.ok ? 'var(--hai-primary-tint)' : 'var(--hai-danger-tint)',
+            borderColor: result.ok ? 'var(--hai-primary-500)' : 'var(--hai-danger-border)',
+            color: result.ok ? 'var(--hai-primary-700)' : 'var(--hai-danger)',
+          }}
+        >
+          <p className="hai-body-strong">{result.summary}</p>
+          {result.detail && <p className="hai-caption hai-mt-1">{result.detail}</p>}
+        </div>
+      )}
     </div>
   )
 }
