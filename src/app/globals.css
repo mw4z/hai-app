@@ -403,15 +403,26 @@ body::before {
   height: env(safe-area-inset-top, 0px);
   z-index: 50;
   pointer-events: none;
-  /* Fallback to solid white so the safe-area cover still paints even
-     if the stylesheet load races the var() resolution on iOS WKWebView.
-     Dark mode override follows below. */
+  /* Safe-area cover tracks the APP HEADER colour, not the page
+     background — so the notch / status-bar region always reads as
+     part of the header on iOS AND Android. Screens with a sticky
+     `.glass` header inherit the same surface-1; header-less screens
+     (auth / onboarding) still get a tidy top chrome band in the
+     same material family.
+
+     --hai-safe-top-bg is the single override point: a screen that
+     needs a different safe-area colour can set it locally
+     (e.g. inline on <main> or via a data-attr rule) and everything
+     else will track automatically.
+
+     Concrete hex first for WKWebView's stylesheet-load race; var()
+     second so theme / per-screen overrides still win once resolved. */
   background: #ffffff;
-  background: var(--hai-bg, #ffffff);
+  background: var(--hai-safe-top-bg, var(--hai-surface-1, #ffffff));
 }
 html.dark body::before {
-  background: #000000;
-  background: var(--hai-bg, #000000);
+  background: #101619;
+  background: var(--hai-safe-top-bg, var(--hai-surface-1, #101619));
 }
 /* Safe-area cover is now rendered as #__hai_safe_top in layout.tsx —
    a real DOM node paints reliably across WKWebView versions. */
