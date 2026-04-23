@@ -1246,16 +1246,16 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
       const s = swipeRef.current
       if (!s || e.touches.length !== 1) return
       const dx = e.touches[0].clientX - s.startX
-      // Only allow swipe in one direction: left in LTR, right in RTL
+      // Swipe in reading direction: right in LTR, left in RTL.
       const isRTL = document.documentElement.getAttribute('dir') === 'rtl'
-      const progress = isRTL ? dx : -dx
+      const progress = isRTL ? -dx : dx
       if (progress < 0) { s.dx = 0; return }
       if (progress > 8 && !s.active) { s.active = true }
       if (!s.active) return
       e.preventDefault()
       const clamped = Math.min(progress, 80)
       s.dx = clamped
-      const translate = isRTL ? clamped : -clamped
+      const translate = isRTL ? -clamped : clamped
       const bubble = bubbleRef.current
       if (bubble) {
         bubble.style.transform = `translateX(${translate}px)`
