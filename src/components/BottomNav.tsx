@@ -76,7 +76,7 @@ export default function BottomNav({ active, isReadOnly = false }: { active: stri
         boxShadow: 'var(--hai-shadow-md)',
       }}
     >
-      <div className="flex items-end">
+      <div className="flex items-stretch">
         {/* Left two tabs: Home, Market */}
         {NAV_ITEMS.slice(0, 2).map((item) => {
           const Icon = item.icon
@@ -85,7 +85,7 @@ export default function BottomNav({ active, isReadOnly = false }: { active: stri
             <Link
               key={item.key}
               href={item.href}
-              className={`flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors ${
+              className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors ${
                 isActive ? 'text-primary-600' : 'text-gray-400'
               }`}
             >
@@ -97,19 +97,19 @@ export default function BottomNav({ active, isReadOnly = false }: { active: stri
           )
         })}
 
-        {/* Center FAB — flat, single-color, token-driven. Sized to sit
-            cleanly inside the bottom-nav rhythm (48px button in a 64px
-            nav) instead of floating above it. */}
+        {/* Center FAB — flat, token-driven. Sized to match the rhythm of
+            the side tabs (icon size matches, total button footprint sits
+            within the nav row, no floating/elevation). */}
         <div className="flex-1 flex justify-center items-center">
           <button
             onClick={handleNewPost}
-            className="w-12 h-12 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"
+            className="w-10 h-10 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"
             style={{
               background: 'var(--hai-primary-500)',
             }}
             aria-label="new post"
           >
-            <FiPlus className="w-6 h-6" />
+            <FiPlus className="w-5 h-5" strokeWidth={2.5} />
           </button>
         </div>
 
@@ -123,7 +123,7 @@ export default function BottomNav({ active, isReadOnly = false }: { active: stri
               key={item.key}
               href={item.href}
               data-tour={item.key === 'profile' ? 'profile-tab' : undefined}
-              className={`flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors ${
+              className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors ${
                 isActive ? 'text-primary-600' : 'text-gray-400'
               }`}
             >
