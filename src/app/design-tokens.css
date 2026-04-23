@@ -1543,9 +1543,9 @@ textarea.hai-input {
   border-color: var(--hai-primary-200);
 }
 .dark .hai-pill--brand {
-  background: rgba(0, 168, 132, 0.16);
-  color: var(--hai-primary-700);
-  border-color: rgba(0, 168, 132, 0.32);
+  background: rgba(0, 168, 132, 0.18);
+  color: var(--hai-primary-100);
+  border-color: rgba(0, 168, 132, 0.42);
 }
 .hai-pill--danger {
   background: var(--hai-danger-tint);
