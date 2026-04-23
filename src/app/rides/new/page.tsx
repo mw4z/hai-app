@@ -7,6 +7,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import BackButton from '@/components/BackButton'
 import LocationPicker from '@/components/rides/LocationPicker'
 import RiyalIcon from '@/components/RiyalIcon'
+import { translateApiError } from '@/lib/apiError'
 import { FiNavigation, FiClock, FiFileText } from 'react-icons/fi'
 
 interface Location {
@@ -72,7 +73,9 @@ export default function NewRidePage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        toast.error(lang !== 'en' ? (data.message || data.error) : (data.messageEn || data.error))
+        toast.error(translateApiError(data, lang as 'ar' | 'en' | 'ur'), {
+          duration: 4500,
+        })
         return
       }
       toast.success(lang === 'en' ? 'Request published' : lang === 'ur' ? 'درخواست شائع ہو گئی' : 'تم نشر طلبك')

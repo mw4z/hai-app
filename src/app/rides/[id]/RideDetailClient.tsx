@@ -12,6 +12,7 @@ import { uploadFiles } from '@/lib/upload'
 import { pickImageOrFallback } from '@/lib/imagePicker'
 import RiyalIcon from '@/components/RiyalIcon'
 import UserBadgeDisplay from '@/components/UserBadge'
+import { translateApiError } from '@/lib/apiError'
 import {
   FiMapPin, FiClock, FiNavigation, FiSend, FiStar, FiX, FiArrowRight, FiArrowLeft, FiCamera,
   FiAlertTriangle, FiChevronDown, FiChevronUp, FiTruck, FiMessageCircle
@@ -179,7 +180,9 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
       const data = await res.json()
       if (!res.ok) {
         hapticError()
-        toast.error(lang !== 'en' ? data.message : (data.messageEn || data.error || 'Error'))
+        toast.error(translateApiError(data, lang as 'ar' | 'en' | 'ur'), {
+          duration: 4500,
+        })
         if (data.shouldRefresh) fetchRide()
         return false
       }
@@ -437,7 +440,7 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                             })
                             const data = await res.json()
                             if (!res.ok) {
-                              toast.error(lang !== 'en' ? (data.message || data.error) : (data.messageEn || data.error))
+                              toast.error(translateApiError(data, lang as 'ar' | 'en' | 'ur'), { duration: 4500 })
                               if (data.shouldRefresh) fetchRide()
                             } else {
                               setMyOffer(data)

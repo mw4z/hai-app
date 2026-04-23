@@ -63,6 +63,43 @@ export function translateApiError(body: any, lang: Lang): string {
           ? 'آپ کو اس کی اجازت نہیں ہے۔'
           : 'ليست لديك الصلاحية لذلك.'
 
+    case 'Invalid request':
+    case 'invalid_request':
+      return lang === 'en'
+        ? 'Invalid request.'
+        : lang === 'ur'
+          ? 'درخواست درست نہیں۔'
+          : 'الطلب غير صالح.'
+
+    case 'Invalid action':
+    case 'invalid_action':
+      return lang === 'en'
+        ? 'That action is not allowed right now.'
+        : lang === 'ur'
+          ? 'یہ عمل اس وقت ممکن نہیں۔'
+          : 'هذا الإجراء غير متاح الآن.'
+
+    case 'Coordinates required':
+      return lang === 'en'
+        ? 'Location coordinates are required.'
+        : lang === 'ur'
+          ? 'مقام کے نقاط درکار ہیں۔'
+          : 'الإحداثيات مطلوبة.'
+
+    case 'Image URL required':
+      return lang === 'en'
+        ? 'Image is required.'
+        : lang === 'ur'
+          ? 'تصویر درکار ہے۔'
+          : 'الصورة مطلوبة.'
+
+    case 'User not found':
+      return lang === 'en'
+        ? 'User not found.'
+        : lang === 'ur'
+          ? 'صارف نہیں ملا۔'
+          : 'لم يتم العثور على المستخدم.'
+
     case 'rate_limited':
     case 'too_many_requests':
       return lang === 'en'
@@ -116,8 +153,17 @@ export function translateApiError(body: any, lang: Lang): string {
   //     We translate them into the user's language so EN/UR users get a
   //     real explanation instead of an untranslated Arabic string.
   if (serverMsg) {
-    const m = SERVER_MSG_MAP[serverMsg.trim()]
+    const trimmed = serverMsg.trim()
+    const m = SERVER_MSG_MAP[trimmed]
     if (m) return m[lang] || m.ar
+    // Pattern match for messages with interpolated numbers / variables
+    // (e.g. "حسابك يجب أن يكون عمره 7 أيام على الأقل") so the same
+    // translation works regardless of the specific value the server
+    // plugged in.
+    for (const rule of PATTERN_RULES) {
+      const match = trimmed.match(rule.pattern)
+      if (match) return rule.translate(match, lang)
+    }
     // Fall through: server sent a message we haven't mapped yet; surface
     // it verbatim. Any message is better than a generic "حدث خطأ".
     return serverMsg
@@ -199,7 +245,161 @@ const SERVER_MSG_MAP: Record<string, { ar: string; en: string; ur: string }> = {
     en: 'Server error. Please try again in a moment.',
     ur: 'سرور میں مسئلہ۔ چند لمحوں میں دوبارہ کوشش کریں۔',
   },
+
+  // ── Rides API (new/offers/status/messages/confirm) ───────────────
+  'بيانات نقطة الانطلاق ناقصة': {
+    ar: 'بيانات نقطة الانطلاق ناقصة.',
+    en: 'Pickup location details are missing.',
+    ur: 'اٹھانے کی جگہ کی تفصیل نامکمل ہے۔',
+  },
+  'بيانات الوجهة ناقصة': {
+    ar: 'بيانات الوجهة ناقصة.',
+    en: 'Drop-off location details are missing.',
+    ur: 'منزل کی تفصیل نامکمل ہے۔',
+  },
+  'بيانات الإحداثيات غير صالحة': {
+    ar: 'بيانات الإحداثيات غير صالحة.',
+    en: 'The location coordinates are invalid.',
+    ur: 'مقام کے نقاط درست نہیں۔',
+  },
+  'عنوان الانطلاق غير صالح': {
+    ar: 'عنوان نقطة الانطلاق غير صالح.',
+    en: 'Pickup address is invalid.',
+    ur: 'اٹھانے کی جگہ کا پتہ درست نہیں۔',
+  },
+  'عنوان الوجهة غير صالح': {
+    ar: 'عنوان الوجهة غير صالح.',
+    en: 'Drop-off address is invalid.',
+    ur: 'منزل کا پتہ درست نہیں۔',
+  },
+  'الملاحظات طويلة جداً': {
+    ar: 'الملاحظات طويلة جداً.',
+    en: 'Notes are too long.',
+    ur: 'نوٹس بہت طویل ہیں۔',
+  },
+  'حدد وقت الرحلة': {
+    ar: 'حدّد وقت الرحلة.',
+    en: 'Please set the trip time.',
+    ur: 'سفر کا وقت مقرر کریں۔',
+  },
+  'وقت الرحلة يجب أن يكون بين 30 دقيقة و48 ساعة من الآن': {
+    ar: 'وقت الرحلة يجب أن يكون بين 30 دقيقة و48 ساعة من الآن.',
+    en: 'Trip time must be between 30 minutes and 48 hours from now.',
+    ur: 'سفر کا وقت ابھی سے 30 منٹ اور 48 گھنٹوں کے درمیان ہونا چاہیے۔',
+  },
+  'لديك طلب نشط بالفعل': {
+    ar: 'لديك طلب نشط بالفعل — أغلقه قبل إنشاء طلب جديد.',
+    en: 'You already have an active request — close it before starting a new one.',
+    ur: 'آپ کی پہلے سے ایک فعال درخواست موجود ہے — نئی بنانے سے پہلے اسے بند کریں۔',
+  },
+  'تجاوزت الحد الأقصى (3 طلبات بالساعة)': {
+    ar: 'تجاوزت الحد الأقصى (3 طلبات بالساعة). انتظر قليلاً.',
+    en: "You've hit the limit (3 requests per hour). Please wait a bit.",
+    ur: 'حد مکمل ہو گئی (فی گھنٹہ 3 درخواستیں)۔ تھوڑا انتظار کریں۔',
+  },
+  'المحادثة مغلقة': {
+    ar: 'المحادثة مغلقة.',
+    en: 'This chat is closed.',
+    ur: 'یہ گفتگو بند ہے۔',
+  },
+  'المحادثة غير متاحة في هذه المرحلة': {
+    ar: 'المحادثة غير متاحة في هذه المرحلة.',
+    en: "Chat isn't available at this stage of the ride.",
+    ur: 'سفر کے اس مرحلے پر گفتگو دستیاب نہیں۔',
+  },
+  'الرسالة فارغة': {
+    ar: 'الرسالة فارغة.',
+    en: 'Message is empty.',
+    ur: 'پیغام خالی ہے۔',
+  },
+  'الرسالة طويلة جداً': {
+    ar: 'الرسالة طويلة جداً.',
+    en: 'Message is too long.',
+    ur: 'پیغام بہت طویل ہے۔',
+  },
+  'الرسالة طويلة جداً (100 حرف كحد أقصى)': {
+    ar: 'الرسالة طويلة جداً (الحد 100 حرف).',
+    en: 'Message is too long (max 100 characters).',
+    ur: 'پیغام بہت طویل ہے (زیادہ سے زیادہ 100 حروف)۔',
+  },
+  'أنت لست الشخص المختار': {
+    ar: 'أنت لست الشخص المختار لهذه الرحلة.',
+    en: "You aren't the selected offer for this ride.",
+    ur: 'آپ اس سفر کے لیے منتخب شخص نہیں ہیں۔',
+  },
+  'انتهت مهلة التأكيد': {
+    ar: 'انتهت مهلة التأكيد.',
+    en: 'The confirmation window has expired.',
+    ur: 'تصدیق کی مہلت ختم ہو گئی۔',
+  },
+  'لم يعد بالإمكان التأكيد': {
+    ar: 'لم يعد بالإمكان تأكيد هذه الرحلة.',
+    en: 'This ride can no longer be confirmed.',
+    ur: 'اس سفر کی تصدیق اب ممکن نہیں۔',
+  },
+  'الطلب لم يعد يقبل عروض': {
+    ar: 'هذا الطلب لم يعد يقبل عروضاً جديدة.',
+    en: 'This request is no longer accepting new offers.',
+    ur: 'یہ درخواست نئی پیشکشیں قبول نہیں کر رہی۔',
+  },
+  'لا يمكنك تقديم عرض على طلبك': {
+    ar: 'لا يمكنك تقديم عرض على طلبك الخاص.',
+    en: "You can't make an offer on your own request.",
+    ur: 'آپ اپنی ہی درخواست پر پیشکش نہیں دے سکتے۔',
+  },
+  'أدخل سعراً صحيحاً': {
+    ar: 'أدخل سعراً صحيحاً.',
+    en: 'Please enter a valid price.',
+    ur: 'درست قیمت درج کریں۔',
+  },
+  'وقت الوصول يجب أن يكون بين 1 و120 دقيقة': {
+    ar: 'وقت الوصول يجب أن يكون بين 1 و120 دقيقة.',
+    en: 'Arrival time must be between 1 and 120 minutes.',
+    ur: 'پہنچنے کا وقت 1 سے 120 منٹ کے درمیان ہونا چاہیے۔',
+  },
+  'تجاوزت الحد الأقصى للعروض': {
+    ar: 'تجاوزت الحد الأقصى للعروض.',
+    en: "You've hit the offers limit.",
+    ur: 'پیشکشوں کی حد مکمل ہو گئی۔',
+  },
+  'لديك عرض على هذا الطلب بالفعل': {
+    ar: 'لديك عرض على هذا الطلب بالفعل.',
+    en: 'You already have an offer on this request.',
+    ur: 'آپ کی اس درخواست پر پہلے سے ایک پیشکش موجود ہے۔',
+  },
+  'سبب الإلغاء مطلوب': {
+    ar: 'اكتب سبب الإلغاء.',
+    en: 'Please provide a cancellation reason.',
+    ur: 'منسوخی کی وجہ لکھیں۔',
+  },
+  'اشرح سبب النزاع (10 أحرف على الأقل)': {
+    ar: 'اشرح سبب النزاع (10 أحرف على الأقل).',
+    en: 'Please explain the dispute reason (at least 10 characters).',
+    ur: 'تنازع کی وجہ بیان کریں (کم از کم 10 حروف)۔',
+  },
 }
+
+/** Pattern-match rules for server messages that interpolate values
+ *  (numbers, usernames, etc.). Checked AFTER exact-match lookup in
+ *  SERVER_MSG_MAP misses — keeps simple cases fast while still
+ *  translating dynamic ones. */
+interface PatternRule {
+  pattern: RegExp
+  translate: (match: RegExpMatchArray, lang: Lang) => string
+}
+const PATTERN_RULES: PatternRule[] = [
+  // Account-age minimum for making a ride offer:
+  //   "حسابك يجب أن يكون عمره {N} أيام على الأقل"
+  {
+    pattern: /^حسابك يجب أن يكون عمره\s+(\d+)\s+أيام على الأقل\.?$/,
+    translate: (m, lang) => {
+      const n = m[1]
+      if (lang === 'en') return `Your account must be at least ${n} days old to do that.`
+      if (lang === 'ur') return `یہ کام کرنے کے لیے آپ کا اکاؤنٹ کم از کم ${n} دن پرانا ہونا چاہیے۔`
+      return `حسابك يجب أن يكون عمره ${n} أيام على الأقل.`
+    },
+  },
+]
 
 /**
  * One-shot: parse a failed response and show a localized toast.
