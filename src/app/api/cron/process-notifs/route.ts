@@ -160,9 +160,15 @@ async function sendFcmBatch(
         data: content.data,
         android: {
           priority: androidPriority,
-          notification: content.androidChannel
-            ? { channel_id: content.androidChannel, sound: 'default' }
-            : { sound: 'default' },
+          // Always target a named channel so the OS shows the banner.
+          // Without a channel_id, FCM posts to an auto-created hidden
+          // channel and many users see "notifications off" in their
+          // app settings. PushRegistration.tsx creates both channels
+          // at init.
+          notification: {
+            channel_id: content.androidChannel || 'hai_default',
+            sound: 'default',
+          },
         },
         apns: {
           headers: { 'apns-priority': apnsPriority },

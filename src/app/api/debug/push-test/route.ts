@@ -284,7 +284,10 @@ async function sendFcmTokens(
         token,
         notification: { title, body: text },
         data: { type: 'debug_test', ts: String(Date.now()) },
-        android: { priority: 'HIGH', notification: { sound: 'default' } },
+        android: {
+          priority: 'HIGH',
+          notification: { channel_id: 'hai_default', sound: 'default' },
+        },
       },
     }
     try {

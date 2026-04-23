@@ -54,11 +54,26 @@ export default function PushRegistration() {
         // Safe to call repeatedly — no-op if already present.
         if (platform === 'android') {
           try {
+            // Default channel — every non-emergency push targets this.
+            // Android 8+ requires an explicit channel; without one, FCM
+            // auto-creates a hidden "Misc" channel that users often see
+            // as "notifications aren't working" because it's buried in
+            // the app's Settings → Notifications list.
+            await PushNotifications.createChannel({
+              id: 'hai_default',
+              name: 'General Notifications',
+              description: 'Neighborhood activity, messages, rides',
+              importance: 4,         // HIGH — banner + sound by default
+              visibility: 1,
+              sound: 'default',
+              vibration: true,
+              lights: true,
+            })
             await PushNotifications.createChannel({
               id: 'emergency',
               name: 'Emergency Alerts',
               description: 'Urgent neighborhood alerts',
-              importance: 5,
+              importance: 5,         // MAX — full-screen capable
               visibility: 1,
               sound: 'default',
               vibration: true,
@@ -88,8 +103,11 @@ export default function PushRegistration() {
           console.error('[PUSH] registrationError:', err)
         })
 
-        // Foreground: log only — we don't want to double-notify on top of
-        // the native banner. Server already queued the push.
+        // Foreground: Android (and iOS by default) suppresses the system
+        // banner when the app is open. Surface the push as an in-app
+        // toast so the user actually sees it — without it, tapping the
+        // diagnostic "send test" button with the app foregrounded looks
+        // like nothing happened.
         await PushNotifications.addListener(
           'pushNotificationReceived',
           (notification) => {
@@ -97,6 +115,13 @@ export default function PushRegistration() {
               '[PUSH] foreground received:',
               notification?.data?.type,
             )
+            try {
+              const { default: toast } = require('react-hot-toast') as typeof import('react-hot-toast')
+              const title = notification?.title || (notification?.data as any)?.title
+              const body = notification?.body || (notification?.data as any)?.body
+              const text = [title, body].filter(Boolean).join(' — ')
+              if (text) toast(text, { duration: 5000, icon: '🔔' })
+            } catch { /* toast not available yet — ignore */ }
           },
         )
 
