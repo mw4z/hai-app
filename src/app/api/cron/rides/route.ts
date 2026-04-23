@@ -20,8 +20,11 @@ const CRON_SECRET = process.env.CRON_SECRET || 'hai-cron-dev-key'
  * 7. OPEN expiry (2hr immediate / scheduledAt+15min scheduled)
  */
 export async function GET(req: NextRequest) {
+  // Vercel Cron sends this header; accept it as auth so the scheduled
+  // job runs without having to leak CRON_SECRET into vercel.json.
+  const isVercelCron = req.headers.get('x-vercel-cron') != null
   const { searchParams } = new URL(req.url)
-  if (searchParams.get('key') !== CRON_SECRET) {
+  if (!isVercelCron && searchParams.get('key') !== CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

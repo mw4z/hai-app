@@ -4,11 +4,20 @@ import { shouldArchivePost } from '@/lib/postExpiry'
 import { del } from '@vercel/blob'
 
 /**
- * POST /api/cron/archive-posts
  * Archives expired posts. Run periodically (e.g. every hour).
  * Deletes images from Blob storage if no one bookmarked the post.
+ *
+ * Exposes both GET and POST so Vercel Cron (which calls with GET) can
+ * trigger it alongside manual invocations.
  */
+export async function GET() {
+  return runArchive()
+}
 export async function POST() {
+  return runArchive()
+}
+
+async function runArchive() {
   try {
     // Get all active posts with their comment counts and bookmark/image info
     const posts = await db.post.findMany({
