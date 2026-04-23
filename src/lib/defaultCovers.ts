@@ -80,7 +80,7 @@ export const DEFAULT_COVERS: CoverOption[] = [
     id: 'aurora',
     nameAr: 'فجر',
     nameEn: 'Aurora',
-    css: `${dots}, linear-gradient(135deg, #25d366 0%, #2dd4bf 30%, #818cf8 70%, #c084fc 100%)`,
+    css: `${dots}, linear-gradient(135deg, #00a884 0%, #2dd4bf 30%, #818cf8 70%, #c084fc 100%)`,
   },
   {
     id: 'purple',

@@ -4,6 +4,6 @@
          --hai-primary-* in src/app/design-tokens.css). -->
     <color name="colorPrimary">#00a884</color>
     <color name="colorPrimaryDark">#006d57</color>
-    <color name="colorAccent">#25d366</color>
+    <color name="colorAccent">#00a884</color>
     <color name="splash_bg">#e0f7f2</color>
 </resources>

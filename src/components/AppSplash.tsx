@@ -269,7 +269,7 @@ export default function AppSplash() {
           animation: _ln 2s ease-in-out infinite;
           will-change: opacity;
         }
-        :global(.dark) ._sp-ln { stroke: #25d366; }
+        :global(.dark) ._sp-ln { stroke: #00a884; }
 
         @keyframes _ln {
           0%, 100% { opacity: 0; }
@@ -294,7 +294,7 @@ export default function AppSplash() {
           animation-delay: var(--d);
           will-change: opacity, transform;
         }
-        :global(.dark) ._sp-dot { background: #25d366; }
+        :global(.dark) ._sp-dot { background: #00a884; }
 
         @keyframes _dot {
           0%, 100% {
@@ -345,7 +345,7 @@ export default function AppSplash() {
           color: #006d57;
           line-height: 1.6;
         }
-        :global(.dark) ._sp-ar { color: #66d5b6; }
+        :global(.dark) ._sp-ar { color: #00a884; }
 
         ._sp-en {
           font-size: 10px;
@@ -378,7 +378,7 @@ export default function AppSplash() {
           animation: _wave 1s ease-in-out infinite;
           will-change: transform, opacity;
         }
-        :global(.dark) ._sp-ld i { background: #25d366; }
+        :global(.dark) ._sp-ld i { background: #00a884; }
 
         @keyframes _wave {
           0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }

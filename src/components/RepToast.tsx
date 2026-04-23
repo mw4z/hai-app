@@ -106,7 +106,7 @@ export default function RepToast() {
       <span style={{ fontSize: '28px' }}>🏆</span>
       <div>
         <div style={{ color: '#ffffff', fontSize: '14px', fontWeight: 600, lineHeight: 1.4 }}>{popup.text}</div>
-        <div style={{ color: '#66d5b6', fontSize: '13px', fontWeight: 700, marginTop: '4px' }}>
+        <div style={{ color: '#00a884', fontSize: '13px', fontWeight: 700, marginTop: '4px' }}>
           +{popup.diff} {lang !== 'en' ? 'نقطة' : 'pts'}
         </div>
       </div>

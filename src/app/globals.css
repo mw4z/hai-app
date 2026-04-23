@@ -79,8 +79,8 @@ input, textarea, [contenteditable="true"] {
 .dark .bg-primary-600, .dark .bg-primary-500  { background-color: #00a884 !important; }
 .dark .bg-primary-50                          { background-color: rgba(0,168,132,.14) !important; }
 .dark .border-primary-200                     { border-color: rgba(0,168,132,.30) !important; }
-.dark .text-primary-800                       { color: #25d366 !important; }
-.dark .text-primary-600                       { color: #25d366 !important; }
+.dark .text-primary-800                       { color: #00a884 !important; }
+.dark .text-primary-600                       { color: #00a884 !important; }
 .dark .bg-red-50                              { background-color: rgba(220,38,38,.10) !important; }
 .dark .border-red-100                         { border-color: rgba(220,38,38,.22) !important; }
 .dark .text-red-600                           { color: #f87171 !important; }
@@ -172,7 +172,7 @@ input, textarea, [contenteditable="true"] {
   box-shadow: 0 0 15px rgba(0, 168, 132, 0.25), 0 0 40px rgba(0, 168, 132, 0.1);
 }
 .dark .glow-primary {
-  box-shadow: 0 0 20px rgba(37, 211, 102, 0.2), 0 0 50px rgba(37, 211, 102, 0.08);
+  box-shadow: 0 0 20px rgba(0, 168, 132, 0.2), 0 0 50px rgba(0, 168, 132, 0.08);
 }
 
 /* Post-card hover glow intentionally disabled — user feedback was that
@@ -228,7 +228,7 @@ input, textarea, [contenteditable="true"] {
   filter: drop-shadow(0 1px 4px rgba(0, 168, 132, 0.3));
 }
 .dark .glow-tab {
-  filter: drop-shadow(0 1px 5px rgba(37, 211, 102, 0.25));
+  filter: drop-shadow(0 1px 5px rgba(0, 168, 132, 0.25));
 }
 
 /* Soft ambient glow for avatars */
@@ -236,7 +236,7 @@ input, textarea, [contenteditable="true"] {
   box-shadow: 0 0 12px rgba(0, 168, 132, 0.15);
 }
 .dark .glow-avatar {
-  box-shadow: 0 0 15px rgba(37, 211, 102, 0.1);
+  box-shadow: 0 0 15px rgba(0, 168, 132, 0.1);
 }
 
 /* Pulse glow animation */

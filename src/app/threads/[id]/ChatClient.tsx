@@ -713,10 +713,10 @@ export default function ChatClient({
         <button onClick={() => setShowWallpaperPicker(true)}
           className="p-2 rounded-full hover:bg-white/10 transition-colors active:scale-90">
           <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="#25d366" strokeWidth="1.5" opacity="0.7" />
-            <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="#25d366" strokeWidth="1.5" opacity="0.5" />
-            <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="#25d366" strokeWidth="1.5" opacity="0.5" />
-            <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="#25d366" strokeWidth="1.5" opacity="0.3" />
+            <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="#00a884" strokeWidth="1.5" opacity="0.7" />
+            <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="#00a884" strokeWidth="1.5" opacity="0.5" />
+            <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="#00a884" strokeWidth="1.5" opacity="0.5" />
+            <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="#00a884" strokeWidth="1.5" opacity="0.3" />
           </svg>
         </button>
         {!closed && (

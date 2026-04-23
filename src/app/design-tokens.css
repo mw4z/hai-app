@@ -38,16 +38,17 @@
      Primitive scales; no semantic meaning here.
      ═══════════════════════════════════════════════════════════════════ */
 
-  /* ── Color ramps — WhatsApp-teal brand family ────────────────────
-     Unified on #00a884 as the brand default so every "green" surface
-     (buttons, active states, pills, rings, tints, dots, hover tints,
-     glows) is the same hue across light and dark modes. */
+  /* ── Color ramps — ONE brand green across the whole ramp ────────
+     Collapsed 300/400/500 to the same #00a884 so no "brighter
+     accent" ever renders as the dirty #4ec06d mid-tone under
+     partial opacity. Hover darkens to 600; light bg tints still
+     fade through 50/100/200. */
   --hai-primary-50:  #e0f7f2;
   --hai-primary-100: #b3ebdc;
   --hai-primary-200: #80dec4;
-  --hai-primary-400: #25d366;   /* classic WhatsApp brighter accent */
+  --hai-primary-400: #00a884;   /* collapsed — was #00a884 */
   --hai-primary-500: #00a884;   /* brand default — THE green */
-  --hai-primary-600: #008f72;   /* hover / pressed */
+  --hai-primary-600: #008f72;   /* hover / pressed (darker) */
   --hai-primary-700: #006d57;   /* text on primary-tint bg */
   --hai-primary-900: #004d3e;
 
@@ -397,13 +398,15 @@
   --hai-text-muted:  #8696a0;   /* WhatsApp secondary text */
   --hai-text-faint:  #667781;   /* timestamps / placeholders */
 
-  /* Brand accent — WhatsApp's outgoing-bubble teal-green, tuned
-     so it still reads as the Hai brand colour family (green). */
-  --hai-primary-500: #00a884;   /* WhatsApp teal-green */
+  /* Brand accent — ONE teal, same as light mode, no brighter variant
+     (collapsed — the WhatsApp-bright accent used to render as #4ec06d
+     under dark-surface opacity and broke the unified look). */
+  --hai-primary-400: #00a884;
+  --hai-primary-500: #00a884;   /* brand default */
   --hai-primary-600: #008f72;   /* pressed darker */
-  --hai-primary-700: #25d366;   /* classic WhatsApp brighter accent */
+  --hai-primary-700: #006d57;   /* text on tint — match light */
 
-  --hai-primary-hover:   #1daa90;               /* subtle brighten on hover */
+  --hai-primary-hover:   var(--hai-primary-600);    /* darken on hover */
   --hai-primary-pressed: var(--hai-primary-600);
   --hai-primary-ring:    rgba(0, 168, 132, 0.35);
   --hai-primary-tint:    rgba(0, 168, 132, 0.14);
@@ -415,7 +418,7 @@
   --hai-warning-tint:  rgba(251, 191, 36, 0.12);
   --hai-warning-border:rgba(251, 191, 36, 0.30);
   --hai-warning-text:  #fcd34d;
-  --hai-success-text:  #25d366;
+  --hai-success-text:  #00a884;
 
   /* Shadows — plain black at moderate opacity so cards separate
      from the #0b141a page without looking inset. */
@@ -442,7 +445,7 @@
   --hai-category-LOST_FOUND-bg:         rgba(168, 85, 247, 0.12);
   --hai-category-LOST_FOUND-fg:         #d8b4fe;
   --hai-category-MOSQUE-bg:             rgba(0, 168, 132, 0.14);
-  --hai-category-MOSQUE-fg:             #25d366;
+  --hai-category-MOSQUE-fg:             #00a884;
   --hai-category-EID_RAMADAN-bg:        rgba(234, 179, 8, 0.12);
   --hai-category-EID_RAMADAN-fg:        #fde68a;
   --hai-category-CONTESTS-bg:           rgba(217, 70, 239, 0.12);
@@ -459,7 +462,7 @@
   --hai-state-verified-fg:      #93c5fd;
   --hai-state-verified-border:  rgba(96, 165, 250, 0.28);
   --hai-state-provider-bg:      rgba(0, 168, 132, 0.14);
-  --hai-state-provider-fg:      #25d366;
+  --hai-state-provider-fg:      #00a884;
   --hai-state-provider-border:  rgba(0, 168, 132, 0.32);
   --hai-state-mod-bg:           rgba(251, 191, 36, 0.12);
   --hai-state-mod-fg:           #fcd34d;
@@ -473,7 +476,7 @@
   --hai-state-tier-active-bg:           rgba(96, 165, 250, 0.12);
   --hai-state-tier-active-fg:           #93c5fd;
   --hai-state-tier-trusted-bg:          rgba(0, 168, 132, 0.16);
-  --hai-state-tier-trusted-fg:          #25d366;
+  --hai-state-tier-trusted-fg:          #00a884;
   --hai-state-tier-distinguished-bg:    rgba(251, 191, 36, 0.12);
   --hai-state-tier-distinguished-fg:    #fcd34d;
 
@@ -482,7 +485,7 @@
   --hai-state-featured-border:  rgba(251, 191, 36, 0.35);
   --hai-state-featured-ring:    rgba(251, 191, 36, 0.35);
   --hai-state-pinned-bg:        rgba(0, 168, 132, 0.16);
-  --hai-state-pinned-fg:        #25d366;
+  --hai-state-pinned-fg:        #00a884;
   --hai-state-pinned-border:    rgba(0, 168, 132, 0.32);
   --hai-state-boosted-bg:       rgba(192, 132, 252, 0.12);
   --hai-state-boosted-fg:       #d8b4fe;
@@ -508,7 +511,7 @@
   --hai-state-locked-border:    rgba(255, 255, 255, 0.12);
 
   --hai-state-open-bg:          rgba(0, 168, 132, 0.16);
-  --hai-state-open-fg:          #25d366;
+  --hai-state-open-fg:          #00a884;
   --hai-state-open-border:      rgba(0, 168, 132, 0.32);
   --hai-state-inprogress-bg:    rgba(125, 211, 252, 0.12);
   --hai-state-inprogress-fg:    #7dd3fc;
@@ -526,13 +529,13 @@
   --hai-state-arrived-fg:       #d8b4fe;
   --hai-state-arrived-border:   rgba(216, 180, 254, 0.30);
   --hai-state-resolved-bg:      rgba(0, 168, 132, 0.16);
-  --hai-state-resolved-fg:      #25d366;
+  --hai-state-resolved-fg:      #00a884;
   --hai-state-resolved-border:  rgba(0, 168, 132, 0.32);
   --hai-state-closed-bg:        rgba(255, 255, 255, 0.05);
   --hai-state-closed-fg:        #94a3b8;
   --hai-state-closed-border:    rgba(255, 255, 255, 0.10);
   --hai-state-sold-bg:          rgba(0, 168, 132, 0.16);
-  --hai-state-sold-fg:          #25d366;
+  --hai-state-sold-fg:          #00a884;
   --hai-state-sold-border:      rgba(0, 168, 132, 0.32);
   --hai-state-expired-bg:       rgba(255, 255, 255, 0.05);
   --hai-state-expired-fg:       #94a3b8;

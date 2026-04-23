@@ -17,11 +17,11 @@ module.exports = {
           50:  '#e0f7f2',
           100: '#b3ebdc',
           200: '#80dec4',
-          300: '#66d5b6',
-          400: '#25d366',   // classic WhatsApp brighter accent
-          500: '#00a884',   // brand default — THE green
-          600: '#008f72',   // hover / pressed
-          700: '#006d57',   // text on tint
+          300: '#00a884',   // collapsed — brand green only
+          400: '#00a884',
+          500: '#00a884',   // THE green — single hue
+          600: '#008f72',   // hover / pressed (darker)
+          700: '#006d57',
           800: '#005745',
           900: '#004d3e',
         },
