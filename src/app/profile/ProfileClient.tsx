@@ -1963,43 +1963,151 @@ function PushTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
     detail?: string
   }>(null)
 
-  /** On native, force PushNotifications to request permission + register.
-   *  Waits for the 'registration' event, then POSTs the token to the
-   *  server. Returns true if the round-trip succeeded. No-ops on web. */
-  async function tryForceRegister(): Promise<boolean> {
+  /** On native, force PushNotifications to request permission + register,
+   *  wait for the 'registration' event, then POST the token to the server.
+   *  Returns a rich status object so the UI can tell the user exactly
+   *  which step failed instead of a silent "no". */
+  type ForceRegResult =
+    | { ok: true }
+    | { ok: false; reason:
+        | 'not_native'
+        | 'plugin_import_failed'
+        | 'permission_denied'
+        | 'permission_prompt_failed'
+        | 'register_timeout'
+        | 'register_error'
+        | 'server_error'
+      detail?: string }
+
+  async function tryForceRegister(): Promise<ForceRegResult> {
+    const w = window as any
+    if (!w?.Capacitor?.isNativePlatform?.()) {
+      return { ok: false, reason: 'not_native' }
+    }
+
+    let PushNotifications: any
     try {
-      const w = window as any
-      if (!w?.Capacitor?.isNativePlatform?.()) return false
-      const { PushNotifications } = await import('@capacitor/push-notifications')
-      const platform = w.Capacitor?.getPlatform?.() || 'android'
+      const mod = await import('@capacitor/push-notifications')
+      PushNotifications = mod.PushNotifications
+    } catch (err: any) {
+      return { ok: false, reason: 'plugin_import_failed', detail: err?.message || String(err) }
+    }
+    const platform = w.Capacitor?.getPlatform?.() || 'android'
 
-      const perm = await PushNotifications.requestPermissions()
-      if (perm.receive !== 'granted') return false
+    let perm: any
+    try {
+      perm = await PushNotifications.requestPermissions()
+    } catch (err: any) {
+      return { ok: false, reason: 'permission_prompt_failed', detail: err?.message || String(err) }
+    }
+    if (perm?.receive !== 'granted') {
+      return { ok: false, reason: 'permission_denied', detail: `receive=${perm?.receive}` }
+    }
 
-      const tokenPromise = new Promise<string | null>((resolve) => {
-        const timer = setTimeout(() => resolve(null), 8000)
-        PushNotifications.addListener('registration', (t: any) => {
-          clearTimeout(timer)
-          resolve(t?.value || null)
-        })
-        PushNotifications.addListener('registrationError', () => {
-          clearTimeout(timer)
-          resolve(null)
-        })
+    // Listeners must be attached BEFORE register() fires. addListener
+    // returns a promise in Capacitor 8 — await it so the handler is
+    // wired when the native side posts back.
+    let regErrorDetail: string | undefined
+    const tokenPromise = new Promise<string | null>(async (resolve) => {
+      const timer = setTimeout(() => resolve(null), 10_000)
+      await PushNotifications.addListener('registration', (t: any) => {
+        clearTimeout(timer)
+        resolve(t?.value || null)
       })
-      await PushNotifications.register()
-      const token = await tokenPromise
-      if (!token) return false
+      await PushNotifications.addListener('registrationError', (err: any) => {
+        clearTimeout(timer)
+        regErrorDetail = err?.error || err?.message || JSON.stringify(err || {}).slice(0, 200)
+        resolve(null)
+      })
+    })
 
+    try {
+      await PushNotifications.register()
+    } catch (err: any) {
+      return { ok: false, reason: 'register_error', detail: err?.message || String(err) }
+    }
+
+    const token = await tokenPromise
+    if (!token) {
+      return {
+        ok: false,
+        reason: regErrorDetail ? 'register_error' : 'register_timeout',
+        detail: regErrorDetail,
+      }
+    }
+
+    try {
       const res = await fetch('/api/devices/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, platform }),
         credentials: 'include',
       })
-      return res.ok
-    } catch {
-      return false
+      if (!res.ok) {
+        const body = await res.text().catch(() => '')
+        return { ok: false, reason: 'server_error', detail: `HTTP ${res.status} ${body.slice(0, 160)}` }
+      }
+      return { ok: true }
+    } catch (err: any) {
+      return { ok: false, reason: 'server_error', detail: err?.message || String(err) }
+    }
+  }
+
+  function forceRegReasonLabel(reason: string, detail?: string): { summary: string; detail?: string } {
+    const d = detail ? ` (${detail})` : ''
+    const pairs: Record<string, { ar: string; en: string; ur: string; hintAr?: string; hintEn?: string; hintUr?: string }> = {
+      not_native: {
+        ar: 'هذا المتصفح ليس تطبيقاً أصلياً.',
+        en: 'Running in a browser — push requires the native app.',
+        ur: 'براؤزر میں ہے — پش کے لیے نیٹو ایپ چاہیے۔',
+      },
+      plugin_import_failed: {
+        ar: 'فشل تحميل إضافة الإشعارات.',
+        en: 'Push plugin failed to load.',
+        ur: 'پش پلگ ان لوڈ نہیں ہو سکا۔',
+      },
+      permission_denied: {
+        ar: 'لم يتم السماح بالإشعارات.',
+        en: 'Notification permission is denied.',
+        ur: 'نوٹیفیکیشن کی اجازت نہیں دی گئی۔',
+        hintAr: 'افتح إعدادات الجهاز → التطبيقات → حي → الإشعارات وفعّلها.',
+        hintEn: 'Open device Settings → Apps → Hai → Notifications and enable them.',
+        hintUr: 'سیٹنگز → ایپس → Hai → نوٹیفیکیشنز کھولیں اور فعال کریں۔',
+      },
+      permission_prompt_failed: {
+        ar: 'تعذر طلب الإذن من نظام الجهاز.',
+        en: 'Could not prompt the OS for permission.',
+        ur: 'نظام سے اجازت طلب نہیں ہو سکی۔',
+      },
+      register_timeout: {
+        ar: 'انتظار التسجيل مع FCM/APNs انتهى بدون رد.',
+        en: 'FCM/APNs registration timed out (10s).',
+        ur: 'FCM/APNs رجسٹریشن ٹائم آؤٹ ہو گئی۔',
+        hintAr: 'iOS: تأكد من تفعيل قدرة Push على معرّف التطبيق ورفع مفتاح APNs في Firebase.',
+        hintEn: 'iOS: enable Push Notifications capability on the App ID and upload the APNs key to Firebase.',
+        hintUr: 'iOS: ایپ ID پر پش اہلیت فعال کریں اور APNs کلید Firebase میں اپ لوڈ کریں۔',
+      },
+      register_error: {
+        ar: 'FCM/APNs رفض التسجيل.',
+        en: 'FCM/APNs rejected registration.',
+        ur: 'FCM/APNs نے رجسٹریشن مسترد کر دی۔',
+      },
+      server_error: {
+        ar: 'فشل حفظ الرمز على الخادم.',
+        en: 'Server refused to save the token.',
+        ur: 'سرور نے ٹوکن محفوظ کرنے سے انکار کیا۔',
+      },
+    }
+    const entry = pairs[reason] || {
+      ar: 'سبب غير معروف.',
+      en: 'Unknown reason.',
+      ur: 'نامعلوم وجہ۔',
+    }
+    const summaryKey = lang === 'en' ? 'en' : lang === 'ur' ? 'ur' : 'ar'
+    const hintKey = lang === 'en' ? 'hintEn' : lang === 'ur' ? 'hintUr' : 'hintAr'
+    return {
+      summary: entry[summaryKey] + d,
+      detail: (entry as any)[hintKey],
     }
   }
 
@@ -2034,9 +2142,10 @@ function PushTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
       }
       if (tokens === 0) {
         // Try forcing a fresh registration right here instead of asking the
-        // user to reinstall. Works on native; no-ops on web.
+        // user to reinstall. Works on native; no-ops on web. Surface the
+        // specific failure reason if it doesn't succeed so we can act on it.
         const forced = await tryForceRegister()
-        if (forced) {
+        if (forced.ok) {
           setResult({
             ok: true,
             summary: lang === 'en'
@@ -2047,18 +2156,8 @@ function PushTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
           })
           return
         }
-        setResult({
-          ok: false,
-          summary: lang === 'en'
-            ? 'No device tokens registered for this account.'
-            : lang === 'ur' ? 'اس اکاؤنٹ کے لیے کوئی ڈیوائس ٹوکن رجسٹرڈ نہیں۔'
-            : 'لا توجد أجهزة مسجّلة لهذا الحساب.',
-          detail: lang === 'en'
-            ? 'Make sure notifications permission is granted in iOS / Android Settings, then reopen the app.'
-            : lang === 'ur'
-              ? 'iOS / Android کی ترتیبات میں نوٹیفیکیشنز کی اجازت دیں اور ایپ دوبارہ کھولیں۔'
-              : 'تأكد من السماح بالإشعارات من إعدادات الجهاز ثم أعد فتح التطبيق.',
-        })
+        const msg = forceRegReasonLabel(forced.reason, forced.detail)
+        setResult({ ok: false, summary: msg.summary, detail: msg.detail })
         return
       }
 
