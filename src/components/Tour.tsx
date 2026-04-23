@@ -635,7 +635,7 @@ function TourOverlay({ step, stepIndex, totalSteps }: { step: TourStep; stepInde
       {/* Highlight border glow */}
       <div
         className="fixed rounded-xl border-2 border-primary-400 animate-pulse pointer-events-none"
-        style={{ ...highlightStyle, zIndex: 10001, boxShadow: '0 0 0 4px rgba(22,163,74,0.3), 0 0 20px rgba(22,163,74,0.2)' }}
+        style={{ ...highlightStyle, zIndex: 10001, boxShadow: '0 0 0 4px rgba(0,168,132,0.3), 0 0 20px rgba(0,168,132,0.2)' }}
       />
 
       {/* Tooltip */}

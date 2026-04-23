@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       text: `تذكرة دعم جديدة\n\nالمستخدم: ${user?.name || 'غير معروف'}\nالنوع: ${typeNameAr}\nالموضوع: ${subject.trim()}\n\n${ticketBody.trim()}\n\n---\nرقم التذكرة: ${ticket.id}`,
       html: `
         <div dir="rtl" style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background: #15803d; color: white; padding: 16px 24px; border-radius: 12px 12px 0 0; text-align: center;">
+          <div style="background: #006d57; color: white; padding: 16px 24px; border-radius: 12px 12px 0 0; text-align: center;">
             <h2 style="margin: 0;">${typeLabel} تذكرة دعم جديدة</h2>
           </div>
           <div style="background: #f9fafb; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">

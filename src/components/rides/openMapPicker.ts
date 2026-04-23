@@ -51,7 +51,7 @@ export function openMapPicker(options: {
     addressText.textContent = lang === 'en' ? 'Tap the map to select a location' : lang === 'ur' ? 'مقام منتخب کرنے کیلئے نقشے پر ٹیپ کریں' : 'انقر على الخريطة لاختيار الموقع'
     const confirmBtn = document.createElement('button')
     confirmBtn.textContent = lang !== 'en' ? '✓ تأكيد الموقع' : '✓ Confirm Location'
-    confirmBtn.style.cssText = 'width:100%;padding:14px;border-radius:12px;background:#16a34a;color:white;font-weight:700;font-size:14px;border:none;cursor:pointer;'
+    confirmBtn.style.cssText = 'width:100%;padding:14px;border-radius:12px;background:#00a884;color:white;font-weight:700;font-size:14px;border:none;cursor:pointer;'
     confirmBtn.disabled = true
     confirmBtn.style.opacity = '0.4'
     bottomCard.appendChild(addressText)

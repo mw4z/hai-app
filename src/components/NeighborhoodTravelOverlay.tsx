@@ -85,7 +85,7 @@ export default function NeighborhoodTravelOverlay() {
         className="absolute inset-0 dark:hidden"
         style={{
           background:
-            'linear-gradient(180deg, #ffffff 0%, #f0fdf4 60%, #dcfce7 100%)',
+            'linear-gradient(180deg, #ffffff 0%, #e0f7f2 60%, #b3ebdc 100%)',
         }}
       />
       <div
@@ -120,9 +120,9 @@ export default function NeighborhoodTravelOverlay() {
           >
             <defs>
               <linearGradient id="haiTrailGrad" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#16a34a" stopOpacity="0.35" />
-                <stop offset="50%" stopColor="#16a34a" stopOpacity="0.95" />
-                <stop offset="100%" stopColor="#16a34a" stopOpacity="0.35" />
+                <stop offset="0%" stopColor="#00a884" stopOpacity="0.35" />
+                <stop offset="50%" stopColor="#00a884" stopOpacity="0.95" />
+                <stop offset="100%" stopColor="#00a884" stopOpacity="0.35" />
               </linearGradient>
             </defs>
             <path
@@ -159,7 +159,7 @@ export default function NeighborhoodTravelOverlay() {
             className={`absolute w-14 h-14 ${isRTL ? 'hai-arc-pin-rtl' : 'hai-arc-pin-ltr'}`}
             style={{ bottom: 0, left: 0, willChange: 'transform' }}
           >
-            <div className="relative w-14 h-14 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 shadow-[0_10px_28px_rgba(22,163,74,0.5)] flex items-center justify-center">
+            <div className="relative w-14 h-14 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 shadow-[0_10px_28px_rgba(0,168,132,0.5)] flex items-center justify-center">
               <FiNavigation className="w-6 h-6 text-white" />
             </div>
           </div>

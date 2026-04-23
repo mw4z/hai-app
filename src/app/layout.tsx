@@ -45,7 +45,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: 'cover',
-  themeColor: '#15803d',
+  themeColor: '#006d57',
 }
 
 export default function RootLayout({
@@ -92,7 +92,7 @@ export default function RootLayout({
             animated AppSplash is the only visible intro. */}
         <div id="__hai_preload" style={{
           position: 'fixed', inset: 0, zIndex: 99999,
-          background: 'radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #f0fdf4 40%, #fff 100%)',
+          background: 'radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #e0f7f2 40%, #fff 100%)',
         }} />
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){

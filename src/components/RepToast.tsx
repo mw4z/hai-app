@@ -90,8 +90,8 @@ export default function RepToast() {
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 99999,
-        background: 'linear-gradient(135deg, #166534 0%, #15803d 100%)',
-        border: '1px solid #22c55e',
+        background: 'linear-gradient(135deg, #005745 0%, #006d57 100%)',
+        border: '1px solid #00a884',
         borderRadius: '16px',
         padding: '14px 20px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
@@ -106,7 +106,7 @@ export default function RepToast() {
       <span style={{ fontSize: '28px' }}>🏆</span>
       <div>
         <div style={{ color: '#ffffff', fontSize: '14px', fontWeight: 600, lineHeight: 1.4 }}>{popup.text}</div>
-        <div style={{ color: '#86efac', fontSize: '13px', fontWeight: 700, marginTop: '4px' }}>
+        <div style={{ color: '#66d5b6', fontSize: '13px', fontWeight: 700, marginTop: '4px' }}>
           +{popup.diff} {lang !== 'en' ? 'نقطة' : 'pts'}
         </div>
       </div>

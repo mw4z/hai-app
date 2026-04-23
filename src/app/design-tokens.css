@@ -38,15 +38,18 @@
      Primitive scales; no semantic meaning here.
      ═══════════════════════════════════════════════════════════════════ */
 
-  /* ── Color ramps ───────────────────────────────────────────────── */
-  --hai-primary-50:  #ecfdf5;
-  --hai-primary-100: #d1fae5;
-  --hai-primary-200: #a7f3d0;
-  --hai-primary-400: #4ade80;
-  --hai-primary-500: #22c55e;
-  --hai-primary-600: #16a34a;
-  --hai-primary-700: #15803d;
-  --hai-primary-900: #14532d;
+  /* ── Color ramps — WhatsApp-teal brand family ────────────────────
+     Unified on #00a884 as the brand default so every "green" surface
+     (buttons, active states, pills, rings, tints, dots, hover tints,
+     glows) is the same hue across light and dark modes. */
+  --hai-primary-50:  #e0f7f2;
+  --hai-primary-100: #b3ebdc;
+  --hai-primary-200: #80dec4;
+  --hai-primary-400: #25d366;   /* classic WhatsApp brighter accent */
+  --hai-primary-500: #00a884;   /* brand default — THE green */
+  --hai-primary-600: #008f72;   /* hover / pressed */
+  --hai-primary-700: #006d57;   /* text on primary-tint bg */
+  --hai-primary-900: #004d3e;
 
   /* ── Spacing — 8pt base grid ───────────────────────────────────── */
   --hai-space-1:  4px;   /* 0.5× */
@@ -158,8 +161,8 @@
   /* ── Brand interaction state ───────────────────────────────────── */
   --hai-primary-hover:   var(--hai-primary-600);
   --hai-primary-pressed: var(--hai-primary-700);
-  --hai-primary-ring:    rgba(34, 197, 94, 0.25);
-  --hai-primary-tint:    rgba(34, 197, 94, 0.08);
+  --hai-primary-ring:    rgba(0, 168, 132, 0.28);
+  --hai-primary-tint:    rgba(0, 168, 132, 0.10);
 
   /* ── Surface & text ────────────────────────────────────────────── */
   --hai-bg:          #ffffff;
@@ -185,13 +188,13 @@
   --hai-warning-border: rgba(245, 158, 11, 0.35);
   --hai-warning-text:   #92400e;
   --hai-info:           #3b82f6;
-  --hai-success-text:   #15803d;
+  --hai-success-text:   #006d57;
 
   /* ── Shadows — subtle only; WebView paint cost matters ─────────── */
   --hai-shadow-sm:  0 1px 2px rgba(15, 23, 42, 0.04);
   --hai-shadow-md:  0 2px 8px rgba(15, 23, 42, 0.06);
   --hai-shadow-lg:  0 6px 20px rgba(15, 23, 42, 0.08);
-  --hai-shadow-fab: 0 6px 18px rgba(22, 163, 74, 0.30), 0 2px 4px rgba(0, 0, 0, 0.12);
+  --hai-shadow-fab: 0 6px 18px rgba(0, 168, 132, 0.32), 0 2px 4px rgba(0, 0, 0, 0.12);
 
   /* ── Layout ────────────────────────────────────────────────────── */
   --hai-tap-min:       44px;   /* iOS HIG minimum tap target */
@@ -223,8 +226,8 @@
   --hai-category-SERVICES-fg:           #2563eb;
   --hai-category-LOST_FOUND-bg:         #faf5ff;
   --hai-category-LOST_FOUND-fg:         #9333ea;
-  --hai-category-MOSQUE-bg:             #f0fdf4;
-  --hai-category-MOSQUE-fg:             #15803d;
+  --hai-category-MOSQUE-bg:             #e0f7f2;
+  --hai-category-MOSQUE-fg:             #006d57;
   --hai-category-EID_RAMADAN-bg:        #fefce8;
   --hai-category-EID_RAMADAN-fg:        #a16207;
   --hai-category-CONTESTS-bg:           #fdf4ff;
@@ -256,9 +259,9 @@
   --hai-state-verified-bg:      rgba(59, 130, 246, 0.08);
   --hai-state-verified-fg:      #2563eb;
   --hai-state-verified-border:  rgba(59, 130, 246, 0.28);
-  --hai-state-provider-bg:      rgba(22, 163, 74, 0.08);
+  --hai-state-provider-bg:      rgba(0, 168, 132, 0.10);
   --hai-state-provider-fg:      var(--hai-primary-700);
-  --hai-state-provider-border:  rgba(22, 163, 74, 0.28);
+  --hai-state-provider-border:  rgba(0, 168, 132, 0.28);
   --hai-state-mod-bg:           rgba(245, 158, 11, 0.10);
   --hai-state-mod-fg:           #b45309;
   --hai-state-mod-border:       rgba(245, 158, 11, 0.30);
@@ -271,8 +274,8 @@
   --hai-state-tier-new-fg:              #6b7280;
   --hai-state-tier-active-bg:           #eff6ff;
   --hai-state-tier-active-fg:           #2563eb;
-  --hai-state-tier-trusted-bg:          #ecfdf5;
-  --hai-state-tier-trusted-fg:          #15803d;
+  --hai-state-tier-trusted-bg:          #e0f7f2;
+  --hai-state-tier-trusted-fg:          #006d57;
   --hai-state-tier-distinguished-bg:    #fffbeb;
   --hai-state-tier-distinguished-fg:    #b45309;
 
@@ -281,9 +284,9 @@
   --hai-state-featured-fg:      #b45309;
   --hai-state-featured-border:  rgba(245, 158, 11, 0.35);
   --hai-state-featured-ring:    rgba(245, 158, 11, 0.35);
-  --hai-state-pinned-bg:        rgba(22, 163, 74, 0.08);
+  --hai-state-pinned-bg:        rgba(0, 168, 132, 0.10);
   --hai-state-pinned-fg:        var(--hai-primary-700);
-  --hai-state-pinned-border:    rgba(22, 163, 74, 0.28);
+  --hai-state-pinned-border:    rgba(0, 168, 132, 0.28);
   --hai-state-boosted-bg:       rgba(168, 85, 247, 0.10);
   --hai-state-boosted-fg:       #7e22ce;
   --hai-state-boosted-border:   rgba(168, 85, 247, 0.30);
@@ -309,9 +312,9 @@
   --hai-state-locked-border:    rgba(107, 114, 128, 0.30);
 
   /* ── Listing / request status ──────────────────────────────────── */
-  --hai-state-open-bg:          rgba(22, 163, 74, 0.10);
+  --hai-state-open-bg:          rgba(0, 168, 132, 0.12);
   --hai-state-open-fg:          var(--hai-primary-700);
-  --hai-state-open-border:      rgba(22, 163, 74, 0.28);
+  --hai-state-open-border:      rgba(0, 168, 132, 0.28);
   --hai-state-inprogress-bg:    rgba(14, 165, 233, 0.10);
   --hai-state-inprogress-fg:    #0369a1;
   --hai-state-inprogress-border:rgba(14, 165, 233, 0.28);
@@ -327,15 +330,15 @@
   --hai-state-arrived-bg:       rgba(168, 85, 247, 0.10);
   --hai-state-arrived-fg:       #7e22ce;
   --hai-state-arrived-border:   rgba(168, 85, 247, 0.28);
-  --hai-state-resolved-bg:      rgba(22, 163, 74, 0.10);
+  --hai-state-resolved-bg:      rgba(0, 168, 132, 0.12);
   --hai-state-resolved-fg:      var(--hai-primary-700);
-  --hai-state-resolved-border:  rgba(22, 163, 74, 0.28);
+  --hai-state-resolved-border:  rgba(0, 168, 132, 0.28);
   --hai-state-closed-bg:        #f3f4f6;
   --hai-state-closed-fg:        #4b5563;
   --hai-state-closed-border:    rgba(107, 114, 128, 0.20);
-  --hai-state-sold-bg:          rgba(22, 163, 74, 0.10);
+  --hai-state-sold-bg:          rgba(0, 168, 132, 0.12);
   --hai-state-sold-fg:          var(--hai-primary-700);
-  --hai-state-sold-border:      rgba(22, 163, 74, 0.28);
+  --hai-state-sold-border:      rgba(0, 168, 132, 0.28);
   --hai-state-expired-bg:       #f3f4f6;
   --hai-state-expired-fg:       #6b7280;
   --hai-state-expired-border:   rgba(107, 114, 128, 0.20);
@@ -438,8 +441,8 @@
   --hai-category-SERVICES-fg:           #93c5fd;
   --hai-category-LOST_FOUND-bg:         rgba(168, 85, 247, 0.12);
   --hai-category-LOST_FOUND-fg:         #d8b4fe;
-  --hai-category-MOSQUE-bg:             rgba(34, 197, 94, 0.12);
-  --hai-category-MOSQUE-fg:             #86efac;
+  --hai-category-MOSQUE-bg:             rgba(0, 168, 132, 0.14);
+  --hai-category-MOSQUE-fg:             #25d366;
   --hai-category-EID_RAMADAN-bg:        rgba(234, 179, 8, 0.12);
   --hai-category-EID_RAMADAN-fg:        #fde68a;
   --hai-category-CONTESTS-bg:           rgba(217, 70, 239, 0.12);
@@ -455,9 +458,9 @@
   --hai-state-verified-bg:      rgba(96, 165, 250, 0.12);
   --hai-state-verified-fg:      #93c5fd;
   --hai-state-verified-border:  rgba(96, 165, 250, 0.28);
-  --hai-state-provider-bg:      rgba(74, 222, 128, 0.10);
-  --hai-state-provider-fg:      #86efac;
-  --hai-state-provider-border:  rgba(74, 222, 128, 0.28);
+  --hai-state-provider-bg:      rgba(0, 168, 132, 0.14);
+  --hai-state-provider-fg:      #25d366;
+  --hai-state-provider-border:  rgba(0, 168, 132, 0.32);
   --hai-state-mod-bg:           rgba(251, 191, 36, 0.12);
   --hai-state-mod-fg:           #fcd34d;
   --hai-state-mod-border:       rgba(251, 191, 36, 0.30);
@@ -469,8 +472,8 @@
   --hai-state-tier-new-fg:              #94a3b8;
   --hai-state-tier-active-bg:           rgba(96, 165, 250, 0.12);
   --hai-state-tier-active-fg:           #93c5fd;
-  --hai-state-tier-trusted-bg:          rgba(74, 222, 128, 0.12);
-  --hai-state-tier-trusted-fg:          #86efac;
+  --hai-state-tier-trusted-bg:          rgba(0, 168, 132, 0.16);
+  --hai-state-tier-trusted-fg:          #25d366;
   --hai-state-tier-distinguished-bg:    rgba(251, 191, 36, 0.12);
   --hai-state-tier-distinguished-fg:    #fcd34d;
 
@@ -478,9 +481,9 @@
   --hai-state-featured-fg:      #fcd34d;
   --hai-state-featured-border:  rgba(251, 191, 36, 0.35);
   --hai-state-featured-ring:    rgba(251, 191, 36, 0.35);
-  --hai-state-pinned-bg:        rgba(74, 222, 128, 0.12);
-  --hai-state-pinned-fg:        #86efac;
-  --hai-state-pinned-border:    rgba(74, 222, 128, 0.28);
+  --hai-state-pinned-bg:        rgba(0, 168, 132, 0.16);
+  --hai-state-pinned-fg:        #25d366;
+  --hai-state-pinned-border:    rgba(0, 168, 132, 0.32);
   --hai-state-boosted-bg:       rgba(192, 132, 252, 0.12);
   --hai-state-boosted-fg:       #d8b4fe;
   --hai-state-boosted-border:   rgba(192, 132, 252, 0.30);
@@ -504,9 +507,9 @@
   --hai-state-locked-fg:        #cbd5e1;
   --hai-state-locked-border:    rgba(255, 255, 255, 0.12);
 
-  --hai-state-open-bg:          rgba(74, 222, 128, 0.12);
-  --hai-state-open-fg:          #86efac;
-  --hai-state-open-border:      rgba(74, 222, 128, 0.28);
+  --hai-state-open-bg:          rgba(0, 168, 132, 0.16);
+  --hai-state-open-fg:          #25d366;
+  --hai-state-open-border:      rgba(0, 168, 132, 0.32);
   --hai-state-inprogress-bg:    rgba(125, 211, 252, 0.12);
   --hai-state-inprogress-fg:    #7dd3fc;
   --hai-state-inprogress-border:rgba(125, 211, 252, 0.28);
@@ -522,15 +525,15 @@
   --hai-state-arrived-bg:       rgba(216, 180, 254, 0.12);
   --hai-state-arrived-fg:       #d8b4fe;
   --hai-state-arrived-border:   rgba(216, 180, 254, 0.30);
-  --hai-state-resolved-bg:      rgba(74, 222, 128, 0.12);
-  --hai-state-resolved-fg:      #86efac;
-  --hai-state-resolved-border:  rgba(74, 222, 128, 0.28);
+  --hai-state-resolved-bg:      rgba(0, 168, 132, 0.16);
+  --hai-state-resolved-fg:      #25d366;
+  --hai-state-resolved-border:  rgba(0, 168, 132, 0.32);
   --hai-state-closed-bg:        rgba(255, 255, 255, 0.05);
   --hai-state-closed-fg:        #94a3b8;
   --hai-state-closed-border:    rgba(255, 255, 255, 0.10);
-  --hai-state-sold-bg:          rgba(74, 222, 128, 0.12);
-  --hai-state-sold-fg:          #86efac;
-  --hai-state-sold-border:      rgba(74, 222, 128, 0.28);
+  --hai-state-sold-bg:          rgba(0, 168, 132, 0.16);
+  --hai-state-sold-fg:          #25d366;
+  --hai-state-sold-border:      rgba(0, 168, 132, 0.32);
   --hai-state-expired-bg:       rgba(255, 255, 255, 0.05);
   --hai-state-expired-fg:       #94a3b8;
   --hai-state-expired-border:   rgba(255, 255, 255, 0.10);
@@ -1537,9 +1540,9 @@ textarea.hai-input {
   border-color: var(--hai-primary-200);
 }
 .dark .hai-pill--brand {
-  background: rgba(74, 222, 128, 0.12);
+  background: rgba(0, 168, 132, 0.16);
   color: var(--hai-primary-700);
-  border-color: rgba(74, 222, 128, 0.30);
+  border-color: rgba(0, 168, 132, 0.32);
 }
 .hai-pill--danger {
   background: var(--hai-danger-tint);
@@ -1719,7 +1722,7 @@ textarea.hai-input {
   color: var(--hai-warning);
 }
 .dark .hai-icon-circle--brand {
-  background: rgba(74, 222, 128, 0.14);
+  background: rgba(0, 168, 132, 0.18);
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -1771,8 +1774,8 @@ textarea.hai-input {
   font-weight: var(--hai-fw-bold);
 }
 .dark .hai-callout--brand {
-  background: rgba(74, 222, 128, 0.10);
-  border-color: rgba(74, 222, 128, 0.25);
+  background: rgba(0, 168, 132, 0.14);
+  border-color: rgba(0, 168, 132, 0.30);
   color: var(--hai-primary-700);
 }
 
@@ -1800,7 +1803,7 @@ textarea.hai-input {
   background: var(--hai-surface-2);
 }
 .dark .hai-accordion-header {
-  border-color: rgba(74, 222, 128, 0.25);
+  border-color: rgba(0, 168, 132, 0.30);
 }
 .hai-accordion-header__icon {
   display: inline-flex;

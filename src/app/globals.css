@@ -29,7 +29,7 @@ input, textarea, [contenteditable="true"] {
 }
 
 :root {
-  --primary: #16a34a;
+  --primary: #00a884;
   --bg:             #ffffff;
   --surface:        #ffffff;
   --surface-alt:    #f9fafb;
@@ -141,9 +141,9 @@ input, textarea, [contenteditable="true"] {
    The .msg-jump-highlight class is added to the message row wrapper
    so the green wash spans the row horizontally and fades out. */
 @keyframes msg-jump-flash {
-  0%   { background-color: rgba(34, 197, 94, 0.45); }
-  60%  { background-color: rgba(34, 197, 94, 0.25); }
-  100% { background-color: rgba(34, 197, 94, 0); }
+  0%   { background-color: rgba(0, 168, 132, 0.45); }
+  60%  { background-color: rgba(0, 168, 132, 0.25); }
+  100% { background-color: rgba(0, 168, 132, 0); }
 }
 .msg-jump-highlight {
   animation: msg-jump-flash 1.6s ease-out;
@@ -169,10 +169,10 @@ input, textarea, [contenteditable="true"] {
 
 /* Primary green glow — for CTAs, active states, important buttons */
 .glow-primary {
-  box-shadow: 0 0 15px rgba(22, 163, 74, 0.25), 0 0 40px rgba(22, 163, 74, 0.1);
+  box-shadow: 0 0 15px rgba(0, 168, 132, 0.25), 0 0 40px rgba(0, 168, 132, 0.1);
 }
 .dark .glow-primary {
-  box-shadow: 0 0 20px rgba(74, 222, 128, 0.2), 0 0 50px rgba(74, 222, 128, 0.08);
+  box-shadow: 0 0 20px rgba(37, 211, 102, 0.2), 0 0 50px rgba(37, 211, 102, 0.08);
 }
 
 /* Post-card hover glow intentionally disabled — user feedback was that
@@ -225,24 +225,24 @@ input, textarea, [contenteditable="true"] {
 
 /* Active tab glow — subtle underlight */
 .glow-tab {
-  filter: drop-shadow(0 1px 4px rgba(22, 163, 74, 0.3));
+  filter: drop-shadow(0 1px 4px rgba(0, 168, 132, 0.3));
 }
 .dark .glow-tab {
-  filter: drop-shadow(0 1px 5px rgba(74, 222, 128, 0.25));
+  filter: drop-shadow(0 1px 5px rgba(37, 211, 102, 0.25));
 }
 
 /* Soft ambient glow for avatars */
 .glow-avatar {
-  box-shadow: 0 0 12px rgba(22, 163, 74, 0.15);
+  box-shadow: 0 0 12px rgba(0, 168, 132, 0.15);
 }
 .dark .glow-avatar {
-  box-shadow: 0 0 15px rgba(74, 222, 128, 0.1);
+  box-shadow: 0 0 15px rgba(37, 211, 102, 0.1);
 }
 
 /* Pulse glow animation */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 10px rgba(22, 163, 74, 0.2); }
-  50% { box-shadow: 0 0 25px rgba(22, 163, 74, 0.4); }
+  0%, 100% { box-shadow: 0 0 10px rgba(0, 168, 132, 0.2); }
+  50% { box-shadow: 0 0 25px rgba(0, 168, 132, 0.4); }
 }
 .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
 
@@ -444,7 +444,7 @@ html.dark body::before {
 @media (min-width: 768px) {
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: #f1f1f1; }
-  ::-webkit-scrollbar-thumb { background: #16a34a; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb { background: #00a884; border-radius: 2px; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -701,7 +701,7 @@ html.dark body::before {
   position: absolute;
   inset: -4px;
   border-radius: 9999px;
-  background: radial-gradient(circle, rgba(22, 163, 74, 0.35) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(0, 168, 132, 0.35) 0%, transparent 70%);
   z-index: -1;
   animation: fabPulse 2.6s ease-in-out infinite;
 }

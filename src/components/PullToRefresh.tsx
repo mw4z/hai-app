@@ -130,7 +130,7 @@ export default function PullToRefresh() {
           <circle
             cx="24" cy="24"
             r={ready ? 5 : 4}
-            fill={ready ? 'white' : '#16a34a'}
+            fill={ready ? 'white' : '#00a884'}
             style={{ transform: `scale(${centerScale})`, transformOrigin: '24px 24px', transition: 'all 0.2s' }}
           />
           {/* Orbiting dots */}
@@ -145,7 +145,7 @@ export default function PullToRefresh() {
               <circle
                 key={i}
                 cx={x} cy={y} r={dotR}
-                fill={ready ? 'white' : '#16a34a'}
+                fill={ready ? 'white' : '#00a884'}
                 opacity={opacity}
                 style={{ transition: refreshing ? 'none' : 'all 0.1s' }}
               />

@@ -168,7 +168,7 @@ export default function AppSplash() {
         {/* Logo */}
         <div className="_sp-logo">
           <svg viewBox="0 0 192 192" width="68" height="68">
-            <rect width="192" height="192" rx="42" fill="#15803d"/>
+            <rect width="192" height="192" rx="42" fill="#006d57"/>
             <circle cx="96" cy="106" r="17" fill="#fff"/>
             <circle cx="96" cy="51" r="11" fill="#fff"/>
             <circle cx="144" cy="134" r="11" fill="#fff"/>
@@ -217,7 +217,7 @@ export default function AppSplash() {
         ._sp-bg {
           position: absolute;
           inset: 0;
-          background: radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #f0fdf4 40%, #fff 100%);
+          background: radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #e0f7f2 40%, #fff 100%);
         }
         :global(.dark) ._sp-bg {
           /* Near-black radial — matches --hai-bg so the splash→app
@@ -240,12 +240,12 @@ export default function AppSplash() {
         ._sp-ring {
           position: absolute;
           border-radius: 50%;
-          border: 1px solid #16a34a;
+          border: 1px solid #00a884;
           opacity: 0;
           animation: _rp 1.8s ease-out infinite;
           will-change: transform, opacity;
         }
-        :global(.dark) ._sp-ring { border-color: #22c55e; }
+        :global(.dark) ._sp-ring { border-color: #00a884; }
 
         ._sp-r1 { width: 100px; height: 100px; animation-delay: 0.4s; }
         ._sp-r2 { width: 180px; height: 180px; animation-delay: 0.7s; }
@@ -263,13 +263,13 @@ export default function AppSplash() {
           height: 100%;
         }
         ._sp-ln {
-          stroke: #16a34a;
+          stroke: #00a884;
           stroke-width: 0.6;
           opacity: 0;
           animation: _ln 2s ease-in-out infinite;
           will-change: opacity;
         }
-        :global(.dark) ._sp-ln { stroke: #4ade80; }
+        :global(.dark) ._sp-ln { stroke: #25d366; }
 
         @keyframes _ln {
           0%, 100% { opacity: 0; }
@@ -282,7 +282,7 @@ export default function AppSplash() {
           width: var(--s);
           height: var(--s);
           border-radius: 50%;
-          background: #16a34a;
+          background: #00a884;
           top: 50%;
           left: 50%;
           transform: translate(
@@ -294,7 +294,7 @@ export default function AppSplash() {
           animation-delay: var(--d);
           will-change: opacity, transform;
         }
-        :global(.dark) ._sp-dot { background: #4ade80; }
+        :global(.dark) ._sp-dot { background: #25d366; }
 
         @keyframes _dot {
           0%, 100% {
@@ -315,7 +315,7 @@ export default function AppSplash() {
           height: 68px;
           border-radius: 15px;
           overflow: hidden;
-          box-shadow: 0 6px 24px rgba(22, 163, 74, 0.3);
+          box-shadow: 0 6px 24px rgba(0, 168, 132, 0.32);
           animation: _logo 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
           will-change: transform, opacity;
         }
@@ -342,10 +342,10 @@ export default function AppSplash() {
           font-family: 'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, sans-serif;
           font-size: 26px;
           font-weight: 700;
-          color: #15803d;
+          color: #006d57;
           line-height: 1.6;
         }
-        :global(.dark) ._sp-ar { color: #86efac; }
+        :global(.dark) ._sp-ar { color: #66d5b6; }
 
         ._sp-en {
           font-size: 10px;
@@ -374,11 +374,11 @@ export default function AppSplash() {
           width: 5px;
           height: 5px;
           border-radius: 50%;
-          background: #16a34a;
+          background: #00a884;
           animation: _wave 1s ease-in-out infinite;
           will-change: transform, opacity;
         }
-        :global(.dark) ._sp-ld i { background: #4ade80; }
+        :global(.dark) ._sp-ld i { background: #25d366; }
 
         @keyframes _wave {
           0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
