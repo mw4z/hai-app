@@ -12,9 +12,9 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     // Matches --hai-bg in dark mode (src/app/design-tokens.css) so the
-    // native Android window behind the webview is the same navy as the
-    // app body — no slate-vs-navy seam visible in the safe-area / notch.
-    backgroundColor: '#0b1222',
+    // native Android window behind the webview is the same WhatsApp
+    // charcoal as the app body — no seam in the safe-area / notch.
+    backgroundColor: '#0b141a',
   },
   plugins: {
     SplashScreen: {
