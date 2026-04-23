@@ -23,7 +23,14 @@ export function translateApiError(body: any, lang: Lang): string {
   if (body && typeof body === 'object') {
     const err = body.error
     if (typeof err === 'string') {
+      // Flat shape: { error: 'some string' }. Treat the string as BOTH
+      // a candidate symbolic code (for the switch below) AND a server
+      // message (for the SERVER_MSG_MAP / pattern-rule lookup). Without
+      // this, full sentences like "Maximum ride distance is 500 km"
+      // would match neither path and fall through to the raw English
+      // string — the exact bug the user hit.
       code = err
+      serverMsg = err
     } else if (err && typeof err === 'object') {
       if (typeof err.code === 'string') code = err.code
       if (typeof err.message === 'string') serverMsg = err.message
