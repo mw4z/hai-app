@@ -355,28 +355,35 @@
 
 /* ── Dark mode — pure dark surfaces, reduced green saturation ──── */
 .dark {
-  --hai-bg:          #0a0f0c;
-  --hai-surface-1:   #101614;
-  --hai-surface-2:   #141a18;
-  --hai-surface-3:   #1b221f;
-  --hai-border:      rgba(255, 255, 255, 0.08);
-  --hai-border-soft: rgba(255, 255, 255, 0.04);
+  /* ── Dark-mode recalibration (Pass 11) ───────────────────────────
+     One coherent dark material system based on deep navy.
+     Previous green-tinted near-black (#0a0f0c / #101614 …) is gone —
+     it clashed with the legacy slate-900 body background and made
+     cards look black against a navy page. Everything now belongs to
+     the same slate/navy family; green survives only as an accent. */
+  --hai-bg:          #0b1222;   /* page — deepest navy (below slate-900) */
+  --hai-surface-1:   #162137;   /* card — raised from bg */
+  --hai-surface-2:   #1b2742;   /* input / panel inside a card */
+  --hai-surface-3:   #253457;   /* pressed / selected on surface-1 */
+  --hai-border:      rgba(148, 163, 184, 0.14);  /* slate-400 tint */
+  --hai-border-soft: rgba(148, 163, 184, 0.07);
 
-  --hai-text:        #f1f5f9;
-  --hai-text-sub:    #cbd5e1;
-  --hai-text-muted:  #94a3b8;
-  --hai-text-faint:  #64748b;
+  --hai-text:        #e2e8f0;   /* slate-200 — primary text on navy */
+  --hai-text-sub:    #cbd5e1;   /* slate-300 */
+  --hai-text-muted:  #94a3b8;   /* slate-400 */
+  --hai-text-faint:  #64748b;   /* slate-500 */
 
-  /* Green stays readable on very dark bg; primary-400 reads as the
-     "accent" in dark mode rather than primary-600. */
-  --hai-primary-500: #4ade80;
-  --hai-primary-600: #22c55e;
-  --hai-primary-700: #86efac;
+  /* Primary is the brand ACCENT — it must not cast the surfaces.
+     Default stays #22c55e (same brand green as light mode) so buttons
+     feel consistent; hover brightens to primary-400 (#4ade80). */
+  --hai-primary-500: #22c55e;   /* brand default — buttons, active tab */
+  --hai-primary-600: #16a34a;   /* pressed (darker, reads clearly on navy) */
+  --hai-primary-700: #86efac;   /* light mint — text on primary-tint bg */
 
-  --hai-primary-hover:   var(--hai-primary-400);
-  --hai-primary-pressed: var(--hai-primary-600);
-  --hai-primary-ring:    rgba(74, 222, 128, 0.28);
-  --hai-primary-tint:    rgba(74, 222, 128, 0.10);
+  --hai-primary-hover:   var(--hai-primary-400);          /* brighten to #4ade80 */
+  --hai-primary-pressed: var(--hai-primary-600);          /* darken to #16a34a */
+  --hai-primary-ring:    rgba(34, 197, 94, 0.35);         /* focus ring, crisp */
+  --hai-primary-tint:    rgba(34, 197, 94, 0.14);         /* ghost hover on navy */
 
   --hai-danger-tint:   rgba(248, 113, 113, 0.10);
   --hai-danger-border: rgba(248, 113, 113, 0.40);
@@ -387,10 +394,12 @@
   --hai-warning-text:  #fcd34d;
   --hai-success-text:  #86efac;
 
-  --hai-shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.5);
-  --hai-shadow-md:  0 2px 8px rgba(0, 0, 0, 0.55);
-  --hai-shadow-lg:  0 6px 20px rgba(0, 0, 0, 0.6);
-  --hai-shadow-fab: 0 6px 18px rgba(74, 222, 128, 0.25), 0 2px 4px rgba(0, 0, 0, 0.4);
+  /* Shadows on deep navy — plain black at slightly higher opacity
+     so cards actually appear raised against the background. */
+  --hai-shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.45);
+  --hai-shadow-md:  0 2px 10px rgba(0, 0, 0, 0.45);
+  --hai-shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.50);
+  --hai-shadow-fab: 0 8px 22px rgba(22, 163, 74, 0.40), 0 2px 6px rgba(0, 0, 0, 0.55);
 
   /* Category palette — muted dark-mode counterparts */
   --hai-category-ALERT-bg:              rgba(239, 68, 68, 0.12);
