@@ -1225,10 +1225,15 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
 }) {
   const longPress = useLongPress(onLongPress, onDoubleTap, 400)
   const rowRef = useRef<HTMLDivElement>(null)
+  const bubbleRef = useRef<HTMLDivElement>(null)
   const swipeRef = useRef<{ startX: number; dx: number; active: boolean } | null>(null)
   const REPLY_THRESHOLD = 50
 
-  // Swipe-to-reply gesture — swipe the message row to trigger reply
+  // Swipe-to-reply gesture — the touch listener lives on the row so
+  // the user can start the swipe from anywhere in the message area,
+  // but the translate is applied to the BUBBLE wrapper only so the
+  // date divider / unread divider / reactions stay rigid. Just the
+  // bubble slides, matching WhatsApp-style swipe-to-reply.
   useEffect(() => {
     const row = rowRef.current
     if (!row || msg.type === 'DELETED') return
@@ -1251,17 +1256,19 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
       const clamped = Math.min(progress, 80)
       s.dx = clamped
       const translate = isRTL ? clamped : -clamped
-      if (row) {
-        row.style.transform = `translateX(${translate}px)`
-        row.style.transition = 'none'
+      const bubble = bubbleRef.current
+      if (bubble) {
+        bubble.style.transform = `translateX(${translate}px)`
+        bubble.style.transition = 'none'
       }
     }
     function onTouchEnd() {
       const s = swipeRef.current
       if (!s) return
-      if (row) {
-        row.style.transition = 'transform 200ms ease-out'
-        row.style.transform = ''
+      const bubble = bubbleRef.current
+      if (bubble) {
+        bubble.style.transition = 'transform 200ms ease-out'
+        bubble.style.transform = ''
       }
       if (s.dx >= REPLY_THRESHOLD) hapticLight()
       if (s.dx >= REPLY_THRESHOLD) {
@@ -1302,7 +1309,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
   ) : null
 
   return (
-    <div ref={rowRef} data-msg-row={msg.id} style={{ willChange: 'transform' }}>
+    <div ref={rowRef} data-msg-row={msg.id}>
       {showUnreadDivider && (
         <div id="unread-divider" className="flex items-center gap-3 my-4">
           <div className="flex-1 h-px bg-primary-400/50" />
@@ -1320,7 +1327,11 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
         </div>
       )}
 
-      <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} ${isLastInGroup ? 'mb-2' : 'mb-[3px]'} ${isFirstInGroup && !showDate ? 'mt-3' : ''}`}>
+      <div
+        ref={bubbleRef}
+        style={{ willChange: 'transform' }}
+        className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} ${isLastInGroup ? 'mb-2' : 'mb-[3px]'} ${isFirstInGroup && !showDate ? 'mt-3' : ''}`}
+      >
         {msg.type === 'IMAGE' && (msg.imageUrl || (msg as any).localPreview) ? (
           <div className={`max-w-[70%]`} data-msg-id={msg.id} {...longPress}>
             {replyQuote && <div className="mb-1">{replyQuote}</div>}
