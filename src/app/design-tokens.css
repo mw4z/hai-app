@@ -377,16 +377,16 @@
 
 /* ── Dark mode — pure dark surfaces, reduced green saturation ──── */
 .dark {
-  /* ── Dark-mode (Pass 12) — WhatsApp-style charcoal-teal family ──
-     Rebalanced from deep navy to WhatsApp's signature charcoal
-     ramp (#0b141a / #1f2c33 / #2a3942) with the teal-green brand
-     used as an accent. One coherent dark material system; green
-     never casts the surfaces. */
-  --hai-bg:          #0b141a;   /* page — WhatsApp app background */
-  --hai-surface-1:   #1f2c33;   /* card / header / bottom nav */
-  --hai-surface-2:   #2a3942;   /* input / nested panel */
-  --hai-surface-3:   #374248;   /* pressed / selected on surface-1 */
-  --hai-border:      rgba(255, 255, 255, 0.08);   /* WhatsApp hairline */
+  /* ── Dark-mode (Pass 13) — deeper, OLED-friendly near-black ramp ──
+     True-black page with a faint cool tint retained on surfaces so
+     cards still read as elevated against the body. Same material
+     system as the previous WhatsApp charcoal pass, just shifted
+     closer to black per user feedback ("more darker black"). */
+  --hai-bg:          #000000;   /* page — true black (OLED-friendly) */
+  --hai-surface-1:   #101619;   /* card / header / bottom nav */
+  --hai-surface-2:   #19232a;   /* input / nested panel */
+  --hai-surface-3:   #27323a;   /* pressed / selected on surface-1 */
+  --hai-border:      rgba(255, 255, 255, 0.08);
   --hai-border-soft: rgba(255, 255, 255, 0.04);
 
   --hai-text:        #e9edef;   /* WhatsApp primary (warm white) */

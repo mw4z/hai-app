@@ -46,9 +46,9 @@ input, textarea, [contenteditable="true"] {
    --hai-bg / --hai-surface-* so pages that still use these aliases
    feel like the same material system. */
 .dark {
-  --bg:             #0b141a;   /* page (matches --hai-bg) */
-  --surface:        #1f2c33;   /* card (matches --hai-surface-1) */
-  --surface-alt:    #2a3942;   /* panel (matches --hai-surface-2) */
+  --bg:             #000000;   /* page (matches --hai-bg) */
+  --surface:        #101619;   /* card (matches --hai-surface-1) */
+  --surface-alt:    #19232a;   /* panel (matches --hai-surface-2) */
   --text:           #e9edef;
   --text-sub:       #d1d7db;
   --text-muted:     #8696a0;
@@ -118,10 +118,9 @@ input, textarea, [contenteditable="true"] {
   /* Header sits on the same raised surface as the bottom nav so
      they visually bracket the page at the same elevation.
      Fallback paints even if var() resolution is delayed (iOS WKWebView
-     can briefly race stylesheet load on first launch). WhatsApp
-     charcoal #1f2c33. */
-  background: #1f2c33 !important;
-  background: var(--hai-surface-1, #1f2c33) !important;
+     can briefly race stylesheet load on first launch). */
+  background: #101619 !important;
+  background: var(--hai-surface-1, #101619) !important;
   border-bottom-color: rgba(255, 255, 255, 0.08);
   border-bottom-color: var(--hai-border, rgba(255, 255, 255, 0.08));
 }
@@ -156,8 +155,8 @@ input, textarea, [contenteditable="true"] {
   border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 .dark .glass-bottom {
-  background: #1f2c33 !important;
-  background: var(--hai-surface-1, #1f2c33) !important;
+  background: #101619 !important;
+  background: var(--hai-surface-1, #101619) !important;
   border-top-color: rgba(255, 255, 255, 0.08);
   border-top-color: var(--hai-border, rgba(255, 255, 255, 0.08));
 }
@@ -320,8 +319,8 @@ body {
   position: relative;
 }
 .dark body {
-  background-color: #0b141a;
-  background-color: var(--bg, #0b141a);
+  background-color: #000000;
+  background-color: var(--bg, #000000);
   color: #e9edef;
   color: var(--text, #e9edef);
 }
@@ -386,8 +385,8 @@ html {
   background-color: #ffffff;
 }
 .dark html, html.dark {
-  background-color: #0b141a;              /* concrete fallback — WhatsApp page bg */
-  background-color: var(--hai-bg, #0b141a);
+  background-color: #000000;              /* concrete fallback — true-black page */
+  background-color: var(--hai-bg, #000000);
 }
 
 /* ── iOS safe area — universal approach ──────────────────────── */
@@ -411,8 +410,8 @@ body::before {
   background: var(--hai-bg, #ffffff);
 }
 html.dark body::before {
-  background: #0b141a;
-  background: var(--hai-bg, #0b141a);
+  background: #000000;
+  background: var(--hai-bg, #000000);
 }
 /* Safe-area cover is now rendered as #__hai_safe_top in layout.tsx —
    a real DOM node paints reliably across WKWebView versions. */

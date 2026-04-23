@@ -11,10 +11,10 @@ const config: CapacitorConfig = {
   appendUserAgent: 'HaiNativeApp',
   android: {
     allowMixedContent: true,
-    // Matches --hai-bg in dark mode (src/app/design-tokens.css) so the
-    // native Android window behind the webview is the same WhatsApp
-    // charcoal as the app body — no seam in the safe-area / notch.
-    backgroundColor: '#0b141a',
+    // Matches --hai-bg in dark mode (src/app/design-tokens.css) —
+    // true black so the native Android window behind the webview is
+    // the same as the app body (no seam in the safe-area / notch).
+    backgroundColor: '#000000',
   },
   plugins: {
     SplashScreen: {

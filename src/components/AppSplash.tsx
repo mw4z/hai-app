@@ -220,9 +220,9 @@ export default function AppSplash() {
           background: radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #f0fdf4 40%, #fff 100%);
         }
         :global(.dark) ._sp-bg {
-          /* WhatsApp charcoal radial — matches --hai-bg so the
-             splash→app handoff has no color seam. */
-          background: radial-gradient(ellipse at 50% 42%, #1f2c33 0%, #121d22 40%, #0b141a 100%);
+          /* Near-black radial — matches --hai-bg so the splash→app
+             handoff has no colour seam. */
+          background: radial-gradient(ellipse at 50% 42%, #101619 0%, #070b0d 40%, #000000 100%);
         }
 
         /* ── Stage ────────────────────────────────────────── */
