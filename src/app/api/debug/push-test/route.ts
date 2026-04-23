@@ -286,7 +286,16 @@ async function sendFcmTokens(
         data: { type: 'debug_test', ts: String(Date.now()) },
         android: {
           priority: 'HIGH',
-          notification: { channel_id: 'hai_default', sound: 'default' },
+          // NO channel_id on the debug payload. The installed Android
+          // build might predate the 'hai_default' channel, and posting
+          // to a non-existent channel on Android 8+ (targetSdk ≥ 26)
+          // causes NotificationManager to silently drop it — user sees
+          // "sent" on the card but nothing on the phone. Without a
+          // channel_id, FCM routes to the auto-generated fallback
+          // channel that every Android install has. Once the rebuild
+          // with PushRegistration's channel registration ships, we can
+          // add channel_id back.
+          notification: { sound: 'default' },
         },
       },
     }
