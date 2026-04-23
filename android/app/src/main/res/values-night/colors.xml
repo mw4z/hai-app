@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#16a34a</color>
-    <color name="colorPrimaryDark">#0f172a</color>
-    <color name="colorAccent">#4ade80</color>
-    <color name="splash_bg">#0f172a</color>
+    <!-- Dark brand palette — matches .dark --hai-primary-* / --hai-bg
+         in src/app/design-tokens.css. splash_bg is true-black so the
+         native splash seams into the webview's #000000 page. -->
+    <color name="colorPrimary">#00a884</color>
+    <color name="colorPrimaryDark">#000000</color>
+    <color name="colorAccent">#25d366</color>
+    <color name="splash_bg">#000000</color>
 </resources>

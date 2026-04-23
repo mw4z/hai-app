@@ -24,7 +24,7 @@ const config: CapacitorConfig = {
       // layer in between.
       launchShowDuration: 0,
       launchAutoHide: true,
-      backgroundColor: '#f0fdf4',
+      backgroundColor: '#e0f7f2',
       showSpinner: false,
       androidSplashResourceName: 'splash',
       splashFullScreen: true,

@@ -32,7 +32,7 @@ export const DEFAULT_COVERS: CoverOption[] = [
     id: 'green-gradient',
     nameAr: 'أخضر',
     nameEn: 'Green',
-    css: `${mosque}, linear-gradient(135deg, #00a884 0%, #065f46 100%)`,
+    css: `${mosque}, linear-gradient(135deg, #00a884 0%, #006d57 100%)`,
   },
   {
     id: 'emerald-wave',

@@ -12,7 +12,7 @@
              starting gradient. No logo or text here — the animated
              JS AppSplash is the ONLY visible intro. Apple requires a
              launch storyboard to exist; this is the minimum viable
-             one. Background is #f0fdf4 (same as AppSplash's outer
+             one. Background is #e0f7f2 (same as AppSplash's outer
              radial gradient stop) so there's no color flash when
              handoff happens. -->
         <scene sceneID="EHf-IW-A2E">
@@ -21,7 +21,7 @@
                     <view key="view" contentMode="scaleToFill" id="snD-IY-ifK">
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                        <color key="backgroundColor" red="0.94117647058823528" green="0.99215686274509807" blue="0.95686274509803926" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <color key="backgroundColor" red="0.87843137254901960" green="0.96862745098039216" blue="0.94901960784313726" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <viewLayoutGuide key="safeArea" id="safe-01"/>
                     </view>
                 </viewController>

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#16a34a</color>
-    <color name="colorPrimaryDark">#065f46</color>
-    <color name="colorAccent">#4ade80</color>
-    <color name="splash_bg">#f0fdf4</color>
+    <!-- Brand palette — unified WhatsApp-teal family (matches
+         --hai-primary-* in src/app/design-tokens.css). -->
+    <color name="colorPrimary">#00a884</color>
+    <color name="colorPrimaryDark">#006d57</color>
+    <color name="colorAccent">#25d366</color>
+    <color name="splash_bg">#e0f7f2</color>
 </resources>
