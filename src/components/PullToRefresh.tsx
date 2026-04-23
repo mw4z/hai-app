@@ -53,12 +53,17 @@ export default function PullToRefresh() {
       const delta = e.touches[0].clientY - startY.current
       if (delta <= 0) { setPullY(0); return }
       // Resistance divisor from the unified motion token (soft = 2.2
-       // by default → roughly 0.45 factor, tuned so the pull has enough
-       // travel to feel responsive without outrunning the indicator).
+      // by default → roughly 0.45 factor, tuned so the pull has enough
+      // travel to feel responsive without outrunning the indicator).
       const resistance = tokenNumber('--hai-resistance-soft', 2.2)
       const clamped = Math.min(delta / resistance, MAX_PULL)
       setPullY(clamped)
-      if (delta > 10) e.preventDefault()
+      // Intentionally DO NOT call e.preventDefault(). Letting the default
+      // touch action through lets WKWebView play its native rubber-band
+      // bounce at the same time — the refresh indicator floats with the
+      // pull inside the rubber-band zone (iOS Mail pattern). Previous
+      // commit f125efd removed this component entirely because the
+      // old preventDefault killed the bounce; coexistence avoids that.
       // Haptic when crossing threshold
       if (clamped >= THRESHOLD && !hitThreshold.current) {
         hitThreshold.current = true
@@ -84,7 +89,9 @@ export default function PullToRefresh() {
     }
 
     document.addEventListener('touchstart', onTouchStart, { passive: true })
-    document.addEventListener('touchmove', onTouchMove, { passive: false })
+    // Passive now — we no longer call preventDefault so the WebView can
+    // keep scheduling the native rubber-band on the same gesture.
+    document.addEventListener('touchmove', onTouchMove, { passive: true })
     document.addEventListener('touchend', onTouchEnd)
     return () => {
       document.removeEventListener('touchstart', onTouchStart)

@@ -13,6 +13,7 @@ import AndroidBackButton from '@/components/AndroidBackButton'
 import NeighborhoodTravelOverlay from '@/components/NeighborhoodTravelOverlay'
 import { ConfirmProvider } from '@/components/ConfirmProvider'
 import ScrollReset from '@/components/ScrollReset'
+import PullToRefresh from '@/components/PullToRefresh'
 import { LangProvider } from '@/hooks/useLanguage'
 import { checkEnvironment } from '@/lib/env-check'
 import type { Lang } from '@/lib/i18n'
@@ -127,6 +128,7 @@ export default function RootLayout({
               {children}
           </ErrorBoundary>
           <ScrollReset />
+          <PullToRefresh />
           <ArrivalAlert />
           <RouteTransition />
           </ConfirmProvider>

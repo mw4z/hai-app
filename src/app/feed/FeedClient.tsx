@@ -477,7 +477,7 @@ export default function FeedClient({
           <button
             data-tour="new-post"
             onClick={() => setShowAsk(true)}
-            className="w-full flex items-center gap-3 bg-white border border-sky-100 rounded-2xl px-4 py-3 shadow-sm hover:shadow-md transition-shadow"
+            className="glow-ask w-full flex items-center gap-3 bg-white border border-sky-100 rounded-2xl px-4 py-3 transition-shadow"
           >
             <span className="text-lg">🔎</span>
             <span className="flex-1 text-start text-sm text-gray-400">{t('feed_ask_placeholder')}</span>

@@ -175,12 +175,47 @@ input, textarea, [contenteditable="true"] {
   box-shadow: 0 0 20px rgba(74, 222, 128, 0.2), 0 0 50px rgba(74, 222, 128, 0.08);
 }
 
-/* Subtle glow for cards on hover */
-.glow-card:hover {
-  box-shadow: 0 4px 20px rgba(22, 163, 74, 0.08), 0 0 0 1px rgba(22, 163, 74, 0.05);
+/* Post-card hover glow intentionally disabled — user feedback was that
+   it read as noisy while scrolling the feed. Rule kept as a no-op so
+   the existing `.glow-card` class on PostCard doesn't need to change. */
+.glow-card:hover,
+.dark .glow-card:hover { box-shadow: none; }
+
+/* Continuous soft glow for the main Quick-Ask bar — sky/info tint
+   pulsing gently to signal it's tappable. transform+opacity only so
+   the animation is compositor-only (no layout/paint churn). */
+@keyframes hai-ask-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px rgba(14, 165, 233, 0.10),
+      0 4px 14px rgba(14, 165, 233, 0.18);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(14, 165, 233, 0.22),
+      0 6px 20px rgba(14, 165, 233, 0.30);
+  }
 }
-.dark .glow-card:hover {
-  box-shadow: 0 4px 25px rgba(74, 222, 128, 0.06), 0 0 0 1px rgba(74, 222, 128, 0.08);
+.glow-ask {
+  animation: hai-ask-glow 2.4s ease-in-out infinite;
+}
+.dark .glow-ask {
+  animation-name: hai-ask-glow-dark;
+}
+@keyframes hai-ask-glow-dark {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px rgba(125, 211, 252, 0.10),
+      0 4px 14px rgba(125, 211, 252, 0.18);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(125, 211, 252, 0.22),
+      0 6px 20px rgba(125, 211, 252, 0.30);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glow-ask, .dark .glow-ask { animation: none; }
 }
 
 /* Notification/badge glow */
