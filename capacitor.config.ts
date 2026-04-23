@@ -28,9 +28,18 @@ const config: CapacitorConfig = {
       splashImmersive: true,
     },
     StatusBar: {
+      // Dark icons/text — correct for light mode (the common case).
+      // CapacitorBridge flips to light icons at runtime when the app
+      // is in dark mode.
       style: 'DARK',
-      backgroundColor: '#0f172a',
-      overlaysWebView: false,
+      // Match the launch storyboard + preload div background so there's
+      // no dark flash behind the status bar while the bridge is still
+      // booting.
+      backgroundColor: '#f0fdf4',
+      // Let the webview extend under the status bar from the first
+      // frame; CapacitorBridge already sets this at runtime, so starting
+      // here avoids the layout shift when the override kicks in.
+      overlaysWebView: true,
     },
   },
 };
