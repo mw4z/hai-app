@@ -153,6 +153,205 @@ export function translateApiError(body: any, lang: Lang): string {
         : lang === 'ur'
           ? 'آپ نے پچھلے 3 گھنٹوں میں ملتی جلتی پوسٹ کر دی ہے۔ متن تبدیل کریں یا تھوڑی دیر بعد دوبارہ کوشش کریں۔'
           : 'لديك منشور مشابه خلال آخر 3 ساعات. غيّر الصياغة أو انتظر قليلاً قبل النشر مرة أخرى.'
+
+    // ── Emergency alert requests ────────────────────────────────────
+    case 'no_neighborhood':
+      return lang === 'en'
+        ? 'Your account has no neighborhood set.'
+        : lang === 'ur'
+          ? 'آپ کے اکاؤنٹ میں کوئی محلہ درج نہیں۔'
+          : 'لا يوجد حي مرتبط بحسابك.'
+
+    case 'invalid_body':
+      return lang === 'en'
+        ? 'Invalid request body.'
+        : lang === 'ur'
+          ? 'درخواست کا مواد درست نہیں۔'
+          : 'محتوى الطلب غير صالح.'
+
+    case 'invalid_title':
+      return lang === 'en'
+        ? 'Title is invalid or too long.'
+        : lang === 'ur'
+          ? 'عنوان درست نہیں یا بہت طویل ہے۔'
+          : 'العنوان غير صالح أو طويل جداً.'
+
+    case 'invalid_body_text':
+      return lang === 'en'
+        ? 'Message text is invalid or too long.'
+        : lang === 'ur'
+          ? 'پیغام کا متن درست نہیں یا بہت طویل ہے۔'
+          : 'نص الرسالة غير صالح أو طويل جداً.'
+
+    case 'invalid_severity':
+      return lang === 'en'
+        ? 'Please pick a valid severity level.'
+        : lang === 'ur'
+          ? 'درست درجۂ خطرہ منتخب کریں۔'
+          : 'اختر مستوى خطورة صالحاً.'
+
+    case 'pending_exists':
+      return lang === 'en'
+        ? 'You already have a pending emergency request.'
+        : lang === 'ur'
+          ? 'آپ کی پہلے سے ایک ہنگامی درخواست زیرِ غور ہے۔'
+          : 'لديك طلب طوارئ قيد المراجعة بالفعل.'
+
+    case 'expired':
+      return lang === 'en'
+        ? 'This request has expired.'
+        : lang === 'ur'
+          ? 'یہ درخواست ختم ہو چکی ہے۔'
+          : 'انتهت صلاحية هذا الطلب.'
+
+    case 'already_reviewed':
+      return lang === 'en'
+        ? 'Another moderator has already reviewed this request.'
+        : lang === 'ur'
+          ? 'کسی اور منتظم نے پہلے ہی اس درخواست کا جائزہ لے لیا ہے۔'
+          : 'قام مشرف آخر بمراجعة هذا الطلب بالفعل.'
+
+    // ── Invite codes / redemption ───────────────────────────────────
+    case 'code_required':
+      return lang === 'en'
+        ? 'Invite code is required.'
+        : lang === 'ur'
+          ? 'دعوتی کوڈ درکار ہے۔'
+          : 'رمز الدعوة مطلوب.'
+
+    case 'code_not_found':
+      return lang === 'en'
+        ? "We couldn't find this invite code."
+        : lang === 'ur'
+          ? 'یہ دعوتی کوڈ نہیں ملا۔'
+          : 'رمز الدعوة غير موجود.'
+
+    case 'too_late':
+      return lang === 'en'
+        ? 'Invite codes can only be redeemed within your new-user window.'
+        : lang === 'ur'
+          ? 'دعوتی کوڈ صرف نئے صارف کی مہلت میں استعمال ہو سکتا ہے۔'
+          : 'لا يمكن استخدام رمز الدعوة إلا خلال فترة المستخدم الجديد.'
+
+    case 'already_redeemed':
+      return lang === 'en'
+        ? 'This invite code has already been used.'
+        : lang === 'ur'
+          ? 'یہ دعوتی کوڈ پہلے استعمال ہو چکا ہے۔'
+          : 'تم استخدام رمز الدعوة مسبقاً.'
+
+    case 'self_invite':
+      return lang === 'en'
+        ? "You can't redeem your own invite code."
+        : lang === 'ur'
+          ? 'آپ اپنا ہی دعوتی کوڈ استعمال نہیں کر سکتے۔'
+          : 'لا يمكنك استخدام رمز دعوتك الخاص.'
+
+    case 'inviter_unavailable':
+      return lang === 'en'
+        ? 'The inviter is no longer active.'
+        : lang === 'ur'
+          ? 'دعوت دینے والا اب فعال نہیں۔'
+          : 'صاحب الدعوة لم يعد نشطاً.'
+
+    case 'same_device':
+      return lang === 'en'
+        ? 'Invite codes cannot be redeemed from the same device.'
+        : lang === 'ur'
+          ? 'ایک ہی ڈیوائس سے دعوتی کوڈ استعمال نہیں ہو سکتا۔'
+          : 'لا يمكن استخدام رمز الدعوة من الجهاز نفسه.'
+
+    // ── Rides: offers / rating / transitions ────────────────────────
+    case 'OFFER_NOT_EDITABLE':
+      return lang === 'en'
+        ? 'This offer can no longer be edited.'
+        : lang === 'ur'
+          ? 'یہ پیشکش اب قابلِ ترمیم نہیں۔'
+          : 'لم يعد بالإمكان تعديل هذا العرض.'
+
+    case 'INVALID_TRANSITION':
+      return lang === 'en'
+        ? 'This trip is not complete yet.'
+        : lang === 'ur'
+          ? 'یہ سفر ابھی مکمل نہیں ہوا۔'
+          : 'الرحلة لم تكتمل بعد.'
+
+    case 'RATING_WINDOW_CLOSED':
+      return lang === 'en'
+        ? 'The rating window has closed.'
+        : lang === 'ur'
+          ? 'تجزیہ دینے کی مہلت ختم ہو چکی ہے۔'
+          : 'انتهت مهلة التقييم.'
+
+    case 'NOT_PARTICIPANT':
+      return lang === 'en'
+        ? "You aren't a participant in this ride."
+        : lang === 'ur'
+          ? 'آپ اس سفر میں شریک نہیں۔'
+          : 'أنت لست طرفاً في هذه الرحلة.'
+
+    case 'ALREADY_RATED':
+      return lang === 'en'
+        ? 'You have already rated this trip.'
+        : lang === 'ur'
+          ? 'آپ اس سفر کی درجہ بندی کر چکے ہیں۔'
+          : 'قيّمت هذه الرحلة بالفعل.'
+
+    case 'claimed':
+      return lang === 'en'
+        ? 'Already coordinated with someone else.'
+        : lang === 'ur'
+          ? 'کسی اور کے ساتھ طے کر لیا گیا ہے۔'
+          : 'تم التنسيق مع شخص آخر.'
+
+    // ── Threads / messaging ─────────────────────────────────────────
+    case 'Cannot message yourself':
+    case 'cannot_message_self':
+      return lang === 'en'
+        ? "You can't send a message to yourself."
+        : lang === 'ur'
+          ? 'آپ اپنے آپ کو پیغام نہیں بھیج سکتے۔'
+          : 'لا يمكنك إرسال رسالة لنفسك.'
+
+    case 'Cannot block yourself':
+    case 'cannot_block_self':
+      return lang === 'en'
+        ? "You can't block yourself."
+        : lang === 'ur'
+          ? 'آپ اپنے آپ کو بلاک نہیں کر سکتے۔'
+          : 'لا يمكنك حظر نفسك.'
+
+    case 'userId required':
+    case 'user_id_required':
+      return lang === 'en'
+        ? 'User ID is required.'
+        : lang === 'ur'
+          ? 'صارف کی شناخت درکار ہے۔'
+          : 'معرّف المستخدم مطلوب.'
+
+    case 'Mismatch':
+    case 'mismatch':
+      return lang === 'en'
+        ? 'This item does not belong to that post.'
+        : lang === 'ur'
+          ? 'یہ آئٹم اس پوسٹ سے مطابقت نہیں رکھتا۔'
+          : 'هذا العنصر لا يتبع هذا المنشور.'
+
+    case 'Server error':
+    case 'server_error':
+      return lang === 'en'
+        ? 'Server error. Please try again in a moment.'
+        : lang === 'ur'
+          ? 'سرور میں مسئلہ۔ چند لمحوں میں دوبارہ کوشش کریں۔'
+          : 'خطأ في الخادم. حاول بعد لحظات.'
+
+    case 'Title required':
+    case 'title_required':
+      return lang === 'en'
+        ? 'Title is required.'
+        : lang === 'ur'
+          ? 'عنوان درکار ہے۔'
+          : 'العنوان مطلوب.'
   }
 
   // ── 3. Map specific Arabic server messages that post routes emit ──
@@ -395,6 +594,236 @@ const SERVER_MSG_MAP: Record<string, { ar: string; en: string; ur: string }> = {
     ar: 'الحد الأقصى للمسافة هو 500 كم.',
     en: 'Maximum ride distance is 500 km.',
     ur: 'سفر کی زیادہ سے زیادہ مسافت 500 کلومیٹر ہے۔',
+  },
+
+  // ── Posts: comments ──────────────────────────────────────────────
+  'لا يمكنك التعليق على منشورات حي آخر': {
+    ar: 'لا يمكنك التعليق على منشورات حيّ آخر.',
+    en: "You can't comment on posts from another neighborhood.",
+    ur: 'آپ دوسرے محلے کی پوسٹ پر تبصرہ نہیں کر سکتے۔',
+  },
+  'التعليق فارغ': {
+    ar: 'التعليق فارغ.',
+    en: 'Comment is empty.',
+    ur: 'تبصرہ خالی ہے۔',
+  },
+  'التعليق طويل جداً': {
+    ar: 'التعليق طويل جداً.',
+    en: 'Comment is too long.',
+    ur: 'تبصرہ بہت طویل ہے۔',
+  },
+  'التعليق قصير جداً': {
+    ar: 'التعليق قصير جداً.',
+    en: 'Comment is too short.',
+    ur: 'تبصرہ بہت مختصر ہے۔',
+  },
+  'تعليق غير صالح': {
+    ar: 'التعليق غير صالح.',
+    en: 'Invalid comment.',
+    ur: 'تبصرہ درست نہیں۔',
+  },
+  'تم حظر التعليق': {
+    ar: 'تم حظر التعليق لاحتوائه على محتوى غير لائق.',
+    en: 'The comment was blocked for inappropriate content.',
+    ur: 'نامناسب مواد کی وجہ سے تبصرہ بلاک کر دیا گیا۔',
+  },
+  'تم حظر المحتوى': {
+    ar: 'تم حظر المحتوى لاحتوائه على كلمات غير لائقة.',
+    en: 'The content was blocked for inappropriate language.',
+    ur: 'نامناسب الفاظ کی وجہ سے مواد بلاک کر دیا گیا۔',
+  },
+  'انتهت مهلة التعديل': {
+    ar: 'انتهت مهلة تعديل هذا العنصر.',
+    en: 'The edit window has closed.',
+    ur: 'ترمیم کی مہلت ختم ہو گئی ہے۔',
+  },
+
+  // ── Posts: reactions ─────────────────────────────────────────────
+  'رمز تعبيري غير صالح': {
+    ar: 'الرمز التعبيري غير صالح.',
+    en: 'Invalid emoji.',
+    ur: 'ایموجی درست نہیں۔',
+  },
+  'لا يمكنك التفاعل مع منشورات حي آخر': {
+    ar: 'لا يمكنك التفاعل مع منشورات حيّ آخر.',
+    en: "You can't react to posts from another neighborhood.",
+    ur: 'آپ دوسرے محلے کی پوسٹ پر ری ایکشن نہیں دے سکتے۔',
+  },
+
+  // ── Rides: offers ────────────────────────────────────────────────
+  'لا يوجد عرض لك على هذا الطلب': {
+    ar: 'لا يوجد عرض لك على هذا الطلب.',
+    en: "You don't have an offer on this request.",
+    ur: 'آپ کی اس درخواست پر کوئی پیشکش نہیں۔',
+  },
+  'العرض لم يعد قابلاً للتعديل': {
+    ar: 'العرض لم يعد قابلاً للتعديل.',
+    en: 'The offer can no longer be edited.',
+    ur: 'پیشکش اب قابلِ ترمیم نہیں۔',
+  },
+  'لا يوجد تغييرات': {
+    ar: 'لا يوجد تغييرات للحفظ.',
+    en: 'No changes to save.',
+    ur: 'محفوظ کرنے کے لیے کوئی تبدیلیاں نہیں۔',
+  },
+
+  // ── Threads / direct messages ────────────────────────────────────
+  'لا يمكنك التواصل مع هذا المستخدم / Cannot contact this user': {
+    ar: 'لا يمكنك التواصل مع هذا المستخدم.',
+    en: "You can't contact this user.",
+    ur: 'آپ اس صارف سے رابطہ نہیں کر سکتے۔',
+  },
+  'هذا النوع من المنشورات لا يدعم المحادثات الخاصة': {
+    ar: 'هذا النوع من المنشورات لا يدعم المحادثات الخاصة.',
+    en: "This type of post doesn't support private messages.",
+    ur: 'اس قسم کی پوسٹ پر نجی گفتگو کی اجازت نہیں۔',
+  },
+  'تم التنسيق مع شخص آخر': {
+    ar: 'تم التنسيق مع شخص آخر بالفعل.',
+    en: 'Already coordinated with someone else.',
+    ur: 'کسی اور کے ساتھ طے کر لیا گیا ہے۔',
+  },
+
+  // ── Profile ──────────────────────────────────────────────────────
+  'الاسم مطلوب': {
+    ar: 'الاسم مطلوب.',
+    en: 'Name is required.',
+    ur: 'نام درکار ہے۔',
+  },
+  'النبذة طويلة جداً (300 حرف كحد أقصى)': {
+    ar: 'النبذة طويلة جداً (الحد 300 حرف).',
+    en: 'Bio is too long (max 300 characters).',
+    ur: 'تعارف بہت طویل ہے (زیادہ سے زیادہ 300 حروف)۔',
+  },
+  'وصف الخدمة طويل جداً (500 حرف كحد أقصى)': {
+    ar: 'وصف الخدمة طويل جداً (الحد 500 حرف).',
+    en: 'Service description is too long (max 500 characters).',
+    ur: 'خدمت کی تفصیل بہت طویل ہے (زیادہ سے زیادہ 500 حروف)۔',
+  },
+  'لا يوجد بيانات للتحديث': {
+    ar: 'لا توجد بيانات للتحديث.',
+    en: 'Nothing to update.',
+    ur: 'اپ ڈیٹ کرنے کے لیے کوئی ڈیٹا نہیں۔',
+  },
+
+  // ── Moderator requests ───────────────────────────────────────────
+  'لديك صلاحيات بالفعل': {
+    ar: 'لديك صلاحيات إشراف بالفعل.',
+    en: 'You already have moderator permissions.',
+    ur: 'آپ کے پاس پہلے سے انتظامی اختیارات ہیں۔',
+  },
+  'يجب أن تكون مسجلاً في حي': {
+    ar: 'يجب أن تكون مسجلاً في حيّ لإتمام هذا الإجراء.',
+    en: 'You need to be registered in a neighborhood to do that.',
+    ur: 'اس کے لیے کسی محلے میں رجسٹرڈ ہونا ضروری ہے۔',
+  },
+  'تحتاج 20 نقطة سمعة على الأقل': {
+    ar: 'تحتاج 20 نقطة سمعة على الأقل.',
+    en: 'You need at least 20 reputation points.',
+    ur: 'کم از کم 20 ساکھ پوائنٹس درکار ہیں۔',
+  },
+  'لديك طلب قيد المراجعة بالفعل': {
+    ar: 'لديك طلب قيد المراجعة بالفعل.',
+    en: 'You already have a pending request.',
+    ur: 'آپ کی ایک درخواست پہلے سے زیرِ غور ہے۔',
+  },
+  'اكتب سبب طلبك (10 أحرف على الأقل)': {
+    ar: 'اكتب سبب طلبك (10 أحرف على الأقل).',
+    en: 'Please write a reason (at least 10 characters).',
+    ur: 'وجہ لکھیں (کم از کم 10 حروف)۔',
+  },
+  'حيّك لديه عدد كافٍ من المشرفين حالياً / This neighborhood currently has enough moderators': {
+    ar: 'حيّك لديه عدد كافٍ من المشرفين حالياً.',
+    en: 'This neighborhood already has enough moderators.',
+    ur: 'اس محلے میں پہلے سے کافی منتظم موجود ہیں۔',
+  },
+
+  // ── Rides: rating ────────────────────────────────────────────────
+  'الرحلة لم تكتمل بعد': {
+    ar: 'الرحلة لم تكتمل بعد.',
+    en: 'The trip has not completed yet.',
+    ur: 'سفر ابھی مکمل نہیں ہوا۔',
+  },
+  'انتهت مهلة التقييم': {
+    ar: 'انتهت مهلة التقييم.',
+    en: 'The rating window has closed.',
+    ur: 'درجہ بندی کی مہلت ختم ہو گئی۔',
+  },
+  'ليس لديك صلاحية': {
+    ar: 'ليست لديك صلاحية لهذا الإجراء.',
+    en: "You don't have permission to do that.",
+    ur: 'آپ کو اس کام کی اجازت نہیں۔',
+  },
+  'قيّمت هذه الرحلة بالفعل': {
+    ar: 'قيّمت هذه الرحلة بالفعل.',
+    en: 'You have already rated this trip.',
+    ur: 'آپ اس سفر کی درجہ بندی کر چکے ہیں۔',
+  },
+  'التقييم يجب أن يكون بين 1 و5': {
+    ar: 'التقييم يجب أن يكون بين 1 و5.',
+    en: 'Rating must be between 1 and 5.',
+    ur: 'درجہ بندی 1 سے 5 کے درمیان ہونی چاہیے۔',
+  },
+
+  // ── Polls ────────────────────────────────────────────────────────
+  'التصويت متاح فقط للمشرفين': {
+    ar: 'التصويت لا يُنشئه سوى المشرفين.',
+    en: 'Only moderators can create polls.',
+    ur: 'پولز صرف منتظم بنا سکتے ہیں۔',
+  },
+  'السؤال قصير جداً': {
+    ar: 'السؤال قصير جداً.',
+    en: 'The question is too short.',
+    ur: 'سوال بہت مختصر ہے۔',
+  },
+  'يجب أن يكون هناك 2-6 خيارات': {
+    ar: 'يجب أن يكون هناك بين 2 و6 خيارات.',
+    en: 'You need between 2 and 6 options.',
+    ur: '2 سے 6 اختیارات درکار ہیں۔',
+  },
+  'الخيارات فارغة': {
+    ar: 'الخيارات فارغة.',
+    en: 'Options cannot be empty.',
+    ur: 'اختیارات خالی ہیں۔',
+  },
+
+  // ── Service provider items ───────────────────────────────────────
+  'متاح فقط لمقدمي الخدمات / Service providers only': {
+    ar: 'هذا القسم متاح فقط لحسابات مقدّمي الخدمات.',
+    en: 'Service-provider accounts only.',
+    ur: 'صرف سروس پرووائیڈر اکاؤنٹس کے لیے۔',
+  },
+  'وصلت الحد الأقصى للعناصر حالياً / Item limit reached for now': {
+    ar: 'وصلت الحد الأقصى للعناصر حالياً.',
+    en: "You've hit the item limit for now.",
+    ur: 'ابھی آئٹمز کی حد مکمل ہو گئی۔',
+  },
+  'العنوان مطلوب / Title required': {
+    ar: 'العنوان مطلوب.',
+    en: 'Title is required.',
+    ur: 'عنوان درکار ہے۔',
+  },
+  'العنوان طويل جداً / Title too long': {
+    ar: 'العنوان طويل جداً.',
+    en: 'Title is too long.',
+    ur: 'عنوان بہت طویل ہے۔',
+  },
+  'الوصف طويل جداً / Description too long': {
+    ar: 'الوصف طويل جداً.',
+    en: 'Description is too long.',
+    ur: 'تفصیل بہت طویل ہے۔',
+  },
+  'سعر غير صالح / Invalid price': {
+    ar: 'السعر غير صالح — أدخل رقماً صحيحاً.',
+    en: 'Price is invalid — enter a valid number.',
+    ur: 'قیمت درست نہیں — درست نمبر درج کریں۔',
+  },
+
+  // ── Emergency request (English messages from server) ─────────────
+  'You already have a pending emergency request': {
+    ar: 'لديك طلب طوارئ قيد المراجعة بالفعل.',
+    en: 'You already have a pending emergency request.',
+    ur: 'آپ کی ایک ہنگامی درخواست پہلے سے زیرِ غور ہے۔',
   },
 }
 
