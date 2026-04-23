@@ -1963,6 +1963,46 @@ function PushTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
     detail?: string
   }>(null)
 
+  /** On native, force PushNotifications to request permission + register.
+   *  Waits for the 'registration' event, then POSTs the token to the
+   *  server. Returns true if the round-trip succeeded. No-ops on web. */
+  async function tryForceRegister(): Promise<boolean> {
+    try {
+      const w = window as any
+      if (!w?.Capacitor?.isNativePlatform?.()) return false
+      const { PushNotifications } = await import('@capacitor/push-notifications')
+      const platform = w.Capacitor?.getPlatform?.() || 'android'
+
+      const perm = await PushNotifications.requestPermissions()
+      if (perm.receive !== 'granted') return false
+
+      const tokenPromise = new Promise<string | null>((resolve) => {
+        const timer = setTimeout(() => resolve(null), 8000)
+        PushNotifications.addListener('registration', (t: any) => {
+          clearTimeout(timer)
+          resolve(t?.value || null)
+        })
+        PushNotifications.addListener('registrationError', () => {
+          clearTimeout(timer)
+          resolve(null)
+        })
+      })
+      await PushNotifications.register()
+      const token = await tokenPromise
+      if (!token) return false
+
+      const res = await fetch('/api/devices/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, platform }),
+        credentials: 'include',
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  }
+
   async function run() {
     setLoading(true)
     setResult(null)
@@ -1993,6 +2033,20 @@ function PushTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
         return
       }
       if (tokens === 0) {
+        // Try forcing a fresh registration right here instead of asking the
+        // user to reinstall. Works on native; no-ops on web.
+        const forced = await tryForceRegister()
+        if (forced) {
+          setResult({
+            ok: true,
+            summary: lang === 'en'
+              ? 'Device registered just now. Tap the button again to send a test push.'
+              : lang === 'ur'
+                ? 'ڈیوائس ابھی رجسٹر ہو گئی۔ ٹیسٹ پش بھیجنے کے لیے بٹن دوبارہ دبائیں۔'
+                : 'تم تسجيل الجهاز الآن. اضغط الزر مرة أخرى لإرسال إشعار تجريبي.',
+          })
+          return
+        }
         setResult({
           ok: false,
           summary: lang === 'en'
@@ -2000,8 +2054,10 @@ function PushTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
             : lang === 'ur' ? 'اس اکاؤنٹ کے لیے کوئی ڈیوائس ٹوکن رجسٹرڈ نہیں۔'
             : 'لا توجد أجهزة مسجّلة لهذا الحساب.',
           detail: lang === 'en'
-            ? 'Make sure notifications permission is granted, then reopen the app.'
-            : 'تأكد من السماح بالإشعارات ثم أعد فتح التطبيق.',
+            ? 'Make sure notifications permission is granted in iOS / Android Settings, then reopen the app.'
+            : lang === 'ur'
+              ? 'iOS / Android کی ترتیبات میں نوٹیفیکیشنز کی اجازت دیں اور ایپ دوبارہ کھولیں۔'
+              : 'تأكد من السماح بالإشعارات من إعدادات الجهاز ثم أعد فتح التطبيق.',
         })
         return
       }

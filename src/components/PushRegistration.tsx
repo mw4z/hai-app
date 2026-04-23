@@ -21,10 +21,21 @@ export default function PushRegistration() {
     if (typeof window === 'undefined') return
     if (!window.Capacitor?.isNativePlatform()) return
 
-    const hasAuthCookie = () =>
-      document.cookie
-        .split(';')
-        .some((c) => c.trim().startsWith('hai_token='))
+    // The hai_token cookie is HttpOnly, so we can't see it from JS.
+    // Probe a real authenticated endpoint instead — /api/notifications/unread
+    // already runs on every tab and is cheap. 200 = signed in.
+    const isSignedIn = async (): Promise<boolean> => {
+      try {
+        const res = await fetch('/api/notifications/unread', {
+          method: 'GET',
+          credentials: 'include',
+          cache: 'no-store',
+        })
+        return res.ok
+      } catch {
+        return false
+      }
+    }
 
     const init = async () => {
       try {
@@ -111,9 +122,10 @@ export default function PushRegistration() {
       }
     }
 
-    const attempt = () => {
+    const attempt = async () => {
       if (registeredRef.current) return
-      if (!hasAuthCookie()) return
+      const signedIn = await isSignedIn()
+      if (!signedIn) return
       registeredRef.current = true
       init()
     }
@@ -122,11 +134,11 @@ export default function PushRegistration() {
     attempt()
 
     // New signups / fresh logins dispatch this event after OTP success
-    const onAuth = () => attempt()
+    const onAuth = () => { void attempt() }
     window.addEventListener('hai:auth-ready', onAuth)
 
     // Safety net: retry on focus in case the event was missed
-    const onFocus = () => attempt()
+    const onFocus = () => { void attempt() }
     window.addEventListener('focus', onFocus)
 
     return () => {
