@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { createNotification } from '@/lib/notifications'
 import { addReputation, REP_POINTS } from '@/lib/reputation'
 import { requireVerified } from '@/lib/requireVerified'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 
 function isValidEmoji(str: string) {
   return typeof str === 'string' && str.trim().length > 0 && str.length <= 8
@@ -129,6 +130,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             })
           }
         })
+        kickNotifCron()
       } catch (err) {
         console.error('[NOTIF_JOB] enqueue reaction_on_post failed:', err)
       }

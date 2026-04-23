@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import crypto from 'crypto'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 
 export const dynamic = 'force-dynamic'
 
@@ -182,6 +183,7 @@ export async function POST(req: NextRequest) {
       })
       return created
     })
+    kickNotifCron()
 
     console.log('[EMERGENCY_ALERT] created', {
       alertId: alert.id,

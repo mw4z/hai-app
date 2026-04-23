@@ -8,6 +8,7 @@ import { getPostLimit } from '@/lib/reputation'
 import { getLimits } from '@/lib/capabilities'
 import { cacheDeletePrefix } from '@/lib/cache'
 import { moderateContent } from '@/lib/moderation'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 import { requireVerified } from '@/lib/requireVerified'
 
 const DEFAULT_POST_LIMIT = 5
@@ -224,6 +225,7 @@ export async function POST(req: NextRequest) {
     }).catch((err) => {
       console.error('[NOTIF_JOB] enqueue new_post failed:', err)
     })
+    kickNotifCron()
 
     // Notify all neighbors when someone posts in LOOKING_FOR
     if (category === 'LOOKING_FOR') {

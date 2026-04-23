@@ -440,7 +440,9 @@ async function processNewPost(job: JobRow): Promise<JobOutcome> {
   const result = await sendPushBatch(tokens, {
     title: pushTitle,
     body: pushBody,
-    priority: 'normal',
+    // HIGH — real-time neighborhood activity needs immediate delivery.
+    // NORMAL priority lets FCM + Android Doze mode defer for minutes.
+    priority: 'high',
     data: {
       type: 'new_post',
       postId,
@@ -510,7 +512,7 @@ async function processCommentOnPost(job: JobRow): Promise<JobOutcome> {
   const result = await sendPushBatch(tokens, {
     title: pushTitle,
     body: pushBody,
-    priority: 'normal',
+    priority: 'high',
     data: {
       type: 'comment_on_post',
       postId,
@@ -595,7 +597,7 @@ async function processReplyToComment(job: JobRow): Promise<JobOutcome> {
   const result = await sendPushBatch(tokens, {
     title: pushTitle,
     body: pushBody,
-    priority: 'normal',
+    priority: 'high',
     data: {
       type: 'reply_to_comment',
       postId,
@@ -666,7 +668,7 @@ async function processReactionOnPost(job: JobRow): Promise<JobOutcome> {
   const result = await sendPushBatch(tokens, {
     title: pushTitle,
     body: pushBody,
-    priority: 'normal',
+    priority: 'high',
     data: {
       type: 'reaction_on_post',
       postId,

@@ -5,6 +5,7 @@ import { createNotification } from '@/lib/notifications'
 import { apiError } from '@/lib/validation'
 import { moderateContent } from '@/lib/moderation'
 import { requireVerified } from '@/lib/requireVerified'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
@@ -191,6 +192,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }).catch((err) => {
         console.error('[NOTIF_JOB] enqueue reply_to_comment failed:', err)
       })
+      kickNotifCron()
     }
   } else if (post.authorId !== session.userId) {
     db.notifJob.create({
@@ -211,6 +213,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }).catch((err) => {
       console.error('[NOTIF_JOB] enqueue comment_on_post failed:', err)
     })
+    kickNotifCron()
   }
 
   return NextResponse.json(comment)
