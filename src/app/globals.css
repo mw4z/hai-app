@@ -222,7 +222,7 @@ input, textarea, [contenteditable="true"] {
   from { transform: translateY(100%); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
 }
-.animate-slide-up { animation: slide-up 0.25s ease-out; }
+.animate-slide-up { animation: slide-up var(--hai-dur-slow) var(--hai-ease-standard); }
 
 @keyframes slide-in-right {
   from { transform: translateX(30px); opacity: 0; }
@@ -236,9 +236,22 @@ input, textarea, [contenteditable="true"] {
   from { transform: translateY(15px); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
 }
-.animate-slide-in-rtl { animation: slide-in-right 0.35s ease-out; }
-.animate-slide-in-ltr { animation: slide-in-left 0.35s ease-out; }
-.animate-fade-in-up   { animation: fade-in-up 0.3s ease-out; }
+.animate-slide-in-rtl { animation: slide-in-right var(--hai-dur-slow) var(--hai-ease-standard); }
+.animate-slide-in-ltr { animation: slide-in-left  var(--hai-dur-slow) var(--hai-ease-standard); }
+.animate-fade-in-up   { animation: fade-in-up     var(--hai-dur-slow) var(--hai-ease-standard); }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-up,
+  .animate-slide-in-rtl,
+  .animate-slide-in-ltr,
+  .animate-fade-in-up,
+  .hai-arc-pin-ltr,
+  .hai-arc-pin-rtl,
+  .hai-label-in,
+  .hai-label-out {
+    animation: none;
+  }
+}
 
 * {
   box-sizing: border-box;
@@ -499,11 +512,23 @@ body::before {
 }
 
 .reaction-picker-enter {
-  animation: popUp 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  /* Tamed overshoot (was 1.56 — too cartoonish). Uses the unified
+     --hai-ease-overshoot so every "pop in" in the app shares the
+     same restrained bounce. */
+  animation: popUp var(--hai-dur-normal) var(--hai-ease-overshoot) forwards;
 }
 
 .reaction-bounce {
-  animation: reactionBounce 0.4s ease forwards;
+  animation: reactionBounce var(--hai-dur-slow) ease forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reaction-picker-enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .reaction-bounce { animation: none; }
 }
 
 /* ── HaiLoader — branded dot animation ──────────────── */
@@ -561,8 +586,8 @@ body::before {
   88%  { transform: translate3d(26px,  -22px, 0) scale(1); }
   100% { transform: translate3d(-6px,    0px, 0) scale(1);    opacity: 1; }
 }
-.hai-arc-pin-ltr { animation: hai-arc-travel-ltr 560ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards; }
-.hai-arc-pin-rtl { animation: hai-arc-travel-rtl 560ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards; }
+.hai-arc-pin-ltr { animation: hai-arc-travel-ltr var(--hai-dur-travel) var(--hai-ease-standard) forwards; }
+.hai-arc-pin-rtl { animation: hai-arc-travel-rtl var(--hai-dur-travel) var(--hai-ease-standard) forwards; }
 
 @keyframes hai-trail-draw {
   0%   { stroke-dashoffset: 420; opacity: 0.25; }
@@ -584,7 +609,7 @@ body::before {
   100% { opacity: 1; transform: translateY(0) scale(1); letter-spacing: 0; }
 }
 .hai-label-out { animation: hai-label-out 280ms ease-out forwards; }
-.hai-label-in  { animation: hai-label-in  560ms cubic-bezier(0.34, 1.56, 0.64, 1) 240ms both; }
+.hai-label-in  { animation: hai-label-in  var(--hai-dur-travel) var(--hai-ease-overshoot) 240ms both; }
 
 /* Shimmer used for neighborhood picker skeleton rows */
 @keyframes hai-shimmer {

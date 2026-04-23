@@ -7,6 +7,24 @@ import { hapticMedium, hapticLight } from '@/lib/haptic'
 const THRESHOLD = 80
 const MAX_PULL = 120
 
+/* Shared motion helpers — read the calibrated tokens so the
+   pull-to-refresh resistance and snap-back match the rest of the
+   app (sheets, lightbox). See design-tokens.css. */
+function motionToken(name: string, fallback: string): string {
+  if (typeof window === 'undefined') return fallback
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return v || fallback
+}
+function tokenNumber(name: string, fallback: number): number {
+  const raw = motionToken(name, String(fallback))
+  const n = parseFloat(raw)
+  return Number.isFinite(n) ? n : fallback
+}
+function reducedMotion(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true
+}
+
 export default function PullToRefresh() {
   const router = useRouter()
   const [pullY, setPullY] = useState(0)
@@ -34,7 +52,11 @@ export default function PullToRefresh() {
       if (!pulling.current || refreshing) return
       const delta = e.touches[0].clientY - startY.current
       if (delta <= 0) { setPullY(0); return }
-      const clamped = Math.min(delta * 0.5, MAX_PULL)
+      // Resistance divisor from the unified motion token (soft = 2.2
+       // by default → roughly 0.45 factor, tuned so the pull has enough
+       // travel to feel responsive without outrunning the indicator).
+      const resistance = tokenNumber('--hai-resistance-soft', 2.2)
+      const clamped = Math.min(delta / resistance, MAX_PULL)
       setPullY(clamped)
       if (delta > 10) e.preventDefault()
       // Haptic when crossing threshold
@@ -83,7 +105,15 @@ export default function PullToRefresh() {
   return (
     <div
       className="fixed left-0 right-0 z-50 flex justify-center pointer-events-none"
-      style={{ top: 'env(safe-area-inset-top, 0px)', transform: `translateY(${pullY - 52}px)`, transition: pulling.current ? 'none' : 'transform 0.3s ease' }}
+      style={{
+        top: 'env(safe-area-inset-top, 0px)',
+        transform: `translateY(${pullY - 52}px)`,
+        transition: pulling.current
+          ? 'none'
+          : reducedMotion()
+            ? 'none'
+            : `transform ${motionToken('--hai-dur-slow', '260ms')} ${motionToken('--hai-ease-standard', 'cubic-bezier(0.22, 1, 0.36, 1)')}`,
+      }}
     >
       <div className={`w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${
         ready ? 'bg-primary-600 scale-110' : 'bg-white dark:bg-gray-800'

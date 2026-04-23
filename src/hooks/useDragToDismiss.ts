@@ -19,6 +19,24 @@ import { useCallback, useEffect, useRef } from 'react'
 const DISMISS_THRESHOLD = 120 // px
 const VELOCITY_THRESHOLD = 0.6 // px/ms
 
+/** Shared motion values, read from design-tokens.css so the hook
+ *  tracks the app-wide calibration. Falls back to sensible defaults
+ *  if the page has no `.dark` / `:root` styles yet. */
+function motionToken(name: string, fallback: string): string {
+  if (typeof window === 'undefined') return fallback
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return v || fallback
+}
+function tokenNumber(name: string, fallback: number): number {
+  const raw = motionToken(name, String(fallback))
+  const n = parseFloat(raw)
+  return Number.isFinite(n) ? n : fallback
+}
+function reducedMotion(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true
+}
+
 interface Opts {
   open: boolean
   onDismiss: () => void
@@ -43,7 +61,9 @@ export function useDragToDismiss<T extends HTMLElement, H extends HTMLElement>({
   const springBack = useCallback(() => {
     const el = sheetRef.current
     if (!el) return
-    el.style.transition = 'transform 240ms cubic-bezier(0.22, 1, 0.36, 1)'
+    const dur = reducedMotion() ? '0ms' : motionToken('--hai-dur-slow', '260ms')
+    const ease = motionToken('--hai-ease-standard', 'cubic-bezier(0.22, 1, 0.36, 1)')
+    el.style.transition = `transform ${dur} ${ease}`
     el.style.transform = 'translateY(0px)'
     const done = () => {
       el.style.transition = ''
@@ -79,8 +99,11 @@ export function useDragToDismiss<T extends HTMLElement, H extends HTMLElement>({
 
       const rawDelta = y - startY.current
       // Rubber-band the upward drag — the sheet can stretch a little
-      // but never leaves the screen upward.
-      const delta = rawDelta >= 0 ? rawDelta : rawDelta / 3
+      // but never leaves the screen upward. Divisor comes from the
+      // shared --hai-resistance-standard token so all drag surfaces
+      // share the same elastic character.
+      const resistance = tokenNumber('--hai-resistance-standard', 3)
+      const delta = rawDelta >= 0 ? rawDelta : rawDelta / resistance
       setTransform(delta)
       if (rawDelta > 6) e.preventDefault()
     }
@@ -94,10 +117,12 @@ export function useDragToDismiss<T extends HTMLElement, H extends HTMLElement>({
         // Animate out then dismiss so the close feels continuous.
         const el = sheetRef.current
         if (el) {
-          el.style.transition = 'transform 220ms cubic-bezier(0.4, 0, 1, 1)'
+          const dur = reducedMotion() ? '0ms' : motionToken('--hai-dur-normal', '180ms')
+          const ease = motionToken('--hai-ease-exit', 'cubic-bezier(0.4, 0, 1, 1)')
+          el.style.transition = `transform ${dur} ${ease}`
           el.style.transform = `translateY(${el.offsetHeight}px)`
         }
-        setTimeout(onDismiss, 180)
+        setTimeout(onDismiss, reducedMotion() ? 0 : 180)
       } else {
         springBack()
       }

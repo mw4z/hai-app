@@ -97,17 +97,19 @@ export default function BottomNav({ active, isReadOnly = false }: { active: stri
           )
         })}
 
-        {/* Center FAB — flat, single-color, token-driven. */}
-        <div className="flex-1 flex justify-center" style={{ marginTop: -20 }}>
+        {/* Center FAB — flat, single-color, token-driven. Sized to sit
+            cleanly inside the bottom-nav rhythm (48px button in a 64px
+            nav) instead of floating above it. */}
+        <div className="flex-1 flex justify-center items-center">
           <button
             onClick={handleNewPost}
-            className="w-[58px] h-[58px] rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"
+            className="w-12 h-12 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"
             style={{
               background: 'var(--hai-primary-500)',
             }}
             aria-label="new post"
           >
-            <FiPlus className="w-7 h-7" />
+            <FiPlus className="w-6 h-6" />
           </button>
         </div>
 

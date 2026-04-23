@@ -21,10 +21,33 @@ const V_DISMISS_VEL = 0.7      // px/ms — "flick down to close"
 const DIR_LOCK_PX = 8          // pixels before we commit to horizontal/vertical
 const MAX_ZOOM = 5
 
-const SPRING =
-  'transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1)'
-const ZOOM_SPRING =
-  'transform 300ms cubic-bezier(0.22, 0.61, 0.36, 1)'
+/** Read the shared motion tokens (design-tokens.css) so the lightbox's
+ *  snap / zoom springs match sheet and pull-to-refresh calibration.
+ *  Falls back to the legacy hand-tuned values if the tokens haven't
+ *  loaded yet (first paint before CSS is ready). */
+function motionToken(name: string, fallback: string): string {
+  if (typeof window === 'undefined') return fallback
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return v || fallback
+}
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true
+}
+// Computed at call-site so SSR never touches window and prefers-reduced-motion
+// can shorten / disable the spring at event time.
+const SPRING = (): string => {
+  if (prefersReducedMotion()) return 'transform 0ms linear'
+  const dur = motionToken('--hai-dur-xslow', '420ms')
+  const ease = motionToken('--hai-ease-standard', 'cubic-bezier(0.22, 1, 0.36, 1)')
+  return `transform ${dur} ${ease}`
+}
+const ZOOM_SPRING = (): string => {
+  if (prefersReducedMotion()) return 'transform 0ms linear'
+  const dur = motionToken('--hai-dur-slow', '260ms')
+  const ease = motionToken('--hai-ease-standard', 'cubic-bezier(0.22, 1, 0.36, 1)')
+  return `transform ${dur} ${ease}`
+}
 
 /**
  * Premium fullscreen image viewer.
@@ -116,14 +139,14 @@ export default function ImageLightbox({
     const track = trackRef.current
     if (!track) return
     const vw = window.innerWidth
-    track.style.transition = SPRING
+    track.style.transition = SPRING()
     track.style.transform = `translate3d(${-trackIdx * vw}px, 0, 0)`
 
     // Reset zoom state of the newly-active image
     zoomRef.current = { scale: 1, tx: 0, ty: 0 }
     const wrap = imgWrapRefs.current[index]
     if (wrap) {
-      wrap.style.transition = ZOOM_SPRING
+      wrap.style.transition = ZOOM_SPRING()
       wrap.style.transform = 'translate3d(0, 0, 0) scale(1)'
     }
   }, [index, trackIdx])
@@ -238,9 +261,16 @@ export default function ImageLightbox({
       if (g.mode === 'h') {
         e.preventDefault()
         let offset = dx
-        // Rubber band at physical track edges
+        // Rubber band at physical track edges — divisor comes from
+        // the shared --hai-resistance-standard token so the lightbox
+        // track, bottom sheets, and onboarding all yield identically
+        // when dragged past their limits.
         if ((tIdx === 0 && dx > 0) || (tIdx === lenm1 && dx < 0)) {
-          offset = dx * 0.32
+          const resistance = parseFloat(
+            getComputedStyle(document.documentElement)
+              .getPropertyValue('--hai-resistance-standard').trim(),
+          ) || 3
+          offset = dx / resistance
         }
         if (trackRef.current) {
           const vw = window.innerWidth
@@ -287,7 +317,7 @@ export default function ImageLightbox({
           nextTIdx = Math.max(0, tIdx - 1)
         }
         if (trackRef.current) {
-          trackRef.current.style.transition = SPRING
+          trackRef.current.style.transition = SPRING()
           const vw = window.innerWidth
           trackRef.current.style.transform = `translate3d(${-nextTIdx * vw}px, 0, 0)`
         }
@@ -306,11 +336,14 @@ export default function ImageLightbox({
           const realIdx = rtl ? len - 1 - tIdx : tIdx
           const wrap = imgWrapRefs.current[realIdx]
           if (wrap) {
-            wrap.style.transition = ZOOM_SPRING
+            wrap.style.transition = ZOOM_SPRING()
             wrap.style.transform = 'translate3d(0, 0, 0) scale(1)'
           }
           if (backdropRef.current) {
-            backdropRef.current.style.transition = 'opacity 260ms ease-out'
+            const bdDur = prefersReducedMotion()
+              ? '0ms'
+              : motionToken('--hai-dur-slow', '260ms')
+            backdropRef.current.style.transition = `opacity ${bdDur} ease-out`
             backdropRef.current.style.opacity = '1'
           }
         }
@@ -320,7 +353,7 @@ export default function ImageLightbox({
           const realIdx = rtl ? len - 1 - tIdx : tIdx
           const wrap = imgWrapRefs.current[realIdx]
           if (wrap) {
-            wrap.style.transition = ZOOM_SPRING
+            wrap.style.transition = ZOOM_SPRING()
             wrap.style.transform = 'translate3d(0, 0, 0) scale(1)'
           }
         }
@@ -330,7 +363,7 @@ export default function ImageLightbox({
         const realIdx = rtl ? len - 1 - tIdx : tIdx
         if (now - lastTapRef.current < 280) {
           const wrap = imgWrapRefs.current[realIdx]
-          if (wrap) wrap.style.transition = ZOOM_SPRING
+          if (wrap) wrap.style.transition = ZOOM_SPRING()
           if (zoomRef.current.scale > 1.05) {
             zoomRef.current = { scale: 1, tx: 0, ty: 0 }
           } else {
@@ -394,7 +427,7 @@ export default function ImageLightbox({
         dir="ltr"
         style={{
           transform: `translate3d(${-trackIdx * 100}%, 0, 0)`,
-          transition: SPRING,
+          transition: SPRING(),
         }}
       >
         {images.map((url, i) => (
