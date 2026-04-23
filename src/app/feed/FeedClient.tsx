@@ -404,11 +404,8 @@ export default function FeedClient({
               <button
                 key={cat.key}
                 onClick={() => handleCategoryChange(cat.key)}
-                className={`flex items-center gap-1 whitespace-nowrap px-3.5 py-1.5 rounded-full text-xs font-medium transition-all flex-shrink-0 ${
-                  selectedCategory === cat.key
-                    ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/25 glow-tab'
-                    : 'bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 border border-gray-200 dark:border-white/[0.08]'
-                }`}
+                data-active={selectedCategory === cat.key ? 'true' : 'false'}
+                className="hai-chip flex-shrink-0"
               >
                 <span>{cat.icon}</span>
                 <span>{t(cat.tKey)}</span>

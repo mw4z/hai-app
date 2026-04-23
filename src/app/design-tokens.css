@@ -1,0 +1,196 @@
+/* ───────────────────────────────────────────────────────────────────────
+   Hai — Design Tokens (v1)
+   Single source of truth for colors, spacing, radius, typography, shadows.
+   All components should reference these variables; avoid hex literals and
+   one-off pixel values in component files.
+   ─────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Primary — muted professional green ─────────────────────────── */
+  --hai-primary-50:  #ecfdf5;
+  --hai-primary-100: #d1fae5;
+  --hai-primary-200: #a7f3d0;
+  --hai-primary-400: #4ade80;
+  --hai-primary-500: #22c55e;   /* brand default (buttons, active tab) */
+  --hai-primary-600: #16a34a;   /* brand hover / pressed */
+  --hai-primary-700: #15803d;   /* brand text on light bg */
+  --hai-primary-900: #14532d;
+
+  /* ── Neutral — grayscale surfaces & text ────────────────────────── */
+  --hai-bg:          #ffffff;   /* page background */
+  --hai-surface-1:   #ffffff;   /* card / header background */
+  --hai-surface-2:   #f9fafb;   /* subtle inner surfaces */
+  --hai-surface-3:   #f3f4f6;   /* pressed / selected bg */
+  --hai-border:      #e5e7eb;
+  --hai-border-soft: #f3f4f6;
+
+  --hai-text:        #0f172a;   /* primary text */
+  --hai-text-sub:    #374151;   /* secondary text */
+  --hai-text-muted:  #6b7280;   /* labels, metadata */
+  --hai-text-faint:  #9ca3af;   /* placeholders, timestamps */
+
+  /* ── Semantic accents ────────────────────────────────────────────── */
+  --hai-danger:      #ef4444;
+  --hai-warning:     #f59e0b;
+  --hai-info:        #3b82f6;
+
+  /* ── Spacing — 8pt base grid ─────────────────────────────────────── */
+  --hai-space-1: 4px;    /* 0.5× */
+  --hai-space-2: 8px;    /* 1×   */
+  --hai-space-3: 12px;   /* 1.5× */
+  --hai-space-4: 16px;   /* 2×   */
+  --hai-space-5: 20px;   /* 2.5× */
+  --hai-space-6: 24px;   /* 3×   */
+  --hai-space-8: 32px;   /* 4×   */
+  --hai-space-10: 40px;  /* 5×   */
+  --hai-space-12: 48px;  /* 6×   */
+
+  /* ── Radius ─────────────────────────────────────────────────────── */
+  --hai-radius-sm: 8px;
+  --hai-radius-md: 12px;   /* buttons, inputs */
+  --hai-radius-lg: 16px;   /* cards */
+  --hai-radius-xl: 20px;   /* sheets, large cards */
+  --hai-radius-full: 9999px;
+
+  /* ── Typography ─────────────────────────────────────────────────── */
+  --hai-font-ar: 'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --hai-font-ur: 'Noto Nastaliq Urdu', system-ui, sans-serif;
+  --hai-font-en: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+
+  --hai-fs-xs:  11px;
+  --hai-fs-sm:  13px;
+  --hai-fs-md:  15px;   /* body default */
+  --hai-fs-lg:  17px;
+  --hai-fs-xl:  20px;
+  --hai-fs-2xl: 24px;
+  --hai-fs-3xl: 30px;
+
+  --hai-fw-regular:  400;
+  --hai-fw-medium:   500;
+  --hai-fw-semibold: 600;
+  --hai-fw-bold:     700;
+
+  --hai-lh-tight:  1.2;
+  --hai-lh-normal: 1.4;
+  --hai-lh-relaxed: 1.6;
+
+  /* ── Shadows — subtle only; WebView paint cost matters ──────────── */
+  --hai-shadow-sm:  0 1px 2px rgba(15, 23, 42, 0.04);
+  --hai-shadow-md:  0 2px 8px rgba(15, 23, 42, 0.06);
+  --hai-shadow-lg:  0 6px 20px rgba(15, 23, 42, 0.08);
+  --hai-shadow-fab: 0 6px 18px rgba(22, 163, 74, 0.30), 0 2px 4px rgba(0, 0, 0, 0.12);
+
+  /* ── Motion ─────────────────────────────────────────────────────── */
+  --hai-dur-fast:   120ms;
+  --hai-dur-normal: 180ms;
+  --hai-dur-slow:   260ms;
+  --hai-ease:       cubic-bezier(0.16, 1, 0.3, 1);  /* ease-out-expo */
+
+  /* ── Layout ─────────────────────────────────────────────────────── */
+  --hai-tap-min: 44px;            /* iOS HIG minimum tap target */
+  --hai-max-width: 480px;         /* phone container */
+  --hai-nav-height: 64px;         /* bottom nav */
+  --hai-header-height: 56px;
+}
+
+/* ── Dark mode — pure dark surfaces, reduced green saturation ──── */
+.dark {
+  --hai-bg:          #0a0f0c;
+  --hai-surface-1:   #101614;
+  --hai-surface-2:   #141a18;
+  --hai-surface-3:   #1b221f;
+  --hai-border:      rgba(255, 255, 255, 0.08);
+  --hai-border-soft: rgba(255, 255, 255, 0.04);
+
+  --hai-text:        #f1f5f9;
+  --hai-text-sub:    #cbd5e1;
+  --hai-text-muted:  #94a3b8;
+  --hai-text-faint:  #64748b;
+
+  /* Green stays readable on very dark bg; primary-400 reads as the
+     "accent" in dark mode rather than primary-600. */
+  --hai-primary-500: #4ade80;
+  --hai-primary-600: #22c55e;
+  --hai-primary-700: #86efac;
+
+  --hai-shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.5);
+  --hai-shadow-md:  0 2px 8px rgba(0, 0, 0, 0.55);
+  --hai-shadow-lg:  0 6px 20px rgba(0, 0, 0, 0.6);
+  --hai-shadow-fab: 0 6px 18px rgba(74, 222, 128, 0.25), 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Shared utility classes that wrap the tokens ─────────────────── */
+.hai-card {
+  background: var(--hai-surface-1);
+  border: 1px solid var(--hai-border);
+  border-radius: var(--hai-radius-lg);
+  box-shadow: var(--hai-shadow-sm);
+  padding: var(--hai-space-4);
+}
+
+.hai-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hai-space-2);
+  height: 32px;
+  padding: 0 var(--hai-space-3);
+  border-radius: var(--hai-radius-full);
+  font-size: var(--hai-fs-sm);
+  font-weight: var(--hai-fw-medium);
+  background: var(--hai-surface-3);
+  color: var(--hai-text-sub);
+  border: 1px solid var(--hai-border);
+  transition: transform var(--hai-dur-fast) var(--hai-ease),
+              background-color var(--hai-dur-normal) var(--hai-ease);
+}
+.hai-chip:active { transform: scale(0.96); }
+.hai-chip[data-active="true"] {
+  background: var(--hai-primary-500);
+  color: #ffffff;
+  border-color: var(--hai-primary-500);
+}
+
+.hai-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hai-space-2);
+  min-height: var(--hai-tap-min);
+  padding: 0 var(--hai-space-5);
+  border-radius: var(--hai-radius-md);
+  background: var(--hai-primary-500);
+  color: #ffffff;
+  font-weight: var(--hai-fw-semibold);
+  font-size: var(--hai-fs-md);
+  box-shadow: var(--hai-shadow-md);
+  transition: transform var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-btn-primary:active { transform: scale(0.97); }
+
+.hai-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hai-space-2);
+  min-height: var(--hai-tap-min);
+  padding: 0 var(--hai-space-4);
+  border-radius: var(--hai-radius-md);
+  background: transparent;
+  color: var(--hai-text-sub);
+  font-weight: var(--hai-fw-medium);
+  font-size: var(--hai-fs-md);
+  border: 1px solid var(--hai-border);
+}
+
+.hai-divider {
+  height: 1px;
+  background: var(--hai-border-soft);
+  margin: var(--hai-space-3) 0;
+}
+
+/* ── Accessibility: honor reduced-motion ─────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .hai-chip, .hai-btn-primary {
+    transition: none;
+  }
+}

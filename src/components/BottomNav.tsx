@@ -66,7 +66,16 @@ export default function BottomNav({ active, isReadOnly = false }: { active: stri
   }, [])
 
   return (
-    <nav className="fixed bottom-0 right-0 left-0 max-w-[480px] mx-auto glass-bottom z-10" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}>
+    <nav
+      className="fixed bottom-0 right-0 left-0 mx-auto z-10"
+      style={{
+        maxWidth: 'var(--hai-max-width)',
+        paddingBottom: 'max(env(safe-area-inset-bottom), var(--hai-space-2))',
+        background: 'var(--hai-surface-1)',
+        borderTop: '1px solid var(--hai-border)',
+        boxShadow: 'var(--hai-shadow-md)',
+      }}
+    >
       <div className="flex items-end">
         {/* Left two tabs: Home, Market */}
         {NAV_ITEMS.slice(0, 2).map((item) => {
