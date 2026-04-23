@@ -377,6 +377,18 @@ const SERVER_MSG_MAP: Record<string, { ar: string; en: string; ur: string }> = {
     en: 'Please explain the dispute reason (at least 10 characters).',
     ur: 'تنازع کی وجہ بیان کریں (کم از کم 10 حروف)۔',
   },
+
+  // ── Ride distance validation (src/lib/rides/distance.ts) ─────────
+  'Pickup and dropoff must be at least 500m apart': {
+    ar: 'يجب أن تكون نقطة الانطلاق والوجهة على بُعد 500 متر على الأقل.',
+    en: 'Pickup and drop-off must be at least 500 m apart.',
+    ur: 'اٹھانے کی جگہ اور منزل کے درمیان کم از کم 500 میٹر ہونا ضروری ہے۔',
+  },
+  'Maximum ride distance is 500 km': {
+    ar: 'الحد الأقصى للمسافة هو 500 كم.',
+    en: 'Maximum ride distance is 500 km.',
+    ur: 'سفر کی زیادہ سے زیادہ مسافت 500 کلومیٹر ہے۔',
+  },
 }
 
 /** Pattern-match rules for server messages that interpolate values
