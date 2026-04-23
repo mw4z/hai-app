@@ -390,19 +390,23 @@ html.dark body::before {
    ══════════════════════════════════════════════════════════════════════ */
 @layer components {
   .btn-primary {
-    display: inline-flex;
+    /* display:flex (block-level) so a consumer adding Tailwind `block`
+       can't override display:inline-flex and kill vertical centering. */
+    display: flex;
     align-items: center;
     justify-content: center;
     gap: var(--hai-space-2);
     width: 100%;
     min-height: var(--hai-tap-min);
-    padding: 0 var(--hai-space-5);
+    /* Vertical padding + lh-normal so Arabic text (e.g. "انضم لحيّك")
+       has breathing room and shadda/descenders don't clip. */
+    padding: var(--hai-space-3) var(--hai-space-5);
     border-radius: var(--hai-radius-md);
     background: var(--hai-primary-500);
     color: var(--hai-text-invert);
     font-weight: var(--hai-fw-semibold);
     font-size: var(--hai-fs-md);
-    line-height: var(--hai-lh-tight);
+    line-height: var(--hai-lh-normal);
     box-shadow: var(--hai-shadow-md);
     border: 1px solid transparent;
     transition: transform var(--hai-dur-fast) var(--hai-ease),
@@ -419,19 +423,19 @@ html.dark body::before {
   }
 
   .btn-outline {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
     gap: var(--hai-space-2);
     width: 100%;
     min-height: var(--hai-tap-min);
-    padding: 0 var(--hai-space-5);
+    padding: var(--hai-space-3) var(--hai-space-5);
     border-radius: var(--hai-radius-md);
     background: transparent;
     color: var(--hai-primary-600);
     font-weight: var(--hai-fw-semibold);
     font-size: var(--hai-fs-md);
-    line-height: var(--hai-lh-tight);
+    line-height: var(--hai-lh-normal);
     border: 2px solid var(--hai-primary-500);
     transition: transform var(--hai-dur-fast) var(--hai-ease),
                 background-color var(--hai-dur-normal) var(--hai-ease),

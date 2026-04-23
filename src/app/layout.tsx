@@ -98,7 +98,7 @@ export default function RootLayout({
             var d = document.documentElement.classList.contains('dark');
             if (d) {
               var el = document.getElementById('__hai_preload');
-              if (el) el.style.background = 'radial-gradient(ellipse at 50% 42%, #0d2818 0%, #0f1a14 40%, #0a0f0c 100%)';
+              if (el) el.style.background = 'radial-gradient(ellipse at 50% 42%, #162137 0%, #0f1a30 40%, #0b1222 100%)';
             }
           })();
         `}} />

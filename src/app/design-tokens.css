@@ -676,11 +676,15 @@
   justify-content: center;
   gap: var(--hai-space-2);
   min-height: var(--hai-tap-min);
-  padding: 0 var(--hai-space-5);
+  /* Vertical padding protects Arabic descenders / shadda from
+     hugging the button edge; horizontal keeps the same rhythm. */
+  padding: var(--hai-space-3) var(--hai-space-5);
   border-radius: var(--hai-radius-md);
   font-size: var(--hai-fs-md);
   font-weight: var(--hai-fw-semibold);
-  line-height: var(--hai-lh-tight);
+  /* Normal line-height (1.4) — lh-tight (1.2) clipped Arabic diacritics
+     and looked cramped on "انضم لحيّك" / "عندي حساب" in the landing CTAs. */
+  line-height: var(--hai-lh-normal);
   text-align: center;
   text-decoration: none;
   border: 1px solid transparent;

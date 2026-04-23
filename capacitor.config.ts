@@ -11,7 +11,10 @@ const config: CapacitorConfig = {
   appendUserAgent: 'HaiNativeApp',
   android: {
     allowMixedContent: true,
-    backgroundColor: '#0f172a',
+    // Matches --hai-bg in dark mode (src/app/design-tokens.css) so the
+    // native Android window behind the webview is the same navy as the
+    // app body — no slate-vs-navy seam visible in the safe-area / notch.
+    backgroundColor: '#0b1222',
   },
   plugins: {
     SplashScreen: {

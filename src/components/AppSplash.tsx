@@ -220,7 +220,9 @@ export default function AppSplash() {
           background: radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #f0fdf4 40%, #fff 100%);
         }
         :global(.dark) ._sp-bg {
-          background: radial-gradient(ellipse at 50% 42%, #0d2818 0%, #0f1a14 40%, #0a0f0c 100%);
+          /* Navy radial — matches the app's dark --hai-bg ramp so the
+             splash→app handoff has no color seam. */
+          background: radial-gradient(ellipse at 50% 42%, #162137 0%, #0f1a30 40%, #0b1222 100%);
         }
 
         /* ── Stage ────────────────────────────────────────── */
