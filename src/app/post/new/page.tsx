@@ -246,7 +246,29 @@ export default function NewPostPage() {
   async function handleSubmit() {
     if (loading || uploading) return // Prevent double-submit
     if (!title.trim() || !body.trim()) {
-      toast.error('أدخل العنوان والتفاصيل')
+      const missing =
+        !title.trim() && !body.trim() ? 'both'
+          : !title.trim() ? 'title'
+          : 'body'
+      toast.error(
+        lang === 'en'
+          ? missing === 'title'
+            ? 'Please add a title.'
+            : missing === 'body'
+              ? 'Please add details in the body.'
+              : 'Please add a title and details.'
+          : lang === 'ur'
+            ? missing === 'title'
+              ? 'عنوان درج کریں۔'
+              : missing === 'body'
+                ? 'تفصیل درج کریں۔'
+                : 'عنوان اور تفصیل دونوں درج کریں۔'
+            : missing === 'title'
+              ? 'أدخل عنواناً للمنشور.'
+              : missing === 'body'
+                ? 'أدخل تفاصيل المنشور.'
+                : 'أدخل العنوان والتفاصيل.',
+      )
       return
     }
     if (!category) {
@@ -279,7 +301,12 @@ export default function NewPostPage() {
 
       if (!res.ok) {
         playError()
-        toast.error(translateApiError(data, lang as 'ar' | 'en' | 'ur'))
+        // Surface the server's specific reason (category invalid, missing
+        // fields, rate-limit, content blocked, duplicate, etc.) instead of
+        // the generic fallback. 4.5s so the user can actually read it.
+        toast.error(translateApiError(data, lang as 'ar' | 'en' | 'ur'), {
+          duration: 4500,
+        })
         return
       }
 
@@ -289,7 +316,14 @@ export default function NewPostPage() {
       sessionStorage.setItem('hai_feed_refresh', '1')
       router.push('/feed')
     } catch {
-      toast.error('تعذر الاتصال')
+      toast.error(
+        lang === 'en'
+          ? "Couldn't connect. Check your internet and try again."
+          : lang === 'ur'
+            ? 'کنیکشن نہیں بن سکا۔ انٹرنیٹ چیک کر کے دوبارہ کوشش کریں۔'
+            : 'تعذر الاتصال. تحقّق من الإنترنت وحاول مرة أخرى.',
+        { duration: 4500 },
+      )
     } finally {
       setLoading(false)
     }

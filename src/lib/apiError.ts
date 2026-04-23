@@ -4,13 +4,34 @@ type Lang = 'ar' | 'en' | 'ur'
 
 /**
  * Extract a user-friendly error message from an API response body.
- * Always returns a message in the user's current language with a
- * brief explanation of why the error happened.
+ * Always returns a message in the user's current language explaining
+ * *why* the request failed — never a generic "something went wrong"
+ * when the server told us something specific.
+ *
+ * Supports every error shape the API emits:
+ *   • { error: 'DUPLICATE_POST' }                 ← flat code
+ *   • { error: 'CONTENT_BLOCKED' }
+ *   • { error: { code: 'ERR_400', message: '…' } } ← apiError() helper
+ *   • { error: 'some raw error', message: '…' }
+ *   • unknown / empty body
  */
 export function translateApiError(body: any, lang: Lang): string {
-  const code = body?.error
-  const serverMsg = typeof body?.message === 'string' ? body.message : ''
+  // ── 1. Normalize both possible shapes ─────────────────────────────
+  let code: string | undefined
+  let serverMsg: string | undefined
 
+  if (body && typeof body === 'object') {
+    const err = body.error
+    if (typeof err === 'string') {
+      code = err
+    } else if (err && typeof err === 'object') {
+      if (typeof err.code === 'string') code = err.code
+      if (typeof err.message === 'string') serverMsg = err.message
+    }
+    if (!serverMsg && typeof body.message === 'string') serverMsg = body.message
+  }
+
+  // ── 2. Known semantic codes → bilingual canonical copy ────────────
   switch (code) {
     case 'not_verified':
       return lang === 'en'
@@ -52,6 +73,7 @@ export function translateApiError(body: any, lang: Lang): string {
 
     case 'banned':
     case 'user_banned':
+    case 'BANNED':
       return lang === 'en'
         ? 'Your account is temporarily restricted.'
         : lang === 'ur'
@@ -83,21 +105,100 @@ export function translateApiError(body: any, lang: Lang): string {
 
     case 'DUPLICATE_POST':
       return lang === 'en'
-        ? 'You\'ve already posted something similar in the last 3 hours. Please rephrase or wait a bit before posting again.'
+        ? "You've already posted something similar in the last 3 hours. Please rephrase or wait a bit before posting again."
         : lang === 'ur'
           ? 'آپ نے پچھلے 3 گھنٹوں میں ملتی جلتی پوسٹ کر دی ہے۔ متن تبدیل کریں یا تھوڑی دیر بعد دوبارہ کوشش کریں۔'
           : 'لديك منشور مشابه خلال آخر 3 ساعات. غيّر الصياغة أو انتظر قليلاً قبل النشر مرة أخرى.'
-
-    default:
-      // Server provided a human-readable message? Use it.
-      if (serverMsg) return serverMsg
-      if (typeof code === 'string' && code.length > 0 && code.length < 120) return code
-      return lang === 'en'
-        ? 'Something went wrong. Please try again.'
-        : lang === 'ur'
-          ? 'کچھ مسئلہ ہو گیا۔ دوبارہ کوشش کریں۔'
-          : 'حدث خطأ. يرجى المحاولة مرة أخرى.'
   }
+
+  // ── 3. Map specific Arabic server messages that post routes emit ──
+  //     These come from `apiError('…', status)` without a symbolic code.
+  //     We translate them into the user's language so EN/UR users get a
+  //     real explanation instead of an untranslated Arabic string.
+  if (serverMsg) {
+    const m = SERVER_MSG_MAP[serverMsg.trim()]
+    if (m) return m[lang] || m.ar
+    // Fall through: server sent a message we haven't mapped yet; surface
+    // it verbatim. Any message is better than a generic "حدث خطأ".
+    return serverMsg
+  }
+
+  // ── 4. Last resort — only when the server said literally nothing. ──
+  if (typeof code === 'string' && code.length > 0 && code.length < 120) return code
+  return lang === 'en'
+    ? 'Something went wrong. Please try again.'
+    : lang === 'ur'
+      ? 'کچھ مسئلہ ہو گیا۔ دوبارہ کوشش کریں۔'
+      : 'حدث خطأ. يرجى المحاولة مرة أخرى.'
+}
+
+/**
+ * Server-side specific messages → trilingual canonical copy.
+ * Keyed by the exact Arabic string the API emits so existing routes
+ * keep working without a migration. Additions here stay backwards-
+ * compatible with routes that already ship those messages.
+ */
+const SERVER_MSG_MAP: Record<string, { ar: string; en: string; ur: string }> = {
+  'يجب تسجيل الدخول': {
+    ar: 'يجب تسجيل الدخول.',
+    en: 'You need to be signed in.',
+    ur: 'سائن ان کرنا ضروری ہے۔',
+  },
+  'أكمل ملفك الشخصي أولاً': {
+    ar: 'أكمل ملفك الشخصي أولاً.',
+    en: 'Please complete your profile first.',
+    ur: 'پہلے اپنی پروفائل مکمل کریں۔',
+  },
+  'حسابك موقوف': {
+    ar: 'حسابك موقوف.',
+    en: 'Your account is suspended.',
+    ur: 'آپ کا اکاؤنٹ معطل ہے۔',
+  },
+  'تصنيف غير صالح': {
+    ar: 'اختر تصنيفاً صالحاً.',
+    en: 'Please pick a valid category.',
+    ur: 'ایک درست زمرہ منتخب کریں۔',
+  },
+  'بيانات ناقصة': {
+    ar: 'البيانات ناقصة — تأكد من العنوان والمحتوى.',
+    en: 'Missing fields — make sure the title and body are filled in.',
+    ur: 'معلومات نامکمل — عنوان اور تفصیل دونوں پُر کریں۔',
+  },
+  'سعر غير صالح': {
+    ar: 'السعر غير صالح — أدخل رقماً صحيحاً.',
+    en: 'Price is invalid — enter a number.',
+    ur: 'قیمت درست نہیں — صحیح نمبر درج کریں۔',
+  },
+  'هذا القسم للنساء فقط': {
+    ar: 'هذا القسم مخصّص للنساء فقط.',
+    en: 'This category is for women only.',
+    ur: 'یہ زمرہ صرف خواتین کے لیے ہے۔',
+  },
+  'هذا القسم متاح فقط لمقدمي الخدمات': {
+    ar: 'هذا القسم متاح فقط لحسابات مقدّمي الخدمات.',
+    en: 'This category is only available to service-provider accounts.',
+    ur: 'یہ زمرہ صرف سروس پرووائیڈر اکاؤنٹس کے لیے ہے۔',
+  },
+  'المسابقات متاحة فقط للمشرفين': {
+    ar: 'المسابقات لا ينشرها سوى المشرفين.',
+    en: 'Only moderators can publish contests.',
+    ur: 'مسابقے صرف منتظم شائع کر سکتے ہیں۔',
+  },
+  'انتظر قليلاً قبل نشر منشور جديد': {
+    ar: 'انتظر قليلاً قبل نشر منشور جديد.',
+    en: 'Please wait a bit before creating another post.',
+    ur: 'نئی پوسٹ بنانے سے پہلے تھوڑا انتظار کریں۔',
+  },
+  'وصلت الحد الأقصى للمنشورات اليوم': {
+    ar: 'وصلت الحد الأقصى للمنشورات اليوم — حاول مجدداً غداً.',
+    en: "You've hit today's post limit — try again tomorrow.",
+    ur: 'آج کی پوسٹنگ کی حد مکمل ہو گئی — کل دوبارہ کوشش کریں۔',
+  },
+  'خطأ في الخادم': {
+    ar: 'خطأ في الخادم. حاول بعد لحظات.',
+    en: 'Server error. Please try again in a moment.',
+    ur: 'سرور میں مسئلہ۔ چند لمحوں میں دوبارہ کوشش کریں۔',
+  },
 }
 
 /**
@@ -108,12 +209,21 @@ export function translateApiError(body: any, lang: Lang): string {
  */
 export async function showApiError(res: Response, lang: Lang): Promise<void> {
   let body: any = null
-  try { body = await res.json() } catch { /* */ }
+  try { body = await res.json() } catch { /* body may be empty / non-json */ }
   const msg = translateApiError(body, lang)
-  if (body?.error === 'not_verified') {
+  const code = typeof body?.error === 'string'
+    ? body.error
+    : typeof body?.error?.code === 'string'
+      ? body.error.code
+      : undefined
+
+  if (code === 'not_verified') {
     // Guide the user to the verify-location page with an actionable toast.
     toast.error(msg, { duration: 5000 })
   } else {
-    toast.error(msg)
+    // Longer duration for content/validation failures so the user has
+    // time to read the specific reason (otherwise a 3s toast whips past
+    // and they never catch what they did wrong).
+    toast.error(msg, { duration: 4500 })
   }
 }
