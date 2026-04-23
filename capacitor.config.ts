@@ -35,10 +35,11 @@ const config: CapacitorConfig = {
       // CapacitorBridge flips to light icons at runtime when the app
       // is in dark mode.
       style: 'DARK',
-      // Match the launch storyboard + preload div background so there's
-      // no dark flash behind the status bar while the bridge is still
-      // booting.
-      backgroundColor: '#f0fdf4',
+      // Transparent so the webview paints the safe-area region itself
+      // (via body / body::before / .hai-screen background). Prevents a
+      // colored band appearing on top of the app while the native
+      // bridge is still booting.
+      backgroundColor: '#00000000',
       // Let the webview extend under the status bar from the first
       // frame; CapacitorBridge already sets this at runtime, so starting
       // here avoids the layout shift when the override kicks in.

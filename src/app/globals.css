@@ -115,7 +115,9 @@ input, textarea, [contenteditable="true"] {
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 .dark .glass {
-  background: var(--hai-bg) !important;
+  /* Header sits on the same raised surface as the bottom nav so
+     they visually bracket the page at the same elevation. */
+  background: var(--hai-surface-1) !important;
   border-bottom-color: var(--hai-border);
 }
 
@@ -334,9 +336,9 @@ body::before {
   height: env(safe-area-inset-top, 0px);
   z-index: 50;
   pointer-events: none;
-  background: #ffffff;
-}
-html.dark body::before {
+  /* Single authoritative token — --hai-bg flips with theme, so the
+     safe-area cover is guaranteed to match the page background in
+     both light and dark modes without a separate override rule. */
   background: var(--hai-bg);
 }
 /* Safe-area cover is now rendered as #__hai_safe_top in layout.tsx —

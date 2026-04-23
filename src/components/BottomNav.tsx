@@ -97,21 +97,17 @@ export default function BottomNav({ active, isReadOnly = false }: { active: stri
           )
         })}
 
-        {/* Center FAB */}
+        {/* Center FAB — flat, single-color, token-driven. */}
         <div className="flex-1 flex justify-center" style={{ marginTop: -20 }}>
           <button
             onClick={handleNewPost}
-            className="fab-glow relative w-[58px] h-[58px] rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"
+            className="w-[58px] h-[58px] rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"
             style={{
-              background: 'radial-gradient(circle at 30% 30%, #34d399 0%, #16a34a 50%, #14532d 100%)',
-              boxShadow: '0 6px 20px -2px rgba(22, 163, 74, 0.55), 0 2px 6px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.35)',
+              background: 'var(--hai-primary-500)',
             }}
             aria-label="new post"
           >
-            {/* Outer soft ring */}
-            <span className="absolute inset-0 rounded-full ring-[3px] ring-white/60 dark:ring-gray-900/60" />
-            {/* Icon */}
-            <FiPlus className="w-7 h-7 relative z-10 drop-shadow-sm" />
+            <FiPlus className="w-7 h-7" />
           </button>
         </div>
 

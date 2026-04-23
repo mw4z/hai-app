@@ -2585,11 +2585,16 @@ textarea.hai-input {
 .hai-action-btn__label { }
 .hai-action-btn__count { font-variant-numeric: tabular-nums; }
 
-/* Reaction picker popover anchor — positioned above the trigger */
+/* Reaction picker popover — positioned above the trigger.
+   Anchored to the START edge of the trigger so the 288px emoji
+   picker extends INWARD across the card body instead of off-screen
+   (the trigger is a small left-edge item in the action bar).
+   max-width keeps it inside the viewport on narrow phones. */
 .hai-reaction-popover {
   position: absolute;
   bottom: calc(100% + var(--hai-space-2));
-  inset-inline-end: 0;
+  inset-inline-start: 0;
+  max-width: calc(100vw - var(--hai-space-6));
   z-index: var(--hai-z-menu);
   border-radius: var(--hai-radius-lg);
   overflow: hidden;

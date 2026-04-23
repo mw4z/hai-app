@@ -578,7 +578,7 @@ export default function PostCard({
               <FiMoreVertical className="hai-icon-md" />
             </button>
             {showMenu && (
-              <div className="hai-menu hai-menu--anchored hai-menu--anchored-start">
+              <div className="hai-menu hai-menu--anchored hai-menu--anchored-end">
                 {/* Owner: edit + delete */}
                 {post.author.id === currentUserId && (
                   <>
