@@ -23,8 +23,12 @@ import { useState, useEffect, useRef } from 'react'
  */
 
 const SESSION_KEY = 'hai_splash'
-const MIN_MS = 1500
-const MAX_MS = 2500
+// Timings lengthened so the full pulse-rings + dot stagger play on
+// every launch, not just the slow-load (signed-in/feed) path. The
+// ring loop is 1.8s starting at 0.4s, so we need at least 2.2s for
+// one full cycle to be visible before dismiss kicks in.
+const MIN_MS = 2200
+const MAX_MS = 3000
 const FADE_MS = 400
 
 function alreadyShown() {
