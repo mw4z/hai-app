@@ -33,6 +33,29 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
     }
 
+    // ── Push Notifications — REQUIRED forwarders ────────────────────────
+    // Capacitor's @capacitor/push-notifications plugin listens for these
+    // two iOS delegate callbacks via NotificationCenter. Without explicit
+    // forwarders here the plugin never sees the device token and
+    // register() silently times out after ~10s — which is why every
+    // iOS build was hitting register_timeout in the diagnostic. See:
+    // https://capacitorjs.com/docs/apis/push-notifications#ios
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(
+            name: .capacitorDidRegisterForRemoteNotifications,
+            object: deviceToken
+        )
+    }
+
+    func application(_ application: UIApplication,
+                     didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(
+            name: .capacitorDidFailToRegisterForRemoteNotifications,
+            object: error
+        )
+    }
+
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
         // Called when the app was launched with a url. Feel free to add additional processing here,
         // but if you want the App API to support tracking app url opens, make sure to keep this call
