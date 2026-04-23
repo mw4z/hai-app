@@ -1994,6 +1994,20 @@ function PushTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
     }
     const platform = w.Capacitor?.getPlatform?.() || 'android'
 
+    // Purge every token this user has on the server before we ask for
+    // a fresh one. FCM returns 200 for tokens that belonged to a
+    // previous install but which no live device is listening on — so
+    // the push is silently dropped. Wiping first guarantees the only
+    // token we test against is the one this live install produces.
+    try {
+      await fetch('/api/devices/register?all=true', {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+    } catch {
+      // non-fatal — worst case we end up with an extra dead token
+    }
+
     let perm: any
     try {
       perm = await PushNotifications.requestPermissions()
@@ -2124,7 +2138,6 @@ function PushTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
         return
       }
 
-      const tokens = Array.isArray(info.deviceTokens) ? info.deviceTokens.length : 0
       const fcmOk = !!info?.fcm?.configured
 
       if (!fcmOk) {
@@ -2140,24 +2153,40 @@ function PushTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
         })
         return
       }
-      if (tokens === 0) {
-        // Try forcing a fresh registration right here instead of asking the
-        // user to reinstall. Works on native; no-ops on web. Surface the
-        // specific failure reason if it doesn't succeed so we can act on it.
-        const forced = await tryForceRegister()
-        if (forced.ok) {
-          setResult({
-            ok: true,
-            summary: lang === 'en'
-              ? 'Device registered just now. Tap the button again to send a test push.'
-              : lang === 'ur'
-                ? 'ڈیوائس ابھی رجسٹر ہو گئی۔ ٹیسٹ پش بھیجنے کے لیے بٹن دوبارہ دبائیں۔'
-                : 'تم تسجيل الجهاز الآن. اضغط الزر مرة أخرى لإرسال إشعار تجريبي.',
-          })
-          return
-        }
+
+      // 2. ALWAYS force-register first so we test with a fresh token
+      //    from the CURRENT install. FCM returns 200 for stale tokens
+      //    that belong to a previous uninstall, so if the DB has a
+      //    dead token from an earlier force-register, FCM silently
+      //    drops the push and we see "sent but nothing arrives".
+      //    Re-registering here replaces it with today's live token.
+      const forced = await tryForceRegister()
+      if (!forced.ok && forced.reason !== 'not_native') {
+        // On web we ignore not_native (no tokens to refresh); on
+        // native any other failure means we can't prove delivery
+        // works and should surface the specific reason.
         const msg = forceRegReasonLabel(forced.reason, forced.detail)
         setResult({ ok: false, summary: msg.summary, detail: msg.detail })
+        return
+      }
+
+      // Re-fetch to confirm a token now exists after force-register.
+      const info2 = await fetch('/api/debug/push-test')
+        .then((r) => r.json())
+        .catch(() => null) as any
+      const tokens = Array.isArray(info2?.deviceTokens) ? info2.deviceTokens.length : 0
+      if (tokens === 0) {
+        setResult({
+          ok: false,
+          summary: lang === 'en'
+            ? 'No device token after forced registration.'
+            : lang === 'ur'
+              ? 'زبردستی رجسٹریشن کے بعد بھی کوئی ٹوکن نہیں۔'
+              : 'لا يوجد رمز جهاز حتى بعد محاولة التسجيل.',
+          detail: lang === 'en'
+            ? 'Check OS notification permission for Hai in phone Settings.'
+            : 'تحقق من إذن الإشعارات للتطبيق في إعدادات الجهاز.',
+        })
         return
       }
 
@@ -2176,15 +2205,27 @@ function PushTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
         return
       }
       if (send.ok) {
+        // Surface per-device outcome so the user can see whether the
+        // delivery actually landed on the current phone (platform +
+        // channel + token prefix). Helps distinguish "FCM returned
+        // 200 but phone didn't receive" (stale token elsewhere) from
+        // real delivery to THIS device.
+        const perDevice = Array.isArray(send.results)
+          ? send.results
+              .map((r: any) => `${r.ok ? '✓' : '✗'} ${r.platform || '?'} ${r.tokenPrefix || ''} (${r.channel || 'fcm'})`)
+              .join('\n')
+          : ''
         setResult({
           ok: true,
           summary: lang === 'en'
             ? `Sent to ${send.delivered} of ${send.totalDevices} devices.`
             : lang === 'ur' ? `${send.totalDevices} میں سے ${send.delivered} ڈیوائسز پر بھیجا گیا۔`
             : `تم الإرسال إلى ${send.delivered} من ${send.totalDevices} أجهزة.`,
-          detail: lang === 'en'
-            ? 'If nothing shows on your lock screen, check OS notification permission for Hai.'
-            : 'إذا لم يصل شيء، تحقق من إذن الإشعارات للتطبيق في إعدادات الجهاز.',
+          detail:
+            (lang === 'en'
+              ? 'If the phone shows no banner even with the app open (you should see a 🔔 toast) AND locked, the FCM token in our DB is for a different install. Reinstall the app to get a fresh token.'
+              : 'لو الجهاز ما ظهر عليه إشعار حتى مع الشاشة المقفلة، الرمز المسجّل لنسخة ثانية من التطبيق. إعادة تثبيت التطبيق يصلح هذا.')
+            + (perDevice ? `\n\n${perDevice}` : ''),
         })
       } else {
         const firstErr = Array.isArray(send.results)

@@ -61,13 +61,19 @@ export async function DELETE(req: NextRequest) {
 
   const url = new URL(req.url)
   const token = url.searchParams.get('token')
-  if (!token) return NextResponse.json({ error: 'invalid_token' }, { status: 400 })
+  const all = url.searchParams.get('all') === 'true'
+
+  if (!token && !all) {
+    return NextResponse.json({ error: 'invalid_token' }, { status: 400 })
+  }
 
   try {
-    await db.deviceToken.deleteMany({
-      where: { token, userId: session.userId },
+    const result = await db.deviceToken.deleteMany({
+      where: all
+        ? { userId: session.userId }
+        : { token: token!, userId: session.userId },
     })
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: true, deleted: result.count })
   } catch (err) {
     console.error('[DEVICE_REGISTER] delete failed', err)
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
