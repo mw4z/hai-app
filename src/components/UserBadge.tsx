@@ -3,13 +3,22 @@
 import { getPrimaryBadge, getRoleBadge, getTierBadge } from '@/lib/user-badge'
 import { useLanguage } from '@/hooks/useLanguage'
 
-/** Blue verification check — for identity (providers, mods) */
+/** Blue verification check — identity (providers, mods). Color comes
+ *  from the design system via `.hai-verified-mark`. */
 function VerifyCheck({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className={className || 'w-[14px] h-[14px]'} fill="currentColor" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className={`hai-verified-mark ${className || 'hai-icon-sm'}`} fill="currentColor" aria-hidden="true">
       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1.4 14.6L6 12l1.4-1.4 3.2 3.2 6.4-6.4L18.4 8.8l-7.8 7.8z" />
     </svg>
   )
+}
+
+/** Map role → semantic state key for the design system. */
+function roleState(role?: string): 'admin' | 'mod' | null {
+  if (!role) return null
+  if (role === 'SUPER_ADMIN') return 'admin'
+  if (role === 'NEIGHBORHOOD_MOD' || role === 'PLATFORM_MOD') return 'mod'
+  return null
 }
 
 /**
@@ -35,6 +44,7 @@ export default function UserBadgeDisplay({
   const { lang } = useLanguage()
   const roleBadge = getRoleBadge(role || '')
   const primary = getPrimaryBadge(accountType || 'NORMAL', providerStatus)
+  const rState = roleState(role)
 
   // Identity badges only — no tier in this component
   if (!roleBadge && !primary) return null
@@ -45,24 +55,30 @@ export default function UserBadgeDisplay({
     return obj.ar
   }
 
-  const labelColor = lightText ? 'text-white/90' : 'text-gray-500'
+  const primaryState = accountType === 'VERIFIED_PROVIDER' ? 'verified' : 'provider'
 
   return (
-    <span className="inline-flex items-center gap-1 mx-1">
+    <span className="hai-row-1 hai-user-badges">
       {roleBadge && (
-        <span className="text-[11px] leading-none" title={label(roleBadge)}>
-          {roleBadge.emoji}
-          {showLabel && <span className={`mr-0.5 ${lightText ? 'text-white/90' : 'text-amber-600 dark:text-amber-400'}`}>{label(roleBadge)}</span>}
+        <span className="hai-row-1 hai-user-badge-slot" title={label(roleBadge)}>
+          <span className="hai-user-badge-emoji">{roleBadge.emoji}</span>
+          {showLabel && rState && (
+            <span className="hai-state-pill" data-state={rState}>{label(roleBadge)}</span>
+          )}
         </span>
       )}
 
       {primary && (
-        <span className="inline-flex items-center gap-0.5">
+        <span className="hai-row-1 hai-user-badge-slot">
           {accountType === 'VERIFIED_PROVIDER'
-            ? <VerifyCheck className="w-[14px] h-[14px] text-blue-500 flex-shrink-0" />
-            : <span className="text-[11px] leading-none">{primary.emoji}</span>
+            ? <VerifyCheck />
+            : <span className="hai-user-badge-emoji">{primary.emoji}</span>
           }
-          {showLabel && <span className={`text-[10px] leading-none ${labelColor}`}>{label(primary)}</span>}
+          {showLabel && (
+            <span className="hai-state-pill" data-state={primaryState} data-light-text={lightText ? 'true' : 'false'}>
+              {label(primary)}
+            </span>
+          )}
         </span>
       )}
     </span>
@@ -71,7 +87,7 @@ export default function UserBadgeDisplay({
 
 /**
  * Tier label — shown below username or in profile.
- * Subtle text badge, not an icon.
+ * Semantic badge driven by the `[data-tier]` attribute.
  */
 export function TierLabel({
   reputation,
@@ -82,7 +98,7 @@ export function TierLabel({
 }) {
   const { lang } = useLanguage()
   const tier = getTierBadge(reputation)
-  if (!tier) return null // "new" tier = no label
+  if (!tier || tier.tier === 'new') return null // "new" tier = no label
 
   function label(obj: { ar: string; en: string; ur: string }) {
     if (lang === 'en') return obj.en
@@ -90,17 +106,6 @@ export function TierLabel({
     return obj.ar
   }
 
-  const colors: Record<string, string> = {
-    'text-amber-500': 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20',
-    'text-green-500': 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20',
-    'text-blue-500':  'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700',
-  }
-
-  const colorClass = colors[tier.colorClass] || 'text-gray-500 bg-gray-100'
-
-  if (compact) {
-    return <span className={`text-[9px] font-medium ${colorClass} px-1.5 py-0.5 rounded-full`}>{label(tier)}</span>
-  }
-
-  return <span className={`text-[10px] font-medium ${colorClass} px-2 py-0.5 rounded-full`}>{label(tier)}</span>
+  const cls = compact ? 'hai-tier-badge hai-tier-badge--compact' : 'hai-tier-badge'
+  return <span className={cls} data-tier={tier.tier}>{label(tier)}</span>
 }

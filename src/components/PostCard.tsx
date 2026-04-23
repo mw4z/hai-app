@@ -20,22 +20,31 @@ import { canStartPrivateThread } from '@/lib/thread-rules'
 import { getRepLevel } from '@/lib/reputation-levels'
 import RiyalIcon from './RiyalIcon'
 import UserBadgeDisplay, { TierLabel } from './UserBadge'
+import { StatePill } from '@/lib/state-render'
 
-const CATEGORY_STYLES: Record<string, { tKey: TranslationKey; bg: string; text: string; icon: string }> = {
-  ALERT:             { tKey: 'cat_ALERT',             bg: 'bg-red-50',     text: 'text-red-600',     icon: '🔔' },
-  NEIGHBORHOOD_ISSUE:{ tKey: 'cat_NEIGHBORHOOD_ISSUE', bg: 'bg-orange-50',  text: 'text-orange-600',  icon: '⚠️' },
-  LOOKING_FOR:       { tKey: 'cat_LOOKING_FOR',        bg: 'bg-sky-50',     text: 'text-sky-600',     icon: '🔎' },
-  MARKETPLACE:       { tKey: 'cat_MARKETPLACE',        bg: 'bg-amber-50',   text: 'text-amber-600',   icon: '🛒' },
-  FOOD_HOME:         { tKey: 'cat_FOOD_HOME',          bg: 'bg-lime-50',    text: 'text-lime-700',    icon: '🍱' },
-  REAL_ESTATE:       { tKey: 'cat_REAL_ESTATE',        bg: 'bg-teal-50',    text: 'text-teal-700',    icon: '🏠' },
-  SERVICES:          { tKey: 'cat_SERVICES',           bg: 'bg-blue-50',    text: 'text-blue-600',    icon: '🔧' },
-  LOST_FOUND:        { tKey: 'cat_LOST_FOUND',         bg: 'bg-purple-50',  text: 'text-purple-600',  icon: '🔍' },
-  MOSQUE:            { tKey: 'cat_MOSQUE',             bg: 'bg-green-50',   text: 'text-green-700',   icon: '🕌' },
-  EID_RAMADAN:       { tKey: 'cat_EID_RAMADAN',        bg: 'bg-yellow-50',  text: 'text-yellow-700',  icon: '🎉' },
-  CONTESTS:          { tKey: 'cat_CONTESTS',           bg: 'bg-fuchsia-50', text: 'text-fuchsia-700', icon: '🏆' },
-  RIDE_REQUEST:      { tKey: 'cat_RIDE_REQUEST',        bg: 'bg-indigo-50',  text: 'text-indigo-600',  icon: '🚗' },
-  WOMEN_ONLY:        { tKey: 'cat_WOMEN_ONLY',         bg: 'bg-pink-50',    text: 'text-pink-600',    icon: '👩' },
-  GENERAL:           { tKey: 'cat_GENERAL',            bg: 'bg-gray-50',    text: 'text-gray-600',    icon: '💬' },
+/**
+ * Category → semantic label + icon.
+ *
+ * Appearance is NO LONGER stored here. All category colors (light + dark)
+ * live in design-tokens.css as --hai-category-{ENUM}-{bg|fg} and are
+ * applied by the `.hai-category-badge` primitive via `data-category`.
+ * This map is pure business metadata (translation key + icon glyph).
+ */
+const CATEGORY_STYLES: Record<string, { tKey: TranslationKey; icon: string }> = {
+  ALERT:              { tKey: 'cat_ALERT',              icon: '🔔' },
+  NEIGHBORHOOD_ISSUE: { tKey: 'cat_NEIGHBORHOOD_ISSUE', icon: '⚠️' },
+  LOOKING_FOR:        { tKey: 'cat_LOOKING_FOR',        icon: '🔎' },
+  MARKETPLACE:        { tKey: 'cat_MARKETPLACE',        icon: '🛒' },
+  FOOD_HOME:          { tKey: 'cat_FOOD_HOME',          icon: '🍱' },
+  REAL_ESTATE:        { tKey: 'cat_REAL_ESTATE',        icon: '🏠' },
+  SERVICES:           { tKey: 'cat_SERVICES',           icon: '🔧' },
+  LOST_FOUND:         { tKey: 'cat_LOST_FOUND',         icon: '🔍' },
+  MOSQUE:             { tKey: 'cat_MOSQUE',             icon: '🕌' },
+  EID_RAMADAN:        { tKey: 'cat_EID_RAMADAN',        icon: '🎉' },
+  CONTESTS:           { tKey: 'cat_CONTESTS',           icon: '🏆' },
+  RIDE_REQUEST:       { tKey: 'cat_RIDE_REQUEST',       icon: '🚗' },
+  WOMEN_ONLY:         { tKey: 'cat_WOMEN_ONLY',         icon: '👩' },
+  GENERAL:            { tKey: 'cat_GENERAL',            icon: '💬' },
 }
 
 
@@ -531,95 +540,117 @@ export default function PostCard({
   const isLookingFor = post.category === 'LOOKING_FOR'
 
   return (
-    <div className={`card relative animate-fade-in-up glow-card ${post.isPinned ? 'border-t-2 border-t-primary-500' : ''} ${isLookingFor ? 'border border-sky-200 bg-sky-50/40' : ''}`}>
-      {post.isPinned && <span className="text-xs text-primary-600 font-medium mb-1 block">{t('post_pinned')}</span>}
+    <div className={`hai-card relative animate-fade-in-up glow-card ${post.isPinned ? 'hai-post--pinned' : ''} ${isLookingFor ? 'hai-post--looking-for' : ''}`}>
+      {post.isPinned && (
+        <StatePill state="pinned" label={t('post_pinned')} className="hai-mb-1" />
+      )}
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setShowUserPopup(true)}>
-          <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-sm flex-shrink-0 overflow-hidden">
+      <div className="hai-row-2 hai-justify-between hai-items-start hai-mb-2">
+        <div className="hai-row-2 hai-cursor-pointer" onClick={() => setShowUserPopup(true)}>
+          <div className="hai-avatar hai-avatar--sm">
             {post.author.avatarUrl
-              ? <img src={post.author.avatarUrl} alt="" className="w-full h-full object-cover" />
+              ? <img src={post.author.avatarUrl} alt="" />
               : (post.author.name?.[0] || '؟')
             }
           </div>
           <div>
-            <div className="flex items-center">
-              <span className="text-sm font-medium text-gray-800">{post.author.name || t('post_neighbor')}</span>
+            <div className="hai-row-1">
+              <span className="hai-body-strong">{post.author.name || t('post_neighbor')}</span>
               <UserBadgeDisplay accountType={post.author.accountType} providerStatus={post.author.providerStatus} reputation={post.author.reputation} role={post.author.role} />
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-400">{timeAgo(post.createdAt)}</span>
+            <div className="hai-row-1">
+              <span className="hai-meta">{timeAgo(post.createdAt)}</span>
               <TierLabel reputation={post.author.reputation} compact />
               {post.isFeatured && (
-                <span className="text-[9px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
-                  {lang !== 'en' ? 'بارز' : 'Featured'}
-                </span>
+                <StatePill state="featured" label={lang !== 'en' ? 'بارز' : 'Featured'} />
               )}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className={`category-badge ${style.bg} ${style.text}`}>{style.icon} {t(style.tKey)}</span>
-          <div className="relative" ref={menuRef}>
-            <button onClick={() => { setShowMenu(!showMenu); hapticLight() }} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400">
-              <FiMoreVertical className="w-4 h-4" />
+        <div className="hai-row-2">
+          <span className="hai-category-badge" data-category={post.category}>{style.icon} {t(style.tKey)}</span>
+          <div className="hai-menu-anchor" ref={menuRef}>
+            <button
+              onClick={() => { setShowMenu(!showMenu); hapticLight() }}
+              className="hai-btn-icon hai-btn-icon--sm"
+            >
+              <FiMoreVertical className="hai-icon-md" />
             </button>
             {showMenu && (
-              <div className="absolute left-0 top-6 bg-white dark:bg-gray-800 shadow-lg rounded-xl border border-gray-100 dark:border-gray-700 py-1 z-10 min-w-40">
+              <div className="hai-menu hai-menu--anchored hai-menu--anchored-start">
                 {/* Owner: edit + delete */}
                 {post.author.id === currentUserId && (
                   <>
-                    <button onClick={() => { setEditing(true); setShowMenu(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 w-full text-start">
-                      <FiEdit2 className="w-3.5 h-3.5" />
-                      {lang === 'en' ? 'Edit' : lang === 'ur' ? 'ترمیم' : 'تعديل'}
+                    <button
+                      onClick={() => { setEditing(true); setShowMenu(false) }}
+                      className="hai-menu-item is-brand"
+                    >
+                      <FiEdit2 className="hai-icon-sm hai-menu-item__icon" />
+                      <span className="hai-menu-item__label">{lang === 'en' ? 'Edit' : lang === 'ur' ? 'ترمیم' : 'تعديل'}</span>
                     </button>
-                    <button onClick={async () => {
-                      const ok = await confirmDialog({
-                        message: lang === 'en' ? 'Delete this post?' : lang === 'ur' ? 'پوسٹ حذف کریں؟' : 'حذف هذا المنشور؟',
-                        variant: 'danger',
-                        confirmText: lang === 'en' ? 'Delete' : lang === 'ur' ? 'حذف' : 'حذف',
-                      })
-                      if (!ok) return
-                      const res = await fetch(`/api/posts/${post.id}`, { method: 'DELETE' })
-                      if (res.ok) {
-                        playDelete()
-                        toast.success(lang === 'en' ? 'Deleted' : lang === 'ur' ? 'حذف ہو گیا' : 'تم الحذف')
-                        onDelete ? onDelete(post.id) : router.refresh()
-                      } else {
-                        toast.error(lang === 'en' ? 'Delete failed' : lang === 'ur' ? 'حذف ناکام' : 'فشل الحذف')
-                      }
-                      setShowMenu(false)
-                    }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 w-full text-start">
-                      <FiTrash2 className="w-3.5 h-3.5" />
-                      {lang !== 'en' ? 'حذف' : 'Delete'}
+                    <button
+                      onClick={async () => {
+                        const ok = await confirmDialog({
+                          message: lang === 'en' ? 'Delete this post?' : lang === 'ur' ? 'پوسٹ حذف کریں؟' : 'حذف هذا المنشور؟',
+                          variant: 'danger',
+                          confirmText: lang === 'en' ? 'Delete' : lang === 'ur' ? 'حذف' : 'حذف',
+                        })
+                        if (!ok) return
+                        const res = await fetch(`/api/posts/${post.id}`, { method: 'DELETE' })
+                        if (res.ok) {
+                          playDelete()
+                          toast.success(lang === 'en' ? 'Deleted' : lang === 'ur' ? 'حذف ہو گیا' : 'تم الحذف')
+                          onDelete ? onDelete(post.id) : router.refresh()
+                        } else {
+                          toast.error(lang === 'en' ? 'Delete failed' : lang === 'ur' ? 'حذف ناکام' : 'فشل الحذف')
+                        }
+                        setShowMenu(false)
+                      }}
+                      className="hai-menu-item is-danger"
+                    >
+                      <FiTrash2 className="hai-icon-sm hai-menu-item__icon" />
+                      <span className="hai-menu-item__label">{lang !== 'en' ? 'حذف' : 'Delete'}</span>
                     </button>
                   </>
                 )}
                 {/* Admin actions */}
                 {isAdmin && post.status !== 'HIDDEN' && (
-                  <button onClick={() => { handleAdminAction('hide_post'); setShowMenu(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 w-full text-start">
-                    <FiFlag className="w-3.5 h-3.5" />
-                    {lang !== 'en' ? 'إخفاء' : 'Hide'}
+                  <button
+                    onClick={() => { handleAdminAction('hide_post'); setShowMenu(false) }}
+                    className="hai-menu-item is-warning"
+                  >
+                    <FiFlag className="hai-icon-sm hai-menu-item__icon" />
+                    <span className="hai-menu-item__label">{lang !== 'en' ? 'إخفاء' : 'Hide'}</span>
                   </button>
                 )}
                 {currentUserRole === 'SUPER_ADMIN' && (
-                  <button onClick={() => { handleAdminAction('remove_post'); setShowMenu(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 w-full text-start">
-                    <FiFlag className="w-3.5 h-3.5" />
-                    {lang !== 'en' ? 'حذف نهائي' : 'Remove'}
+                  <button
+                    onClick={() => { handleAdminAction('remove_post'); setShowMenu(false) }}
+                    className="hai-menu-item is-danger"
+                  >
+                    <FiFlag className="hai-icon-sm hai-menu-item__icon" />
+                    <span className="hai-menu-item__label">{lang !== 'en' ? 'حذف نهائي' : 'Remove'}</span>
                   </button>
                 )}
                 {isAdmin && post.status === 'HIDDEN' && (
-                  <button onClick={() => { handleAdminAction('restore_post'); setShowMenu(false) }} className="flex items-center gap-2 px-3 py-2.5 text-sm text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 w-full text-start">
-                    <FiFlag className="w-3.5 h-3.5" />
-                    {lang !== 'en' ? 'استعادة' : 'Restore'}
+                  <button
+                    onClick={() => { handleAdminAction('restore_post'); setShowMenu(false) }}
+                    className="hai-menu-item is-brand"
+                  >
+                    <FiFlag className="hai-icon-sm hai-menu-item__icon" />
+                    <span className="hai-menu-item__label">{lang !== 'en' ? 'استعادة' : 'Restore'}</span>
                   </button>
                 )}
                 {/* Report */}
                 {post.author.id !== currentUserId && (
-                  <button onClick={handleReport} disabled={reported} className="flex items-center gap-2 px-3 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 w-full text-start">
-                    <FiFlag className="w-3.5 h-3.5" />
-                    {reported ? t('post_reported') : t('post_report')}
+                  <button
+                    onClick={handleReport}
+                    disabled={reported}
+                    className="hai-menu-item is-danger"
+                  >
+                    <FiFlag className="hai-icon-sm hai-menu-item__icon" />
+                    <span className="hai-menu-item__label">{reported ? t('post_reported') : t('post_report')}</span>
                   </button>
                 )}
               </div>
@@ -630,44 +661,58 @@ export default function PostCard({
 
       {/* Content — editable or display */}
       {editing ? (
-        <div className="space-y-2 mb-2">
-          <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)}
-            className="w-full border border-blue-300 dark:border-blue-700 rounded-xl px-3 py-2 text-sm font-semibold bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          <textarea value={editBody} onChange={e => setEditBody(e.target.value)}
-            className="w-full border border-blue-300 dark:border-blue-700 rounded-xl px-3 py-2 text-sm bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            rows={3} />
-          <div className="flex gap-2">
-            <button disabled={editLoading} onClick={async () => {
-              setEditLoading(true)
-              const res = await fetch(`/api/posts/${post.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: editTitle.trim(), body: editBody.trim() }),
-              })
-              if (res.ok) {
-                const d = await res.json()
-                setPostData({ title: d.title, body: d.body, editedAt: d.editedAt })
-                setEditing(false)
-                toast.success(lang === 'en' ? 'Updated' : lang === 'ur' ? 'ترمیم شدہ' : 'تم التعديل')
-              } else {
-                const err = await res.json()
-                toast.error(err.error || 'Error')
-              }
-              setEditLoading(false)
-            }}
-              className="flex-1 bg-blue-600 text-white rounded-xl py-2 text-sm font-semibold disabled:opacity-50">
+        <div className="hai-stack-2 hai-mb-2">
+          <input
+            type="text"
+            value={editTitle}
+            onChange={e => setEditTitle(e.target.value)}
+            className="hai-input"
+          />
+          <textarea
+            value={editBody}
+            onChange={e => setEditBody(e.target.value)}
+            className="hai-input"
+            rows={3}
+          />
+          <div className="hai-row-2">
+            <button
+              disabled={editLoading}
+              onClick={async () => {
+                setEditLoading(true)
+                const res = await fetch(`/api/posts/${post.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ title: editTitle.trim(), body: editBody.trim() }),
+                })
+                if (res.ok) {
+                  const d = await res.json()
+                  setPostData({ title: d.title, body: d.body, editedAt: d.editedAt })
+                  setEditing(false)
+                  toast.success(lang === 'en' ? 'Updated' : lang === 'ur' ? 'ترمیم شدہ' : 'تم التعديل')
+                } else {
+                  const err = await res.json()
+                  toast.error(err.error || 'Error')
+                }
+                setEditLoading(false)
+              }}
+              className="hai-btn-primary hai-btn-sm hai-flex-1"
+            >
               {editLoading ? '...' : (lang === 'en' ? 'Save' : lang === 'ur' ? 'محفوظ' : 'حفظ')}
             </button>
-            <button onClick={() => { setEditing(false); setEditTitle(postData.title); setEditBody(postData.body) }}
-              className="px-4 py-2 text-sm text-gray-500">{lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء'}</button>
+            <button
+              onClick={() => { setEditing(false); setEditTitle(postData.title); setEditBody(postData.body) }}
+              className="hai-btn-ghost hai-btn-sm"
+            >
+              {lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء'}
+            </button>
           </div>
         </div>
       ) : (
         <>
-          <h3 className="font-semibold text-gray-900 text-sm mb-1 selectable-text">{postData.title}</h3>
-          <p className="text-gray-600 text-sm leading-relaxed line-clamp-3 selectable-text">{postData.body}</p>
+          <h3 className="hai-body-strong hai-mb-1 selectable-text">{postData.title}</h3>
+          <p className="hai-body hai-tc-sub line-clamp-3 selectable-text">{postData.body}</p>
           {postData.editedAt && (
-            <p className="text-[10px] text-gray-400 mt-1">
+            <p className="hai-meta hai-mt-1">
               {lang === 'en' ? 'Edited' : lang === 'ur' ? 'ترمیم شدہ' : 'تم التعديل'} {new Date(postData.editedAt).toLocaleDateString(lang !== 'en' ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </p>
           )}
@@ -675,8 +720,8 @@ export default function PostCard({
       )}
 
       {post.price && (
-        <div className="mt-2">
-          <span className="text-primary-600 font-bold text-base">{post.price.toLocaleString('ar-SA')} <RiyalIcon /></span>
+        <div className="hai-mt-2">
+          <span className="hai-price">{post.price.toLocaleString('ar-SA')} <RiyalIcon /></span>
         </div>
       )}
 
@@ -684,36 +729,28 @@ export default function PostCard({
         <a
           href={`https://www.google.com/maps?q=${post.locationLat},${post.locationLng}`}
           target="_blank" rel="noopener noreferrer"
-          className="mt-2 flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl px-3 py-2 active:scale-[0.98] transition-transform"
+          className="hai-callout hai-callout--info hai-row-2 hai-mt-2"
         >
-          <FiMapPin className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-          <span className="text-xs font-medium text-blue-700 dark:text-blue-300 truncate">
+          <FiMapPin className="hai-icon-md hai-shrink-0" />
+          <span className="hai-truncate hai-flex-1">
             {post.locationName || `${post.locationLat.toFixed(4)}, ${post.locationLng.toFixed(4)}`}
           </span>
-          <span className="text-[10px] text-blue-500 flex-shrink-0">{lang === 'en' ? 'Open map' : lang === 'ur' ? 'نقشہ کھولیں' : 'فتح الخريطة'}</span>
+          <span className="hai-meta hai-shrink-0">{lang === 'en' ? 'Open map' : lang === 'ur' ? 'نقشہ کھولیں' : 'فتح الخريطة'}</span>
         </a>
       )}
 
       {post.imageUrls.length > 0 && (
         <>
-          <div className={`mt-3 grid gap-1 rounded-xl overflow-hidden ${
-            post.imageUrls.length === 1 ? 'grid-cols-1' : post.imageUrls.length === 2 ? 'grid-cols-2' : 'grid-cols-3'
-          }`}>
+          <div className="hai-media-grid" data-count={Math.min(post.imageUrls.length, 4)}>
             {post.imageUrls.slice(0, 3).map((url, i) => {
               const extra = post.imageUrls.length - 3
               const showOverlay = i === 2 && extra > 0
               return (
-                <div key={i} className="relative cursor-pointer active:opacity-80" onClick={() => setLightboxIndex(i)}>
-                  <img
-                    src={url}
-                    alt=""
-                    className={`w-full object-cover ${
-                      post.imageUrls.length === 1 ? 'h-48 rounded-xl' : 'h-24'
-                    }`}
-                  />
+                <div key={i} className="hai-media-grid__item" onClick={() => setLightboxIndex(i)}>
+                  <img src={url} alt="" />
                   {showOverlay && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                      <span className="text-white text-xl font-black">+{extra}</span>
+                    <div className="hai-media-grid__overlay">
+                      <span>+{extra}</span>
                     </div>
                   )}
                 </div>
@@ -740,15 +777,15 @@ export default function PostCard({
       />
 
       {/* Reaction + Comment bar */}
-      <div className="mt-3 pt-3 border-t border-gray-100/50 dark:border-white/[0.06] flex items-center justify-between">
+      <div className="hai-action-bar hai-justify-between">
         {/* Reactions — full emoji picker */}
-        <div className="relative flex items-center gap-2">
+        <div className="hai-menu-anchor hai-row-2">
 
           {/* Emoji-mart picker */}
           {showReactionPicker && (
             <div
               ref={pickerRef}
-              className="absolute bottom-10 right-0 z-30 reaction-picker-enter shadow-2xl rounded-2xl overflow-hidden"
+              className="hai-reaction-popover reaction-picker-enter"
             >
               <EmojiPicker onSelect={(emoji) => { handleReact(emoji); setShowReactionPicker(false) }} />
             </div>
@@ -757,9 +794,10 @@ export default function PostCard({
           {/* Trigger button — tap own reaction to remove, long-press to change */}
           <button
             onClick={() => myReaction ? handleReact(myReaction) : setShowReactionPicker(v => !v)}
-            className="flex items-center gap-1.5 active:scale-90 transition-transform"
+            className="hai-reaction-item"
+            data-selected={myReaction ? 'true' : 'false'}
           >
-            <span className={`text-2xl leading-none ${bouncingReaction && myReaction ? 'reaction-bounce' : ''}`}>
+            <span className={`hai-reaction-item__icon hai-reaction-emoji-lg ${bouncingReaction && myReaction ? 'reaction-bounce' : ''}`}>
               {myReaction ?? '😊'}
             </span>
           </button>
@@ -767,32 +805,32 @@ export default function PostCard({
           {myReaction && (
             <button
               onClick={() => setShowReactionPicker(v => !v)}
-              className="text-xs text-gray-400 active:text-gray-600"
+              className="hai-reaction-item"
             >
-              +
+              <span className="hai-reaction-item__count">+</span>
             </button>
           )}
 
           {/* Reaction summary: unique emojis + total */}
           {totalReactions > 0 && (
-            <div className="flex items-center gap-1">
-              <span className="flex">
+            <div className="hai-row-1">
+              <span className="hai-reaction-stack">
                 {Object.keys(reactionCounts).filter(e => reactionCounts[e] > 0).slice(0, 3).map(e => (
-                  <span key={e} className="text-sm leading-none -mr-0.5">{e}</span>
+                  <span key={e} className="hai-reaction-stack__emoji">{e}</span>
                 ))}
               </span>
-              <span className="text-xs text-gray-400 mr-1">{totalReactions}</span>
+              <span className="hai-meta">{totalReactions}</span>
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="hai-row-1">
           {/* Contact / DM button */}
           {post.author.id !== currentUserId && canStartPrivateThread(post.category) && (
             post.coordinationMode === 'EXCLUSIVE' && post.activeThreadId ? (
-              <span className="text-xs text-amber-500 font-medium flex items-center gap-1 px-2 py-1.5">
-                <FiMail className="w-4 h-4" />
-                {t('thread_in_progress')}
+              <span className="hai-action-btn is-warning hai-action-btn--static">
+                <FiMail className="hai-icon-md hai-action-btn__icon" />
+                <span className="hai-action-btn__label">{t('thread_in_progress')}</span>
               </span>
             ) : (
               <button
@@ -811,10 +849,10 @@ export default function PostCard({
                     }
                   } catch { /* ignore */ }
                 }}
-                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-primary-600 transition-colors px-2.5 py-2 rounded-lg active:bg-gray-100 dark:active:bg-white/5 min-w-[40px] justify-center"
+                className="hai-action-btn"
               >
-                <FiMail className="w-4.5 h-4.5" />
-                <span>{t('thread_contact')}</span>
+                <FiMail className="hai-icon-md hai-action-btn__icon" />
+                <span className="hai-action-btn__label">{t('thread_contact')}</span>
               </button>
             )
           )}
@@ -831,30 +869,26 @@ export default function PostCard({
                 toast.success(lang !== 'en' ? 'تم نسخ الرابط' : 'Link copied')
               }
             }}
-            className="flex items-center justify-center text-gray-400 hover:text-primary-600 transition-colors p-2.5 rounded-lg active:bg-gray-100 dark:active:bg-white/5 min-w-[40px]"
+            className="hai-action-btn"
           >
-            <FiShare2 className="w-4.5 h-4.5" />
+            <FiShare2 className="hai-icon-md hai-action-btn__icon" />
           </button>
 
           {/* Bookmark */}
           <button
             onClick={toggleBookmark}
-            className={`flex items-center justify-center p-2.5 rounded-lg active:bg-gray-100 dark:active:bg-white/5 min-w-[40px] transition-colors ${
-              bookmarked ? 'text-primary-600' : 'text-gray-400 hover:text-primary-600'
-            }`}
+            data-selected={bookmarked ? 'true' : 'false'}
+            className="hai-action-btn"
           >
-            <FiBookmark className={`w-4.5 h-4.5 ${bookmarked ? 'fill-current' : ''}`} />
+            <FiBookmark className={`hai-icon-md hai-action-btn__icon ${bookmarked ? 'hai-fill-current' : ''}`} />
           </button>
 
           {/* Comment toggle */}
           {isLookingFor ? (
             <button
               onClick={() => { toggleComments(); hapticLight() }}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all active:scale-95 ${
-                showComments
-                  ? 'bg-sky-600 text-white shadow-sm'
-                  : 'bg-sky-500 text-white shadow-md shadow-sky-500/30 hover:bg-sky-600'
-              }`}
+              data-active={showComments ? 'true' : 'false'}
+              className="hai-help-pill"
             >
               <span>🤝</span>
               <span>{showComments ? (totalComments > 0 ? `${totalComments} ${t('post_helped')}` : t('post_help_btn')) : (lang !== 'en' ? 'ساعده' : 'Help')}</span>
@@ -862,10 +896,10 @@ export default function PostCard({
           ) : (
             <button
               onClick={toggleComments}
-              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-primary-600 transition-colors p-2.5 rounded-lg active:bg-gray-100 dark:active:bg-white/5 min-w-[40px] justify-center"
+              className="hai-action-btn"
             >
-              <FiMessageCircle className="w-4.5 h-4.5" />
-              <span>{totalComments > 0 ? totalComments : t('post_comment')}</span>
+              <FiMessageCircle className="hai-icon-md hai-action-btn__icon" />
+              <span className="hai-action-btn__count">{totalComments > 0 ? totalComments : t('post_comment')}</span>
             </button>
           )}
         </div>
@@ -912,234 +946,236 @@ export default function PostCard({
       {showComments && (
         <div
           data-overlay="true"
-          className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center"
+          className="hai-sheet-overlay"
           onClick={() => setShowComments(false)}
         >
           <div
-            className="bg-white dark:bg-gray-900 w-full sm:max-w-lg max-h-[90vh] rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden animate-slide-up shadow-2xl"
+            className="hai-sheet animate-slide-up"
             onClick={(e) => e.stopPropagation()}
-            style={{ paddingBottom: 0 }}
           >
-            {/* Drag handle */}
-            <div className="flex justify-center pt-2 pb-1 flex-shrink-0">
-              <div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-700" />
-            </div>
-
-            {/* Header */}
-            <div className="flex items-center justify-center py-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0 relative">
-              <h3 className="font-semibold text-sm text-gray-900 dark:text-white">
+            <div className="hai-sheet__handle" />
+            <div className="hai-sheet__header">
+              <h3 className="hai-sheet__header-title">
                 {lang === 'en' ? 'Comments' : 'التعليقات'}
               </h3>
               <button
                 type="button"
                 onClick={() => setShowComments(false)}
-                className="absolute end-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="hai-sheet__close"
               >
-                <FiX className="w-5 h-5" />
+                <FiX className="hai-icon-lg" />
               </button>
             </div>
 
-            {/* Scrollable comments list */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-          {comments.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-12">{t('post_no_comments')}</p>
-          ) : (
-            comments.map((c: any) => (
-              <div key={c.id}>
-                {/* Comment */}
-                <div className="flex gap-2.5">
-                  {c.author.avatarUrl ? (
-                    <img src={c.author.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300 flex-shrink-0">
-                      {c.author.name?.[0] || '؟'}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <span className="text-[13px] font-semibold text-gray-800 dark:text-gray-200">{c.author.name || t('post_neighbor')}</span>
-                      <UserBadgeDisplay accountType={c.author.accountType} providerStatus={c.author.providerStatus} reputation={c.author.reputation} />
-                      <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                        {(() => {
-                          const mins = Math.floor((Date.now() - new Date(c.createdAt).getTime()) / 60000)
-                          if (mins < 1) return lang === 'en' ? 'now' : 'الآن'
-                          if (mins < 60) return lang === 'en' ? `${mins}m` : `${mins}د`
-                          const hrs = Math.floor(mins / 60)
-                          if (hrs < 24) return lang === 'en' ? `${hrs}h` : `${hrs}س`
-                          return lang === 'en' ? `${Math.floor(hrs/24)}d` : `${Math.floor(hrs/24)}ي`
-                        })()}
-                      </span>
-                    </div>
-                    {editingCommentId === c.id ? (
-                      <div className="flex items-center gap-2 mt-1">
-                        <input
-                          type="text"
-                          value={editCommentBody}
-                          onChange={e => setEditCommentBody(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') saveCommentEdit(c.id, post.id); if (e.key === 'Escape') setEditingCommentId(null) }}
-                          className="flex-1 bg-white dark:bg-gray-700 border border-primary-300 rounded-xl px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary-400/50"
-                          autoFocus
-                          maxLength={500}
-                        />
-                        <button onClick={() => saveCommentEdit(c.id, post.id)} className="w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center active:scale-90 transition-transform text-sm font-bold">✓</button>
-                        <button onClick={() => setEditingCommentId(null)} className="w-8 h-8 bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-300 rounded-full flex items-center justify-center active:scale-90 transition-transform text-sm">✕</button>
-                      </div>
-                    ) : (
-                      <>
-                        {c.body && (
-                          <p className="text-[13px] text-gray-600 dark:text-gray-300 leading-relaxed selectable-text">
-                            <SmartText text={c.body} />
-                            {c.editedAt && <span className="text-[10px] text-gray-400 dark:text-gray-500 italic ml-1">{lang === 'en' ? '(edited)' : '(معدّل)'}</span>}
-                          </p>
-                        )}
-                        {c.imageUrl && (
-                          <img
-                            src={c.imageUrl}
-                            alt=""
-                            className="mt-1.5 max-w-[200px] max-h-48 rounded-xl object-cover cursor-pointer"
-                            onClick={() => setCommentLightbox(c.imageUrl!)}
-                          />
-                        )}
-                      </>
-                    )}
-                    <div className="flex items-center gap-4 mt-1.5">
-                      <button
-                        onClick={() => handleCommentLike(c.id)}
-                        className={`text-[12px] flex items-center gap-1 transition-colors ${c.isLiked ? 'text-red-500 font-medium' : 'text-gray-400 hover:text-red-400'}`}
-                      >
-                        <FiHeart className={`w-3.5 h-3.5 ${c.isLiked ? 'fill-current' : ''}`} />
-                        {(c.likeCount || 0) > 0 && <span>{c.likeCount}</span>}
-                      </button>
-                      <button
-                        onClick={() => setReplyingTo(replyingTo?.id === c.id ? null : { id: c.id, name: c.author.name || t('post_neighbor') })}
-                        className="text-[12px] text-gray-400 hover:text-primary-600 font-medium"
-                      >
-                        {t('post_reply')}
-                      </button>
-                      {c.author.id === currentUserId && (
-                        <>
-                          {Date.now() - new Date(c.createdAt).getTime() < 30 * 60_000 && (
-                            <button onClick={() => { setEditingCommentId(c.id); setEditCommentBody(c.body) }}
-                              className="text-[12px] text-gray-400 hover:text-blue-500">{lang === 'en' ? 'Edit' : 'تعديل'}</button>
-                          )}
-                          <button onClick={() => deleteComment(c.id, post.id)}
-                            className="text-[12px] text-gray-400 hover:text-red-500">{lang === 'en' ? 'Delete' : 'حذف'}</button>
-                        </>
+            <div className="hai-sheet__body">
+              {comments.length === 0 ? (
+                <p className="hai-empty-state">{t('post_no_comments')}</p>
+              ) : (
+                comments.map((c: any) => (
+                  <div key={c.id}>
+                    <div className="hai-comment">
+                      {c.author.avatarUrl ? (
+                        <img src={c.author.avatarUrl} alt="" className="hai-avatar hai-avatar--sm" />
+                      ) : (
+                        <div className="hai-avatar hai-avatar--sm">
+                          {c.author.name?.[0] || '؟'}
+                        </div>
                       )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Replies */}
-                {c.replies.length > 0 && (
-                  <div className="mr-10 mt-2.5 space-y-2.5 border-r-2 border-gray-100 dark:border-gray-700/50 pr-3">
-                    {c.replies.map((reply: any) => (
-                      <div key={reply.id} className="flex gap-2">
-                        {reply.author.avatarUrl ? (
-                          <img src={reply.author.avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-500 dark:text-gray-400 flex-shrink-0">
-                            {reply.author.name?.[0] || '؟'}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            <span className="text-[12px] font-semibold text-gray-700 dark:text-gray-300">{reply.author.name || t('post_neighbor')}</span>
-                            <UserBadgeDisplay accountType={reply.author.accountType} providerStatus={reply.author.providerStatus} reputation={reply.author.reputation} />
-                          </div>
-                          {reply.body && <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-relaxed selectable-text"><SmartText text={reply.body} /></p>}
-                          {reply.imageUrl && (
-                            <img
-                              src={reply.imageUrl}
-                              alt=""
-                              className="mt-1 max-w-[160px] max-h-40 rounded-lg object-cover cursor-pointer"
-                              onClick={() => setCommentLightbox(reply.imageUrl!)}
+                      <div className="hai-comment__body">
+                        <div className="hai-comment__meta">
+                          <span className="hai-comment__author">{c.author.name || t('post_neighbor')}</span>
+                          <UserBadgeDisplay accountType={c.author.accountType} providerStatus={c.author.providerStatus} reputation={c.author.reputation} />
+                          <span className="hai-comment__time">
+                            {(() => {
+                              const mins = Math.floor((Date.now() - new Date(c.createdAt).getTime()) / 60000)
+                              if (mins < 1) return lang === 'en' ? 'now' : 'الآن'
+                              if (mins < 60) return lang === 'en' ? `${mins}m` : `${mins}د`
+                              const hrs = Math.floor(mins / 60)
+                              if (hrs < 24) return lang === 'en' ? `${hrs}h` : `${hrs}س`
+                              return lang === 'en' ? `${Math.floor(hrs/24)}d` : `${Math.floor(hrs/24)}ي`
+                            })()}
+                          </span>
+                        </div>
+                        {editingCommentId === c.id ? (
+                          <div className="hai-comment__edit-form">
+                            <input
+                              type="text"
+                              value={editCommentBody}
+                              onChange={e => setEditCommentBody(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') saveCommentEdit(c.id, post.id); if (e.key === 'Escape') setEditingCommentId(null) }}
+                              autoFocus
+                              maxLength={500}
                             />
-                          )}
-                          <div className="flex items-center gap-3 mt-1">
-                            <button
-                              onClick={() => handleCommentLike(reply.id)}
-                              className={`text-[11px] flex items-center gap-1 transition-colors ${reply.isLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-400'}`}
-                            >
-                              <FiHeart className={`w-3 h-3 ${reply.isLiked ? 'fill-current' : ''}`} />
-                              {(reply.likeCount || 0) > 0 && <span>{reply.likeCount}</span>}
-                            </button>
-                            {reply.author.id === currentUserId && (
+                            <button onClick={() => saveCommentEdit(c.id, post.id)} className="hai-comment__edit-btn hai-comment__edit-btn--save">✓</button>
+                            <button onClick={() => setEditingCommentId(null)} className="hai-comment__edit-btn hai-comment__edit-btn--cancel">✕</button>
+                          </div>
+                        ) : (
+                          <>
+                            {c.body && (
+                              <p className="hai-comment__text selectable-text">
+                                <SmartText text={c.body} />
+                                {c.editedAt && <span className="hai-meta hai-comment__edited"> {lang === 'en' ? '(edited)' : '(معدّل)'}</span>}
+                              </p>
+                            )}
+                            {c.imageUrl && (
+                              <img
+                                src={c.imageUrl}
+                                alt=""
+                                className="hai-comment__image"
+                                onClick={() => setCommentLightbox(c.imageUrl!)}
+                              />
+                            )}
+                          </>
+                        )}
+                        <div className="hai-comment__actions">
+                          <button
+                            onClick={() => handleCommentLike(c.id)}
+                            data-selected={c.isLiked ? 'true' : 'false'}
+                            className="hai-comment__action is-liked"
+                          >
+                            <FiHeart className={`hai-icon-sm ${c.isLiked ? 'hai-fill-current' : ''}`} />
+                            {(c.likeCount || 0) > 0 && <span>{c.likeCount}</span>}
+                          </button>
+                          <button
+                            onClick={() => setReplyingTo(replyingTo?.id === c.id ? null : { id: c.id, name: c.author.name || t('post_neighbor') })}
+                            className="hai-comment__action"
+                          >
+                            {t('post_reply')}
+                          </button>
+                          {c.author.id === currentUserId && (
+                            <>
+                              {Date.now() - new Date(c.createdAt).getTime() < 30 * 60_000 && (
+                                <button
+                                  onClick={() => { setEditingCommentId(c.id); setEditCommentBody(c.body) }}
+                                  className="hai-comment__action"
+                                >
+                                  {lang === 'en' ? 'Edit' : 'تعديل'}
+                                </button>
+                              )}
                               <button
-                                onClick={() => deleteComment(reply.id, post.id)}
-                                className="text-[11px] text-gray-400 hover:text-red-500"
+                                onClick={() => deleteComment(c.id, post.id)}
+                                className="hai-comment__action is-danger"
                               >
                                 {lang === 'en' ? 'Delete' : 'حذف'}
                               </button>
-                            )}
-                          </div>
+                            </>
+                          )}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
 
-                {/* Reply input */}
-                {replyingTo?.id === c.id && (
-                  <div className="mr-9 mt-2">
-                    {replyImagePreview && (
-                      <div className="relative inline-block mb-2">
-                        <img src={replyImagePreview} alt="" className="h-20 rounded-lg object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => { if (replyImagePreview) URL.revokeObjectURL(replyImagePreview); setReplyImage(null); setReplyImagePreview(null) }}
-                          className="absolute -top-1 -right-1 w-5 h-5 bg-black/70 text-white rounded-full flex items-center justify-center"
-                        ><FiX className="w-3 h-3" /></button>
+                    {/* Replies */}
+                    {c.replies.length > 0 && (
+                      <div className="hai-comment-replies">
+                        {c.replies.map((reply: any) => (
+                          <div key={reply.id} className="hai-comment-reply">
+                            {reply.author.avatarUrl ? (
+                              <img src={reply.author.avatarUrl} alt="" className="hai-avatar hai-avatar--xs" />
+                            ) : (
+                              <div className="hai-avatar hai-avatar--xs">
+                                {reply.author.name?.[0] || '؟'}
+                              </div>
+                            )}
+                            <div className="hai-comment__body">
+                              <div className="hai-comment__meta">
+                                <span className="hai-comment__author">{reply.author.name || t('post_neighbor')}</span>
+                                <UserBadgeDisplay accountType={reply.author.accountType} providerStatus={reply.author.providerStatus} reputation={reply.author.reputation} />
+                              </div>
+                              {reply.body && (
+                                <p className="hai-comment__text selectable-text">
+                                  <SmartText text={reply.body} />
+                                </p>
+                              )}
+                              {reply.imageUrl && (
+                                <img
+                                  src={reply.imageUrl}
+                                  alt=""
+                                  className="hai-comment__image"
+                                  onClick={() => setCommentLightbox(reply.imageUrl!)}
+                                />
+                              )}
+                              <div className="hai-comment__actions">
+                                <button
+                                  onClick={() => handleCommentLike(reply.id)}
+                                  data-selected={reply.isLiked ? 'true' : 'false'}
+                                  className="hai-comment__action is-liked"
+                                >
+                                  <FiHeart className={`hai-icon-xs ${reply.isLiked ? 'hai-fill-current' : ''}`} />
+                                  {(reply.likeCount || 0) > 0 && <span>{reply.likeCount}</span>}
+                                </button>
+                                {reply.author.id === currentUserId && (
+                                  <button
+                                    onClick={() => deleteComment(reply.id, post.id)}
+                                    className="hai-comment__action is-danger"
+                                  >
+                                    {lang === 'en' ? 'Delete' : 'حذف'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
-                    <form onSubmit={handleReply} className="flex gap-2 items-center">
-                      <input
-                        type="text"
-                        value={replyText}
-                        onChange={e => setReplyText(e.target.value)}
-                        placeholder={`${t('post_reply')}...`}
-                        autoFocus
-                        className="flex-1 bg-gray-50 border border-primary-200 rounded-full px-3 py-1.5 text-xs text-start focus:outline-none focus:ring-2 focus:ring-primary-400"
-                        maxLength={500}
-                      />
-                      <input type="file" accept="image/*" ref={replyImgRef} onChange={e => handleCommentImageSelect(e, 'reply')} className="hidden" />
-                      <button
-                        type="button"
-                        onClick={() => openImagePicker('reply')}
-                        className="w-7 h-7 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-500 flex-shrink-0"
-                      >
-                        <FiImage className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => attachContactToComposer('reply')}
-                        className="w-7 h-7 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-500 flex-shrink-0"
-                        aria-label={t('attach_contact')}
-                        title={t('attach_contact')}
-                      >
-                        <FiUser className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={submittingReply || (!replyText.trim() && !replyImage)}
-                        className="w-7 h-7 bg-primary-600 rounded-full flex items-center justify-center text-white disabled:opacity-40 flex-shrink-0"
-                      >
-                        <FiSend className="w-3 h-3" />
-                      </button>
-                    </form>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
 
+                    {/* Reply input */}
+                    {replyingTo?.id === c.id && (
+                      <div className="hai-comment-reply-composer">
+                        {replyImagePreview && (
+                          <div className="hai-comment-input__attach">
+                            <img src={replyImagePreview} alt="" />
+                            <button
+                              type="button"
+                              onClick={() => { if (replyImagePreview) URL.revokeObjectURL(replyImagePreview); setReplyImage(null); setReplyImagePreview(null) }}
+                              className="hai-comment-input__attach-remove"
+                            >
+                              <FiX className="hai-icon-xs" />
+                            </button>
+                          </div>
+                        )}
+                        <form onSubmit={handleReply} className="hai-comment-input hai-comment-input--compact">
+                          <input
+                            type="text"
+                            value={replyText}
+                            onChange={e => setReplyText(e.target.value)}
+                            placeholder={`${t('post_reply')}...`}
+                            autoFocus
+                            maxLength={500}
+                          />
+                          <input type="file" accept="image/*" ref={replyImgRef} onChange={e => handleCommentImageSelect(e, 'reply')} className="hai-hidden" />
+                          <button
+                            type="button"
+                            onClick={() => openImagePicker('reply')}
+                            className="hai-comment-input__attach-btn"
+                          >
+                            <FiImage className="hai-icon-sm" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => attachContactToComposer('reply')}
+                            className="hai-comment-input__attach-btn"
+                            aria-label={t('attach_contact')}
+                            title={t('attach_contact')}
+                          >
+                            <FiUser className="hai-icon-sm" />
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={submittingReply || (!replyText.trim() && !replyImage)}
+                            className="hai-comment-input__send"
+                          >
+                            <FiSend className="hai-icon-xs" />
+                          </button>
+                        </form>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
 
             {/* Pinned footer — contact picker + input, safe-area aware */}
-            <div
-              className="border-t border-gray-100 dark:border-gray-800 px-3 py-2 flex-shrink-0 bg-white dark:bg-gray-900"
-              style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
-            >
+            <div className="hai-sheet__footer">
               {/* Pick contact from phone — only for LOOKING_FOR on supported devices */}
               {isLookingFor && supportsContacts && (
                 <button
@@ -1157,7 +1193,7 @@ export default function PostCard({
                       // user cancelled — do nothing
                     }
                   }}
-                  className="flex items-center gap-2 px-3 py-2 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-700 font-medium hover:bg-sky-100 transition-colors w-full justify-center mb-2"
+                  className="hai-callout hai-callout--info hai-row-2 hai-justify-center hai-mb-2 hai-cursor-pointer"
                 >
                   <span>📱</span>
                   <span>{t('post_share_contacts')}</span>
@@ -1165,47 +1201,48 @@ export default function PostCard({
               )}
 
               {commentImagePreview && (
-                <div className="relative inline-block mb-2">
-                  <img src={commentImagePreview} alt="" className="h-20 rounded-lg object-cover" />
+                <div className="hai-comment-input__attach">
+                  <img src={commentImagePreview} alt="" />
                   <button
                     type="button"
                     onClick={() => { if (commentImagePreview) URL.revokeObjectURL(commentImagePreview); setCommentImage(null); setCommentImagePreview(null) }}
-                    className="absolute -top-1 -right-1 w-5 h-5 bg-black/70 text-white rounded-full flex items-center justify-center"
-                  ><FiX className="w-3 h-3" /></button>
+                    className="hai-comment-input__attach-remove"
+                  >
+                    <FiX className="hai-icon-xs" />
+                  </button>
                 </div>
               )}
-              <form onSubmit={handleComment} className="flex gap-2 items-center">
+              <form onSubmit={handleComment} className="hai-comment-input">
                 <input
                   type="text"
                   value={commentText}
                   onChange={e => setCommentText(e.target.value)}
                   placeholder={isLookingFor ? t('post_share_placeholder') : t('post_comment_placeholder')}
-                  className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 dark:text-white"
                   maxLength={500}
                 />
-                <input type="file" accept="image/*" ref={commentImgRef} onChange={e => handleCommentImageSelect(e, 'comment')} className="hidden" />
+                <input type="file" accept="image/*" ref={commentImgRef} onChange={e => handleCommentImageSelect(e, 'comment')} className="hai-hidden" />
                 <button
                   type="button"
                   onClick={() => openImagePicker('comment')}
-                  className="w-9 h-9 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-500 flex-shrink-0"
+                  className="hai-comment-input__attach-btn"
                 >
-                  <FiImage className="w-4 h-4" />
+                  <FiImage className="hai-icon-md" />
                 </button>
                 <button
                   type="button"
                   onClick={() => attachContactToComposer('comment')}
-                  className="w-9 h-9 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center text-gray-500 flex-shrink-0"
+                  className="hai-comment-input__attach-btn"
                   aria-label={t('attach_contact')}
                   title={t('attach_contact')}
                 >
-                  <FiUser className="w-4 h-4" />
+                  <FiUser className="hai-icon-md" />
                 </button>
                 <button
                   type="submit"
                   disabled={submitting || (!commentText.trim() && !commentImage)}
-                  className="w-9 h-9 bg-primary-600 rounded-full flex items-center justify-center text-white disabled:opacity-40 flex-shrink-0"
+                  className="hai-comment-input__send"
                 >
-                  <FiSend className="w-4 h-4" />
+                  <FiSend className="hai-icon-md" />
                 </button>
               </form>
             </div>

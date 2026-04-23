@@ -10,14 +10,6 @@ import { tryRedeemPendingInvite } from '@/lib/pendingInvite'
 
 type Step = 'name' | 'gender' | 'account_type' | 'location'
 
-// Simplified location states:
-//   ask            → user hasn't shared location yet (initial prompt)
-//   detecting      → GPS is running
-//   confirm        → precise match found, ask user to confirm
-//   nearby         → either low-accuracy fallback OR user said "not my neighborhood" —
-//                    show the short nearby list derived from the captured coordinates
-//   denied         → permission explicitly denied; retry only
-//   timeout        → location request failed with no sample at all; retry only
 type LocationStep =
   | 'ask'
   | 'detecting'
@@ -44,7 +36,6 @@ interface NearbyNeighborhood {
   city: { name: string; nameEn: string }
 }
 
-// Must match src/lib/location/verify.ts
 const NEARBY_MAX_RESULTS = 4
 
 export default function OnboardingPage() {
@@ -73,8 +64,8 @@ export default function OnboardingPage() {
   const gps = useGPSLocation()
 
   const BackBtn = ({ onClick }: { onClick: () => void }) => (
-    <button onClick={onClick} className="flex items-center gap-1 text-gray-400 text-sm mb-4 self-start">
-      {lang !== 'en' ? <FiArrowRight className="w-4 h-4" /> : <FiArrowLeft className="w-4 h-4" />}
+    <button onClick={onClick} className="hai-link--back hai-self-start hai-mb-4">
+      {lang !== 'en' ? <FiArrowRight className="hai-icon-md" /> : <FiArrowLeft className="hai-icon-md" />}
       {t('common_back')}
     </button>
   )
@@ -107,8 +98,6 @@ export default function OnboardingPage() {
     )
   }
 
-  // Smart retry: check permission status BEFORE attempting location.
-  // If still denied, stay on the denied screen — don't loop.
   async function retryAfterSettings() {
     if (isNativePlatform()) {
       try {
@@ -154,18 +143,12 @@ export default function OnboardingPage() {
     setUserLat(null)
     setUserLng(null)
     setUserAccuracy(null)
-    // If prefetch hasn't finished yet, show spinner; otherwise the
-    // list is already populated and the switch feels instant.
     if (allNeighborhoods.length === 0) {
       setManualLoading(true)
       loadAllNeighborhoods()
     }
   }
 
-  // Prefetch the full neighborhood list as soon as the user lands on
-  // any screen where manual picking is an option (denied / timeout /
-  // low-accuracy nearby) — so the "browse neighborhoods" button
-  // responds instantly instead of waiting on a fetch.
   useEffect(() => {
     if (!['denied', 'timeout', 'nearby'].includes(locationStep)) return
     if (allNeighborhoods.length > 0) return
@@ -174,20 +157,16 @@ export default function OnboardingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationStep])
 
-  // Ultimate fallback: plain browser geolocation, low accuracy allowed
   function tryDirectGeolocation() {
-    console.log('[ONBOARD-LOCATION] Trying direct navigator.geolocation...')
     if (!navigator.geolocation) {
       setLocationStep('timeout')
       return
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        console.log('[ONBOARD-LOCATION] Direct geolocation SUCCESS:', pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy)
         resolveNeighborhood(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, false)
       },
       (err) => {
-        console.log('[ONBOARD-LOCATION] Direct geolocation FAILED:', err.code, err.message)
         if (err.code === 1) setLocationStep('denied')
         else setLocationStep('timeout')
       },
@@ -209,35 +188,21 @@ export default function OnboardingPage() {
 
     const { result, error } = gps
 
-    console.log('[ONBOARD-LOCATION]', {
-      error,
-      hasResult: !!result,
-      accuracy: result?.accuracy,
-      confidence: result?.confidence,
-    })
-
-    // denied / unavailable → try direct browser fallback once to trigger permission dialog
     if (error === 'denied' || error === 'unavailable') {
-      console.log('[ONBOARD-LOCATION] Hook failed with', error, '— trying direct geolocation fallback')
       tryDirectGeolocation()
       return
     }
 
-    // timeout with no result → try direct fallback
     if (error === 'timeout' || (!result && !error)) {
-      console.log('[ONBOARD-LOCATION] Hook timed out — trying direct geolocation fallback')
       tryDirectGeolocation()
       return
     }
 
-    // Low accuracy: still have a usable coordinate for the fallback nearby list
     if (error === 'low_accuracy' && result) {
-      console.log('[ONBOARD-LOCATION] Low-accuracy sample — fetching nearby list from', result.lat, result.lng)
       fetchNearbyAndShowPicker(result.lat, result.lng, result.accuracy)
       return
     }
 
-    // We have a usable result (high or medium confidence) → resolve precisely
     if (result) {
       resolveNeighborhood(result.lat, result.lng, result.accuracy, false)
     }
@@ -251,14 +216,11 @@ export default function OnboardingPage() {
     try {
       const res = await fetch(`/api/neighborhoods/detect?lat=${lat}&lng=${lng}&accuracy=${accuracy}`)
       if (!res.ok) {
-        // Detection itself failed — fall back to nearby picker so the user still has a path
         await fetchNearbyAndShowPicker(lat, lng, accuracy)
         return
       }
       const data = await res.json()
 
-      // If the server only managed a low-confidence match, skip straight to
-      // the nearby picker so the user never sees a confusing "we think…" card
       if (data.confidence === 'low' && !forceConfirm) {
         await fetchNearbyAndShowPicker(lat, lng, accuracy)
         return
@@ -272,11 +234,6 @@ export default function OnboardingPage() {
     }
   }
 
-  /**
-   * Fetch the short nearby list for a given fallback location and render
-   * the nearby picker. This is the key fix for the Apple dead-end: even
-   * when precise resolution fails, the user always has a real next step.
-   */
   async function fetchNearbyAndShowPicker(lat: number, lng: number, accuracy: number) {
     setUserLat(lat)
     setUserLng(lng)
@@ -291,7 +248,6 @@ export default function OnboardingPage() {
         NEARBY_MAX_RESULTS,
       )
       setNearbyList(list)
-      // Pre-select the closest so the CTA is always enabled when anything is offered
       if (list.length > 0) {
         setSelectedNeighborhoodId(list[0].id)
         setDetectedNeighborhood({
@@ -378,32 +334,33 @@ export default function OnboardingPage() {
     }
   }
 
+  const stepOrder: Step[] = ['name', 'gender', 'account_type', 'location']
+
   return (
-    <main className="flex flex-col px-6 pt-6 bg-white dark:bg-gray-900" style={{ minHeight: 'calc(100dvh - env(safe-area-inset-top, 0px))' }}>
+    <main className="hai-screen">
       {/* Progress */}
-      <div className="flex gap-2 mb-5">
-        {(['name', 'gender', 'account_type', 'location'] as Step[]).map((s, i) => (
+      <div className="hai-progress hai-mb-5">
+        {stepOrder.map((s, i) => (
           <div
             key={s}
-            className={`h-1 flex-1 rounded-full transition-all ${
-              ['name', 'gender', 'account_type', 'location'].indexOf(step) >= i ? 'bg-primary-600' : 'bg-gray-200'
-            }`}
+            className="hai-progress__segment"
+            data-active={stepOrder.indexOf(step) >= i ? 'true' : 'false'}
           />
         ))}
       </div>
 
       {/* Step: Name */}
       {step === 'name' && (
-        <div className="flex-1 flex flex-col">
+        <div className="hai-flex-1 hai-stack-3">
           <BackBtn onClick={() => router.push('/')} />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{t('onboard_hello')}</h1>
-          <p className="text-gray-500 text-sm mb-8">{t('onboard_your_name')}</p>
+          <h1 className="hai-h2">{t('onboard_hello')}</h1>
+          <p className="hai-caption hai-mb-4">{t('onboard_your_name')}</p>
           <input
             type="text"
             placeholder={t('onboard_first_name')}
             value={name}
-            onChange={(e) => setName(e.target.value.replace(/[^a-zA-Z\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\s]/g, ''))}
-            className="input-field mb-3"
+            onChange={(e) => setName(e.target.value.replace(/[^a-zA-Z؀-ۿݐ-ݿࢠ-ࣿ\s]/g, ''))}
+            className="hai-input"
             autoFocus
             maxLength={50}
           />
@@ -411,13 +368,13 @@ export default function OnboardingPage() {
             type="text"
             placeholder={t('onboard_last_name')}
             value={lastName}
-            onChange={(e) => setLastName(e.target.value.replace(/[^a-zA-Z\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\s]/g, ''))}
-            className="input-field mb-4"
+            onChange={(e) => setLastName(e.target.value.replace(/[^a-zA-Z؀-ۿݐ-ݿࢠ-ࣿ\s]/g, ''))}
+            className="hai-input"
             maxLength={50}
           />
           <button
             onClick={() => { if (!name.trim()) { toast.error(t('onboard_name_required')); return } setStep('gender') }}
-            className="btn-primary"
+            className="hai-btn-primary hai-btn-block"
           >
             {t('onboard_next')}
           </button>
@@ -426,11 +383,13 @@ export default function OnboardingPage() {
 
       {/* Step: Gender */}
       {step === 'gender' && (
-        <div className="flex-1 flex flex-col">
+        <div className="hai-flex-1 hai-stack-4">
           <BackBtn onClick={() => setStep('name')} />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{t('onboard_gender')}</h1>
-          <p className="text-gray-500 text-sm mb-8">{t('onboard_gender_subtitle')}</p>
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="hai-stack-1">
+            <h1 className="hai-h2">{t('onboard_gender')}</h1>
+            <p className="hai-caption">{t('onboard_gender_subtitle')}</p>
+          </div>
+          <div className="hai-option-grid-2">
             {[
               { value: 'MALE',   label: t('onboard_male'),   icon: '👨' },
               { value: 'FEMALE', label: t('onboard_female'), icon: '👩' },
@@ -438,26 +397,24 @@ export default function OnboardingPage() {
               <button
                 key={g.value}
                 onClick={() => setGender(g.value as 'MALE' | 'FEMALE' | 'UNSPECIFIED')}
-                className={`p-4 rounded-2xl border-2 text-center transition-all ${
-                  gender === g.value ? 'border-primary-600 bg-primary-600 text-white' : 'border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white'
-                }`}
+                data-active={gender === g.value ? 'true' : 'false'}
+                className="hai-option hai-option--center"
               >
-                <div className="text-3xl mb-1">{g.icon}</div>
-                <div className="font-medium">{g.label}</div>
+                <span className="hai-option__icon">{g.icon}</span>
+                <span className="hai-option__title">{g.label}</span>
               </button>
             ))}
           </div>
           <button
             onClick={() => setGender('UNSPECIFIED')}
-            className={`w-full text-center py-2.5 mb-6 rounded-xl text-sm font-medium transition-all ${
-              gender === 'UNSPECIFIED' ? 'bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-white' : 'text-gray-400'
-            }`}
+            data-active={gender === 'UNSPECIFIED' ? 'true' : 'false'}
+            className="hai-chip hai-chip--sm hai-self-center"
           >
             {lang === 'en' ? 'Prefer not to say' : lang === 'ur' ? 'بتانا نہیں چاہتا' : 'أفضل عدم التحديد'}
           </button>
           <button
             onClick={() => setStep('account_type')}
-            className="btn-primary"
+            className="hai-btn-primary hai-btn-block hai-mt-2"
           >
             {t('onboard_next')}
           </button>
@@ -466,43 +423,43 @@ export default function OnboardingPage() {
 
       {/* Step: Account Type */}
       {step === 'account_type' && (
-        <div className="flex-1 flex flex-col">
+        <div className="hai-flex-1 hai-stack-4">
           <BackBtn onClick={() => setStep('gender')} />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-            {lang !== 'en' ? 'نوع الحساب' : 'Account Type'}
-          </h1>
-          <p className="text-gray-500 text-sm mb-8">
-            {lang !== 'en' ? 'هل تقدم خدمة في الحي؟' : 'Do you offer a service in the neighborhood?'}
-          </p>
-          <div className="space-y-3 mb-8">
+          <div className="hai-stack-1">
+            <h1 className="hai-h2">
+              {lang !== 'en' ? 'نوع الحساب' : 'Account Type'}
+            </h1>
+            <p className="hai-caption">
+              {lang !== 'en' ? 'هل تقدم خدمة في الحي؟' : 'Do you offer a service in the neighborhood?'}
+            </p>
+          </div>
+          <div className="hai-stack-3">
             <button
               onClick={() => setAccountType('NORMAL')}
-              className={`w-full p-4 rounded-2xl border-2 text-start transition-all ${
-                accountType === 'NORMAL' ? 'border-primary-600 bg-primary-600 text-white' : 'border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white'
-              }`}
+              data-active={accountType === 'NORMAL' ? 'true' : 'false'}
+              className="hai-option"
             >
-              <div className="text-lg mb-1">👤</div>
-              <div className="font-medium">{lang !== 'en' ? 'مستخدم عادي' : 'Regular User'}</div>
-              <p className={`text-xs mt-1 ${accountType === 'NORMAL' ? 'text-primary-100' : 'text-gray-400'}`}>
+              <span className="hai-option__icon">👤</span>
+              <span className="hai-option__title">{lang !== 'en' ? 'مستخدم عادي' : 'Regular User'}</span>
+              <span className="hai-option__desc">
                 {lang !== 'en' ? 'أبحث عن خدمات وأتواصل مع جيراني' : 'Looking for services and connecting with neighbors'}
-              </p>
+              </span>
             </button>
             <button
               onClick={() => setAccountType('SERVICE_PROVIDER')}
-              className={`w-full p-4 rounded-2xl border-2 text-start transition-all ${
-                accountType === 'SERVICE_PROVIDER' ? 'border-primary-600 bg-primary-600 text-white' : 'border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white'
-              }`}
+              data-active={accountType === 'SERVICE_PROVIDER' ? 'true' : 'false'}
+              className="hai-option"
             >
-              <div className="text-lg mb-1">🛠</div>
-              <div className="font-medium">{lang !== 'en' ? 'مقدم خدمة' : 'Service Provider'}</div>
-              <p className={`text-xs mt-1 ${accountType === 'SERVICE_PROVIDER' ? 'text-primary-100' : 'text-gray-400'}`}>
+              <span className="hai-option__icon">🛠</span>
+              <span className="hai-option__title">{lang !== 'en' ? 'مقدم خدمة' : 'Service Provider'}</span>
+              <span className="hai-option__desc">
                 {lang !== 'en' ? 'أقدم خدمة (سباك، كهربائي، توصيل...)' : 'I offer a service (plumber, electrician, delivery...)'}
-              </p>
+              </span>
             </button>
           </div>
           <button
             onClick={() => setStep('location')}
-            className="btn-primary"
+            className="hai-btn-primary hai-btn-block hai-mt-2"
           >
             {t('onboard_next')}
           </button>
@@ -511,32 +468,32 @@ export default function OnboardingPage() {
 
       {/* Step: Location */}
       {step === 'location' && (
-        <div className="flex-1 flex flex-col">
+        <div className="hai-flex-1 flex flex-col">
 
           {/* A. Initial: ask user to share location */}
           {locationStep === 'ask' && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-primary-50 flex items-center justify-center">
-                <FiMapPin className="w-10 h-10 text-primary-600" />
+            <div className="hai-center-col">
+              <div className="hai-icon-circle hai-icon-circle--brand">
+                <FiMapPin className="hai-icon-xl" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h1 className="hai-h3">
                 {lang !== 'en' ? 'تحديد حيّك' : 'Detect your neighborhood'}
               </h1>
-              <p className="text-gray-500 text-sm max-w-xs">
+              <p className="hai-caption">
                 {lang === 'ar'
                   ? 'نحتاج موقعك لتحديد الحي المناسب'
                   : 'We need your location to find your neighborhood'}
               </p>
               <button
                 onClick={requestLocation}
-                className="btn-primary mt-4 w-full max-w-xs flex items-center justify-center gap-2"
+                className="hai-btn-primary hai-btn-block hai-mt-2"
               >
-                <FiMapPin className="w-4 h-4" />
+                <FiMapPin className="hai-icon-md" />
                 {lang !== 'en' ? 'استخدم موقعي' : 'Use my location'}
               </button>
               <button
                 onClick={() => setStep('gender')}
-                className="text-sm text-gray-400 underline mt-2"
+                className="hai-link hai-link--muted hai-link--underline"
               >
                 {t('common_back')}
               </button>
@@ -545,21 +502,21 @@ export default function OnboardingPage() {
 
           {/* B. Detecting — spinner while collecting GPS samples */}
           {locationStep === 'detecting' && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-primary-50 flex items-center justify-center">
-                <FiMapPin className="w-10 h-10 text-primary-600 animate-pulse" />
+            <div className="hai-center-col">
+              <div className="hai-icon-circle hai-icon-circle--brand">
+                <FiMapPin className="hai-icon-xl animate-pulse" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h1 className="hai-h3">
                 {lang !== 'en' ? 'جاري تحديد موقعك...' : 'Detecting your location...'}
               </h1>
-              <div className="flex items-center gap-2 text-primary-600 text-sm">
-                <FiLoader className="w-4 h-4 animate-spin" />
-                <span>
+              <div className="hai-row-2 hai-tc-brand">
+                <FiLoader className="hai-icon-md animate-spin" />
+                <span className="hai-caption hai-tc-brand">
                   {lang === 'en' ? 'Please allow location access' : lang === 'ur' ? 'براہ کرم مقام کی اجازت دیں' : 'يرجى السماح بالوصول للموقع'}
                 </span>
               </div>
               {gps.sampleCount > 0 && (
-                <p className="text-xs text-gray-400">
+                <p className="hai-meta">
                   {gps.sampleCount}/3
                 </p>
               )}
@@ -568,28 +525,28 @@ export default function OnboardingPage() {
 
           {/* C. Precise match — confirm detected neighborhood */}
           {locationStep === 'confirm' && detectedNeighborhood && (
-            <div className="flex-1 flex flex-col">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                {lang !== 'en' ? 'تم تحديد موقعك' : 'Location detected'}
-              </h1>
-              <p className="text-gray-500 text-sm mb-8">
-                {lang !== 'en' ? 'هل هذا حيّك الصحيح؟' : 'Is this your neighborhood?'}
-              </p>
+            <div className="hai-flex-1 hai-stack-4">
+              <div className="hai-stack-1">
+                <h1 className="hai-h2">
+                  {lang !== 'en' ? 'تم تحديد موقعك' : 'Location detected'}
+                </h1>
+                <p className="hai-caption">
+                  {lang !== 'en' ? 'هل هذا حيّك الصحيح؟' : 'Is this your neighborhood?'}
+                </p>
+              </div>
 
-              <div className="bg-primary-50 border-2 border-primary-200 rounded-2xl p-5 mb-6 text-center">
-                <div className="text-4xl mb-2">📍</div>
-                <p className="text-lg font-bold text-primary-800">
+              <div className="hai-callout hai-callout--brand hai-text-center">
+                <div className="hai-option__icon">📍</div>
+                <p className="hai-h4">
                   {dn(detectedNeighborhood.name, detectedNeighborhood.nameEn)}
                 </p>
-                <p className="text-sm text-primary-600">
+                <p className="hai-caption hai-tc-brand">
                   {dn(detectedNeighborhood.city.name, detectedNeighborhood.city.nameEn)}
                 </p>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="hai-meta hai-mt-1">
                   {detectedNeighborhood.distanceKm} {lang !== 'en' ? 'كم' : 'km'}
                 </p>
-                <p className={`text-xs mt-2 font-medium ${
-                  detectedNeighborhood.confidence === 'high' ? 'text-green-600' : 'text-amber-500'
-                }`}>
+                <p className={`hai-meta hai-mt-2 ${detectedNeighborhood.confidence === 'high' ? 'hai-tc-brand' : 'hai-tc-muted'}`}>
                   {detectedNeighborhood.confidence === 'high'
                     ? (lang !== 'en' ? 'دقة عالية ✓' : 'High accuracy ✓')
                     : (lang !== 'en' ? 'دقة متوسطة' : 'Medium accuracy')}
@@ -599,9 +556,9 @@ export default function OnboardingPage() {
               <button
                 onClick={handleFinish}
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 bg-primary-600 text-white font-semibold py-3 rounded-xl active:scale-95 transition-transform disabled:opacity-50 mb-3"
+                className="hai-btn-primary hai-btn-block"
               >
-                <FiCheck className="w-5 h-5" />
+                <FiCheck className="hai-icon-lg" />
                 {lang !== 'en' ? 'نعم، هذا حيّي' : 'Yes, this is my neighborhood'}
               </button>
               <button
@@ -610,53 +567,50 @@ export default function OnboardingPage() {
                     fetchNearbyAndShowPicker(userLat, userLng, userAccuracy ?? 9999)
                   }
                 }}
-                className="w-full text-sm text-gray-500 underline"
+                className="hai-link hai-link--muted hai-link--underline hai-text-center"
               >
                 {lang !== 'en' ? 'لا، حيّي مختلف' : 'No, my neighborhood is different'}
               </button>
             </div>
           )}
 
-          {/* D. Nearby picker — used for:
-              - low-accuracy GPS (automatic)
-              - user rejected the precise match (manual)
-              - detect endpoint error (fallback)
-              Always derived from the captured fallback coordinates — server
-              re-validates the selection against those same coordinates. */}
+          {/* D. Nearby picker */}
           {locationStep === 'nearby' && (
-            <div className="flex-1 flex flex-col">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                {lang !== 'en' ? 'اختر حيّك' : 'Choose your neighborhood'}
-              </h1>
-              <p className="text-gray-500 text-sm mb-4">
-                {lang === 'en'
-                  ? 'We couldn\'t pinpoint you exactly. Pick from the neighborhoods near your current location.'
-                  : 'تعذّر تحديد موقعك بدقة. اختر من الأحياء القريبة من موقعك الحالي.'}
-              </p>
+            <div className="hai-flex-1 hai-stack-4">
+              <div className="hai-stack-1">
+                <h1 className="hai-h2">
+                  {lang !== 'en' ? 'اختر حيّك' : 'Choose your neighborhood'}
+                </h1>
+                <p className="hai-caption">
+                  {lang === 'en'
+                    ? "We couldn't pinpoint you exactly. Pick from the neighborhoods near your current location."
+                    : 'تعذّر تحديد موقعك بدقة. اختر من الأحياء القريبة من موقعك الحالي.'}
+                </p>
+              </div>
 
               {nearbyLoading ? (
-                <div className="flex-1 flex items-center justify-center">
-                  <FiLoader className="w-6 h-6 text-primary-600 animate-spin" />
+                <div className="hai-center-col">
+                  <FiLoader className="hai-icon-lg hai-ic-brand animate-spin" />
                 </div>
               ) : nearbyList.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center text-gray-500">
-                  <div className="text-4xl">😕</div>
-                  <p className="text-sm max-w-xs">
+                <div className="hai-center-col">
+                  <div className="hai-option__icon">😕</div>
+                  <p className="hai-caption">
                     {lang === 'en'
                       ? "We couldn't find neighborhoods near your location. Please try again."
                       : 'لم نتمكن من العثور على أحياء قريبة. يرجى المحاولة مرة أخرى.'}
                   </p>
                   <button
                     onClick={requestLocation}
-                    className="btn-primary mt-3 flex items-center justify-center gap-2"
+                    className="hai-btn-primary"
                   >
-                    <FiRefreshCw className="w-4 h-4" />
+                    <FiRefreshCw className="hai-icon-md" />
                     {lang !== 'en' ? 'إعادة تحديد الموقع' : 'Retry location'}
                   </button>
                 </div>
               ) : (
                 <>
-                  <div className="space-y-2 mb-6 flex-1 overflow-y-auto overscroll-contain">
+                  <div className="hai-stack-2 hai-flex-1 hai-overflow-auto">
                     {nearbyList.map(n => (
                       <button
                         key={n.id}
@@ -671,34 +625,31 @@ export default function OnboardingPage() {
                             city: { id: '', name: n.city.name, nameEn: n.city.nameEn },
                           })
                         }}
-                        className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border-2 transition-all ${
-                          selectedNeighborhoodId === n.id
-                            ? 'border-primary-600 bg-primary-600 text-white'
-                            : 'border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600 text-gray-800 dark:text-white'
-                        }`}
+                        data-active={selectedNeighborhoodId === n.id ? 'true' : 'false'}
+                        className="hai-option hai-row-3 hai-justify-between"
                       >
-                        <span className={`text-xs ${selectedNeighborhoodId === n.id ? 'opacity-70' : 'text-gray-400'}`}>
+                        <span className="hai-meta">
                           {n.distanceKm} {lang !== 'en' ? 'كم' : 'km'} · {dn(n.city.name, n.city.nameEn)}
                         </span>
-                        <span className="font-medium">{dn(n.name, n.nameEn)}</span>
+                        <span className="hai-option__title">{dn(n.name, n.nameEn)}</span>
                       </button>
                     ))}
                   </div>
                   <button
                     onClick={handleFinish}
                     disabled={loading || !selectedNeighborhoodId}
-                    className="btn-primary flex items-center justify-center gap-2"
+                    className="hai-btn-primary hai-btn-block"
                   >
-                    <FiCheck className="w-4 h-4" />
+                    <FiCheck className="hai-icon-md" />
                     {loading
                       ? (lang !== 'en' ? 'جاري الحفظ...' : 'Saving...')
                       : (lang !== 'en' ? 'تأكيد الحي' : 'Confirm neighborhood')}
                   </button>
                   <button
                     onClick={requestLocation}
-                    className="w-full text-sm text-gray-500 underline mt-3 flex items-center justify-center gap-1.5"
+                    className="hai-link hai-link--muted hai-link--underline hai-row-1 hai-justify-center"
                   >
-                    <FiRefreshCw className="w-3 h-3" />
+                    <FiRefreshCw className="hai-icon-xs" />
                     {lang !== 'en' ? 'إعادة تحديد الموقع' : 'Retry location'}
                   </button>
                 </>
@@ -706,90 +657,90 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* E. Permission denied — dedicated recovery screen.
-              iOS will NOT re-show the permission dialog after denial.
-              The user MUST go to Settings to re-enable, then come back. */}
+          {/* E. Permission denied */}
           {locationStep === 'denied' && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
-                <FiMapPin className="w-10 h-10 text-red-400" />
+            <div className="hai-center-col">
+              <div className="hai-icon-circle hai-icon-circle--danger">
+                <FiMapPin className="hai-icon-xl" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h1 className="hai-h3">
                 {lang === 'en' ? 'Location access is required' : lang === 'ur' ? 'مقام کی اجازت ضروری ہے' : 'صلاحية الموقع مطلوبة'}
               </h1>
-              <p className="text-gray-500 dark:text-gray-400 text-sm max-w-xs leading-relaxed">
+              <p className="hai-caption">
                 {lang === 'en'
                   ? 'We need your location to verify your neighborhood. Please enable location access in Settings to continue.'
                   : lang === 'ur'
                     ? 'آپ کے محلے کی تصدیق کیلئے مقام ضروری ہے۔ سیٹنگز سے مقام فعال کریں۔'
                     : 'نحتاج موقعك للتحقق من حيّك. فعّل صلاحية الموقع من الإعدادات للمتابعة.'}
               </p>
-              <div className="flex flex-col gap-3 w-full max-w-xs mt-2">
+              <div className="hai-stack-3 hai-w-full hai-max-xs">
                 <button
                   onClick={openSystemSettings}
-                  className="w-full flex items-center justify-center gap-2 bg-primary-600 text-white font-semibold py-3 rounded-xl active:scale-95 transition-transform"
+                  className="hai-btn-primary hai-btn-block"
                 >
-                  <FiSettings className="w-4 h-4" />
+                  <FiSettings className="hai-icon-md" />
                   {lang === 'en' ? 'Open Settings' : lang === 'ur' ? 'سیٹنگز کھولیں' : 'افتح الإعدادات'}
                 </button>
                 <button
                   onClick={retryAfterSettings}
-                  className="w-full flex items-center justify-center gap-2 border-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold py-3 rounded-xl active:scale-95 transition-transform"
+                  className="hai-btn-ghost hai-btn-block"
                 >
-                  <FiRefreshCw className="w-4 h-4" />
+                  <FiRefreshCw className="hai-icon-md" />
                   {lang === 'en' ? "I've enabled it, try again" : lang === 'ur' ? 'فعال کر دیا، دوبارہ کوشش کریں' : 'فعّلتها، أعد المحاولة'}
                 </button>
+                <button
+                  onClick={enterManualPicker}
+                  className="hai-btn-ghost hai-btn-block is-brand"
+                >
+                  <FiSearch className="hai-icon-md" />
+                  {lang === 'en'
+                    ? 'Browse neighborhoods (limited access)'
+                    : lang === 'ur'
+                      ? 'محلے دیکھیں (محدود رسائی)'
+                      : 'تصفّح الأحياء (وصول محدود)'}
+                </button>
               </div>
-              <button
-                onClick={enterManualPicker}
-                className="w-full flex items-center justify-center gap-2 mt-3 border-2 border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 font-semibold py-3 rounded-xl active:scale-95 transition-transform"
-              >
-                <FiSearch className="w-4 h-4" />
-                {lang === 'en'
-                  ? 'Browse neighborhoods (limited access)'
-                  : lang === 'ur'
-                    ? 'محلے دیکھیں (محدود رسائی)'
-                    : 'تصفّح الأحياء (وصول محدود)'}
-              </button>
             </div>
           )}
 
-          {/* F. Manual neighborhood picker — limited access without GPS */}
+          {/* F. Manual neighborhood picker */}
           {locationStep === 'manual' && (
-            <div className="flex-1 flex flex-col">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                {lang === 'en' ? 'Choose your neighborhood' : lang === 'ur' ? 'اپنا محلہ منتخب کریں' : 'اختر حيّك'}
-              </h1>
-              <p className="text-gray-500 text-sm mb-1">
-                {lang === 'en'
-                  ? 'Select your neighborhood manually. Some features will be limited until location is verified.'
-                  : lang === 'ur'
-                    ? 'اپنا محلہ دستی طور پر منتخب کریں۔ مقام کی تصدیق تک کچھ خصوصیات محدود ہوں گی۔'
-                    : 'اختر حيّك يدوياً. بعض المزايا ستكون محدودة حتى يتم التحقق من موقعك.'}
-              </p>
-              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2 mb-4">
-                <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
-                  ⚠️ {lang === 'en' ? 'Limited access — enable location later in Settings to unlock full features' : lang === 'ur' ? 'محدود رسائی — مکمل خصوصیات کیلئے بعد میں مقام فعال کریں' : 'وصول محدود — فعّل الموقع لاحقاً من الإعدادات لفتح جميع المزايا'}
+            <div className="hai-flex-1 hai-stack-4">
+              <div className="hai-stack-1">
+                <h1 className="hai-h2">
+                  {lang === 'en' ? 'Choose your neighborhood' : lang === 'ur' ? 'اپنا محلہ منتخب کریں' : 'اختر حيّك'}
+                </h1>
+                <p className="hai-caption">
+                  {lang === 'en'
+                    ? 'Select your neighborhood manually. Some features will be limited until location is verified.'
+                    : lang === 'ur'
+                      ? 'اپنا محلہ دستی طور پر منتخب کریں۔ مقام کی تصدیق تک کچھ خصوصیات محدود ہوں گی۔'
+                      : 'اختر حيّك يدوياً. بعض المزايا ستكون محدودة حتى يتم التحقق من موقعك.'}
                 </p>
               </div>
 
+              <div className="hai-callout hai-callout--warning">
+                ⚠️ {lang === 'en' ? 'Limited access — enable location later in Settings to unlock full features' : lang === 'ur' ? 'محدود رسائی — مکمل خصوصیات کیلئے بعد میں مقام فعال کریں' : 'وصول محدود — فعّل الموقع لاحقاً من الإعدادات لفتح جميع المزايا'}
+              </div>
+
               {manualLoading ? (
-                <div className="flex-1 flex items-center justify-center">
-                  <FiLoader className="w-6 h-6 text-primary-600 animate-spin" />
+                <div className="hai-center-col">
+                  <FiLoader className="hai-icon-lg hai-ic-brand animate-spin" />
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 rounded-2xl px-4 py-3.5 mb-3 border border-gray-200 dark:border-gray-700 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-200 dark:focus-within:ring-primary-900/40 transition-all">
-                    <FiSearch className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                  <div className="hai-input-group">
+                    <span className="hai-input-affix">
+                      <FiSearch className="hai-icon-md hai-ic-faint" />
+                    </span>
                     <input
                       type="text"
                       value={manualSearch}
                       onChange={(e) => setManualSearch(e.target.value)}
                       placeholder={lang === 'en' ? 'Search neighborhood...' : lang === 'ur' ? 'محلہ تلاش کریں...' : 'ابحث عن حي...'}
-                      className="flex-1 bg-transparent text-base focus:outline-none text-gray-800 dark:text-gray-100 placeholder:text-gray-400"
                     />
                   </div>
-                  <div className="space-y-2 mb-6 flex-1 overflow-y-auto overscroll-contain" style={{ maxHeight: '40vh' }}>
+                  <div className="hai-stack-2 hai-flex-1 hai-overflow-auto">
                     {allNeighborhoods
                       .filter(n => {
                         if (!manualSearch.trim()) return true
@@ -810,25 +761,22 @@ export default function OnboardingPage() {
                               city: { id: '', name: n.cityName, nameEn: n.cityNameEn },
                             })
                           }}
-                          className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border-2 transition-all ${
-                            selectedNeighborhoodId === n.id
-                              ? 'border-primary-600 bg-primary-600 text-white'
-                              : 'border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600 text-gray-800 dark:text-white'
-                          }`}
+                          data-active={selectedNeighborhoodId === n.id ? 'true' : 'false'}
+                          className="hai-option hai-row-3 hai-justify-between"
                         >
-                          <span className={`text-xs ${selectedNeighborhoodId === n.id ? 'opacity-70' : 'text-gray-400'}`}>
+                          <span className="hai-meta">
                             {dn(n.cityName, n.cityNameEn)}
                           </span>
-                          <span className="font-medium">{dn(n.name, n.nameEn)}</span>
+                          <span className="hai-option__title">{dn(n.name, n.nameEn)}</span>
                         </button>
                       ))}
                   </div>
                   <button
                     onClick={handleFinish}
                     disabled={loading || !selectedNeighborhoodId}
-                    className="btn-primary flex items-center justify-center gap-2"
+                    className="hai-btn-primary hai-btn-block"
                   >
-                    <FiCheck className="w-4 h-4" />
+                    <FiCheck className="hai-icon-md" />
                     {loading
                       ? (lang !== 'en' ? 'جاري الحفظ...' : 'Saving...')
                       : (lang !== 'en' ? 'تأكيد الحي' : 'Confirm neighborhood')}
@@ -838,25 +786,25 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* G. Timeout — no sample at all. Retry only. */}
+          {/* G. Timeout */}
           {locationStep === 'timeout' && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-amber-50 flex items-center justify-center">
-                <FiLoader className="w-10 h-10 text-amber-400" />
+            <div className="hai-center-col">
+              <div className="hai-icon-circle hai-icon-circle--warning">
+                <FiLoader className="hai-icon-xl" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h1 className="hai-h3">
                 {lang !== 'en' ? 'تعذر تحديد موقعك' : "Couldn't detect your location"}
               </h1>
-              <p className="text-gray-500 text-sm max-w-xs leading-relaxed">
+              <p className="hai-caption">
                 {lang === 'en'
                   ? "We couldn't determine your location right now. Make sure location services are on, then try again."
                   : 'تعذر تحديد موقعك حالياً. تأكد من تفعيل خدمات الموقع وأعد المحاولة.'}
               </p>
               <button
                 onClick={requestLocation}
-                className="btn-primary mt-4 w-full max-w-xs flex items-center justify-center gap-2"
+                className="hai-btn-primary hai-btn-block hai-mt-2"
               >
-                <FiRefreshCw className="w-4 h-4" />
+                <FiRefreshCw className="hai-icon-md" />
                 {lang !== 'en' ? 'أعد المحاولة' : 'Try Again'}
               </button>
             </div>

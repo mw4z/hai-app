@@ -36,10 +36,19 @@ export function getRoleBadge(role: string): UserBadge | null {
 
 /**
  * Tier badge — unified dot system.
- * Returns dot character + tailwind color class.
- * Null for "new" tier (no badge shown).
+ *
+ * `tier` is the semantic key consumed by the design system's
+ * `.hai-tier-badge[data-tier="..."]` primitive. Colors live in
+ * design-tokens.css (--hai-state-tier-*). No Tailwind classes here.
+ *
+ * `colorClass` is retained only for legacy callers that pre-date the
+ * semantic layer — new callers should read `tier` and let the design
+ * system decide the appearance.
  */
+export type TierKey = 'new' | 'active' | 'trusted' | 'distinguished'
+
 export interface TierBadge {
+  tier: TierKey
   dot: string
   colorClass: string
   ar: string
@@ -48,10 +57,10 @@ export interface TierBadge {
 }
 
 export function getTierBadge(reputation: number): TierBadge | null {
-  if (reputation >= 400) return { dot: '●', colorClass: 'text-amber-500', ar: 'عضو مميز', en: 'Distinguished', ur: 'ممتاز' }
-  if (reputation >= 150) return { dot: '●', colorClass: 'text-green-500', ar: 'موثوق', en: 'Trusted', ur: 'قابل اعتماد' }
-  if (reputation >= 50)  return { dot: '●', colorClass: 'text-blue-500', ar: 'نشط', en: 'Active', ur: 'سرگرم' }
-  return { dot: '●', colorClass: 'text-gray-400', ar: 'جديد', en: 'New', ur: 'نیا' }
+  if (reputation >= 400) return { tier: 'distinguished', dot: '●', colorClass: 'text-amber-500', ar: 'عضو مميز', en: 'Distinguished', ur: 'ممتاز' }
+  if (reputation >= 150) return { tier: 'trusted',       dot: '●', colorClass: 'text-green-500', ar: 'موثوق',      en: 'Trusted',       ur: 'قابل اعتماد' }
+  if (reputation >= 50)  return { tier: 'active',        dot: '●', colorClass: 'text-blue-500',  ar: 'نشط',        en: 'Active',        ur: 'سرگرم' }
+  return                        { tier: 'new',           dot: '●', colorClass: 'text-gray-400',  ar: 'جديد',       en: 'New',           ur: 'نیا' }
 }
 
 /** @deprecated — use getTierBadge instead for new code */

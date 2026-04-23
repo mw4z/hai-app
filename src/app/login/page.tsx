@@ -46,24 +46,24 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex flex-col px-6 pt-6 bg-white" style={{ minHeight: 'calc(100dvh - env(safe-area-inset-top, 0px))' }}>
-      <Link href="/" className="flex items-center gap-1 text-gray-400 text-sm mb-4 self-start">
-        {lang !== 'en' ? <FiArrowRight className="w-4 h-4" /> : <FiArrowLeft className="w-4 h-4" />}
+    <main className="hai-screen">
+      <Link href="/" className="hai-link--back hai-self-start hai-mb-4">
+        {lang !== 'en' ? <FiArrowRight className="hai-icon-md" /> : <FiArrowLeft className="hai-icon-md" />}
         {t('common_back')}
       </Link>
 
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">{t('login_title')}</h1>
-        <p className="text-gray-500 text-sm">{t('login_subtitle')}</p>
+      <div className="hai-stack-1 hai-mb-5">
+        <h1 className="hai-h2">{t('login_title')}</h1>
+        <p className="hai-caption">{t('login_subtitle')}</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="hai-stack-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="hai-label">
             {t('auth_phone_label')}
           </label>
-          <div className="flex items-center border border-gray-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary-500">
-            <span className="px-3 text-gray-500 text-sm border-l border-gray-200 py-3">
+          <div className="hai-input-group">
+            <span className="hai-input-affix">
               🇸🇦 +966
             </span>
             <input
@@ -72,22 +72,21 @@ export default function LoginPage() {
               placeholder="5xxxxxxxx"
               value={phone}
               onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-              className="flex-1 px-3 py-3 text-start bg-transparent focus:outline-none text-base"
               maxLength={10}
               required
               dir="ltr"
             />
           </div>
-          <p className="text-xs text-gray-400 mt-1.5 px-1">
+          <p className="hai-field-hint">
             {lang === 'en' ? 'Enter with 05 or without the leading 0' : lang === 'ur' ? 'اپنا نمبر 05 کے ساتھ یا بغیر درج کریں' : 'أدخل رقمك بـ 05 أو بدون الصفر'}
           </p>
         </div>
 
-        <button type="submit" disabled={loading} className="btn-primary mt-6">
+        <button type="submit" disabled={loading} className="hai-btn-primary hai-btn-block hai-mt-2">
           {loading ? t('auth_sending') : t('auth_send_otp')}
         </button>
 
-        <p className="text-[11px] text-gray-400 text-center mt-3 leading-relaxed">
+        <p className="hai-meta hai-text-center">
           {lang === 'en'
             ? 'By continuing, you confirm you are 13+ and agree to our Terms & Privacy Policy'
             : lang === 'ur'
@@ -96,16 +95,16 @@ export default function LoginPage() {
         </p>
       </form>
 
-      <p className="text-center text-gray-500 text-sm mt-6">
+      <p className="hai-caption hai-text-center hai-mt-6">
         {t('login_no_account')}{' '}
-        <Link href="/register" className="text-primary-600 font-medium">
+        <Link href="/register" className="hai-link">
           {t('login_signup')}
         </Link>
       </p>
 
       {/* Language Switcher */}
-      <div className="flex items-center justify-center gap-2 mt-8 mb-4">
-        <FiGlobe className="w-3.5 h-3.5 text-gray-400" />
+      <div className="hai-row-2 hai-justify-center hai-mt-8 hai-mb-4">
+        <FiGlobe className="hai-icon-sm hai-ic-faint" />
         {(['ar', 'en', 'ur'] as const).map((l) => (
           <button
             key={l}
@@ -116,11 +115,8 @@ export default function LoginPage() {
               document.documentElement.setAttribute('dir', l === 'en' ? 'ltr' : 'rtl')
               window.dispatchEvent(new Event(LANGUAGE_CHANGE_EVENT))
             }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              lang === l
-                ? 'bg-primary-600 text-white'
-                : 'bg-gray-100 text-gray-600 active:bg-gray-200'
-            }`}
+            data-active={lang === l ? 'true' : 'false'}
+            className="hai-chip hai-chip--sm"
           >
             {l === 'ar' ? 'العربية' : l === 'en' ? 'English' : 'اردو'}
           </button>

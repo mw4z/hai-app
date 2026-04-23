@@ -1955,20 +1955,21 @@ function AccordionSection({
 }) {
   const isOpen = openSection === sectionKey
   return (
-    <div className="mx-4 mt-4">
+    <div className="hai-accordion-section">
       <button
         onClick={() => setOpenSection(isOpen ? null : sectionKey)}
-        className="w-full flex items-center gap-3 px-4 py-3.5 bg-white dark:bg-gray-800 rounded-2xl border border-primary-200 dark:border-primary-800 active:bg-gray-50 dark:active:bg-gray-700 transition-colors"
+        data-open={isOpen ? 'true' : 'false'}
+        className="hai-accordion-header"
       >
-        <span className="text-primary-600 dark:text-primary-400">{icon}</span>
-        <span className="flex-1 text-start">
-          <span className="block text-sm font-semibold text-gray-800 dark:text-gray-100">{label}</span>
-          {hint && <span className="block text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">{hint}</span>}
+        <span className="hai-accordion-header__icon">{icon}</span>
+        <span className="hai-accordion-header__body">
+          <span className="hai-accordion-header__label">{label}</span>
+          {hint && <span className="hai-accordion-header__hint">{hint}</span>}
         </span>
-        <FiChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <FiChevronDown className="hai-icon-md hai-accordion-header__chevron" />
       </button>
       {isOpen && (
-        <div className="mt-2 animate-fade-in-up">
+        <div className="hai-accordion-body animate-fade-in-up">
           {children}
         </div>
       )}
@@ -1990,28 +1991,28 @@ function SettingRow({
 }) {
   return (
     <div
-      className={`flex items-center gap-3 px-4 py-3.5 ${onTap ? 'cursor-pointer active:bg-gray-50' : ''}`}
+      className={`hai-setting-row ${onTap ? 'hai-setting-row--tappable' : ''}`}
       onClick={onTap}
     >
-      <span className="text-gray-400 w-4 flex-shrink-0">{icon}</span>
-      <span className="text-gray-500 text-sm flex-shrink-0">{label}</span>
-      <span className="flex-1" />
-      <div className="flex items-center gap-1.5">
+      <span className="hai-setting-row__icon">{icon}</span>
+      <span className="hai-setting-row__label">{label}</span>
+      <span className="hai-setting-row__spacer" />
+      <div className="hai-row-1">
         {badge === 'verified' && (
-          <span className="bg-green-100 text-green-600 text-[10px] font-medium px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-            <FiCheck className="w-2.5 h-2.5" />{verifiedLabel ?? 'محقق'}
+          <span className="hai-verify-badge hai-verify-badge--ok">
+            <FiCheck className="hai-icon-xs" />{verifiedLabel ?? 'محقق'}
           </span>
         )}
         {badge === 'unverified' && (
-          <span className="bg-amber-100 text-amber-600 text-[10px] font-medium px-1.5 py-0.5 rounded-full">
+          <span className="hai-verify-badge hai-verify-badge--warn">
             {unverifiedLabel ?? 'غير محقق'}
           </span>
         )}
-        <span className={`text-sm font-medium ${valueMuted ? 'text-gray-400' : 'text-gray-800'}`}>
+        <span className={`hai-setting-row__value ${valueMuted ? 'hai-setting-row__value--muted' : ''}`}>
           {value}
         </span>
       </div>
-      {onTap && <FiChevronLeft className="text-gray-300 dark:text-slate-600 w-4 h-4 flex-shrink-0" />}
+      {onTap && <FiChevronLeft className="hai-icon-md hai-setting-row__chevron" />}
     </div>
   )
 }

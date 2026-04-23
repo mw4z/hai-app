@@ -55,32 +55,25 @@ export default function EmergencyBanner() {
 
   if (alerts.length === 0) return null
 
+  /** Map the raw severity string to a semantic design-system state. */
+  function severityState(severity: string): 'emergency' | 'warning' | 'info' {
+    if (severity === 'critical') return 'emergency'
+    if (severity === 'warning')  return 'warning'
+    return 'info'
+  }
+
   return (
-    <div className="px-4 pt-3 space-y-2">
+    <div className="hai-stack-2 hai-px-4 hai-pt-3">
       {alerts.map((alert) => {
-        const isCritical = alert.severity === 'critical'
-        const isWarning = alert.severity === 'warning'
-        const bg = isCritical
-          ? 'bg-red-600'
-          : isWarning
-            ? 'bg-amber-500'
-            : 'bg-blue-600'
-        const ring = isCritical
-          ? 'ring-red-300/60 dark:ring-red-900/60'
-          : isWarning
-            ? 'ring-amber-300/60 dark:ring-amber-900/60'
-            : 'ring-blue-300/60 dark:ring-blue-900/60'
-
+        const state = severityState(alert.severity)
+        const pulse = state === 'emergency' || state === 'warning'
         const isOpen = expanded === alert.id
-
-        // Continuous pulsing glow for critical/warning — grabs attention
-        // even when the user scrolls past. Info is quieter (no glow).
-        const glow = isCritical || isWarning ? 'animate-pulse-glow-emergency' : ''
 
         return (
           <div
             key={alert.id}
-            className={`${bg} ${ring} ${glow} ring-2 text-white rounded-2xl shadow-lg overflow-hidden relative`}
+            data-state={state}
+            className={`hai-state-banner ${pulse ? 'hai-state-banner--pulse' : ''}`}
           >
             <div
               role="button"
@@ -92,25 +85,25 @@ export default function EmergencyBanner() {
                   setExpanded(isOpen ? null : alert.id)
                 }
               }}
-              className="w-full text-start px-4 py-3 pe-10 flex items-start gap-3 active:opacity-90 cursor-pointer"
+              className="hai-state-banner__hit"
             >
-              <div className="flex-shrink-0 mt-0.5">
-                <FiAlertTriangle className="w-5 h-5" />
+              <div className="hai-state-banner__icon">
+                <FiAlertTriangle className="hai-icon-lg" />
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-bold text-sm">
+              <div className="hai-state-banner__body">
+                <div className="hai-row-2 hai-justify-between">
+                  <p className="hai-state-banner__title">
                     {lang === 'en' ? '🚨 Emergency alert' : '🚨 تنبيه عاجل'}
                   </p>
-                  <span className="text-[10px] opacity-80 font-medium">
+                  <span className="hai-state-banner__meta">
                     {alert.authorName || (lang === 'en' ? 'Mod' : 'المشرف')}
                   </span>
                 </div>
-                <p className="font-semibold text-sm mt-1 line-clamp-2">
+                <p className="hai-state-banner__text line-clamp-2">
                   {alert.title}
                 </p>
                 {isOpen && alert.body && (
-                  <p className="text-xs mt-2 whitespace-pre-wrap opacity-95">
+                  <p className="hai-state-banner__body-text">
                     {alert.body}
                   </p>
                 )}
@@ -119,10 +112,10 @@ export default function EmergencyBanner() {
             <button
               type="button"
               onClick={() => dismiss(alert.id)}
-              className="absolute top-2 end-2 p-1.5 rounded-full hover:bg-white/10 active:bg-white/20 z-10"
+              className="hai-state-banner__close"
               aria-label={lang === 'en' ? 'Dismiss' : 'إخفاء'}
             >
-              <FiX className="w-4 h-4" />
+              <FiX className="hai-icon-md" />
             </button>
           </div>
         )

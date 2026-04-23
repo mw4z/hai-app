@@ -376,58 +376,51 @@ export default function ImageLightbox({
   return (
     <div
       data-overlay="true"
-      className="fixed inset-0 z-[99997] select-none"
-      style={{ touchAction: 'none' }}
+      className="hai-lightbox-overlay hai-lightbox-overlay--flush hai-lightbox-root"
     >
       {/* Backdrop */}
       <div
         ref={backdropRef}
-        className={`absolute inset-0 bg-black transition-opacity duration-[260ms] ease-out ${
-          entered ? 'opacity-100' : 'opacity-0'
-        }`}
+        className="hai-lightbox__backdrop"
+        data-entered={entered ? 'true' : 'false'}
+        style={{ opacity: entered ? 1 : 0 }}
       />
 
       {/* Horizontal track of images. dir="ltr" forces left-to-right flex
-          ordering so img[0] is at x=0, img[1] at x=vw, etc. Without this,
-          RTL apps reverse the flex children and the translate math breaks
-          (index 0 would show the last image, swiping right shows black). */}
+          ordering so img[0] is at x=0, img[1] at x=vw, etc. */}
       <div
         ref={trackRef}
-        className="absolute inset-0 flex"
+        className="hai-lightbox__track"
         dir="ltr"
         style={{
           transform: `translate3d(${-trackIdx * 100}%, 0, 0)`,
           transition: SPRING,
-          willChange: 'transform',
-          touchAction: 'none',
         }}
       >
         {images.map((url, i) => (
           <div
             key={i}
-            className="relative w-full h-full flex-shrink-0 flex items-center justify-center px-4"
+            className="hai-lightbox__slide"
             style={{ order: isRTL ? images.length - 1 - i : i }}
           >
             {/* Outer wrapper: enter fade+scale animation */}
             <div
-              className={`transition-all duration-[320ms] ease-out ${
-                entered ? 'opacity-100 scale-100' : 'opacity-0 scale-[0.94]'
-              }`}
-              style={{ transitionDelay: entered ? '40ms' : '0ms' }}
+              className="hai-lightbox__enter"
+              data-entered={entered ? 'true' : 'false'}
             >
-              {/* Inner wrapper: pinch/pan transform */}
+              {/* Inner wrapper: pinch/pan transform (runtime gesture state) */}
               <div
                 ref={(el) => {
                   imgWrapRefs.current[i] = el
                 }}
-                className="will-change-transform"
+                className="hai-lightbox__gesture"
                 style={{ transform: 'translate3d(0,0,0) scale(1)' }}
               >
                 <img
                   src={url}
                   alt=""
                   draggable={false}
-                  className="max-w-full max-h-[100dvh] object-contain pointer-events-none"
+                  className="hai-lightbox__image"
                 />
               </div>
             </div>
@@ -437,47 +430,41 @@ export default function ImageLightbox({
 
       {/* Top chrome — close + counter */}
       <div
-        className={`absolute top-0 left-0 right-0 flex items-center justify-between px-4 transition-all duration-[320ms] ease-out ${
-          entered ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1'
-        }`}
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+        className="hai-lightbox-controls hai-lightbox-controls--top hai-lightbox__chrome-enter"
+        data-entered={entered ? 'true' : 'false'}
       >
         <button
           onClick={onClose}
-          className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
+          className="hai-lightbox__btn"
           aria-label="Close"
         >
-          <FiX className="w-5 h-5" />
+          <FiX className="hai-icon-lg" />
         </button>
         {images.length > 1 && (
-          <div className="px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md text-white text-xs font-bold tabular-nums">
+          <div className="hai-lightbox__counter">
             {index + 1} / {images.length}
           </div>
         )}
         <button
           onClick={handleSave}
-          className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
+          className="hai-lightbox__btn"
           aria-label="Save"
         >
-          <FiDownload className="w-5 h-5" />
+          <FiDownload className="hai-icon-lg" />
         </button>
       </div>
 
-      {/* Bottom chrome — animated pill dots. Inherit the page's dir so
-          dot ordering matches the visual image progression. */}
+      {/* Bottom chrome — animated pill dots. */}
       {images.length > 1 && (
         <div
-          className={`absolute left-0 right-0 flex items-center justify-center gap-1.5 transition-all duration-[320ms] ease-out ${
-            entered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'
-          }`}
-          style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)' }}
+          className="hai-lightbox__pager hai-lightbox__chrome-enter hai-lightbox__chrome-enter--bottom"
+          data-entered={entered ? 'true' : 'false'}
         >
           {images.map((_, i) => (
             <span
               key={i}
-              className={`h-1 rounded-full transition-all duration-[360ms] ease-out ${
-                i === index ? 'w-7 bg-white' : 'w-1 bg-white/40'
-              }`}
+              className="hai-lightbox__dot"
+              data-active={i === index ? 'true' : 'false'}
             />
           ))}
         </div>

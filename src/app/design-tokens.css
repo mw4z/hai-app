@@ -1,58 +1,72 @@
-/* ───────────────────────────────────────────────────────────────────────
-   Hai — Design Tokens (v1)
-   Single source of truth for colors, spacing, radius, typography, shadows.
-   All components should reference these variables; avoid hex literals and
-   one-off pixel values in component files.
+/* ═══════════════════════════════════════════════════════════════════════
+   Hai — Design Tokens (v3)
+   ═══════════════════════════════════════════════════════════════════════
+
+   LAYER MODEL
+   ───────────
+     LAYER 1 — RAW TOKENS         (primitive, context-free scales)
+                 colors, spacing, radius, font sizes, durations, z-indexes
+     LAYER 2 — SEMANTIC TOKENS    (role-based aliases over raw tokens)
+                 surfaces, text, brand, danger, warning, info, rings
+     LAYER 3 — COMPONENT PRIMITIVES (.hai-* classes: the ONLY building blocks
+                 screens should use — utilities are support-only)
+     LAYER 4 — UTILITIES          (.hai-m*, .hai-row-*, .hai-text-center, …
+                 for glue between primitives; never as a primary construct)
+
+   CONTRACT
+   ────────
+     • Screens use LAYER 3 primitives. LAYER 4 utilities are support only —
+       never compose full components out of utilities.
+     • Components reference LAYER 2 (semantic) tokens, never raw hex/rgba.
+     • No arbitrary z-index — always pull from --hai-z-* (LAYER 1).
+     • No hand-rolled shadows — use --hai-shadow-*.
+     • Animations: transform + opacity only (GPU-cheap in WebView).
+     • Dark mode is expressed via LAYER 2 overrides in .dark, not per-rule
+       ternaries inside components.
+
+   DEPRECATION POLICY
+   ──────────────────
+     Legacy globals.css utilities (.btn-primary, .btn-outline, .input-field,
+     .card, .category-badge) are back-compat aliases only. New code MUST
+     use the .hai-* equivalents. Grep guard: `rg '\\bclassName=.*\\b(btn-primary|btn-outline|input-field|card)\\b' src`
+     should return only legacy touch-points that are already migrated.
    ─────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* ── Primary — muted professional green ─────────────────────────── */
+  /* ═══════════════════════════════════════════════════════════════════
+     LAYER 1 — RAW TOKENS
+     Primitive scales; no semantic meaning here.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* ── Color ramps ───────────────────────────────────────────────── */
   --hai-primary-50:  #ecfdf5;
   --hai-primary-100: #d1fae5;
   --hai-primary-200: #a7f3d0;
   --hai-primary-400: #4ade80;
-  --hai-primary-500: #22c55e;   /* brand default (buttons, active tab) */
-  --hai-primary-600: #16a34a;   /* brand hover / pressed */
-  --hai-primary-700: #15803d;   /* brand text on light bg */
+  --hai-primary-500: #22c55e;
+  --hai-primary-600: #16a34a;
+  --hai-primary-700: #15803d;
   --hai-primary-900: #14532d;
 
-  /* ── Neutral — grayscale surfaces & text ────────────────────────── */
-  --hai-bg:          #ffffff;   /* page background */
-  --hai-surface-1:   #ffffff;   /* card / header background */
-  --hai-surface-2:   #f9fafb;   /* subtle inner surfaces */
-  --hai-surface-3:   #f3f4f6;   /* pressed / selected bg */
-  --hai-border:      #e5e7eb;
-  --hai-border-soft: #f3f4f6;
-
-  --hai-text:        #0f172a;   /* primary text */
-  --hai-text-sub:    #374151;   /* secondary text */
-  --hai-text-muted:  #6b7280;   /* labels, metadata */
-  --hai-text-faint:  #9ca3af;   /* placeholders, timestamps */
-
-  /* ── Semantic accents ────────────────────────────────────────────── */
-  --hai-danger:      #ef4444;
-  --hai-warning:     #f59e0b;
-  --hai-info:        #3b82f6;
-
-  /* ── Spacing — 8pt base grid ─────────────────────────────────────── */
-  --hai-space-1: 4px;    /* 0.5× */
-  --hai-space-2: 8px;    /* 1×   */
-  --hai-space-3: 12px;   /* 1.5× */
-  --hai-space-4: 16px;   /* 2×   */
-  --hai-space-5: 20px;   /* 2.5× */
-  --hai-space-6: 24px;   /* 3×   */
-  --hai-space-8: 32px;   /* 4×   */
+  /* ── Spacing — 8pt base grid ───────────────────────────────────── */
+  --hai-space-1:  4px;   /* 0.5× */
+  --hai-space-2:  8px;   /* 1×   */
+  --hai-space-3:  12px;  /* 1.5× */
+  --hai-space-4:  16px;  /* 2×   */
+  --hai-space-5:  20px;  /* 2.5× */
+  --hai-space-6:  24px;  /* 3×   */
+  --hai-space-8:  32px;  /* 4×   */
   --hai-space-10: 40px;  /* 5×   */
   --hai-space-12: 48px;  /* 6×   */
 
-  /* ── Radius ─────────────────────────────────────────────────────── */
-  --hai-radius-sm: 8px;
-  --hai-radius-md: 12px;   /* buttons, inputs */
-  --hai-radius-lg: 16px;   /* cards */
-  --hai-radius-xl: 20px;   /* sheets, large cards */
+  /* ── Radius ────────────────────────────────────────────────────── */
+  --hai-radius-sm:   8px;
+  --hai-radius-md:   12px;
+  --hai-radius-lg:   16px;
+  --hai-radius-xl:   20px;
   --hai-radius-full: 9999px;
 
-  /* ── Typography ─────────────────────────────────────────────────── */
+  /* ── Type scale ────────────────────────────────────────────────── */
   --hai-font-ar: 'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --hai-font-ur: 'Noto Nastaliq Urdu', system-ui, sans-serif;
   --hai-font-en: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
@@ -70,27 +84,273 @@
   --hai-fw-semibold: 600;
   --hai-fw-bold:     700;
 
-  --hai-lh-tight:  1.2;
-  --hai-lh-normal: 1.4;
+  --hai-lh-tight:   1.2;
+  --hai-lh-normal:  1.4;
   --hai-lh-relaxed: 1.6;
 
-  /* ── Shadows — subtle only; WebView paint cost matters ──────────── */
+  /* ── Motion ────────────────────────────────────────────────────── */
+  --hai-dur-fast:   120ms;
+  --hai-dur-normal: 180ms;
+  --hai-dur-slow:   260ms;
+  --hai-ease:       cubic-bezier(0.16, 1, 0.3, 1);   /* ease-out-expo */
+
+  /* ── Opacity ───────────────────────────────────────────────────── */
+  --hai-opacity-disabled: 0.50;
+  --hai-opacity-muted:    0.72;
+
+  /* ── Z-index scale ─────────────────────────────────────────────────
+     Single source of truth for stacking. All component rules MUST
+     pull from this scale — never hand-write numeric z-index.
+     Progression:
+       0–1      base document flow
+       10       sticky headers, pinned footers, inline FAB icons
+       20       dropdowns (inside cards/sheets)
+       30       menus, popovers, filter panels, reaction pickers
+       40       bottom nav, floating action buttons
+       50       modals, confirm dialogs, sheets, user popups
+       60       nested sheets atop a modal
+       70       confirm over a sheet
+       80       travel overlays, onboarding interstitials
+       90       toasts
+       100      lightbox / media viewer (topmost content chrome)
+       1000     arrival alerts / emergency interstitials (top priority)
+     ──────────────────────────────────────────────────────────────── */
+  --hai-z-base:      0;
+  --hai-z-sticky:    10;
+  --hai-z-dropdown:  20;
+  --hai-z-menu:      30;
+  --hai-z-nav:       40;
+  --hai-z-sheet:     50;
+  --hai-z-sheet-2:   60;
+  --hai-z-overlay:   70;
+  --hai-z-travel:    80;
+  --hai-z-toast:     90;
+  --hai-z-lightbox:  100;
+  --hai-z-emergency: 1000;
+
+  /* ═══════════════════════════════════════════════════════════════════
+     LAYER 2 — SEMANTIC TOKENS
+     Role-based aliases. Components reference these, never raw hex.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* ── Brand interaction state ───────────────────────────────────── */
+  --hai-primary-hover:   var(--hai-primary-600);
+  --hai-primary-pressed: var(--hai-primary-700);
+  --hai-primary-ring:    rgba(34, 197, 94, 0.25);
+  --hai-primary-tint:    rgba(34, 197, 94, 0.08);
+
+  /* ── Surface & text ────────────────────────────────────────────── */
+  --hai-bg:          #ffffff;
+  --hai-surface-1:   #ffffff;
+  --hai-surface-2:   #f9fafb;
+  --hai-surface-3:   #f3f4f6;
+  --hai-border:      #e5e7eb;
+  --hai-border-soft: #f3f4f6;
+
+  --hai-text:        #0f172a;
+  --hai-text-sub:    #374151;
+  --hai-text-muted:  #6b7280;
+  --hai-text-faint:  #9ca3af;
+  --hai-text-invert: #ffffff;
+
+  /* ── Semantic accents ──────────────────────────────────────────── */
+  --hai-danger:         #ef4444;
+  --hai-danger-tint:    rgba(239, 68, 68, 0.08);
+  --hai-danger-border:  rgba(239, 68, 68, 0.40);
+  --hai-danger-ring:    rgba(239, 68, 68, 0.22);
+  --hai-warning:        #f59e0b;
+  --hai-warning-tint:   rgba(245, 158, 11, 0.10);
+  --hai-warning-border: rgba(245, 158, 11, 0.35);
+  --hai-warning-text:   #92400e;
+  --hai-info:           #3b82f6;
+  --hai-success-text:   #15803d;
+
+  /* ── Shadows — subtle only; WebView paint cost matters ─────────── */
   --hai-shadow-sm:  0 1px 2px rgba(15, 23, 42, 0.04);
   --hai-shadow-md:  0 2px 8px rgba(15, 23, 42, 0.06);
   --hai-shadow-lg:  0 6px 20px rgba(15, 23, 42, 0.08);
   --hai-shadow-fab: 0 6px 18px rgba(22, 163, 74, 0.30), 0 2px 4px rgba(0, 0, 0, 0.12);
 
-  /* ── Motion ─────────────────────────────────────────────────────── */
-  --hai-dur-fast:   120ms;
-  --hai-dur-normal: 180ms;
-  --hai-dur-slow:   260ms;
-  --hai-ease:       cubic-bezier(0.16, 1, 0.3, 1);  /* ease-out-expo */
-
-  /* ── Layout ─────────────────────────────────────────────────────── */
-  --hai-tap-min: 44px;            /* iOS HIG minimum tap target */
-  --hai-max-width: 480px;         /* phone container */
-  --hai-nav-height: 64px;         /* bottom nav */
+  /* ── Layout ────────────────────────────────────────────────────── */
+  --hai-tap-min:       44px;   /* iOS HIG minimum tap target */
+  --hai-max-width:     480px;  /* phone container           */
+  --hai-nav-height:    64px;
   --hai-header-height: 56px;
+
+  /* ═══════════════════════════════════════════════════════════════════
+     CATEGORY COLOR TOKEN LAYER  (WIRED — Pass 6)
+     ───────────────────────────────────────────────────────────────────
+     Used by `.hai-category-badge` and `.hai-category-dot` via
+     `[data-category="<ENUM>"]` attribute selectors. The category enum
+     itself is the single source of truth (no TS side-map of colors).
+     Dark-mode counterparts below (.dark scope).
+     ═══════════════════════════════════════════════════════════════════ */
+  --hai-category-ALERT-bg:              #fef2f2;
+  --hai-category-ALERT-fg:              #dc2626;
+  --hai-category-NEIGHBORHOOD_ISSUE-bg: #fff7ed;
+  --hai-category-NEIGHBORHOOD_ISSUE-fg: #ea580c;
+  --hai-category-LOOKING_FOR-bg:        #f0f9ff;
+  --hai-category-LOOKING_FOR-fg:        #0284c7;
+  --hai-category-MARKETPLACE-bg:        #fffbeb;
+  --hai-category-MARKETPLACE-fg:        #d97706;
+  --hai-category-FOOD_HOME-bg:          #f7fee7;
+  --hai-category-FOOD_HOME-fg:          #4d7c0f;
+  --hai-category-REAL_ESTATE-bg:        #f0fdfa;
+  --hai-category-REAL_ESTATE-fg:        #0f766e;
+  --hai-category-SERVICES-bg:           #eff6ff;
+  --hai-category-SERVICES-fg:           #2563eb;
+  --hai-category-LOST_FOUND-bg:         #faf5ff;
+  --hai-category-LOST_FOUND-fg:         #9333ea;
+  --hai-category-MOSQUE-bg:             #f0fdf4;
+  --hai-category-MOSQUE-fg:             #15803d;
+  --hai-category-EID_RAMADAN-bg:        #fefce8;
+  --hai-category-EID_RAMADAN-fg:        #a16207;
+  --hai-category-CONTESTS-bg:           #fdf4ff;
+  --hai-category-CONTESTS-fg:           #a21caf;
+  --hai-category-RIDE_REQUEST-bg:       #eef2ff;
+  --hai-category-RIDE_REQUEST-fg:       #4f46e5;
+  --hai-category-WOMEN_ONLY-bg:         #fdf2f8;
+  --hai-category-WOMEN_ONLY-fg:         #db2777;
+  --hai-category-GENERAL-bg:            #f9fafb;
+  --hai-category-GENERAL-fg:            #4b5563;
+
+  /* ═══════════════════════════════════════════════════════════════════
+     PRODUCT-STATE TOKEN LAYER (Pass 7)
+     ───────────────────────────────────────────────────────────────────
+     Existing product states, grouped by family. Each state maps to a
+     matched {bg, fg, border} triplet so it renders as a badge, pill,
+     ring, or row accent through the same state primitives.
+
+     Families:
+       trust       — identity (verified, provider, mod, admin)
+       tier        — reputation tiers (new/active/trusted/distinguished)
+       promotion   — featured, pinned, boosted, highlighted
+       moderation  — pending review, restricted, hidden, flagged, removed, locked
+       listing     — open, in-progress, resolved, closed, sold, expired, unavailable, disputed
+       urgency     — info, warning, urgent, emergency
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* ── Trust / identity ──────────────────────────────────────────── */
+  --hai-state-verified-bg:      rgba(59, 130, 246, 0.08);
+  --hai-state-verified-fg:      #2563eb;
+  --hai-state-verified-border:  rgba(59, 130, 246, 0.28);
+  --hai-state-provider-bg:      rgba(22, 163, 74, 0.08);
+  --hai-state-provider-fg:      var(--hai-primary-700);
+  --hai-state-provider-border:  rgba(22, 163, 74, 0.28);
+  --hai-state-mod-bg:           rgba(245, 158, 11, 0.10);
+  --hai-state-mod-fg:           #b45309;
+  --hai-state-mod-border:       rgba(245, 158, 11, 0.30);
+  --hai-state-admin-bg:         rgba(168, 85, 247, 0.10);
+  --hai-state-admin-fg:         #7e22ce;
+  --hai-state-admin-border:     rgba(168, 85, 247, 0.30);
+
+  /* ── Tier (reputation) ─────────────────────────────────────────── */
+  --hai-state-tier-new-bg:              #f3f4f6;
+  --hai-state-tier-new-fg:              #6b7280;
+  --hai-state-tier-active-bg:           #eff6ff;
+  --hai-state-tier-active-fg:           #2563eb;
+  --hai-state-tier-trusted-bg:          #ecfdf5;
+  --hai-state-tier-trusted-fg:          #15803d;
+  --hai-state-tier-distinguished-bg:    #fffbeb;
+  --hai-state-tier-distinguished-fg:    #b45309;
+
+  /* ── Visibility / promotion ────────────────────────────────────── */
+  --hai-state-featured-bg:      rgba(245, 158, 11, 0.10);
+  --hai-state-featured-fg:      #b45309;
+  --hai-state-featured-border:  rgba(245, 158, 11, 0.35);
+  --hai-state-featured-ring:    rgba(245, 158, 11, 0.35);
+  --hai-state-pinned-bg:        rgba(22, 163, 74, 0.08);
+  --hai-state-pinned-fg:        var(--hai-primary-700);
+  --hai-state-pinned-border:    rgba(22, 163, 74, 0.28);
+  --hai-state-boosted-bg:       rgba(168, 85, 247, 0.10);
+  --hai-state-boosted-fg:       #7e22ce;
+  --hai-state-boosted-border:   rgba(168, 85, 247, 0.30);
+
+  /* ── Moderation / review ───────────────────────────────────────── */
+  --hai-state-pending-bg:       rgba(245, 158, 11, 0.10);
+  --hai-state-pending-fg:       #b45309;
+  --hai-state-pending-border:   rgba(245, 158, 11, 0.35);
+  --hai-state-restricted-bg:    rgba(249, 115, 22, 0.10);
+  --hai-state-restricted-fg:    #c2410c;
+  --hai-state-restricted-border:rgba(249, 115, 22, 0.30);
+  --hai-state-hidden-bg:        rgba(107, 114, 128, 0.12);
+  --hai-state-hidden-fg:        #4b5563;
+  --hai-state-hidden-border:    rgba(107, 114, 128, 0.28);
+  --hai-state-flagged-bg:       rgba(239, 68, 68, 0.08);
+  --hai-state-flagged-fg:       #b91c1c;
+  --hai-state-flagged-border:   rgba(239, 68, 68, 0.30);
+  --hai-state-removed-bg:       rgba(239, 68, 68, 0.12);
+  --hai-state-removed-fg:       #991b1b;
+  --hai-state-removed-border:   rgba(239, 68, 68, 0.40);
+  --hai-state-locked-bg:        rgba(107, 114, 128, 0.12);
+  --hai-state-locked-fg:        #374151;
+  --hai-state-locked-border:    rgba(107, 114, 128, 0.30);
+
+  /* ── Listing / request status ──────────────────────────────────── */
+  --hai-state-open-bg:          rgba(22, 163, 74, 0.10);
+  --hai-state-open-fg:          var(--hai-primary-700);
+  --hai-state-open-border:      rgba(22, 163, 74, 0.28);
+  --hai-state-inprogress-bg:    rgba(14, 165, 233, 0.10);
+  --hai-state-inprogress-fg:    #0369a1;
+  --hai-state-inprogress-border:rgba(14, 165, 233, 0.28);
+  --hai-state-awaiting-bg:      rgba(245, 158, 11, 0.10);
+  --hai-state-awaiting-fg:      #b45309;
+  --hai-state-awaiting-border:  rgba(245, 158, 11, 0.30);
+  --hai-state-confirmed-bg:     rgba(59, 130, 246, 0.10);
+  --hai-state-confirmed-fg:     #1d4ed8;
+  --hai-state-confirmed-border: rgba(59, 130, 246, 0.28);
+  --hai-state-enroute-bg:       rgba(99, 102, 241, 0.10);
+  --hai-state-enroute-fg:       #4338ca;
+  --hai-state-enroute-border:   rgba(99, 102, 241, 0.28);
+  --hai-state-arrived-bg:       rgba(168, 85, 247, 0.10);
+  --hai-state-arrived-fg:       #7e22ce;
+  --hai-state-arrived-border:   rgba(168, 85, 247, 0.28);
+  --hai-state-resolved-bg:      rgba(22, 163, 74, 0.10);
+  --hai-state-resolved-fg:      var(--hai-primary-700);
+  --hai-state-resolved-border:  rgba(22, 163, 74, 0.28);
+  --hai-state-closed-bg:        #f3f4f6;
+  --hai-state-closed-fg:        #4b5563;
+  --hai-state-closed-border:    rgba(107, 114, 128, 0.20);
+  --hai-state-sold-bg:          rgba(22, 163, 74, 0.10);
+  --hai-state-sold-fg:          var(--hai-primary-700);
+  --hai-state-sold-border:      rgba(22, 163, 74, 0.28);
+  --hai-state-expired-bg:       #f3f4f6;
+  --hai-state-expired-fg:       #6b7280;
+  --hai-state-expired-border:   rgba(107, 114, 128, 0.20);
+  --hai-state-unavailable-bg:   #f3f4f6;
+  --hai-state-unavailable-fg:   #6b7280;
+  --hai-state-unavailable-border:rgba(107, 114, 128, 0.20);
+  --hai-state-disputed-bg:      rgba(234, 179, 8, 0.12);
+  --hai-state-disputed-fg:      #a16207;
+  --hai-state-disputed-border:  rgba(234, 179, 8, 0.35);
+  --hai-state-cancelled-bg:     rgba(239, 68, 68, 0.10);
+  --hai-state-cancelled-fg:     #b91c1c;
+  --hai-state-cancelled-border: rgba(239, 68, 68, 0.30);
+
+  /* ── Urgency / priority ────────────────────────────────────────── */
+  --hai-state-info-bg:          rgba(59, 130, 246, 0.08);
+  --hai-state-info-fg:          #1d4ed8;
+  --hai-state-info-border:      rgba(59, 130, 246, 0.28);
+  --hai-state-info-solid-bg:    #2563eb;
+  --hai-state-info-solid-fg:    #ffffff;
+  --hai-state-warning-bg:       rgba(245, 158, 11, 0.10);
+  --hai-state-warning-fg:       #b45309;
+  --hai-state-warning-border:   rgba(245, 158, 11, 0.35);
+  --hai-state-warning-solid-bg: #f59e0b;
+  --hai-state-warning-solid-fg: #ffffff;
+  --hai-state-urgent-bg:        rgba(239, 68, 68, 0.10);
+  --hai-state-urgent-fg:        #b91c1c;
+  --hai-state-urgent-border:    rgba(239, 68, 68, 0.30);
+  --hai-state-urgent-solid-bg:  #ef4444;
+  --hai-state-urgent-solid-fg:  #ffffff;
+  --hai-state-emergency-bg:     rgba(220, 38, 38, 0.12);
+  --hai-state-emergency-fg:     #991b1b;
+  --hai-state-emergency-border: rgba(220, 38, 38, 0.45);
+  --hai-state-emergency-solid-bg: #dc2626;
+  --hai-state-emergency-solid-fg: #ffffff;
+  --hai-state-emergency-ring:   rgba(252, 165, 165, 0.60);
+  --hai-state-warning-ring:     rgba(253, 230, 138, 0.60);
+  --hai-state-info-ring:        rgba(147, 197, 253, 0.60);
 }
 
 /* ── Dark mode — pure dark surfaces, reduced green saturation ──── */
@@ -113,13 +373,244 @@
   --hai-primary-600: #22c55e;
   --hai-primary-700: #86efac;
 
+  --hai-primary-hover:   var(--hai-primary-400);
+  --hai-primary-pressed: var(--hai-primary-600);
+  --hai-primary-ring:    rgba(74, 222, 128, 0.28);
+  --hai-primary-tint:    rgba(74, 222, 128, 0.10);
+
+  --hai-danger-tint:   rgba(248, 113, 113, 0.10);
+  --hai-danger-border: rgba(248, 113, 113, 0.40);
+  --hai-danger-ring:   rgba(248, 113, 113, 0.25);
+
+  --hai-warning-tint:  rgba(251, 191, 36, 0.12);
+  --hai-warning-border:rgba(251, 191, 36, 0.30);
+  --hai-warning-text:  #fcd34d;
+  --hai-success-text:  #86efac;
+
   --hai-shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.5);
   --hai-shadow-md:  0 2px 8px rgba(0, 0, 0, 0.55);
   --hai-shadow-lg:  0 6px 20px rgba(0, 0, 0, 0.6);
   --hai-shadow-fab: 0 6px 18px rgba(74, 222, 128, 0.25), 0 2px 4px rgba(0, 0, 0, 0.4);
+
+  /* Category palette — muted dark-mode counterparts */
+  --hai-category-ALERT-bg:              rgba(239, 68, 68, 0.12);
+  --hai-category-ALERT-fg:              #fca5a5;
+  --hai-category-NEIGHBORHOOD_ISSUE-bg: rgba(249, 115, 22, 0.12);
+  --hai-category-NEIGHBORHOOD_ISSUE-fg: #fdba74;
+  --hai-category-LOOKING_FOR-bg:        rgba(14, 165, 233, 0.12);
+  --hai-category-LOOKING_FOR-fg:        #7dd3fc;
+  --hai-category-MARKETPLACE-bg:        rgba(234, 179, 8, 0.12);
+  --hai-category-MARKETPLACE-fg:        #fcd34d;
+  --hai-category-FOOD_HOME-bg:          rgba(132, 204, 22, 0.12);
+  --hai-category-FOOD_HOME-fg:          #bef264;
+  --hai-category-REAL_ESTATE-bg:        rgba(20, 184, 166, 0.12);
+  --hai-category-REAL_ESTATE-fg:        #5eead4;
+  --hai-category-SERVICES-bg:           rgba(59, 130, 246, 0.12);
+  --hai-category-SERVICES-fg:           #93c5fd;
+  --hai-category-LOST_FOUND-bg:         rgba(168, 85, 247, 0.12);
+  --hai-category-LOST_FOUND-fg:         #d8b4fe;
+  --hai-category-MOSQUE-bg:             rgba(34, 197, 94, 0.12);
+  --hai-category-MOSQUE-fg:             #86efac;
+  --hai-category-EID_RAMADAN-bg:        rgba(234, 179, 8, 0.12);
+  --hai-category-EID_RAMADAN-fg:        #fde68a;
+  --hai-category-CONTESTS-bg:           rgba(217, 70, 239, 0.12);
+  --hai-category-CONTESTS-fg:           #f0abfc;
+  --hai-category-RIDE_REQUEST-bg:       rgba(99, 102, 241, 0.12);
+  --hai-category-RIDE_REQUEST-fg:       #a5b4fc;
+  --hai-category-WOMEN_ONLY-bg:         rgba(236, 72, 153, 0.12);
+  --hai-category-WOMEN_ONLY-fg:         #f9a8d4;
+  --hai-category-GENERAL-bg:            rgba(255, 255, 255, 0.05);
+  --hai-category-GENERAL-fg:            #9ca3af;
+
+  /* Product-state palette — muted dark-mode counterparts */
+  --hai-state-verified-bg:      rgba(96, 165, 250, 0.12);
+  --hai-state-verified-fg:      #93c5fd;
+  --hai-state-verified-border:  rgba(96, 165, 250, 0.28);
+  --hai-state-provider-bg:      rgba(74, 222, 128, 0.10);
+  --hai-state-provider-fg:      #86efac;
+  --hai-state-provider-border:  rgba(74, 222, 128, 0.28);
+  --hai-state-mod-bg:           rgba(251, 191, 36, 0.12);
+  --hai-state-mod-fg:           #fcd34d;
+  --hai-state-mod-border:       rgba(251, 191, 36, 0.30);
+  --hai-state-admin-bg:         rgba(192, 132, 252, 0.12);
+  --hai-state-admin-fg:         #d8b4fe;
+  --hai-state-admin-border:     rgba(192, 132, 252, 0.30);
+
+  --hai-state-tier-new-bg:              rgba(255, 255, 255, 0.06);
+  --hai-state-tier-new-fg:              #94a3b8;
+  --hai-state-tier-active-bg:           rgba(96, 165, 250, 0.12);
+  --hai-state-tier-active-fg:           #93c5fd;
+  --hai-state-tier-trusted-bg:          rgba(74, 222, 128, 0.12);
+  --hai-state-tier-trusted-fg:          #86efac;
+  --hai-state-tier-distinguished-bg:    rgba(251, 191, 36, 0.12);
+  --hai-state-tier-distinguished-fg:    #fcd34d;
+
+  --hai-state-featured-bg:      rgba(251, 191, 36, 0.12);
+  --hai-state-featured-fg:      #fcd34d;
+  --hai-state-featured-border:  rgba(251, 191, 36, 0.35);
+  --hai-state-featured-ring:    rgba(251, 191, 36, 0.35);
+  --hai-state-pinned-bg:        rgba(74, 222, 128, 0.12);
+  --hai-state-pinned-fg:        #86efac;
+  --hai-state-pinned-border:    rgba(74, 222, 128, 0.28);
+  --hai-state-boosted-bg:       rgba(192, 132, 252, 0.12);
+  --hai-state-boosted-fg:       #d8b4fe;
+  --hai-state-boosted-border:   rgba(192, 132, 252, 0.30);
+
+  --hai-state-pending-bg:       rgba(251, 191, 36, 0.12);
+  --hai-state-pending-fg:       #fcd34d;
+  --hai-state-pending-border:   rgba(251, 191, 36, 0.30);
+  --hai-state-restricted-bg:    rgba(253, 186, 116, 0.12);
+  --hai-state-restricted-fg:    #fdba74;
+  --hai-state-restricted-border:rgba(253, 186, 116, 0.30);
+  --hai-state-hidden-bg:        rgba(255, 255, 255, 0.06);
+  --hai-state-hidden-fg:        #94a3b8;
+  --hai-state-hidden-border:    rgba(255, 255, 255, 0.10);
+  --hai-state-flagged-bg:       rgba(248, 113, 113, 0.12);
+  --hai-state-flagged-fg:       #fca5a5;
+  --hai-state-flagged-border:   rgba(248, 113, 113, 0.30);
+  --hai-state-removed-bg:       rgba(248, 113, 113, 0.16);
+  --hai-state-removed-fg:       #fecaca;
+  --hai-state-removed-border:   rgba(248, 113, 113, 0.40);
+  --hai-state-locked-bg:        rgba(255, 255, 255, 0.06);
+  --hai-state-locked-fg:        #cbd5e1;
+  --hai-state-locked-border:    rgba(255, 255, 255, 0.12);
+
+  --hai-state-open-bg:          rgba(74, 222, 128, 0.12);
+  --hai-state-open-fg:          #86efac;
+  --hai-state-open-border:      rgba(74, 222, 128, 0.28);
+  --hai-state-inprogress-bg:    rgba(125, 211, 252, 0.12);
+  --hai-state-inprogress-fg:    #7dd3fc;
+  --hai-state-inprogress-border:rgba(125, 211, 252, 0.28);
+  --hai-state-awaiting-bg:      rgba(251, 191, 36, 0.12);
+  --hai-state-awaiting-fg:      #fcd34d;
+  --hai-state-awaiting-border:  rgba(251, 191, 36, 0.30);
+  --hai-state-confirmed-bg:     rgba(96, 165, 250, 0.12);
+  --hai-state-confirmed-fg:     #93c5fd;
+  --hai-state-confirmed-border: rgba(96, 165, 250, 0.28);
+  --hai-state-enroute-bg:       rgba(165, 180, 252, 0.12);
+  --hai-state-enroute-fg:       #a5b4fc;
+  --hai-state-enroute-border:   rgba(165, 180, 252, 0.30);
+  --hai-state-arrived-bg:       rgba(216, 180, 254, 0.12);
+  --hai-state-arrived-fg:       #d8b4fe;
+  --hai-state-arrived-border:   rgba(216, 180, 254, 0.30);
+  --hai-state-resolved-bg:      rgba(74, 222, 128, 0.12);
+  --hai-state-resolved-fg:      #86efac;
+  --hai-state-resolved-border:  rgba(74, 222, 128, 0.28);
+  --hai-state-closed-bg:        rgba(255, 255, 255, 0.05);
+  --hai-state-closed-fg:        #94a3b8;
+  --hai-state-closed-border:    rgba(255, 255, 255, 0.10);
+  --hai-state-sold-bg:          rgba(74, 222, 128, 0.12);
+  --hai-state-sold-fg:          #86efac;
+  --hai-state-sold-border:      rgba(74, 222, 128, 0.28);
+  --hai-state-expired-bg:       rgba(255, 255, 255, 0.05);
+  --hai-state-expired-fg:       #94a3b8;
+  --hai-state-expired-border:   rgba(255, 255, 255, 0.10);
+  --hai-state-unavailable-bg:   rgba(255, 255, 255, 0.05);
+  --hai-state-unavailable-fg:   #94a3b8;
+  --hai-state-unavailable-border:rgba(255, 255, 255, 0.10);
+  --hai-state-disputed-bg:      rgba(253, 224, 71, 0.12);
+  --hai-state-disputed-fg:      #fde68a;
+  --hai-state-disputed-border:  rgba(253, 224, 71, 0.35);
+  --hai-state-cancelled-bg:     rgba(248, 113, 113, 0.12);
+  --hai-state-cancelled-fg:     #fca5a5;
+  --hai-state-cancelled-border: rgba(248, 113, 113, 0.30);
+
+  --hai-state-info-bg:          rgba(96, 165, 250, 0.12);
+  --hai-state-info-fg:          #93c5fd;
+  --hai-state-info-border:      rgba(96, 165, 250, 0.28);
+  --hai-state-info-solid-bg:    #3b82f6;
+  --hai-state-info-solid-fg:    #f8fafc;
+  --hai-state-warning-bg:       rgba(251, 191, 36, 0.12);
+  --hai-state-warning-fg:       #fcd34d;
+  --hai-state-warning-border:   rgba(251, 191, 36, 0.35);
+  --hai-state-warning-solid-bg: #d97706;
+  --hai-state-warning-solid-fg: #fef3c7;
+  --hai-state-urgent-bg:        rgba(248, 113, 113, 0.14);
+  --hai-state-urgent-fg:        #fca5a5;
+  --hai-state-urgent-border:    rgba(248, 113, 113, 0.35);
+  --hai-state-urgent-solid-bg:  #dc2626;
+  --hai-state-urgent-solid-fg:  #fee2e2;
+  --hai-state-emergency-bg:     rgba(248, 113, 113, 0.16);
+  --hai-state-emergency-fg:     #fecaca;
+  --hai-state-emergency-border: rgba(248, 113, 113, 0.45);
+  --hai-state-emergency-solid-bg: #b91c1c;
+  --hai-state-emergency-solid-fg: #fee2e2;
+  --hai-state-emergency-ring:   rgba(252, 165, 165, 0.45);
+  --hai-state-warning-ring:     rgba(253, 230, 138, 0.45);
+  --hai-state-info-ring:        rgba(147, 197, 253, 0.45);
 }
 
-/* ── Shared utility classes that wrap the tokens ─────────────────── */
+/* ─────────────────────────────────────────────────────────────────
+   Typography utility classes — semantic ramp, token-driven
+   ───────────────────────────────────────────────────────────────── */
+.hai-h1 {
+  font-size: var(--hai-fs-3xl);
+  font-weight: var(--hai-fw-bold);
+  line-height: var(--hai-lh-tight);
+  color: var(--hai-text);
+  letter-spacing: -0.01em;
+}
+.hai-h2 {
+  font-size: var(--hai-fs-2xl);
+  font-weight: var(--hai-fw-bold);
+  line-height: var(--hai-lh-tight);
+  color: var(--hai-text);
+}
+.hai-h3 {
+  font-size: var(--hai-fs-xl);
+  font-weight: var(--hai-fw-semibold);
+  line-height: var(--hai-lh-tight);
+  color: var(--hai-text);
+}
+.hai-h4 {
+  font-size: var(--hai-fs-lg);
+  font-weight: var(--hai-fw-semibold);
+  line-height: var(--hai-lh-normal);
+  color: var(--hai-text);
+}
+.hai-h5 {
+  font-size: var(--hai-fs-md);
+  font-weight: var(--hai-fw-semibold);
+  line-height: var(--hai-lh-normal);
+  color: var(--hai-text);
+}
+.hai-h6 {
+  font-size: var(--hai-fs-sm);
+  font-weight: var(--hai-fw-semibold);
+  line-height: var(--hai-lh-normal);
+  color: var(--hai-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hai-body {
+  font-size: var(--hai-fs-md);
+  font-weight: var(--hai-fw-regular);
+  line-height: var(--hai-lh-relaxed);
+  color: var(--hai-text);
+}
+.hai-body-strong {
+  font-size: var(--hai-fs-md);
+  font-weight: var(--hai-fw-semibold);
+  line-height: var(--hai-lh-normal);
+  color: var(--hai-text);
+}
+.hai-caption {
+  font-size: var(--hai-fs-sm);
+  font-weight: var(--hai-fw-regular);
+  line-height: var(--hai-lh-normal);
+  color: var(--hai-text-muted);
+}
+.hai-meta {
+  font-size: var(--hai-fs-xs);
+  font-weight: var(--hai-fw-medium);
+  line-height: var(--hai-lh-normal);
+  color: var(--hai-text-faint);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Card primitive
+   ───────────────────────────────────────────────────────────────── */
 .hai-card {
   background: var(--hai-surface-1);
   border: 1px solid var(--hai-border);
@@ -127,7 +618,20 @@
   box-shadow: var(--hai-shadow-sm);
   padding: var(--hai-space-4);
 }
+.hai-card--flush {
+  padding: 0;
+}
+.hai-card--elevated {
+  box-shadow: var(--hai-shadow-md);
+}
+.hai-card--inset {
+  background: var(--hai-surface-2);
+  box-shadow: none;
+}
 
+/* ─────────────────────────────────────────────────────────────────
+   Chip primitive
+   ───────────────────────────────────────────────────────────────── */
 .hai-chip {
   display: inline-flex;
   align-items: center;
@@ -141,16 +645,23 @@
   color: var(--hai-text-sub);
   border: 1px solid var(--hai-border);
   transition: transform var(--hai-dur-fast) var(--hai-ease),
-              background-color var(--hai-dur-normal) var(--hai-ease);
+              background-color var(--hai-dur-normal) var(--hai-ease),
+              color var(--hai-dur-normal) var(--hai-ease),
+              border-color var(--hai-dur-normal) var(--hai-ease);
 }
 .hai-chip:active { transform: scale(0.96); }
 .hai-chip[data-active="true"] {
   background: var(--hai-primary-500);
-  color: #ffffff;
+  color: var(--hai-text-invert);
   border-color: var(--hai-primary-500);
 }
 
-.hai-btn-primary {
+/* ─────────────────────────────────────────────────────────────────
+   Button primitives — states: default / hover / active / disabled
+   ───────────────────────────────────────────────────────────────── */
+.hai-btn-primary,
+.hai-btn-ghost,
+.hai-btn-danger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -158,39 +669,2115 @@
   min-height: var(--hai-tap-min);
   padding: 0 var(--hai-space-5);
   border-radius: var(--hai-radius-md);
-  background: var(--hai-primary-500);
-  color: #ffffff;
-  font-weight: var(--hai-fw-semibold);
   font-size: var(--hai-fs-md);
-  box-shadow: var(--hai-shadow-md);
-  transition: transform var(--hai-dur-fast) var(--hai-ease);
+  font-weight: var(--hai-fw-semibold);
+  line-height: var(--hai-lh-tight);
+  text-align: center;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--hai-dur-fast) var(--hai-ease),
+              background-color var(--hai-dur-normal) var(--hai-ease),
+              color var(--hai-dur-normal) var(--hai-ease),
+              border-color var(--hai-dur-normal) var(--hai-ease),
+              box-shadow var(--hai-dur-normal) var(--hai-ease);
 }
-.hai-btn-primary:active { transform: scale(0.97); }
+.hai-btn-primary:focus-visible,
+.hai-btn-ghost:focus-visible,
+.hai-btn-danger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--hai-primary-ring);
+}
 
+/* Filled primary */
+.hai-btn-primary {
+  background: var(--hai-primary-500);
+  color: var(--hai-text-invert);
+  box-shadow: var(--hai-shadow-md);
+}
+.hai-btn-primary:hover  { background: var(--hai-primary-hover); }
+.hai-btn-primary:active {
+  background: var(--hai-primary-pressed);
+  transform: scale(0.97);
+  box-shadow: var(--hai-shadow-sm);
+}
+.hai-btn-primary:disabled,
+.hai-btn-primary[aria-disabled="true"] {
+  opacity: var(--hai-opacity-disabled);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Ghost / outlined */
 .hai-btn-ghost {
+  background: transparent;
+  color: var(--hai-text-sub);
+  border-color: var(--hai-border);
+}
+.hai-btn-ghost:hover {
+  background: var(--hai-surface-2);
+  color: var(--hai-text);
+}
+.hai-btn-ghost:active {
+  background: var(--hai-surface-3);
+  transform: scale(0.97);
+}
+.hai-btn-ghost:disabled,
+.hai-btn-ghost[aria-disabled="true"] {
+  opacity: var(--hai-opacity-disabled);
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Outline variant of ghost — brand-colored border + text */
+.hai-btn-ghost.is-brand {
+  color: var(--hai-primary-600);
+  border-color: var(--hai-primary-500);
+}
+.hai-btn-ghost.is-brand:hover {
+  background: var(--hai-primary-tint);
+  color: var(--hai-primary-700);
+}
+
+/* Danger */
+.hai-btn-danger {
+  background: var(--hai-danger);
+  color: var(--hai-text-invert);
+  box-shadow: var(--hai-shadow-sm);
+}
+.hai-btn-danger:focus-visible {
+  box-shadow: 0 0 0 3px var(--hai-danger-ring);
+}
+.hai-btn-danger:active {
+  transform: scale(0.97);
+}
+.hai-btn-danger:disabled,
+.hai-btn-danger[aria-disabled="true"] {
+  opacity: var(--hai-opacity-disabled);
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Size modifiers */
+.hai-btn-sm {
+  min-height: 36px;
+  padding: 0 var(--hai-space-4);
+  font-size: var(--hai-fs-sm);
+  border-radius: var(--hai-radius-sm);
+}
+.hai-btn-block {
+  width: 100%;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Input primitive — states: default / focus / error / disabled
+   ───────────────────────────────────────────────────────────────── */
+.hai-input {
+  display: block;
+  width: 100%;
+  min-height: var(--hai-tap-min);
+  padding: var(--hai-space-3) var(--hai-space-4);
+  background: var(--hai-surface-1);
+  color: var(--hai-text);
+  border: 1px solid var(--hai-border);
+  border-radius: var(--hai-radius-md);
+  font-size: var(--hai-fs-md);
+  font-weight: var(--hai-fw-regular);
+  line-height: var(--hai-lh-normal);
+  text-align: start;
+  transition: border-color var(--hai-dur-normal) var(--hai-ease),
+              box-shadow var(--hai-dur-normal) var(--hai-ease),
+              background-color var(--hai-dur-normal) var(--hai-ease);
+}
+.hai-input::placeholder {
+  color: var(--hai-text-faint);
+}
+.hai-input:hover:not(:disabled):not([aria-invalid="true"]) {
+  border-color: var(--hai-text-faint);
+}
+.hai-input:focus,
+.hai-input:focus-visible {
+  outline: none;
+  border-color: var(--hai-primary-500);
+  box-shadow: 0 0 0 3px var(--hai-primary-ring);
+}
+.hai-input[aria-invalid="true"],
+.hai-input.is-error {
+  border-color: var(--hai-danger-border);
+  background: var(--hai-danger-tint);
+}
+.hai-input[aria-invalid="true"]:focus,
+.hai-input.is-error:focus {
+  border-color: var(--hai-danger);
+  box-shadow: 0 0 0 3px var(--hai-danger-ring);
+}
+.hai-input:disabled {
+  opacity: var(--hai-opacity-disabled);
+  background: var(--hai-surface-2);
+  cursor: not-allowed;
+}
+
+/* Textarea inherits the input look, just relaxes height. */
+textarea.hai-input {
+  min-height: calc(var(--hai-tap-min) * 2);
+  line-height: var(--hai-lh-relaxed);
+  resize: vertical;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Screen scaffolding
+   ───────────────────────────────────────────────────────────────── */
+.hai-screen {
+  display: flex;
+  flex-direction: column;
+  padding: var(--hai-space-6) var(--hai-space-6) 0;
+  background: var(--hai-bg);
+  min-height: calc(100dvh - env(safe-area-inset-top, 0px));
+}
+.hai-screen--flush {
+  padding: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Stack — token-driven flex gap helpers
+   ───────────────────────────────────────────────────────────────── */
+.hai-stack-1 { display: flex; flex-direction: column; gap: var(--hai-space-1); }
+.hai-stack-2 { display: flex; flex-direction: column; gap: var(--hai-space-2); }
+.hai-stack-3 { display: flex; flex-direction: column; gap: var(--hai-space-3); }
+.hai-stack-4 { display: flex; flex-direction: column; gap: var(--hai-space-4); }
+.hai-stack-5 { display: flex; flex-direction: column; gap: var(--hai-space-5); }
+.hai-stack-6 { display: flex; flex-direction: column; gap: var(--hai-space-6); }
+
+.hai-row-1 { display: flex; align-items: center; gap: var(--hai-space-1); }
+.hai-row-2 { display: flex; align-items: center; gap: var(--hai-space-2); }
+.hai-row-3 { display: flex; align-items: center; gap: var(--hai-space-3); }
+.hai-row-4 { display: flex; align-items: center; gap: var(--hai-space-4); }
+
+/* ─────────────────────────────────────────────────────────────────
+   Margin / padding helpers — token only
+   ───────────────────────────────────────────────────────────────── */
+.hai-mt-1 { margin-top: var(--hai-space-1); }
+.hai-mt-2 { margin-top: var(--hai-space-2); }
+.hai-mt-3 { margin-top: var(--hai-space-3); }
+.hai-mt-4 { margin-top: var(--hai-space-4); }
+.hai-mt-5 { margin-top: var(--hai-space-5); }
+.hai-mt-6 { margin-top: var(--hai-space-6); }
+.hai-mt-8 { margin-top: var(--hai-space-8); }
+.hai-mt-auto { margin-top: auto; }
+
+.hai-mb-1 { margin-bottom: var(--hai-space-1); }
+.hai-mb-2 { margin-bottom: var(--hai-space-2); }
+.hai-mb-3 { margin-bottom: var(--hai-space-3); }
+.hai-mb-4 { margin-bottom: var(--hai-space-4); }
+.hai-mb-5 { margin-bottom: var(--hai-space-5); }
+.hai-mb-6 { margin-bottom: var(--hai-space-6); }
+.hai-mb-8 { margin-bottom: var(--hai-space-8); }
+
+/* Centered flex column for full-screen states (loading / empty / denied) */
+.hai-center-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--hai-space-4);
+}
+
+.hai-flex-1    { flex: 1 1 auto; }
+.hai-grow      { flex-grow: 1; }
+.hai-shrink-0  { flex-shrink: 0; }
+.hai-min-w-0   { min-width: 0; }
+.hai-flex-wrap { flex-wrap: wrap; }
+.hai-overflow-auto   { overflow-y: auto; overscroll-behavior: contain; }
+.hai-overflow-x-auto { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.hai-overflow-x-auto::-webkit-scrollbar { display: none; }
+.hai-w-full    { width: 100%; }
+.hai-max-xs    { max-width: 320px; }
+.hai-truncate  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hai-block     { display: block; }
+.hai-cursor-pointer { cursor: pointer; }
+
+/* Card accent — pinned post (top brand bar) */
+.hai-post--pinned {
+  border-top: 2px solid var(--hai-primary-500);
+}
+/* Card accent — looking-for post (informational info variant) */
+.hai-post--looking-for {
+  background: rgba(56, 189, 248, 0.04);
+  border-color: rgba(56, 189, 248, 0.22);
+}
+.dark .hai-post--looking-for {
+  background: rgba(56, 189, 248, 0.06);
+  border-color: rgba(56, 189, 248, 0.20);
+}
+
+/* Header top / common header paddings */
+.hai-header-top { padding-top: var(--hai-space-3); padding-bottom: var(--hai-space-2); }
+.hai-px-4 { padding-left: var(--hai-space-4); padding-right: var(--hai-space-4); }
+.hai-ps-4 { padding-inline-start: var(--hai-space-4); }
+.hai-pe-4 { padding-inline-end: var(--hai-space-4); }
+.hai-pb-3 { padding-bottom: var(--hai-space-3); }
+
+/* Horizontal scrolling tab strip mask (fade on trailing edge) */
+.hai-tabs-mask {
+  mask-image: linear-gradient(to left, transparent, black 24px);
+  -webkit-mask-image: linear-gradient(to left, transparent, black 24px);
+}
+
+/* Special-case constraint for the neighborhood header pill */
+.hai-neighborhood-pill {
+  min-width: 0;
+  max-width: 45vw;
+}
+.hai-neighborhood-pill .hai-truncate { min-width: 0; }
+
+/* Category hide toggle — line-through + muted when hidden */
+.hai-category-toggle[data-hidden="true"] {
+  text-decoration: line-through;
+  opacity: var(--hai-opacity-muted);
+}
+
+.hai-pb-2 { padding-bottom: var(--hai-space-2); }
+.hai-pb-4 { padding-bottom: var(--hai-space-4); }
+.hai-pb-6 { padding-bottom: var(--hai-space-6); }
+.hai-pb-8 { padding-bottom: var(--hai-space-8); }
+.hai-pt-4 { padding-top: var(--hai-space-4); }
+
+.hai-px-1 { padding-left: var(--hai-space-1); padding-right: var(--hai-space-1); }
+.hai-px-2 { padding-left: var(--hai-space-2); padding-right: var(--hai-space-2); }
+.hai-px-3 { padding-left: var(--hai-space-3); padding-right: var(--hai-space-3); }
+
+.hai-text-center { text-align: center; }
+.hai-text-start  { text-align: start; }
+
+.hai-justify-center  { justify-content: center; }
+.hai-justify-between { justify-content: space-between; }
+.hai-justify-end     { justify-content: flex-end; }
+.hai-self-start      { align-self: flex-start; }
+.hai-self-center     { align-self: center; }
+.hai-items-start     { align-items: flex-start; }
+
+/* Token-driven icon colors */
+.hai-ic        { color: var(--hai-text); }
+.hai-ic-sub    { color: var(--hai-text-sub); }
+.hai-ic-muted  { color: var(--hai-text-muted); }
+.hai-ic-faint  { color: var(--hai-text-faint); }
+.hai-ic-brand  { color: var(--hai-primary-600); }
+.hai-ic-danger { color: var(--hai-danger); }
+.hai-ic-invert { color: var(--hai-text-invert); }
+
+/* Icon sizes */
+.hai-icon-xs { width: 12px; height: 12px; }
+.hai-icon-sm { width: 14px; height: 14px; }
+.hai-icon-md { width: 16px; height: 16px; }
+.hai-icon-lg { width: 20px; height: 20px; }
+.hai-icon-xl { width: 24px; height: 24px; }
+
+/* Token-driven text colors (for inline bits that aren't a full typography class) */
+.hai-tc        { color: var(--hai-text); }
+.hai-tc-sub    { color: var(--hai-text-sub); }
+.hai-tc-muted  { color: var(--hai-text-muted); }
+.hai-tc-faint  { color: var(--hai-text-faint); }
+.hai-tc-brand  { color: var(--hai-primary-600); }
+.hai-tc-danger { color: var(--hai-danger); }
+
+/* ─────────────────────────────────────────────────────────────────
+   Form support — labels, hints, compound input groups
+   ───────────────────────────────────────────────────────────────── */
+.hai-label {
+  display: block;
+  font-size: var(--hai-fs-sm);
+  font-weight: var(--hai-fw-medium);
+  color: var(--hai-text-sub);
+  margin-bottom: var(--hai-space-2);
+}
+.hai-field-hint {
+  font-size: var(--hai-fs-xs);
+  color: var(--hai-text-faint);
+  margin-top: var(--hai-space-1);
+  padding: 0 var(--hai-space-1);
+  line-height: var(--hai-lh-normal);
+}
+.hai-field-error {
+  font-size: var(--hai-fs-xs);
+  color: var(--hai-danger);
+  margin-top: var(--hai-space-1);
+  padding: 0 var(--hai-space-1);
+  line-height: var(--hai-lh-normal);
+}
+
+.hai-input-group {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-height: var(--hai-tap-min);
+  background: var(--hai-surface-1);
+  color: var(--hai-text);
+  border: 1px solid var(--hai-border);
+  border-radius: var(--hai-radius-md);
+  overflow: hidden;
+  transition: border-color var(--hai-dur-normal) var(--hai-ease),
+              box-shadow var(--hai-dur-normal) var(--hai-ease);
+}
+.hai-input-group:focus-within {
+  border-color: var(--hai-primary-500);
+  box-shadow: 0 0 0 3px var(--hai-primary-ring);
+}
+.hai-input-group[aria-invalid="true"] {
+  border-color: var(--hai-danger-border);
+  background: var(--hai-danger-tint);
+}
+.hai-input-group .hai-input-affix {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--hai-space-3);
+  font-size: var(--hai-fs-sm);
+  color: var(--hai-text-muted);
+  background: transparent;
+  white-space: nowrap;
+  border-inline-end: 1px solid var(--hai-border);
+}
+.hai-input-group .hai-input-affix--end {
+  border-inline-end: none;
+  border-inline-start: 1px solid var(--hai-border);
+}
+.hai-input-group input,
+.hai-input-group textarea {
+  flex: 1;
+  min-width: 0;
+  padding: var(--hai-space-3);
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--hai-text);
+  font-size: var(--hai-fs-md);
+  line-height: var(--hai-lh-normal);
+  text-align: start;
+}
+.hai-input-group input::placeholder,
+.hai-input-group textarea::placeholder {
+  color: var(--hai-text-faint);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Link
+   ───────────────────────────────────────────────────────────────── */
+.hai-link {
+  color: var(--hai-primary-600);
+  font-weight: var(--hai-fw-medium);
+  text-decoration: none;
+}
+.hai-link--underline { text-decoration: underline; }
+.hai-link--muted {
+  color: var(--hai-text-muted);
+  font-weight: var(--hai-fw-regular);
+}
+.hai-link--back {
+  color: var(--hai-text-faint);
+  font-size: var(--hai-fs-sm);
+  font-weight: var(--hai-fw-regular);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hai-space-1);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Small chip variant (used in segmented toggles / language switcher)
+   ───────────────────────────────────────────────────────────────── */
+.hai-chip--sm {
+  height: 28px;
+  padding: 0 var(--hai-space-3);
+  font-size: var(--hai-fs-xs);
+  font-weight: var(--hai-fw-medium);
+}
+.hai-chip--xs {
+  height: 22px;
+  padding: 0 var(--hai-space-2);
+  font-size: var(--hai-fs-xs);
+  font-weight: var(--hai-fw-medium);
+  gap: var(--hai-space-1);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Category badge — semantic, token-driven
+   Usage:
+     <span className="hai-category-badge" data-category="ALERT">
+       🔔 Alert
+     </span>
+   The category ENUM drives appearance via --hai-category-{ENUM}-{bg|fg}.
+   Categories without a matching data-category attribute fall back to
+   the neutral (GENERAL) look.
+   This class replaces the legacy globals.css .category-badge alias
+   and the raw color map CATEGORY_STYLES.bg / .text in PostCard.tsx.
+   Dark-mode is already handled via the .dark token overrides.
+   ───────────────────────────────────────────────────────────────── */
+.hai-category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hai-space-1);
+  padding: var(--hai-space-1) var(--hai-space-2);
+  border-radius: var(--hai-radius-full);
+  font-size: var(--hai-fs-xs);
+  font-weight: var(--hai-fw-medium);
+  line-height: var(--hai-lh-tight);
+  /* Defaults track the GENERAL palette so an unknown category
+     still has a legible neutral appearance. */
+  background: var(--hai-category-GENERAL-bg);
+  color:      var(--hai-category-GENERAL-fg);
+}
+.hai-category-badge[data-category="ALERT"] {
+  background: var(--hai-category-ALERT-bg);
+  color:      var(--hai-category-ALERT-fg);
+}
+.hai-category-badge[data-category="NEIGHBORHOOD_ISSUE"] {
+  background: var(--hai-category-NEIGHBORHOOD_ISSUE-bg);
+  color:      var(--hai-category-NEIGHBORHOOD_ISSUE-fg);
+}
+.hai-category-badge[data-category="LOOKING_FOR"] {
+  background: var(--hai-category-LOOKING_FOR-bg);
+  color:      var(--hai-category-LOOKING_FOR-fg);
+}
+.hai-category-badge[data-category="MARKETPLACE"] {
+  background: var(--hai-category-MARKETPLACE-bg);
+  color:      var(--hai-category-MARKETPLACE-fg);
+}
+.hai-category-badge[data-category="FOOD_HOME"] {
+  background: var(--hai-category-FOOD_HOME-bg);
+  color:      var(--hai-category-FOOD_HOME-fg);
+}
+.hai-category-badge[data-category="REAL_ESTATE"] {
+  background: var(--hai-category-REAL_ESTATE-bg);
+  color:      var(--hai-category-REAL_ESTATE-fg);
+}
+.hai-category-badge[data-category="SERVICES"] {
+  background: var(--hai-category-SERVICES-bg);
+  color:      var(--hai-category-SERVICES-fg);
+}
+.hai-category-badge[data-category="LOST_FOUND"] {
+  background: var(--hai-category-LOST_FOUND-bg);
+  color:      var(--hai-category-LOST_FOUND-fg);
+}
+.hai-category-badge[data-category="MOSQUE"] {
+  background: var(--hai-category-MOSQUE-bg);
+  color:      var(--hai-category-MOSQUE-fg);
+}
+.hai-category-badge[data-category="EID_RAMADAN"] {
+  background: var(--hai-category-EID_RAMADAN-bg);
+  color:      var(--hai-category-EID_RAMADAN-fg);
+}
+.hai-category-badge[data-category="CONTESTS"] {
+  background: var(--hai-category-CONTESTS-bg);
+  color:      var(--hai-category-CONTESTS-fg);
+}
+.hai-category-badge[data-category="RIDE_REQUEST"] {
+  background: var(--hai-category-RIDE_REQUEST-bg);
+  color:      var(--hai-category-RIDE_REQUEST-fg);
+}
+.hai-category-badge[data-category="WOMEN_ONLY"] {
+  background: var(--hai-category-WOMEN_ONLY-bg);
+  color:      var(--hai-category-WOMEN_ONLY-fg);
+}
+.hai-category-badge[data-category="GENERAL"] {
+  background: var(--hai-category-GENERAL-bg);
+  color:      var(--hai-category-GENERAL-fg);
+}
+/* Optional dot accent — for surfaces that prefer a minimal dot + label
+   instead of a filled badge (e.g. list rows, inline labels). */
+.hai-category-dot {
+  display: inline-block;
+  width: var(--hai-space-2);
+  height: var(--hai-space-2);
+  border-radius: var(--hai-radius-full);
+  background: var(--hai-category-GENERAL-fg);
+  flex-shrink: 0;
+}
+.hai-category-dot[data-category="ALERT"]              { background: var(--hai-category-ALERT-fg); }
+.hai-category-dot[data-category="NEIGHBORHOOD_ISSUE"] { background: var(--hai-category-NEIGHBORHOOD_ISSUE-fg); }
+.hai-category-dot[data-category="LOOKING_FOR"]        { background: var(--hai-category-LOOKING_FOR-fg); }
+.hai-category-dot[data-category="MARKETPLACE"]        { background: var(--hai-category-MARKETPLACE-fg); }
+.hai-category-dot[data-category="FOOD_HOME"]          { background: var(--hai-category-FOOD_HOME-fg); }
+.hai-category-dot[data-category="REAL_ESTATE"]        { background: var(--hai-category-REAL_ESTATE-fg); }
+.hai-category-dot[data-category="SERVICES"]           { background: var(--hai-category-SERVICES-fg); }
+.hai-category-dot[data-category="LOST_FOUND"]         { background: var(--hai-category-LOST_FOUND-fg); }
+.hai-category-dot[data-category="MOSQUE"]             { background: var(--hai-category-MOSQUE-fg); }
+.hai-category-dot[data-category="EID_RAMADAN"]        { background: var(--hai-category-EID_RAMADAN-fg); }
+.hai-category-dot[data-category="CONTESTS"]           { background: var(--hai-category-CONTESTS-fg); }
+.hai-category-dot[data-category="RIDE_REQUEST"]       { background: var(--hai-category-RIDE_REQUEST-fg); }
+.hai-category-dot[data-category="WOMEN_ONLY"]         { background: var(--hai-category-WOMEN_ONLY-fg); }
+
+/* ═════════════════════════════════════════════════════════════════
+   PRODUCT-STATE PRIMITIVES (Pass 7)
+   ─────────────────────────────────────────────────────────────────
+   A small family of shapes all driven by the same [data-state] (or
+   [data-tier]) attribute. The state name is the *business* concept;
+   colors resolve through --hai-state-{name}-{bg|fg|border}.
+
+     .hai-state-badge   — filled pill (short label, listing/tier)
+     .hai-state-pill    — filled pill (identity: verified, provider)
+     .hai-state-dot     — single coloured dot (tier / inline presence)
+     .hai-state-banner  — solid-color banner (emergency / urgent)
+     .hai-tier-badge    — tier label (new/active/trusted/distinguished)
+     .hai-verified-mark — blue verify check (identity)
+     .hai-featured-ring — outline ring (featured post)
+
+   Every class keeps a neutral fallback so an unknown state still
+   renders without raw colors.
+   ═════════════════════════════════════════════════════════════════ */
+
+/* ── .hai-state-badge — compact filled pill ──────────────────────── */
+.hai-state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hai-space-1);
+  padding: var(--hai-space-1) var(--hai-space-2);
+  border-radius: var(--hai-radius-full);
+  font-size: var(--hai-fs-xs);
+  font-weight: var(--hai-fw-semibold);
+  line-height: var(--hai-lh-tight);
+  background: var(--hai-state-closed-bg);
+  color: var(--hai-state-closed-fg);
+  white-space: nowrap;
+}
+/* Trust */
+.hai-state-badge[data-state="verified"]   { background: var(--hai-state-verified-bg);   color: var(--hai-state-verified-fg); }
+.hai-state-badge[data-state="provider"]   { background: var(--hai-state-provider-bg);   color: var(--hai-state-provider-fg); }
+.hai-state-badge[data-state="mod"]        { background: var(--hai-state-mod-bg);        color: var(--hai-state-mod-fg); }
+.hai-state-badge[data-state="admin"]      { background: var(--hai-state-admin-bg);      color: var(--hai-state-admin-fg); }
+/* Tier */
+.hai-state-badge[data-state="tier-new"]           { background: var(--hai-state-tier-new-bg);           color: var(--hai-state-tier-new-fg); }
+.hai-state-badge[data-state="tier-active"]        { background: var(--hai-state-tier-active-bg);        color: var(--hai-state-tier-active-fg); }
+.hai-state-badge[data-state="tier-trusted"]       { background: var(--hai-state-tier-trusted-bg);       color: var(--hai-state-tier-trusted-fg); }
+.hai-state-badge[data-state="tier-distinguished"] { background: var(--hai-state-tier-distinguished-bg); color: var(--hai-state-tier-distinguished-fg); }
+/* Promotion */
+.hai-state-badge[data-state="featured"]   { background: var(--hai-state-featured-bg);   color: var(--hai-state-featured-fg); }
+.hai-state-badge[data-state="pinned"]     { background: var(--hai-state-pinned-bg);     color: var(--hai-state-pinned-fg); }
+.hai-state-badge[data-state="boosted"]    { background: var(--hai-state-boosted-bg);    color: var(--hai-state-boosted-fg); }
+/* Moderation */
+.hai-state-badge[data-state="pending"]    { background: var(--hai-state-pending-bg);    color: var(--hai-state-pending-fg); }
+.hai-state-badge[data-state="restricted"] { background: var(--hai-state-restricted-bg); color: var(--hai-state-restricted-fg); }
+.hai-state-badge[data-state="hidden"]     { background: var(--hai-state-hidden-bg);     color: var(--hai-state-hidden-fg); }
+.hai-state-badge[data-state="flagged"]    { background: var(--hai-state-flagged-bg);    color: var(--hai-state-flagged-fg); }
+.hai-state-badge[data-state="removed"]    { background: var(--hai-state-removed-bg);    color: var(--hai-state-removed-fg); }
+.hai-state-badge[data-state="locked"]     { background: var(--hai-state-locked-bg);     color: var(--hai-state-locked-fg); }
+/* Listing / request lifecycle */
+.hai-state-badge[data-state="open"]        { background: var(--hai-state-open-bg);        color: var(--hai-state-open-fg); }
+.hai-state-badge[data-state="in-progress"] { background: var(--hai-state-inprogress-bg);  color: var(--hai-state-inprogress-fg); }
+.hai-state-badge[data-state="awaiting"]    { background: var(--hai-state-awaiting-bg);    color: var(--hai-state-awaiting-fg); }
+.hai-state-badge[data-state="confirmed"]   { background: var(--hai-state-confirmed-bg);   color: var(--hai-state-confirmed-fg); }
+.hai-state-badge[data-state="en-route"]    { background: var(--hai-state-enroute-bg);     color: var(--hai-state-enroute-fg); }
+.hai-state-badge[data-state="arrived"]     { background: var(--hai-state-arrived-bg);     color: var(--hai-state-arrived-fg); }
+.hai-state-badge[data-state="resolved"]    { background: var(--hai-state-resolved-bg);    color: var(--hai-state-resolved-fg); }
+.hai-state-badge[data-state="closed"]      { background: var(--hai-state-closed-bg);      color: var(--hai-state-closed-fg); }
+.hai-state-badge[data-state="sold"]        { background: var(--hai-state-sold-bg);        color: var(--hai-state-sold-fg); }
+.hai-state-badge[data-state="expired"]     { background: var(--hai-state-expired-bg);     color: var(--hai-state-expired-fg); }
+.hai-state-badge[data-state="unavailable"] { background: var(--hai-state-unavailable-bg); color: var(--hai-state-unavailable-fg); }
+.hai-state-badge[data-state="disputed"]    { background: var(--hai-state-disputed-bg);    color: var(--hai-state-disputed-fg); }
+.hai-state-badge[data-state="cancelled"]   { background: var(--hai-state-cancelled-bg);   color: var(--hai-state-cancelled-fg); }
+/* Urgency */
+.hai-state-badge[data-state="info"]      { background: var(--hai-state-info-bg);      color: var(--hai-state-info-fg); }
+.hai-state-badge[data-state="warning"]   { background: var(--hai-state-warning-bg);   color: var(--hai-state-warning-fg); }
+.hai-state-badge[data-state="urgent"]    { background: var(--hai-state-urgent-bg);    color: var(--hai-state-urgent-fg); }
+.hai-state-badge[data-state="emergency"] { background: var(--hai-state-emergency-bg); color: var(--hai-state-emergency-fg); }
+
+/* ── .hai-state-pill — identity-sized pill ───────────────────────── */
+.hai-state-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hai-space-1);
+  padding: 2px var(--hai-space-2);
+  border-radius: var(--hai-radius-full);
+  font-size: 10px;
+  font-weight: var(--hai-fw-medium);
+  line-height: var(--hai-lh-tight);
+  background: var(--hai-state-closed-bg);
+  color: var(--hai-state-closed-fg);
+}
+.hai-state-pill[data-state="verified"] { background: var(--hai-state-verified-bg); color: var(--hai-state-verified-fg); }
+.hai-state-pill[data-state="provider"] { background: var(--hai-state-provider-bg); color: var(--hai-state-provider-fg); }
+.hai-state-pill[data-state="mod"]      { background: var(--hai-state-mod-bg);      color: var(--hai-state-mod-fg); }
+.hai-state-pill[data-state="admin"]    { background: var(--hai-state-admin-bg);    color: var(--hai-state-admin-fg); }
+.hai-state-pill[data-state="featured"] { background: var(--hai-state-featured-bg); color: var(--hai-state-featured-fg); }
+.hai-state-pill[data-state="pinned"]   { background: var(--hai-state-pinned-bg);   color: var(--hai-state-pinned-fg); }
+.hai-state-pill[data-state="boosted"]  { background: var(--hai-state-boosted-bg);  color: var(--hai-state-boosted-fg); }
+
+/* ── .hai-state-dot — single colored dot (inline presence) ───────── */
+.hai-state-dot {
+  display: inline-block;
+  width: var(--hai-space-2);
+  height: var(--hai-space-2);
+  border-radius: var(--hai-radius-full);
+  background: var(--hai-text-faint);
+  flex-shrink: 0;
+}
+.hai-state-dot[data-state="verified"]           { background: var(--hai-state-verified-fg); }
+.hai-state-dot[data-state="provider"]           { background: var(--hai-state-provider-fg); }
+.hai-state-dot[data-state="mod"]                { background: var(--hai-state-mod-fg); }
+.hai-state-dot[data-state="admin"]              { background: var(--hai-state-admin-fg); }
+.hai-state-dot[data-state="tier-new"]           { background: var(--hai-state-tier-new-fg); }
+.hai-state-dot[data-state="tier-active"]        { background: var(--hai-state-tier-active-fg); }
+.hai-state-dot[data-state="tier-trusted"]       { background: var(--hai-state-tier-trusted-fg); }
+.hai-state-dot[data-state="tier-distinguished"] { background: var(--hai-state-tier-distinguished-fg); }
+.hai-state-dot[data-state="open"]               { background: var(--hai-state-open-fg); }
+.hai-state-dot[data-state="in-progress"]        { background: var(--hai-state-inprogress-fg); }
+.hai-state-dot[data-state="urgent"]             { background: var(--hai-state-urgent-fg); }
+.hai-state-dot[data-state="warning"]            { background: var(--hai-state-warning-fg); }
+.hai-state-dot[data-state="info"]               { background: var(--hai-state-info-fg); }
+.hai-state-dot[data-state="emergency"]          { background: var(--hai-state-emergency-fg); }
+
+/* ── .hai-tier-badge — semantic shortcut for reputation tiers ────── */
+.hai-tier-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--hai-space-2);
+  border-radius: var(--hai-radius-full);
+  font-size: 10px;
+  font-weight: var(--hai-fw-medium);
+  line-height: var(--hai-lh-tight);
+  background: var(--hai-state-tier-new-bg);
+  color: var(--hai-state-tier-new-fg);
+}
+.hai-tier-badge--compact {
+  padding: 2px var(--hai-space-1);
+  font-size: 9px;
+}
+.hai-tier-badge[data-tier="new"]           { background: var(--hai-state-tier-new-bg);           color: var(--hai-state-tier-new-fg); }
+.hai-tier-badge[data-tier="active"]        { background: var(--hai-state-tier-active-bg);        color: var(--hai-state-tier-active-fg); }
+.hai-tier-badge[data-tier="trusted"]       { background: var(--hai-state-tier-trusted-bg);       color: var(--hai-state-tier-trusted-fg); }
+.hai-tier-badge[data-tier="distinguished"] { background: var(--hai-state-tier-distinguished-bg); color: var(--hai-state-tier-distinguished-fg); }
+
+/* ── .hai-verified-mark — blue verification check ────────────────── */
+.hai-verified-mark {
+  display: inline-block;
+  color: var(--hai-state-verified-fg);
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+/* ── User-badge container + emoji slot (inline with username) ────── */
+.hai-user-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hai-space-1);
+  margin: 0 var(--hai-space-1);
+}
+.hai-user-badge-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.hai-user-badge-emoji {
+  font-size: var(--hai-fs-xs);
+  line-height: 1;
+}
+
+/* ── .hai-featured-ring — outline ring for featured content ──────── */
+.hai-featured-ring {
+  box-shadow: 0 0 0 2px var(--hai-state-featured-ring);
+}
+
+/* ── .hai-state-banner — solid urgency banner (emergency, urgent) ── */
+.hai-state-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hai-space-3);
+  padding: var(--hai-space-3) var(--hai-space-4);
+  border-radius: var(--hai-radius-lg);
+  color: var(--hai-state-info-solid-fg);
+  background: var(--hai-state-info-solid-bg);
+  box-shadow: var(--hai-shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+.hai-state-banner[data-state="info"]      { background: var(--hai-state-info-solid-bg);      color: var(--hai-state-info-solid-fg);      box-shadow: 0 0 0 2px var(--hai-state-info-ring),      var(--hai-shadow-md); }
+.hai-state-banner[data-state="warning"]   { background: var(--hai-state-warning-solid-bg);   color: var(--hai-state-warning-solid-fg);   box-shadow: 0 0 0 2px var(--hai-state-warning-ring),   var(--hai-shadow-md); }
+.hai-state-banner[data-state="urgent"]    { background: var(--hai-state-urgent-solid-bg);    color: var(--hai-state-urgent-solid-fg);    box-shadow: 0 0 0 2px var(--hai-state-emergency-ring), var(--hai-shadow-md); }
+.hai-state-banner[data-state="emergency"] { background: var(--hai-state-emergency-solid-bg); color: var(--hai-state-emergency-solid-fg); box-shadow: 0 0 0 2px var(--hai-state-emergency-ring), var(--hai-shadow-md); }
+.hai-state-banner__icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+}
+.hai-state-banner__hit {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: var(--hai-space-3);
+  padding-inline-end: var(--hai-space-8);
+  min-width: 0;
+  cursor: pointer;
+  color: inherit;
+  outline: none;
+  transition: opacity var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-state-banner__hit:active { opacity: 0.92; }
+.hai-state-banner__body  { flex: 1; min-width: 0; }
+.hai-state-banner__title {
+  font-size: var(--hai-fs-sm);
+  font-weight: var(--hai-fw-bold);
+  line-height: var(--hai-lh-normal);
+}
+.hai-state-banner__text {
+  font-size: var(--hai-fs-sm);
+  font-weight: var(--hai-fw-semibold);
+  line-height: var(--hai-lh-normal);
+  margin-top: var(--hai-space-1);
+}
+.hai-state-banner__body-text {
+  font-size: var(--hai-fs-xs);
+  font-weight: var(--hai-fw-regular);
+  line-height: var(--hai-lh-relaxed);
+  opacity: 0.95;
+  margin-top: var(--hai-space-2);
+  white-space: pre-wrap;
+}
+.hai-state-banner__meta {
+  font-size: 10px;
+  font-weight: var(--hai-fw-medium);
+  opacity: 0.80;
+}
+.hai-state-banner__close {
+  position: absolute;
+  top: var(--hai-space-2);
+  inset-inline-end: var(--hai-space-2);
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--hai-space-2);
-  min-height: var(--hai-tap-min);
-  padding: 0 var(--hai-space-4);
-  border-radius: var(--hai-radius-md);
   background: transparent;
-  color: var(--hai-text-sub);
-  font-weight: var(--hai-fw-medium);
-  font-size: var(--hai-fs-md);
-  border: 1px solid var(--hai-border);
+  color: inherit;
+  border: none;
+  border-radius: var(--hai-radius-full);
+  cursor: pointer;
+  transition: background-color var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-state-banner__close:hover  { background: rgba(255, 255, 255, 0.12); }
+.hai-state-banner__close:active { background: rgba(255, 255, 255, 0.20); }
+/* Continuous attention pulse — scoped to critical/warning banners.
+   Uses the existing animate-pulse-glow-emergency keyframes so no
+   new keyframes are introduced. */
+.hai-state-banner--pulse { animation: pulse-glow-emergency 1.6s ease-in-out infinite; }
+
+/* ── .hai-status-row — label/value row for status listings ──────── */
+.hai-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hai-space-3);
+  padding: var(--hai-space-2) 0;
+}
+.hai-status-row__label {
+  font-size: var(--hai-fs-sm);
+  color: var(--hai-text-muted);
 }
 
+/* ─────────────────────────────────────────────────────────────────
+   Inline brand pill — neighborhood selector etc.
+   ───────────────────────────────────────────────────────────────── */
+.hai-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hai-space-1);
+  height: 28px;
+  padding: 0 var(--hai-space-3);
+  border-radius: var(--hai-radius-full);
+  font-size: var(--hai-fs-sm);
+  font-weight: var(--hai-fw-medium);
+  background: var(--hai-surface-3);
+  color: var(--hai-text-sub);
+  border: 1px solid var(--hai-border);
+  cursor: pointer;
+  transition: background-color var(--hai-dur-normal) var(--hai-ease),
+              transform var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-pill:active { transform: scale(0.95); }
+.hai-pill--brand {
+  background: var(--hai-primary-50);
+  color: var(--hai-primary-700);
+  border-color: var(--hai-primary-200);
+}
+.dark .hai-pill--brand {
+  background: rgba(74, 222, 128, 0.12);
+  color: var(--hai-primary-700);
+  border-color: rgba(74, 222, 128, 0.30);
+}
+.hai-pill--danger {
+  background: var(--hai-danger-tint);
+  color: var(--hai-danger);
+  border-color: var(--hai-danger-border);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Icon button (circular, tap target)
+   ───────────────────────────────────────────────────────────────── */
+.hai-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--hai-radius-full);
+  color: var(--hai-text-muted);
+  cursor: pointer;
+  position: relative;
+  transition: background-color var(--hai-dur-normal) var(--hai-ease),
+              color var(--hai-dur-normal) var(--hai-ease),
+              transform var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-btn-icon:hover  { background: var(--hai-surface-2); color: var(--hai-text); }
+.hai-btn-icon:active { transform: scale(0.93); }
+.hai-btn-icon[data-active="true"] {
+  background: var(--hai-primary-500);
+  color: var(--hai-text-invert);
+  border: 1px solid var(--hai-primary-500);
+}
+.hai-btn-icon--sm { width: 32px; height: 32px; }
+.hai-btn-icon--outlined {
+  background: var(--hai-surface-2);
+  border: 1px solid var(--hai-border);
+  color: var(--hai-text-muted);
+}
+
+/* Notification count badge — positioned on an icon button */
+.hai-count-badge {
+  position: absolute;
+  top: -2px;
+  inset-inline-end: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 var(--hai-space-1);
+  border-radius: var(--hai-radius-full);
+  background: var(--hai-danger);
+  color: var(--hai-text-invert);
+  font-size: 9px;
+  font-weight: var(--hai-fw-bold);
+  line-height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Avatar — circular image/initials holder
+   ───────────────────────────────────────────────────────────────── */
+.hai-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--hai-radius-full);
+  background: var(--hai-surface-3);
+  color: var(--hai-text-sub);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.hai-avatar--xs { width: 24px; height: 24px; font-size: var(--hai-fs-xs); }
+.hai-avatar--sm { width: 32px; height: 32px; font-size: var(--hai-fs-sm); }
+.hai-avatar--lg { width: 56px; height: 56px; font-size: var(--hai-fs-lg); }
+.hai-avatar--xl { width: 96px; height: 96px; font-size: var(--hai-fs-3xl); }
+.hai-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ─────────────────────────────────────────────────────────────────
+   Selectable option card (radio-like button for multi-choice)
+   ───────────────────────────────────────────────────────────────── */
+.hai-option {
+  display: block;
+  width: 100%;
+  padding: var(--hai-space-4);
+  background: var(--hai-surface-1);
+  border: 2px solid var(--hai-border);
+  border-radius: var(--hai-radius-lg);
+  color: var(--hai-text);
+  text-align: start;
+  cursor: pointer;
+  transition: border-color var(--hai-dur-normal) var(--hai-ease),
+              background-color var(--hai-dur-normal) var(--hai-ease),
+              color var(--hai-dur-normal) var(--hai-ease),
+              transform var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-option:active { transform: scale(0.98); }
+.hai-option[data-active="true"] {
+  border-color: var(--hai-primary-500);
+  background: var(--hai-primary-500);
+  color: var(--hai-text-invert);
+}
+.hai-option[data-active="true"] .hai-option__desc {
+  color: var(--hai-primary-100);
+}
+.hai-option__desc {
+  display: block;
+  font-size: var(--hai-fs-xs);
+  color: var(--hai-text-muted);
+  margin-top: var(--hai-space-1);
+  line-height: var(--hai-lh-normal);
+}
+.hai-option__title {
+  display: block;
+  font-size: var(--hai-fs-md);
+  font-weight: var(--hai-fw-semibold);
+  line-height: var(--hai-lh-normal);
+}
+.hai-option__icon {
+  display: block;
+  font-size: var(--hai-fs-xl);
+  margin-bottom: var(--hai-space-1);
+}
+.hai-option--center {
+  text-align: center;
+}
+
+.hai-option-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--hai-space-3);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Progress segments (step indicator)
+   ───────────────────────────────────────────────────────────────── */
+.hai-progress {
+  display: flex;
+  gap: var(--hai-space-2);
+}
+.hai-progress__segment {
+  height: 4px;
+  flex: 1;
+  border-radius: var(--hai-radius-full);
+  background: var(--hai-surface-3);
+  transition: background-color var(--hai-dur-normal) var(--hai-ease);
+}
+.hai-progress__segment[data-active="true"] {
+  background: var(--hai-primary-500);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Icon circle (feature illustration container)
+   ───────────────────────────────────────────────────────────────── */
+.hai-icon-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--hai-radius-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.hai-icon-circle--brand {
+  background: var(--hai-primary-50);
+  color: var(--hai-primary-600);
+}
+.hai-icon-circle--danger {
+  background: var(--hai-danger-tint);
+  color: var(--hai-danger);
+}
+.hai-icon-circle--warning {
+  background: var(--hai-warning-tint);
+  color: var(--hai-warning);
+}
+.dark .hai-icon-circle--brand {
+  background: rgba(74, 222, 128, 0.14);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Callout — informational box
+   ───────────────────────────────────────────────────────────────── */
+.hai-callout {
+  padding: var(--hai-space-3);
+  border-radius: var(--hai-radius-md);
+  border: 1px solid var(--hai-border);
+  background: var(--hai-surface-2);
+  font-size: var(--hai-fs-xs);
+  color: var(--hai-text-sub);
+  font-weight: var(--hai-fw-medium);
+  line-height: var(--hai-lh-normal);
+}
+.hai-callout--warning {
+  background: var(--hai-warning-tint);
+  border-color: var(--hai-warning-border);
+  color: var(--hai-warning-text);
+}
+.hai-callout--danger {
+  background: var(--hai-danger-tint);
+  border-color: var(--hai-danger-border);
+  color: var(--hai-danger);
+}
+.hai-callout--brand {
+  background: var(--hai-primary-50);
+  border-color: var(--hai-primary-200);
+  color: var(--hai-primary-700);
+}
+.hai-callout--info {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.30);
+  color: var(--hai-info);
+}
+.dark .hai-callout--info {
+  background: rgba(96, 165, 250, 0.10);
+  border-color: rgba(96, 165, 250, 0.28);
+  color: #93c5fd;
+}
+
+/* Price text (primary brand, slightly bolder than body) */
+.hai-price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--hai-space-1);
+  color: var(--hai-primary-600);
+  font-size: var(--hai-fs-md);
+  font-weight: var(--hai-fw-bold);
+}
+.dark .hai-callout--brand {
+  background: rgba(74, 222, 128, 0.10);
+  border-color: rgba(74, 222, 128, 0.25);
+  color: var(--hai-primary-700);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Accordion (profile) — standalone header card + separate body block
+   ───────────────────────────────────────────────────────────────── */
+.hai-accordion-section {
+  margin: var(--hai-space-4) var(--hai-space-4) 0;
+}
+.hai-accordion-header {
+  display: flex;
+  align-items: center;
+  gap: var(--hai-space-3);
+  width: 100%;
+  padding: var(--hai-space-3) var(--hai-space-4);
+  background: var(--hai-surface-1);
+  border: 1px solid var(--hai-primary-200);
+  border-radius: var(--hai-radius-lg);
+  color: var(--hai-text);
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--hai-dur-normal) var(--hai-ease);
+}
+.hai-accordion-header:active {
+  background: var(--hai-surface-2);
+}
+.dark .hai-accordion-header {
+  border-color: rgba(74, 222, 128, 0.25);
+}
+.hai-accordion-header__icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--hai-primary-600);
+}
+.hai-accordion-header__body {
+  flex: 1;
+  text-align: start;
+  display: block;
+}
+.hai-accordion-header__label {
+  display: block;
+  font-size: var(--hai-fs-sm);
+  font-weight: var(--hai-fw-semibold);
+  color: var(--hai-text);
+  line-height: var(--hai-lh-normal);
+}
+.hai-accordion-header__hint {
+  display: block;
+  font-size: var(--hai-fs-xs);
+  color: var(--hai-text-muted);
+  margin-top: 2px;
+  line-height: var(--hai-lh-normal);
+}
+.hai-accordion-header__chevron {
+  color: var(--hai-text-faint);
+  flex-shrink: 0;
+  transition: transform var(--hai-dur-normal) var(--hai-ease);
+}
+.hai-accordion-header[data-open="true"] .hai-accordion-header__chevron {
+  transform: rotate(180deg);
+}
+.hai-accordion-body {
+  margin-top: var(--hai-space-2);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Setting row — label / value pair inside accordion body
+   ───────────────────────────────────────────────────────────────── */
+.hai-setting-row {
+  display: flex;
+  align-items: center;
+  gap: var(--hai-space-3);
+  padding: var(--hai-space-3) var(--hai-space-4);
+}
+.hai-setting-row--tappable {
+  cursor: pointer;
+  transition: background-color var(--hai-dur-normal) var(--hai-ease);
+}
+.hai-setting-row--tappable:active { background: var(--hai-surface-2); }
+.hai-setting-row__icon {
+  color: var(--hai-text-faint);
+  width: 16px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.hai-setting-row__label {
+  color: var(--hai-text-muted);
+  font-size: var(--hai-fs-sm);
+  flex-shrink: 0;
+}
+.hai-setting-row__spacer { flex: 1 1 auto; }
+.hai-setting-row__value {
+  font-size: var(--hai-fs-sm);
+  font-weight: var(--hai-fw-medium);
+  color: var(--hai-text);
+}
+.hai-setting-row__value--muted { color: var(--hai-text-faint); }
+.hai-setting-row__chevron { color: var(--hai-text-faint); flex-shrink: 0; }
+
+/* Verified / unverified badges inside setting rows */
+.hai-verify-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px var(--hai-space-2);
+  border-radius: var(--hai-radius-full);
+  font-size: 10px;
+  font-weight: var(--hai-fw-medium);
+}
+.hai-verify-badge--ok {
+  background: var(--hai-primary-100);
+  color: var(--hai-primary-700);
+}
+.hai-verify-badge--warn {
+  background: var(--hai-warning-tint);
+  color: var(--hai-warning-text);
+}
+
+.hai-mx-4 { margin-left: var(--hai-space-4); margin-right: var(--hai-space-4); }
+
+/* ─────────────────────────────────────────────────────────────────
+   Divider
+   ───────────────────────────────────────────────────────────────── */
 .hai-divider {
   height: 1px;
   background: var(--hai-border-soft);
   margin: var(--hai-space-3) 0;
+  border: none;
 }
 
-/* ── Accessibility: honor reduced-motion ─────────────────────────── */
+/* ═════════════════════════════════════════════════════════════════
+   PASS 4 — Interaction primitives
+   Menus, reactions, threads, lightbox, action bars.
+   All reuse existing tokens; no new visual language.
+   ═════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────────
+   Menu / Popover
+   Usage: absolutely position a .hai-menu; inside, render .hai-menu-item
+          buttons. Add .is-danger for destructive, [data-selected="true"]
+          for the current selection. Dividers via .hai-menu-divider.
+   ───────────────────────────────────────────────────────────────── */
+.hai-menu-anchor { position: relative; }
+.hai-menu {
+  background: var(--hai-surface-1);
+  border: 1px solid var(--hai-border);
+  border-radius: var(--hai-radius-md);
+  box-shadow: var(--hai-shadow-lg);
+  padding: var(--hai-space-1) 0;
+  min-width: 160px;
+  overflow: hidden;
+  z-index: var(--hai-z-menu);
+}
+.hai-menu--anchored {
+  position: absolute;
+  top: calc(100% + var(--hai-space-1));
+}
+.hai-menu--anchored-start { inset-inline-start: 0; }
+.hai-menu--anchored-end   { inset-inline-end: 0; }
+.hai-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--hai-space-2);
+  width: 100%;
+  min-height: 40px;
+  padding: var(--hai-space-2) var(--hai-space-3);
+  background: transparent;
+  border: none;
+  color: var(--hai-text-sub);
+  font-size: var(--hai-fs-sm);
+  font-weight: var(--hai-fw-medium);
+  line-height: var(--hai-lh-normal);
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--hai-dur-fast) var(--hai-ease),
+              color var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-menu-item:hover  { background: var(--hai-surface-2); color: var(--hai-text); }
+.hai-menu-item:active { background: var(--hai-surface-3); }
+.hai-menu-item:disabled,
+.hai-menu-item[aria-disabled="true"] {
+  opacity: var(--hai-opacity-disabled);
+  cursor: not-allowed;
+}
+.hai-menu-item[data-selected="true"] {
+  background: var(--hai-primary-tint);
+  color: var(--hai-primary-700);
+}
+.hai-menu-item.is-danger         { color: var(--hai-danger); }
+.hai-menu-item.is-danger:hover   { background: var(--hai-danger-tint); color: var(--hai-danger); }
+.hai-menu-item.is-warning        { color: var(--hai-warning-text); }
+.hai-menu-item.is-warning:hover  { background: var(--hai-warning-tint); }
+.hai-menu-item.is-brand          { color: var(--hai-primary-700); }
+.hai-menu-item.is-brand:hover    { background: var(--hai-primary-tint); color: var(--hai-primary-700); }
+.hai-menu-item__icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.hai-menu-item__label { flex: 1; }
+.hai-menu-divider {
+  height: 1px;
+  margin: var(--hai-space-1) 0;
+  background: var(--hai-border-soft);
+  border: none;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Reaction bar / picker
+   Usage: a .hai-reaction-bar holds .hai-reaction-item buttons. Each
+          item supports data-selected for the user's active pick and
+          is-liked for the heart-style primary action.
+   ───────────────────────────────────────────────────────────────── */
+.hai-reaction-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hai-space-1);
+  padding: var(--hai-space-1);
+  background: var(--hai-surface-1);
+  border: 1px solid var(--hai-border);
+  border-radius: var(--hai-radius-full);
+  box-shadow: var(--hai-shadow-md);
+}
+.hai-reaction-bar--inline {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+.hai-reaction-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hai-space-1);
+  min-height: 32px;
+  padding: 0 var(--hai-space-2);
+  background: transparent;
+  border: none;
+  border-radius: var(--hai-radius-full);
+  color: var(--hai-text-muted);
+  font-size: var(--hai-fs-sm);
+  font-weight: var(--hai-fw-medium);
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--hai-dur-fast) var(--hai-ease),
+              color var(--hai-dur-fast) var(--hai-ease),
+              transform var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-reaction-item:hover  { background: var(--hai-surface-2); color: var(--hai-text); }
+.hai-reaction-item:active { transform: scale(0.92); }
+.hai-reaction-item[data-selected="true"] {
+  background: var(--hai-primary-tint);
+  color: var(--hai-primary-700);
+}
+.hai-reaction-item.is-liked {
+  color: var(--hai-danger);
+}
+.hai-reaction-item.is-liked[data-selected="true"] {
+  background: var(--hai-danger-tint);
+  color: var(--hai-danger);
+}
+.hai-reaction-item__icon { font-size: var(--hai-fs-md); line-height: 1; }
+.hai-reaction-item__count { font-size: var(--hai-fs-xs); }
+
+/* ─────────────────────────────────────────────────────────────────
+   Threaded comments
+   Usage: .hai-comment is the top-level comment container, .hai-comment-reply
+          wraps a reply (indented via border + margin). .hai-comment-input
+          wraps the composer row.
+   ───────────────────────────────────────────────────────────────── */
+.hai-comment {
+  display: flex;
+  gap: var(--hai-space-2);
+  padding: var(--hai-space-3) 0;
+}
+.hai-comment + .hai-comment {
+  border-top: 1px solid var(--hai-border-soft);
+}
+.hai-comment__body {
+  flex: 1;
+  min-width: 0;
+}
+.hai-comment__meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--hai-space-2);
+  margin-bottom: var(--hai-space-1);
+}
+.hai-comment__author {
+  font-size: var(--hai-fs-sm);
+  font-weight: var(--hai-fw-semibold);
+  color: var(--hai-text);
+}
+.hai-comment__time {
+  font-size: var(--hai-fs-xs);
+  color: var(--hai-text-faint);
+}
+.hai-comment__text {
+  font-size: var(--hai-fs-sm);
+  color: var(--hai-text-sub);
+  line-height: var(--hai-lh-relaxed);
+  word-wrap: break-word;
+}
+.hai-comment__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--hai-space-3);
+  margin-top: var(--hai-space-2);
+}
+.hai-comment__action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hai-space-1);
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: var(--hai-fs-xs);
+  font-weight: var(--hai-fw-medium);
+  color: var(--hai-text-muted);
+  cursor: pointer;
+  transition: color var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-comment__action:hover  { color: var(--hai-text); }
+.hai-comment__action:active { transform: scale(0.95); }
+.hai-comment__action[data-selected="true"] { color: var(--hai-primary-600); }
+.hai-comment__action.is-liked[data-selected="true"] { color: var(--hai-danger); }
+
+/* Nested reply — indent via inline-start padding + left rail */
+.hai-comment-reply {
+  display: flex;
+  gap: var(--hai-space-2);
+  padding: var(--hai-space-2) 0 var(--hai-space-2) var(--hai-space-3);
+  border-inline-start: 2px solid var(--hai-border-soft);
+  margin-inline-start: var(--hai-space-10);
+  margin-top: var(--hai-space-2);
+}
+.hai-comment-reply + .hai-comment-reply {
+  border-top: none;
+}
+.hai-comment-reply .hai-comment__text {
+  font-size: var(--hai-fs-sm);
+}
+.hai-comment-replies {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hai-space-2);
+  margin-top: var(--hai-space-2);
+}
+
+/* Inline image attached to a comment or reply */
+.hai-comment__image {
+  margin-top: var(--hai-space-2);
+  max-width: 200px;
+  max-height: 192px;
+  border-radius: var(--hai-radius-md);
+  object-fit: cover;
+  cursor: pointer;
+  display: block;
+}
+.hai-comment-reply .hai-comment__image {
+  max-width: 160px;
+  max-height: 160px;
+  border-radius: var(--hai-radius-sm);
+}
+
+/* Inline edit form inside a comment */
+.hai-comment__edit-form {
+  display: flex;
+  align-items: center;
+  gap: var(--hai-space-2);
+  margin-top: var(--hai-space-1);
+}
+.hai-comment__edit-form input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--hai-space-2) var(--hai-space-3);
+  background: var(--hai-surface-1);
+  color: var(--hai-text);
+  border: 1px solid var(--hai-primary-200);
+  border-radius: var(--hai-radius-lg);
+  font-size: var(--hai-fs-sm);
+  outline: none;
+  transition: border-color var(--hai-dur-normal) var(--hai-ease),
+              box-shadow var(--hai-dur-normal) var(--hai-ease);
+}
+.hai-comment__edit-form input:focus {
+  border-color: var(--hai-primary-500);
+  box-shadow: 0 0 0 3px var(--hai-primary-ring);
+}
+.hai-comment__edit-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--hai-radius-full);
+  cursor: pointer;
+  font-size: var(--hai-fs-sm);
+  font-weight: var(--hai-fw-bold);
+  flex-shrink: 0;
+  transition: transform var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-comment__edit-btn:active { transform: scale(0.92); }
+.hai-comment__edit-btn--save   { background: var(--hai-primary-500); color: var(--hai-text-invert); }
+.hai-comment__edit-btn--cancel { background: var(--hai-surface-3); color: var(--hai-text-muted); }
+
+/* Composer — textarea + send button side by side */
+.hai-comment-input {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--hai-space-2);
+  padding: var(--hai-space-2) 0;
+}
+.hai-comment-input textarea,
+.hai-comment-input input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--hai-tap-min);
+  padding: var(--hai-space-2) var(--hai-space-3);
+  background: var(--hai-surface-2);
+  color: var(--hai-text);
+  border: 1px solid var(--hai-border);
+  border-radius: var(--hai-radius-lg);
+  font-size: var(--hai-fs-sm);
+  line-height: var(--hai-lh-normal);
+  text-align: start;
+  resize: none;
+  transition: border-color var(--hai-dur-normal) var(--hai-ease),
+              box-shadow var(--hai-dur-normal) var(--hai-ease);
+}
+.hai-comment-input textarea::placeholder,
+.hai-comment-input input::placeholder {
+  color: var(--hai-text-faint);
+}
+.hai-comment-input textarea:focus,
+.hai-comment-input input:focus {
+  outline: none;
+  border-color: var(--hai-primary-500);
+  box-shadow: 0 0 0 3px var(--hai-primary-ring);
+}
+.hai-comment-input__send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  background: var(--hai-primary-500);
+  color: var(--hai-text-invert);
+  border: none;
+  border-radius: var(--hai-radius-full);
+  cursor: pointer;
+  transition: background-color var(--hai-dur-normal) var(--hai-ease),
+              transform var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-comment-input__send:hover  { background: var(--hai-primary-hover); }
+.hai-comment-input__send:active { transform: scale(0.92); }
+.hai-comment-input__send:disabled {
+  opacity: var(--hai-opacity-disabled);
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Optional image preview attached to comment composer */
+.hai-comment-input__attach {
+  position: relative;
+  display: inline-block;
+  margin-bottom: var(--hai-space-2);
+}
+.hai-comment-input__attach img {
+  height: 80px;
+  border-radius: var(--hai-radius-md);
+  object-fit: cover;
+}
+.hai-comment-input__attach-remove {
+  position: absolute;
+  top: -4px;
+  inset-inline-end: -4px;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.70);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--hai-radius-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Compact composer for nested reply (smaller than top-level) */
+.hai-comment-input--compact {
+  gap: var(--hai-space-2);
+}
+.hai-comment-input--compact textarea,
+.hai-comment-input--compact input {
+  min-height: 32px;
+  padding: var(--hai-space-1) var(--hai-space-3);
+  border-radius: var(--hai-radius-full);
+  font-size: var(--hai-fs-xs);
+  border-color: var(--hai-primary-200);
+}
+.hai-comment-input--compact .hai-comment-input__send,
+.hai-comment-input--compact .hai-comment-input__attach-btn {
+  width: 28px;
+  height: 28px;
+}
+.hai-comment-input__attach-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  background: var(--hai-surface-3);
+  color: var(--hai-text-muted);
+  border: none;
+  border-radius: var(--hai-radius-full);
+  cursor: pointer;
+  transition: background-color var(--hai-dur-fast) var(--hai-ease),
+              transform var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-comment-input__attach-btn:hover  { background: var(--hai-surface-2); color: var(--hai-text); }
+.hai-comment-input__attach-btn:active { transform: scale(0.92); }
+
+/* Bottom-sheet container (used by comments modal, user popup) */
+.hai-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--hai-z-sheet);
+  background: rgba(0, 0, 0, 0.60);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.hai-sheet {
+  position: relative;
+  width: 100%;
+  max-height: 90vh;
+  background: var(--hai-surface-1);
+  border-top-left-radius: var(--hai-radius-xl);
+  border-top-right-radius: var(--hai-radius-xl);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--hai-shadow-lg);
+}
+.hai-sheet__handle {
+  display: flex;
+  justify-content: center;
+  padding: var(--hai-space-2) 0 var(--hai-space-1);
+  flex-shrink: 0;
+}
+.hai-sheet__handle::before {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 4px;
+  border-radius: var(--hai-radius-full);
+  background: var(--hai-border);
+}
+.hai-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--hai-space-3);
+  border-bottom: 1px solid var(--hai-border-soft);
+  flex-shrink: 0;
+  position: relative;
+}
+.hai-sheet__header-title {
+  font-size: var(--hai-fs-sm);
+  font-weight: var(--hai-fw-semibold);
+  color: var(--hai-text);
+}
+.hai-sheet__close {
+  position: absolute;
+  top: 50%;
+  inset-inline-end: var(--hai-space-3);
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--hai-text-muted);
+  border: none;
+  border-radius: var(--hai-radius-full);
+  cursor: pointer;
+  transition: background-color var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-sheet__close:hover  { background: var(--hai-surface-2); }
+.hai-sheet__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--hai-space-3) var(--hai-space-4);
+}
+.hai-sheet__body--flush { padding: 0; }
+.hai-sheet__footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--hai-border-soft);
+  padding: var(--hai-space-2) var(--hai-space-3);
+  padding-bottom: max(var(--hai-space-2), env(safe-area-inset-bottom));
+  background: var(--hai-surface-1);
+}
+
+/* Empty state text inside sheet body */
+.hai-empty-state {
+  text-align: center;
+  color: var(--hai-text-faint);
+  font-size: var(--hai-fs-sm);
+  padding: var(--hai-space-12) var(--hai-space-4);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Lightbox (media viewer)
+   Usage: .hai-lightbox-overlay is the fixed backdrop, .hai-lightbox
+          is the inner frame, .hai-lightbox-controls holds close /
+          nav / counter buttons.
+   ───────────────────────────────────────────────────────────────── */
+.hai-lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--hai-z-lightbox);
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: env(safe-area-inset-top) var(--hai-space-4) env(safe-area-inset-bottom);
+}
+.hai-lightbox {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hai-lightbox__image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.hai-lightbox-controls {
+  position: absolute;
+  inset-inline: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--hai-space-3) var(--hai-space-4);
+  pointer-events: none;
+}
+.hai-lightbox-controls--top    { top: env(safe-area-inset-top); }
+.hai-lightbox-controls--bottom { bottom: env(safe-area-inset-bottom); }
+.hai-lightbox-controls > * { pointer-events: auto; }
+.hai-lightbox__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hai-tap-min);
+  height: var(--hai-tap-min);
+  padding: 0;
+  background: rgba(0, 0, 0, 0.45);
+  border: none;
+  border-radius: var(--hai-radius-full);
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color var(--hai-dur-fast) var(--hai-ease),
+              transform var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-lightbox__btn:hover  { background: rgba(0, 0, 0, 0.65); }
+.hai-lightbox__btn:active { transform: scale(0.93); }
+.hai-lightbox__counter {
+  padding: var(--hai-space-1) var(--hai-space-3);
+  background: rgba(0, 0, 0, 0.50);
+  color: #ffffff;
+  border-radius: var(--hai-radius-full);
+  font-size: var(--hai-fs-xs);
+  font-weight: var(--hai-fw-bold);
+  line-height: var(--hai-lh-normal);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pager dots along the bottom of the lightbox */
+.hai-lightbox__pager {
+  position: absolute;
+  inset-inline: 0;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--hai-space-6));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hai-space-1);
+}
+.hai-lightbox__dot {
+  height: 4px;
+  width: 4px;
+  border-radius: var(--hai-radius-full);
+  background: rgba(255, 255, 255, 0.40);
+  transition: width var(--hai-dur-slow) var(--hai-ease),
+              background-color var(--hai-dur-normal) var(--hai-ease);
+}
+.hai-lightbox__dot[data-active="true"] {
+  width: 28px;
+  background: #ffffff;
+}
+
+/* Lightbox overlay — override default padding for edge-to-edge track */
+.hai-lightbox-overlay--flush {
+  padding: 0;
+  background: transparent;
+}
+.hai-lightbox-root {
+  /* Lightbox sits above everything except the emergency/arrival layer. */
+  z-index: var(--hai-z-lightbox);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.hai-lightbox__gesture {
+  will-change: transform;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+.hai-lightbox__backdrop {
+  position: absolute;
+  inset: 0;
+  background: #000000;
+  transition: opacity var(--hai-dur-slow) var(--hai-ease);
+}
+.hai-lightbox__track {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  will-change: transform;
+}
+.hai-lightbox__slide {
+  position: relative;
+  flex-shrink: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--hai-space-4);
+}
+.hai-lightbox__enter {
+  transition: opacity var(--hai-dur-slow) var(--hai-ease),
+              transform var(--hai-dur-slow) var(--hai-ease);
+  opacity: 0;
+  transform: scale(0.94);
+}
+.hai-lightbox__enter[data-entered="true"] {
+  opacity: 1;
+  transform: scale(1);
+}
+.hai-lightbox__chrome-enter {
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity var(--hai-dur-slow) var(--hai-ease),
+              transform var(--hai-dur-slow) var(--hai-ease);
+}
+.hai-lightbox__chrome-enter[data-entered="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+.hai-lightbox__chrome-enter--bottom {
+  transform: translateY(4px);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Action bar (post / item actions)
+   Usage: .hai-action-bar wraps .hai-action-btn items. Each action
+          button has label + count + icon. Use data-selected for on-state.
+   ───────────────────────────────────────────────────────────────── */
+.hai-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: var(--hai-space-1);
+  margin-top: var(--hai-space-3);
+  padding-top: var(--hai-space-2);
+  border-top: 1px solid var(--hai-border-soft);
+}
+.hai-action-bar--flush {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.hai-action-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hai-space-1);
+  min-height: 36px;
+  padding: var(--hai-space-1) var(--hai-space-2);
+  background: transparent;
+  border: none;
+  border-radius: var(--hai-radius-md);
+  color: var(--hai-text-muted);
+  font-size: var(--hai-fs-xs);
+  font-weight: var(--hai-fw-medium);
+  cursor: pointer;
+  transition: background-color var(--hai-dur-fast) var(--hai-ease),
+              color var(--hai-dur-fast) var(--hai-ease),
+              transform var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-action-btn:hover  { background: var(--hai-surface-2); color: var(--hai-text); }
+.hai-action-btn:active { transform: scale(0.95); }
+.hai-action-btn:disabled,
+.hai-action-btn[aria-disabled="true"] {
+  opacity: var(--hai-opacity-disabled);
+  cursor: not-allowed;
+  transform: none;
+}
+.hai-action-btn[data-selected="true"] { color: var(--hai-primary-600); }
+.hai-action-btn.is-liked[data-selected="true"] { color: var(--hai-danger); }
+.hai-action-btn.is-danger  { color: var(--hai-danger); }
+.hai-action-btn.is-brand   { color: var(--hai-primary-600); }
+.hai-action-btn.is-warning { color: var(--hai-warning); }
+.hai-action-btn--static    { cursor: default; }
+.hai-action-btn--static:hover { background: transparent; color: inherit; }
+.hai-action-btn__icon  { display: inline-flex; align-items: center; }
+.hai-action-btn__label { }
+.hai-action-btn__count { font-variant-numeric: tabular-nums; }
+
+/* Reaction picker popover anchor — positioned above the trigger */
+.hai-reaction-popover {
+  position: absolute;
+  bottom: calc(100% + var(--hai-space-2));
+  inset-inline-end: 0;
+  z-index: var(--hai-z-menu);
+  border-radius: var(--hai-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--hai-shadow-lg);
+}
+
+/* Reaction summary — stacked unique emojis (slight overlap) */
+.hai-reaction-stack {
+  display: inline-flex;
+  align-items: center;
+}
+.hai-reaction-stack__emoji {
+  font-size: var(--hai-fs-sm);
+  line-height: 1;
+  margin-inline-end: -2px;
+}
+
+/* Large reaction emoji in trigger */
+.hai-reaction-emoji-lg {
+  font-size: var(--hai-fs-2xl);
+  line-height: 1;
+}
+
+/* Fill-current helper for icon fill toggle */
+.hai-fill-current { fill: currentColor; }
+
+/* Visually-hidden helper (e.g., hidden file inputs) */
+.hai-hidden { display: none !important; }
+
+/* Nested composer for inline reply input — indented to align with reply body */
+.hai-comment-reply-composer {
+  margin-inline-start: var(--hai-space-10);
+  margin-top: var(--hai-space-2);
+}
+
+/* Edited marker inside comment text (inline, muted italic) */
+.hai-comment__edited {
+  font-style: italic;
+  margin-inline-start: var(--hai-space-1);
+}
+
+/* Help pill — sky-toned primary variant for LOOKING_FOR posts.
+   Kept as a semantic variant rather than a new brand color. */
+.hai-help-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hai-space-1);
+  padding: var(--hai-space-2) var(--hai-space-4);
+  border-radius: var(--hai-radius-full);
+  background: var(--hai-info);
+  color: var(--hai-text-invert);
+  font-size: var(--hai-fs-xs);
+  font-weight: var(--hai-fw-bold);
+  border: none;
+  box-shadow: var(--hai-shadow-md);
+  cursor: pointer;
+  transition: background-color var(--hai-dur-fast) var(--hai-ease),
+              transform var(--hai-dur-fast) var(--hai-ease),
+              box-shadow var(--hai-dur-fast) var(--hai-ease);
+}
+.hai-help-pill:hover  { filter: brightness(0.95); }
+.hai-help-pill:active { transform: scale(0.95); }
+.hai-help-pill[data-active="true"] {
+  box-shadow: var(--hai-shadow-sm);
+  filter: brightness(0.90);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Media grid (1/2/3-up post images)
+   ───────────────────────────────────────────────────────────────── */
+.hai-media-grid {
+  display: grid;
+  gap: var(--hai-space-1);
+  margin-top: var(--hai-space-3);
+  border-radius: var(--hai-radius-md);
+  overflow: hidden;
+}
+.hai-media-grid[data-count="1"] { grid-template-columns: 1fr; }
+.hai-media-grid[data-count="2"] { grid-template-columns: 1fr 1fr; }
+.hai-media-grid[data-count="3"],
+.hai-media-grid[data-count="4"] { grid-template-columns: 1fr 1fr 1fr; }
+.hai-media-grid__item {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--hai-surface-3);
+}
+.hai-media-grid__item:active { opacity: var(--hai-opacity-muted); }
+.hai-media-grid__item > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.hai-media-grid__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: var(--hai-fs-xl);
+  font-weight: var(--hai-fw-bold);
+}
+
+/* ═════════════════════════════════════════════════════════════════
+   Accessibility: honor reduced-motion
+   Animations are transform/opacity-only (GPU-cheap, WebView-safe).
+   When the user prefers reduced motion, we null the transitions
+   and transforms. We do NOT null properties that drive layout.
+   ═════════════════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
-  .hai-chip, .hai-btn-primary {
+  .hai-chip,
+  .hai-btn-primary,
+  .hai-btn-ghost,
+  .hai-btn-danger,
+  .hai-input,
+  .hai-menu-item,
+  .hai-reaction-item,
+  .hai-action-btn,
+  .hai-lightbox__btn,
+  .hai-comment-input__send,
+  .hai-option,
+  .hai-accordion-header,
+  .hai-setting-row--tappable,
+  .hai-lightbox__backdrop,
+  .hai-lightbox__track,
+  .hai-lightbox__enter,
+  .hai-lightbox__chrome-enter,
+  .hai-lightbox__dot {
     transition: none;
   }
+  .hai-btn-primary:active,
+  .hai-btn-ghost:active,
+  .hai-btn-danger:active,
+  .hai-chip:active,
+  .hai-reaction-item:active,
+  .hai-action-btn:active,
+  .hai-lightbox__btn:active,
+  .hai-comment-input__send:active,
+  .hai-comment__action:active,
+  .hai-option:active,
+  .hai-pill:active,
+  .hai-btn-icon:active,
+  .hai-comment-input__attach-btn:active,
+  .hai-comment__edit-btn:active,
+  .hai-help-pill:active {
+    transform: none;
+  }
 }
+
+/* ═════════════════════════════════════════════════════════════════
+   LAYER GUARD
+   Do not add new raw tokens or component rules below this line.
+   • New raw scale value → extend LAYER 1 at the top of :root
+   • New semantic alias  → extend LAYER 2 inside :root
+   • New component       → add under the Component Primitives section
+   • New utility         → add sparingly under the Utilities section
+                          and document why a primitive wasn't enough
+   Hand-coded numeric z-index is banned anywhere in this file or in
+   components — always use --hai-z-*.
+   ═════════════════════════════════════════════════════════════════ */
+
+/* ═════════════════════════════════════════════════════════════════
+   PERFORMANCE AUDIT (WebView, Pass 5)
+   ═════════════════════════════════════════════════════════════════
+   Animation property audit: all transitions in this file animate
+     • transform          (GPU compositor)
+     • opacity            (GPU compositor)
+     • background-color   (paint, bounded)
+     • color              (paint, bounded)
+     • border-color       (paint, bounded)
+     • box-shadow         (paint; kept to --hai-shadow-sm / md / lg)
+   No transitions on height/top/left/padding/margin/flex — all of
+   those would trigger layout and thrash the main thread.
+
+   Known exception (intentional):
+     .hai-lightbox__dot — transitions `width` as the active-page
+     affordance (morphs 4px dot → 28px pill). Cost is negligible:
+     the dots live inside a position:fixed lightbox overlay so layout
+     cannot propagate to the document. Do not replicate this pattern
+     elsewhere; use transform: scaleX() instead if you need a similar
+     morph inside a scrollable surface.
+
+   Shadow budget:
+     --hai-shadow-sm / md / lg only. No hand-rolled multi-layer
+     shadows. FAB uses --hai-shadow-fab (single composite shadow).
+
+   Filter budget:
+     Only .hai-help-pill uses filter: brightness() — bounded to a
+     tiny single-element surface, hover/active only. Avoid blur()
+     in non-lightbox contexts: blur() is known to cause layer
+     bloat and long paints on older Android WebViews.
+
+   Stacking:
+     All overlays pull z-index from --hai-z-*. See LAYER 1 / Z-index
+     scale for the policy. Sheets stack at --hai-z-sheet (50), a
+     nested sheet-over-sheet at --hai-z-sheet-2 (60), confirm-over-
+     sheet at --hai-z-overlay (70). Lightbox owns --hai-z-lightbox
+     (100). Emergency/arrival banners use --hai-z-emergency (1000)
+     — nothing else should.
+   ═════════════════════════════════════════════════════════════════ */

@@ -357,26 +357,26 @@ export default function FeedClient({
 
       {/* Header */}
       <header className="glass sticky top-0 z-10">
-        <div className="flex items-center justify-between px-4 pt-2.5 pb-1.5">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1">
-              <span data-tour="feed-title" className="text-xl font-bold text-primary-600 flex-shrink-0">{t('feed_title')}</span>
-              <span className="text-gray-400 text-sm flex-shrink-0">·</span>
+        <div className="hai-row-2 hai-justify-between hai-px-4 hai-header-top">
+          <div className="hai-flex-1 hai-min-w-0">
+            <div className="hai-row-1">
+              <span data-tour="feed-title" className="hai-h3 hai-tc-brand hai-shrink-0">{t('feed_title')}</span>
+              <span className="hai-caption hai-tc-faint hai-shrink-0">·</span>
               <button
                 onClick={() => setShowNeighborhoodPicker(true)}
-                className="flex items-center gap-1 text-sm font-medium text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800 rounded-full px-2.5 py-1 hover:bg-primary-100 dark:hover:bg-primary-900/50 active:scale-95 transition-all min-w-0 max-w-[45vw]"
+                className="hai-pill hai-pill--brand hai-neighborhood-pill"
               >
-                <FiMapPin className="w-3.5 h-3.5 text-primary-600 flex-shrink-0" />
-                <span className="truncate">{currentNeighborhood.displayName}</span>
-                <FiChevronDown className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" />
+                <FiMapPin className="hai-icon-sm" />
+                <span className="hai-truncate">{currentNeighborhood.displayName}</span>
+                <FiChevronDown className="hai-icon-sm" />
               </button>
             </div>
-            <p className="text-gray-400 text-xs">{currentNeighborhood.displayCity}</p>
+            <p className="hai-meta">{currentNeighborhood.displayCity}</p>
           </div>
-          <Link data-tour="notifications" href="/notifications" className="relative p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
-            <FiBell className="w-5 h-5 text-gray-600" />
+          <Link data-tour="notifications" href="/notifications" className="hai-btn-icon">
+            <FiBell className="hai-icon-lg" />
             {unreadNotifCount > 0 && (
-              <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+              <span className="hai-count-badge">
                 {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
               </span>
             )}
@@ -384,28 +384,26 @@ export default function FeedClient({
         </div>
 
         {/* Category Tabs */}
-        <div data-tour="categories" className="flex items-center gap-2 pb-2 ps-4">
+        <div data-tour="categories" className="hai-row-2 hai-pb-2 hai-ps-4">
           {/* Filter icon — always visible */}
-          <button onClick={() => setShowFilter(!showFilter)}
-            className={`flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0 relative transition-all ${
-              showFilter || hiddenCategories.size > 0 || sortMode !== 'newest'
-                ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/25'
-                : 'bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 border border-gray-200 dark:border-white/[0.08]'
-            }`}>
-            <FiFilter className="w-4 h-4" />
+          <button
+            onClick={() => setShowFilter(!showFilter)}
+            data-active={showFilter || hiddenCategories.size > 0 || sortMode !== 'newest' ? 'true' : 'false'}
+            className="hai-btn-icon hai-btn-icon--sm hai-btn-icon--outlined hai-shrink-0"
+          >
+            <FiFilter className="hai-icon-md" />
             {hiddenCategories.size > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center">{hiddenCategories.size}</span>
+              <span className="hai-count-badge">{hiddenCategories.size}</span>
             )}
           </button>
           {/* Category tabs */}
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide flex-1 py-0.5 pe-4"
-            style={{ maskImage: 'linear-gradient(to left, transparent, black 24px)', WebkitMaskImage: 'linear-gradient(to left, transparent, black 24px)' }}>
+          <div className="hai-row-2 hai-overflow-x-auto hai-flex-1 hai-pe-4 hai-tabs-mask">
             {categories.map((cat) => (
               <button
                 key={cat.key}
                 onClick={() => handleCategoryChange(cat.key)}
                 data-active={selectedCategory === cat.key ? 'true' : 'false'}
-                className="hai-chip flex-shrink-0"
+                className="hai-chip hai-shrink-0"
               >
                 <span>{cat.icon}</span>
                 <span>{t(cat.tKey)}</span>
@@ -415,20 +413,22 @@ export default function FeedClient({
         </div>
         {/* Filter panel (expands below tabs) */}
         {showFilter && (
-          <div className="px-4 pb-3">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 shadow-lg space-y-4">
+          <div className="hai-px-4 hai-pb-3">
+            <div className="hai-card hai-card--elevated hai-stack-4">
               {/* Sort */}
               <div>
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">{lang === 'en' ? 'Sort by' : lang === 'ur' ? 'ترتیب' : 'الترتيب'}</p>
-                <div className="flex gap-2">
+                <p className="hai-h6 hai-tc-muted hai-mb-2">{lang === 'en' ? 'Sort by' : lang === 'ur' ? 'ترتیب' : 'الترتيب'}</p>
+                <div className="hai-row-2">
                   {[
                     { key: 'newest', ar: 'الأحدث', en: 'Newest' },
                     { key: 'popular', ar: 'الأكثر تفاعلاً', en: 'Most Popular' },
                   ].map(s => (
-                    <button key={s.key} onClick={() => { setSortMode(s.key as any); localStorage.setItem('hai_feed_sort', s.key) }}
-                      className={`flex-1 py-2 rounded-xl text-xs font-medium transition-colors ${
-                        sortMode === s.key ? 'bg-primary-600 text-white' : 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-                      }`}>
+                    <button
+                      key={s.key}
+                      onClick={() => { setSortMode(s.key as any); localStorage.setItem('hai_feed_sort', s.key) }}
+                      data-active={sortMode === s.key ? 'true' : 'false'}
+                      className="hai-chip hai-flex-1 hai-justify-center"
+                    >
                       {lang !== 'en' ? s.ar : s.en}
                     </button>
                   ))}
@@ -436,20 +436,22 @@ export default function FeedClient({
               </div>
               {/* Category hide */}
               <div>
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">{lang === 'en' ? 'Hide categories' : lang === 'ur' ? 'زمرے چھپائیں' : 'إخفاء أقسام'}</p>
-                <div className="flex flex-wrap gap-1.5">
+                <p className="hai-h6 hai-tc-muted hai-mb-2">{lang === 'en' ? 'Hide categories' : lang === 'ur' ? 'زمرے چھپائیں' : 'إخفاء أقسام'}</p>
+                <div className="hai-flex-wrap hai-row-1">
                   {categories.filter(c => c.key !== 'ALL').map(cat => {
                     const hidden = hiddenCategories.has(cat.key)
                     return (
-                      <button key={cat.key} onClick={() => {
-                        const next = new Set(hiddenCategories)
-                        if (hidden) next.delete(cat.key); else next.add(cat.key)
-                        setHiddenCategories(next)
-                        localStorage.setItem('hai_feed_hidden_cats', JSON.stringify(Array.from(next)))
-                      }}
-                        className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${
-                          hidden ? 'bg-gray-200 dark:bg-gray-600 text-gray-400 line-through' : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                        }`}>
+                      <button
+                        key={cat.key}
+                        onClick={() => {
+                          const next = new Set(hiddenCategories)
+                          if (hidden) next.delete(cat.key); else next.add(cat.key)
+                          setHiddenCategories(next)
+                          localStorage.setItem('hai_feed_hidden_cats', JSON.stringify(Array.from(next)))
+                        }}
+                        data-hidden={hidden ? 'true' : 'false'}
+                        className="hai-chip hai-chip--xs hai-category-toggle"
+                      >
                         {cat.icon} {t(cat.tKey)}
                       </button>
                     )
@@ -457,8 +459,12 @@ export default function FeedClient({
                 </div>
               </div>
               {(hiddenCategories.size > 0 || sortMode !== 'newest') && (
-                <button onClick={() => { setHiddenCategories(new Set()); setSortMode('newest'); localStorage.removeItem('hai_feed_hidden_cats'); localStorage.removeItem('hai_feed_sort') }}
-                  className="text-xs text-red-500 font-medium">{lang === 'en' ? 'Reset' : lang === 'ur' ? 'ری سیٹ' : 'إعادة ضبط'}</button>
+                <button
+                  onClick={() => { setHiddenCategories(new Set()); setSortMode('newest'); localStorage.removeItem('hai_feed_hidden_cats'); localStorage.removeItem('hai_feed_sort') }}
+                  className="hai-link hai-tc-danger hai-meta"
+                >
+                  {lang === 'en' ? 'Reset' : lang === 'ur' ? 'ری سیٹ' : 'إعادة ضبط'}
+                </button>
               )}
             </div>
           </div>

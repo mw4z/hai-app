@@ -337,26 +337,122 @@ html.dark body::before {
   ::-webkit-scrollbar-thumb { background: #16a34a; border-radius: 2px; }
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   DEPRECATED — LEGACY PRIMITIVES
+   ══════════════════════════════════════════════════════════════════════
+   The following classes are kept as back-compat aliases over the token
+   system so any un-migrated screen still renders correctly. They are
+   DEPRECATED and must NOT be used in new code.
+
+   Replacement matrix:
+     .btn-primary      → .hai-btn-primary (optionally .hai-btn-block)
+     .btn-outline      → .hai-btn-ghost.is-brand (optionally .hai-btn-block)
+     .input-field      → .hai-input
+     .card             → .hai-card
+     .category-badge   → REMOVED in Pass 6. Use `.hai-category-badge`
+                          with `data-category="<ENUM>"` from
+                          design-tokens.css; colors come from
+                          --hai-category-{ENUM}-{bg|fg}.
+
+   Enforcement:
+     CI grep guard (suggested):
+       rg '\bclassName=.*\b(btn-primary|btn-outline|input-field|card)\b' src
+     Any hit in NEW code is a violation. The existing hits are the
+     remaining un-migrated surface area and will be cleaned up in Pass 7+.
+
+   DO NOT add new rules to @layer components below. Extend the token
+   system in src/app/design-tokens.css instead.
+   ══════════════════════════════════════════════════════════════════════ */
 @layer components {
   .btn-primary {
-    @apply bg-primary-600 text-white font-semibold py-3 px-6 rounded-xl w-full text-center transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--hai-space-2);
+    width: 100%;
+    min-height: var(--hai-tap-min);
+    padding: 0 var(--hai-space-5);
+    border-radius: var(--hai-radius-md);
+    background: var(--hai-primary-500);
+    color: var(--hai-text-invert);
+    font-weight: var(--hai-fw-semibold);
+    font-size: var(--hai-fs-md);
+    line-height: var(--hai-lh-tight);
+    box-shadow: var(--hai-shadow-md);
+    border: 1px solid transparent;
+    transition: transform var(--hai-dur-fast) var(--hai-ease),
+                background-color var(--hai-dur-normal) var(--hai-ease),
+                box-shadow var(--hai-dur-normal) var(--hai-ease);
+  }
+  .btn-primary:hover  { background: var(--hai-primary-hover); }
+  .btn-primary:active { background: var(--hai-primary-pressed); transform: scale(0.97); }
+  .btn-primary:disabled {
+    opacity: var(--hai-opacity-disabled);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
   }
 
   .btn-outline {
-    @apply border-2 border-primary-600 text-primary-600 font-semibold py-3 px-6 rounded-xl w-full text-center transition-all active:scale-95;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--hai-space-2);
+    width: 100%;
+    min-height: var(--hai-tap-min);
+    padding: 0 var(--hai-space-5);
+    border-radius: var(--hai-radius-md);
+    background: transparent;
+    color: var(--hai-primary-600);
+    font-weight: var(--hai-fw-semibold);
+    font-size: var(--hai-fs-md);
+    line-height: var(--hai-lh-tight);
+    border: 2px solid var(--hai-primary-500);
+    transition: transform var(--hai-dur-fast) var(--hai-ease),
+                background-color var(--hai-dur-normal) var(--hai-ease),
+                color var(--hai-dur-normal) var(--hai-ease);
   }
+  .btn-outline:hover  { background: var(--hai-primary-tint); color: var(--hai-primary-700); }
+  .btn-outline:active { transform: scale(0.97); }
 
   .input-field {
-    @apply w-full border border-gray-200 rounded-xl px-4 py-3 text-start bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-base;
+    display: block;
+    width: 100%;
+    min-height: var(--hai-tap-min);
+    padding: var(--hai-space-3) var(--hai-space-4);
+    background: var(--hai-surface-1);
+    color: var(--hai-text);
+    border: 1px solid var(--hai-border);
+    border-radius: var(--hai-radius-md);
+    font-size: var(--hai-fs-md);
+    line-height: var(--hai-lh-normal);
+    text-align: start;
+    transition: border-color var(--hai-dur-normal) var(--hai-ease),
+                box-shadow var(--hai-dur-normal) var(--hai-ease);
+  }
+  .input-field::placeholder { color: var(--hai-text-faint); }
+  .input-field:focus,
+  .input-field:focus-visible {
+    outline: none;
+    border-color: var(--hai-primary-500);
+    box-shadow: 0 0 0 3px var(--hai-primary-ring);
+  }
+  .input-field:disabled {
+    opacity: var(--hai-opacity-disabled);
+    background: var(--hai-surface-2);
+    cursor: not-allowed;
   }
 
   .card {
-    @apply bg-white dark:bg-gray-800/60 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-none border border-gray-200/60 dark:border-white/[0.06] p-4;
+    background: var(--hai-surface-1);
+    border: 1px solid var(--hai-border);
+    border-radius: var(--hai-radius-lg);
+    box-shadow: var(--hai-shadow-sm);
+    padding: var(--hai-space-4);
   }
 
-  .category-badge {
-    @apply text-xs font-medium px-2 py-1 rounded-full;
-  }
+  /* .category-badge — REMOVED (Pass 6). Use `.hai-category-badge`
+     with `data-category="<ENUM>"` from design-tokens.css instead. */
 }
 
 @keyframes popUp {
