@@ -117,6 +117,30 @@ export async function GET(req: NextRequest) {
       author: { select: { id: true, name: true, reputation: true, accountType: true, providerStatus: true, role: true, avatarUrl: true, coverUrl: true, gender: true, showGender: true, createdAt: true, bio: true, serviceDescription: true, serviceAddress: true, serviceLat: true, serviceLng: true, neighborhood: { select: { name: true, nameEn: true } }, _count: { select: { posts: true } } } },
       reactions: { select: { emoji: true, userId: true } },
       _count: { select: { comments: true, reactions: true } },
+      // Preview comment ships with each paginated post too — keeps the
+      // "no 1-second comment pop-in" guarantee consistent with the
+      // initial SSR payload in /feed/page.tsx.
+      comments: {
+        where: { parentId: null },
+        orderBy: [
+          { likes: { _count: 'desc' } },
+          { createdAt: 'desc' },
+        ],
+        take: 1,
+        include: {
+          author: {
+            select: {
+              id: true,
+              name: true,
+              reputation: true,
+              accountType: true,
+              providerStatus: true,
+              avatarUrl: true,
+            },
+          },
+          _count: { select: { likes: true } },
+        },
+      },
     },
     orderBy: { createdAt: 'desc' },
     take: PAGE_SIZE + 1,
@@ -137,17 +161,34 @@ export async function GET(req: NextRequest) {
     ? posts[posts.length - 1].createdAt.toISOString()
     : null
 
-  // Respect each author's privacy: strip gender if they opted out
-  const sanitized = balanced.map((p: any) => ({
-    ...p,
-    author: p.author
-      ? {
-          ...p.author,
-          gender: p.author.showGender === false ? null : p.author.gender,
-          showGender: undefined,
-        }
-      : p.author,
-  }))
+  // Respect each author's privacy: strip gender if they opted out.
+  // Also reshape the Prisma `comments` sub-result into `previewComments`
+  // (with flattened likeCount) so the client matches the SSR contract.
+  const sanitized = balanced.map((p: any) => {
+    const { comments, ...rest } = p
+    const previewComments = Array.isArray(comments)
+      ? comments.map((c: any) => ({
+          id: c.id,
+          body: c.body,
+          imageUrl: c.imageUrl ?? null,
+          createdAt: c.createdAt,
+          author: c.author,
+          likeCount: c._count?.likes ?? 0,
+          replies: [],
+        }))
+      : []
+    return {
+      ...rest,
+      previewComments,
+      author: rest.author
+        ? {
+            ...rest.author,
+            gender: rest.author.showGender === false ? null : rest.author.gender,
+            showGender: undefined,
+          }
+        : rest.author,
+    }
+  })
 
   return NextResponse.json({
     posts: sanitized,

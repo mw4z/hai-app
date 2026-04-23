@@ -54,6 +54,30 @@ export default async function FeedPage({
           author: { select: { id: true, name: true, reputation: true, accountType: true, providerStatus: true, role: true, avatarUrl: true, coverUrl: true, gender: true, showGender: true, createdAt: true, bio: true, serviceDescription: true, serviceAddress: true, serviceLat: true, serviceLng: true, neighborhood: { select: { name: true, nameEn: true } }, _count: { select: { posts: true } } } },
           reactions: { select: { emoji: true, userId: true } },
           _count: { select: { comments: true, reactions: true } },
+          // Preview comment — most-liked root comment, shipped with the
+          // feed so the comment line renders on first paint instead of
+          // popping in ~1s later via a per-card follow-up fetch.
+          comments: {
+            where: { parentId: null },
+            orderBy: [
+              { likes: { _count: 'desc' } },
+              { createdAt: 'desc' },
+            ],
+            take: 1,
+            include: {
+              author: {
+                select: {
+                  id: true,
+                  name: true,
+                  reputation: true,
+                  accountType: true,
+                  providerStatus: true,
+                  avatarUrl: true,
+                },
+              },
+              _count: { select: { likes: true } },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         take: 20,
@@ -150,17 +174,37 @@ export default async function FeedPage({
         neighborhoodId: user.neighborhoodId!,
         role: user.role,
       }}
-      initialPosts={JSON.parse(JSON.stringify(balanced.map((p: any) => ({
-        ...p,
-        author: p.author
-          ? {
-              ...p.author,
-              // Respect author's privacy: hide gender if they opted out
-              gender: p.author.showGender === false ? null : p.author.gender,
-              showGender: undefined,
-            }
-          : p.author,
-      }))))}
+      initialPosts={JSON.parse(JSON.stringify(balanced.map((p: any) => {
+        // Move SSR preview from `comments` into `previewComments` so the
+        // PostCard can seed its comment-row state without confusing
+        // "preview" with "full thread" (which it still lazy-loads on open).
+        // Also flatten `_count.likes` → `likeCount` so the heart badge
+        // renders with zero extra work client-side.
+        const { comments, ...rest } = p
+        const previewComments = Array.isArray(comments)
+          ? comments.map((c: any) => ({
+              id: c.id,
+              body: c.body,
+              imageUrl: c.imageUrl ?? null,
+              createdAt: c.createdAt,
+              author: c.author,
+              likeCount: c._count?.likes ?? 0,
+              replies: [],
+            }))
+          : []
+        return {
+          ...rest,
+          previewComments,
+          author: rest.author
+            ? {
+                ...rest.author,
+                // Respect author's privacy: hide gender if they opted out
+                gender: rest.author.showGender === false ? null : rest.author.gender,
+                showGender: undefined,
+              }
+            : rest.author,
+        }
+      })))}
       selectedCategory={category}
       isReadOnly={isReadOnly}
       browseNeighborhood={browseNeighborhood ? {

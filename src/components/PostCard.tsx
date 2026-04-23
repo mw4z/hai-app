@@ -108,6 +108,25 @@ interface Post {
   activeThreadId?: string | null
   status?: string
   _count?: { comments: number; reactions: number }
+  /** Top-liked root comment(s) shipped with the feed payload so the
+   *  preview row can render on first paint. Full thread still lazy-
+   *  loads on sheet open. */
+  previewComments?: Array<{
+    id: string
+    body: string
+    imageUrl?: string | null
+    createdAt: string
+    author: {
+      id: string
+      name: string | null
+      reputation: number
+      accountType?: string
+      providerStatus?: string | null
+      avatarUrl?: string | null
+    }
+    likeCount?: number
+    replies?: Reply[]
+  }>
 }
 
 export default function PostCard({
@@ -192,7 +211,21 @@ export default function PostCard({
     }
   }, [showMenu])
   const [showComments, setShowComments] = useState(false)
-  const [comments, setComments] = useState<Comment[]>([])
+  // Seed from SSR preview so the comment row paints with the post card
+  // instead of popping in ~1s later. `commentsLoaded` stays false so the
+  // full thread is still lazy-fetched when the user opens the sheet.
+  const [comments, setComments] = useState<Comment[]>(() =>
+    (post.previewComments || []).map((c) => ({
+      id: c.id,
+      body: c.body,
+      imageUrl: c.imageUrl ?? null,
+      createdAt: c.createdAt,
+      author: c.author,
+      likeCount: c.likeCount ?? 0,
+      isLiked: false,
+      replies: [],
+    }))
+  )
   const [commentText, setCommentText] = useState('')
   const [commentImage, setCommentImage] = useState<File | null>(null)
   const [commentImagePreview, setCommentImagePreview] = useState<string | null>(null)
@@ -214,7 +247,13 @@ export default function PostCard({
 
   const style = CATEGORY_STYLES[post.category] || CATEGORY_STYLES.GENERAL
   const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + b, 0)
-  const totalComments = comments.reduce((acc, c) => acc + 1 + c.replies.length, 0)
+  const serverCommentCount = post._count?.comments || 0
+  // Before the full thread is loaded, the SSR `_count` is the truth —
+  // using it avoids the card saying "1 comment" (the preview) when the
+  // post actually has 12.
+  const totalComments = commentsLoaded
+    ? comments.reduce((acc, c) => acc + 1 + c.replies.length, 0)
+    : serverCommentCount
 
   function timeAgo(dateStr: string) {
     const diff = Date.now() - new Date(dateStr).getTime()
@@ -290,13 +329,10 @@ export default function PostCard({
     }
   }
 
-  // Auto-load comments to show top comment preview
-  const serverCommentCount = post._count?.comments || 0
-  useEffect(() => {
-    if (!commentsLoaded && serverCommentCount > 0) {
-      fetchComments()
-    }
-  }, [])
+  // NOTE: we deliberately do NOT auto-fetch comments on mount. The feed
+  // ships the top-liked preview comment inline via `post.previewComments`,
+  // so the preview row renders on first paint. The full thread is
+  // lazy-loaded inside `toggleComments()` when the user opens the sheet.
 
   async function toggleComments() {
     if (!showComments) {
@@ -905,40 +941,55 @@ export default function PostCard({
         </div>
       </div>
 
-      {/* Top comment preview — always visible if has comments */}
-      {!showComments && (totalComments > 0 || serverCommentCount > 0) && comments.length > 0 && (() => {
-        const top: any = [...comments].sort((a: any, b: any) => (b.likeCount || 0) - (a.likeCount || 0))[0]
-        if (!top) return null
-        return (
-          <div className="mt-2 pt-2 border-t border-gray-100/50 dark:border-white/[0.04]">
-            <button onClick={toggleComments} className="w-full text-start">
-              <div className="flex items-start gap-2">
-                {top.author.avatarUrl ? (
-                  <img src={top.author.avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0 mt-0.5" />
-                ) : (
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-600 dark:text-gray-300 flex-shrink-0 mt-0.5">
-                    {top.author.name?.[0] || '؟'}
+      {/* Top comment preview. The outer block is rendered whenever the
+          post has at least one comment, so the card's height is stable
+          from first paint. If real preview data is available (SSR or
+          after full-thread fetch), we show it. If somehow missing, we
+          render a same-height skeleton so the card doesn't jump when
+          data arrives. */}
+      {!showComments && serverCommentCount > 0 && (
+        <div className="mt-2 pt-2 border-t border-gray-100/50 dark:border-white/[0.04]">
+          {comments.length > 0 ? (() => {
+            const top: any = [...comments].sort((a: any, b: any) => (b.likeCount || 0) - (a.likeCount || 0))[0]
+            if (!top) return null
+            return (
+              <button onClick={toggleComments} className="w-full text-start">
+                <div className="flex items-start gap-2">
+                  {top.author.avatarUrl ? (
+                    <img src={top.author.avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-600 dark:text-gray-300 flex-shrink-0 mt-0.5">
+                      {top.author.name?.[0] || '؟'}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">{top.author.name}</span>
+                    <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-snug line-clamp-2">{top.body}</p>
                   </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">{top.author.name}</span>
-                  <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-snug line-clamp-2">{top.body}</p>
+                  {(top.likeCount || 0) > 0 && (
+                    <span className="text-[10px] text-gray-400 flex items-center gap-0.5 flex-shrink-0 mt-1">
+                      <FiHeart className="w-3 h-3" />{top.likeCount}
+                    </span>
+                  )}
                 </div>
-                {(top.likeCount || 0) > 0 && (
-                  <span className="text-[10px] text-gray-400 flex items-center gap-0.5 flex-shrink-0 mt-1">
-                    <FiHeart className="w-3 h-3" />{top.likeCount}
-                  </span>
+                {totalComments > 1 && (
+                  <p className="text-[11px] text-primary-600 dark:text-primary-400 font-medium mt-1.5">
+                    {lang === 'en' ? `View all ${totalComments} comments` : `عرض جميع التعليقات (${totalComments})`}
+                  </p>
                 )}
+              </button>
+            )
+          })() : (
+            <div aria-hidden className="flex items-start gap-2 opacity-60">
+              <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-white/5 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <div className="h-2.5 w-24 rounded bg-gray-200 dark:bg-white/5" />
+                <div className="h-2 w-full rounded bg-gray-200 dark:bg-white/5" />
               </div>
-              {totalComments > 1 && (
-                <p className="text-[11px] text-primary-600 dark:text-primary-400 font-medium mt-1.5">
-                  {lang === 'en' ? `View all ${totalComments} comments` : `عرض جميع التعليقات (${totalComments})`}
-                </p>
-              )}
-            </button>
-          </div>
-        )
-      })()}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Comments — Instagram-style bottom sheet.
           Opens in a fixed-position overlay so long threads never push
