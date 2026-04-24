@@ -127,7 +127,14 @@ export default function PushRegistration() {
           },
         )
 
-        // Tap → deeplink navigation. Conservative: all types land in /feed.
+        // Tap → deeplink navigation. Every push sets data.deeplink
+        // using the `hai://…` scheme (e.g. `hai://rides/abc`,
+        // `hai://post/xyz?comment=k`, `hai://mod?tab=user_reports`).
+        // We translate that scheme to a web path so the in-app
+        // WebView routes straight to the relevant page. If the push
+        // is from an older version without `data.deeplink`, we
+        // infer from the type + other payload fields. Only as a
+        // very last resort do we land on `/feed`.
         await PushNotifications.addListener(
           'pushNotificationActionPerformed',
           (action) => {
@@ -135,7 +142,7 @@ export default function PushRegistration() {
               string,
               string
             >
-            const target = resolveDeeplink(data.type)
+            const target = resolveDeeplink(data)
             if (target) {
               try {
                 window.location.href = target
@@ -177,15 +184,59 @@ export default function PushRegistration() {
   return null
 }
 
-function resolveDeeplink(type: string | undefined): string | null {
+/**
+ * Map a push payload to the in-app route that should open when the
+ * user taps the notification. Priority of sources:
+ *   1. data.deeplink — the `hai://…` scheme the server produced.
+ *      Translated to the matching web path (e.g. `hai://rides/abc`
+ *      → `/rides/abc`). This is the authoritative source when
+ *      present.
+ *   2. Type + id fields in the payload — fallback that handles
+ *      older pushes that didn't include `data.deeplink`.
+ *   3. `/feed` — last resort so the user never lands on a blank
+ *      screen.
+ */
+function resolveDeeplink(data: Record<string, string>): string {
+  const type = data.type || ''
+  const deeplink = data.deeplink || ''
+
+  // hai://<host><path>[?query]  →  /<host><path>[?query]
+  if (deeplink.startsWith('hai://')) {
+    const rest = deeplink.slice('hai://'.length)
+    if (rest.length > 0) return '/' + rest
+  }
+
   switch (type) {
-    case 'new_post':
     case 'comment_on_post':
     case 'reply_to_comment':
-    case 'reaction_on_post':
-    case 'emergency_alert':
-    case 'weekly_digest':
+      if (data.postId) {
+        const c = data.commentId ? `?comment=${encodeURIComponent(data.commentId)}` : ''
+        return `/feed?post=${encodeURIComponent(data.postId)}${c ? '&' + c.slice(1) : ''}`
+      }
       return '/feed'
+
+    case 'new_post':
+    case 'reaction_on_post':
+      if (data.postId) return `/feed?post=${encodeURIComponent(data.postId)}`
+      return '/feed'
+
+    case 'ride_status':
+    case 'ride_offer':
+    case 'ride_message':
+    case 'ride_rating':
+      if (data.rideRequestId) return `/rides/${encodeURIComponent(data.rideRequestId)}`
+      return '/rides'
+
+    case 'emergency_alert_request':
+      return '/mod?tab=emergency_requests'
+
+    case 'user_report':
+      return '/mod?tab=user_reports'
+
+    case 'emergency_alert':
+      return '/feed'
+
+    case 'weekly_digest':
     default:
       return '/feed'
   }
