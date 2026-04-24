@@ -236,20 +236,21 @@ export default function ChatClient({
 
     setHeight(vv.height)
     const onVV = () => {
-      // On iOS while the keyboard is up, the keyboard listener owns
-      // the height. Let vv take over again on keyboardWillHide.
-      if (isIos && keyboardOpen) return
+      // Always trust visualViewport for the visible height. On iPad
+      // specifically, Keyboard.willShow can fire late (or not until
+      // the user actually types a key), which left the composer
+      // hidden below the keyboard. visualViewport.resize fires the
+      // moment the keyboard appears and gives us the correct
+      // shrunken height — so we use it as the primary source on
+      // every platform and let the Keyboard.willShow listener below
+      // act as a redundant fast-path on iPhone only.
       setHeight(vv.height)
-      // Android: when the keyboard opens the WebView shrinks, so the
-      // composer naturally sits flush to the keyboard top. Keep its
-      // bottom padding tight while keyboard is up, restore safe-area
-      // when fully hidden.
-      if (isAndroid) {
-        // crude-but-reliable: if the viewport is notably shorter than
-        // the window it's because the keyboard is up
-        const keyboardIsOpen = (window.innerHeight - vv.height) > 150
-        setComposerPad(keyboardIsOpen ? '10px' : safePad)
-      }
+      // Crude-but-reliable: if the viewport is notably shorter than
+      // the window, the keyboard is up. Tighten composer bottom
+      // padding while keyboard is up, restore safe-area when hidden.
+      const keyboardIsOpen = (window.innerHeight - vv.height) > 150
+      keyboardOpen = keyboardIsOpen
+      setComposerPad(keyboardIsOpen ? '10px' : safePad)
     }
     vv.addEventListener('resize', onVV)
     vv.addEventListener('scroll', onVV)
