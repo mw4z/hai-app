@@ -17,6 +17,7 @@ import { useAttachContact } from '@/hooks/useAttachContact'
 import { playSend } from '@/lib/sound'
 import SmartText from '@/components/SmartText'
 import ImageLightbox from '@/components/ImageLightbox'
+import ReportUserSheet from '@/components/ReportUserSheet'
 import { showApiError } from '@/lib/apiError'
 
 interface ReplyTo {
@@ -221,6 +222,7 @@ export default function ChatClient({
     }
   }, [])
   const [sendingLocation, setSendingLocation] = useState(false)
+  const [reportingUser, setReportingUser] = useState(false)
   const [closed, setClosed] = useState(isClosed)
 
   const [showRating, setShowRating] = useState(isClosed)
@@ -719,6 +721,14 @@ export default function ChatClient({
             <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="#00a884" strokeWidth="1.5" opacity="0.3" />
           </svg>
         </button>
+        <button
+          onClick={() => { setReportingUser(true); hapticLight() }}
+          className="p-2 rounded-full hover:bg-white/10 transition-colors active:scale-90"
+          title={lang === 'en' ? 'Report user' : lang === 'ur' ? 'صارف رپورٹ کریں' : 'الإبلاغ عن المستخدم'}
+          aria-label="report user"
+        >
+          <FiFlag className="w-[18px] h-[18px] text-gray-500 dark:text-gray-400" />
+        </button>
         {!closed && (
           <button data-tour="chat-close" onClick={closeThread}
             className="text-xs text-red-500 dark:text-red-400 flex items-center gap-1 px-3 py-1.5 rounded-full bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors font-medium">
@@ -1211,6 +1221,30 @@ export default function ChatClient({
           </div>
         </div>
       )}
+
+      {/* Account-level report sheet — opened from the flag icon in the
+          chat header. Source is CHAT and conversationId is attached so
+          moderators can jump straight to the thread. */}
+      <ReportUserSheet
+        open={reportingUser}
+        onClose={() => setReportingUser(false)}
+        targetUserId={other.id}
+        targetName={other.name}
+        source="CHAT"
+        conversationId={threadId}
+        onBlockRequested={async () => {
+          try {
+            const res = await fetch('/api/users/block', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: other.id }),
+            })
+            if (res.ok) {
+              toast.success(lang === 'en' ? 'User blocked' : lang === 'ur' ? 'صارف بلاک ہو گیا' : 'تم حظر المستخدم')
+            }
+          } catch { /* non-fatal */ }
+        }}
+      />
     </div>
   )
 }

@@ -14,6 +14,7 @@ import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useAttachContact } from '@/hooks/useAttachContact'
 import ImageLightbox from './ImageLightbox'
 import SmartText from './SmartText'
+import ReportUserSheet from './ReportUserSheet'
 import { showApiError } from '@/lib/apiError'
 import type { TranslationKey } from '@/lib/i18n'
 import { canStartPrivateThread } from '@/lib/thread-rules'
@@ -155,6 +156,7 @@ export default function PostCard({
   const isAdmin = ['SUPER_ADMIN', 'PLATFORM_MOD', 'NEIGHBORHOOD_MOD'].includes(currentUserRole || '')
   const [reported, setReported] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  const [reportingUser, setReportingUser] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Initialize reactions from server data
@@ -678,7 +680,7 @@ export default function PostCard({
                     <span className="hai-menu-item__label">{lang !== 'en' ? 'استعادة' : 'Restore'}</span>
                   </button>
                 )}
-                {/* Report */}
+                {/* Report post */}
                 {post.author.id !== currentUserId && (
                   <button
                     onClick={handleReport}
@@ -687,6 +689,19 @@ export default function PostCard({
                   >
                     <FiFlag className="hai-icon-sm hai-menu-item__icon" />
                     <span className="hai-menu-item__label">{reported ? t('post_reported') : t('post_report')}</span>
+                  </button>
+                )}
+                {/* Report user — account-level complaint, distinct from
+                    reporting the post itself. Opens the ReportUserSheet. */}
+                {post.author.id !== currentUserId && (
+                  <button
+                    onClick={() => { setReportingUser(true); setShowMenu(false) }}
+                    className="hai-menu-item is-danger"
+                  >
+                    <FiFlag className="hai-icon-sm hai-menu-item__icon" />
+                    <span className="hai-menu-item__label">
+                      {lang === 'en' ? 'Report user' : lang === 'ur' ? 'صارف رپورٹ کریں' : 'الإبلاغ عن المستخدم'}
+                    </span>
                   </button>
                 )}
               </div>
@@ -1465,27 +1480,37 @@ export default function PostCard({
                   <ServiceCatalog userId={post.author.id} lang={lang} />
                 )}
 
-                {/* Block user */}
+                {/* Report + Block user — both visible; report is
+                    account-level and doesn't imply a block. */}
                 {post.author.id !== currentUserId && (
-                  <button
-                    onClick={async () => {
-                      const ok = await confirmDialog({
-                        message: lang === 'en' ? "Block this user? You won't see their content." : 'حظر هذا المستخدم؟ لن ترى محتواه.',
-                        variant: 'danger',
-                        confirmText: lang === 'en' ? 'Block' : 'حظر',
-                      })
-                      if (!ok) return
-                      try {
-                        await fetch('/api/users/block', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: post.author.id }) })
-                        toast.success(lang === 'en' ? 'User blocked' : 'تم الحظر')
-                        setShowUserPopup(false)
-                        router.refresh()
-                      } catch {}
-                    }}
-                    className="w-full text-center text-xs text-red-400 py-2 mt-1"
-                  >
-                    {lang !== 'en' ? 'حظر المستخدم' : 'Block User'}
-                  </button>
+                  <div className="flex items-center justify-center gap-4 mt-1">
+                    <button
+                      onClick={() => { setShowUserPopup(false); setReportingUser(true) }}
+                      className="text-xs text-red-400 py-2"
+                    >
+                      {lang === 'en' ? 'Report user' : lang === 'ur' ? 'صارف رپورٹ کریں' : 'الإبلاغ عن المستخدم'}
+                    </button>
+                    <span className="text-gray-300 dark:text-gray-600">·</span>
+                    <button
+                      onClick={async () => {
+                        const ok = await confirmDialog({
+                          message: lang === 'en' ? "Block this user? You won't see their content." : 'حظر هذا المستخدم؟ لن ترى محتواه.',
+                          variant: 'danger',
+                          confirmText: lang === 'en' ? 'Block' : 'حظر',
+                        })
+                        if (!ok) return
+                        try {
+                          await fetch('/api/users/block', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: post.author.id }) })
+                          toast.success(lang === 'en' ? 'User blocked' : 'تم الحظر')
+                          setShowUserPopup(false)
+                          router.refresh()
+                        } catch {}
+                      }}
+                      className="text-xs text-red-400 py-2"
+                    >
+                      {lang !== 'en' ? 'حظر المستخدم' : 'Block User'}
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -1502,6 +1527,30 @@ export default function PostCard({
           <img src={post.author.avatarUrl} alt="" className="max-w-full max-h-full object-contain" />
         </div>
       )}
+
+      {/* Report user sheet — mounted once per card, opened from the
+          overflow menu or the user popup. Separate from the post-report
+          action; never blocks automatically. */}
+      <ReportUserSheet
+        open={reportingUser}
+        onClose={() => setReportingUser(false)}
+        targetUserId={post.author.id}
+        targetName={post.author.name}
+        source="POST"
+        postId={post.id}
+        onBlockRequested={async () => {
+          try {
+            const res = await fetch('/api/users/block', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: post.author.id }),
+            })
+            if (res.ok) {
+              toast.success(lang === 'en' ? 'User blocked' : lang === 'ur' ? 'صارف بلاک ہو گیا' : 'تم حظر المستخدم')
+            }
+          } catch { /* ignore — block is best-effort post-report */ }
+        }}
+      />
     </div>
   )
 }

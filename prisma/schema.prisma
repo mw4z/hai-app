@@ -71,6 +71,8 @@ model User {
   posts            Post[]
   reports          Report[]      @relation("reporter")
   reportedPosts    Report[]      @relation("reportedUser")
+  userReportsSent     UserReport[] @relation("userReporter")
+  userReportsReceived UserReport[] @relation("userReported")
   otpCodes         OtpCode[]
   reactions        Reaction[]
   bookmarks        Bookmark[]
@@ -343,6 +345,53 @@ enum ReportStatus {
   REVIEWED
   DISMISSED
   ACTION_TAKEN
+}
+
+// ─── Account-level user reports ───────────────────────────────────────────────
+// Separate from Report (post-level) so existing post moderation is unaffected.
+// Captures account/behavior-level complaints: impersonation, scams, harassment,
+// abusive DMs, profile content, etc. A reporter may file multiple reports
+// against the same user over time, but duplicates (same reporter+target+reason)
+// within a short window are blocked at the API layer.
+model UserReport {
+  id             String             @id @default(cuid())
+  reporter       User               @relation("userReporter", fields: [reporterId], references: [id])
+  reporterId     String
+  reportedUser   User               @relation("userReported", fields: [reportedUserId], references: [id])
+  reportedUserId String
+  reason         UserReportReason
+  details        String?
+  source         UserReportSource   @default(PROFILE)
+  // Optional context — lets moderators jump to the surface where the
+  // report was filed (a specific post, DM thread, or marketplace listing).
+  postId         String?
+  conversationId String?
+  listingId      String?
+  status         ReportStatus       @default(PENDING)
+  createdAt      DateTime           @default(now())
+
+  @@index([reportedUserId])
+  @@index([reporterId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum UserReportReason {
+  IMPERSONATION           // fake account / pretending to be someone else
+  SCAM_FRAUD              // selling stolen goods, payment scams
+  HARASSMENT              // unwanted contact, stalking, bullying
+  ABUSIVE_LANGUAGE        // slurs, threats, hate speech
+  SPAM                    // unsolicited advertising / mass-messaging
+  INAPPROPRIATE_PROFILE   // offensive avatar, bio, cover image
+  OTHER
+}
+
+enum UserReportSource {
+  PROFILE
+  POST
+  CHAT
+  MARKETPLACE
+  PROVIDER
 }
 
 // ─── Reactions ────────────────────────────────────────────────────────────────
