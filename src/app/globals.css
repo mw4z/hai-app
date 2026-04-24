@@ -338,11 +338,13 @@ html[data-platform="android"] .hai-page-enter {
   animation: hai-page-fade 220ms cubic-bezier(0.32, 0.72, 0.35, 1);
   will-change: opacity;
 }
-/* Horizontal clip at body so the off-screen start never flashes a
-   scrollbar. overflow-x:hidden here is safe because body is already
-   the document scroll root — it doesn't create a new containing
-   block for sticky/fixed descendants. */
-body {
+/* Horizontal clip at <html> so the slide's off-screen start never
+   flashes a horizontal scrollbar. Using body here coerces overflow-y
+   to auto (per CSS spec), turning body into an implicit scroll
+   container — which on iOS broke sheet inputs (keyboard-behind-
+   input, comment sheet appearing cut off). html is already the
+   viewport root, so clipping x there has no such side-effects. */
+html {
   overflow-x: hidden;
 }
 @media (prefers-reduced-motion: reduce) {
