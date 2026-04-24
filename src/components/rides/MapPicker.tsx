@@ -84,15 +84,28 @@ export default function MapPicker({ centerLat, centerLng, lang, maptilerKey, onC
       if (!mounted.current || !containerRef.current) return
       const maplibregl = (window as any).maplibregl
 
-      // For Arabic UI use MapTiler's dedicated 'ar' map style —
-      // it ships with a font that renders Arabic ligatures cleanly
-      // (the default streets-v2 has a Latin-tuned halo that broke
-      // Arabic labels like الهنداوية / الخالدية). Other UI languages
-      // keep the default streets-v2.
+      // RTL text plugin — required before any map with Arabic /
+      // Urdu / Hebrew labels. Without it MapLibre renders glyphs in
+      // logical order without RTL reshaping, so الرصيفة comes out
+      // as ةفيصرلا (letters reversed). setRTLTextPlugin is
+      // idempotent — safe to call on every mount, only actually
+      // loads once per session. Must be called BEFORE the Map
+      // constructor for the plugin to take effect on this map.
+      try {
+        if (typeof maplibregl.setRTLTextPlugin === 'function' && !maplibregl.getRTLTextPluginStatus?.()?.startsWith?.('loaded')) {
+          maplibregl.setRTLTextPlugin(
+            'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.3.0/mapbox-gl-rtl-text.js',
+            null,
+            true, // lazy load
+          )
+        }
+      } catch { /* non-fatal — fall back to default text rendering */ }
+
+      // MapTiler's 'streets-v2' style with language=ar uses an
+      // Arabic-capable font and, combined with the RTL plugin
+      // above, renders labels correctly. English/Urdu unchanged.
       const styleUrl = maptilerKey
-        ? (lang === 'ar'
-            ? `https://api.maptiler.com/maps/ar/style.json?key=${maptilerKey}`
-            : `https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}${lang === 'ur' ? '&language=ur' : ''}`)
+        ? `https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}${lang === 'ar' ? '&language=ar' : lang === 'ur' ? '&language=ur' : ''}`
         : 'https://demotiles.maplibre.org/style.json'
       map = new maplibregl.Map({
         container: containerRef.current,
