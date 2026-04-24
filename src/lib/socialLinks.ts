@@ -106,39 +106,41 @@ export function buildSocialUrls(platform: SocialPlatform, handle: string): { app
 /**
  * Open the platform's app if installed, otherwise the web profile.
  *
- * On native (Capacitor): hands the URL to the OS via App.openUrl —
- * the WebView is NOT navigated, so React state is preserved on return.
- * Tries the app scheme first; if the OS reports no handler
- * (`completed: false` on iOS, thrown error on Android), falls back to
- * the HTTPS URL which routes through the system browser or Universal
- * Links / App Links.
+ * Previously used `window.location.href = appScheme`, which actually
+ * navigated the Capacitor WebView — on return the WebView had lost
+ * React state so the feed looked empty.
  *
- * On web: opens the HTTPS profile in a new tab (Universal Links on
- * iOS Safari + App Links on Android Chrome still route to the app
- * when installed, so this is sufficient).
- *
- * Previously used window.location.href = appScheme, which actually
- * navigated the Capacitor WebView — that wiped React state so
- * returning to the app showed a blank page.
+ * The iframe trick below fires the custom scheme without touching
+ * the main window: iOS/Android intercept the scheme from the hidden
+ * iframe and hand it to the owning app if installed. If not, nothing
+ * visible happens, the page stays mounted, and 1.2s later we open
+ * the HTTPS profile in a new context (system browser on Capacitor).
  */
-export async function openSocial(platform: SocialPlatform, handle: string): Promise<void> {
+export function openSocial(platform: SocialPlatform, handle: string): void {
   if (typeof window === 'undefined') return
   const { app, web } = buildSocialUrls(platform, handle)
 
-  const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
-  if (cap?.isNativePlatform?.()) {
-    try {
-      const { App } = await import('@capacitor/app')
-      const appResult = await App.openUrl({ url: app }).catch(() => ({ completed: false as const }))
-      if (appResult && 'completed' in appResult && appResult.completed) return
-      // App scheme didn't resolve — fall back to the HTTPS profile.
-      await App.openUrl({ url: web }).catch(() => undefined)
-      return
-    } catch {
-      // @capacitor/app import failed for some reason — degrade to web.
-    }
-  }
+  // Hidden iframe — no WebView navigation. If the owning app is
+  // installed, the OS catches the scheme and backgrounds our app.
+  try {
+    const iframe = document.createElement('iframe')
+    iframe.style.cssText = 'position:fixed;top:-1000px;left:-1000px;width:0;height:0;border:0;opacity:0'
+    iframe.setAttribute('aria-hidden', 'true')
+    iframe.src = app
+    document.body.appendChild(iframe)
+    setTimeout(() => {
+      try { iframe.parentNode?.removeChild(iframe) } catch { /* ignore */ }
+    }, 800)
+  } catch { /* ignore */ }
 
-  // Pure web fallback: new tab avoids navigating the current page.
-  try { window.open(web, '_blank', 'noopener') } catch { /* ignore */ }
+  // Fallback: if the app didn't catch the scheme we're still visible
+  // a moment later — open the HTTPS profile. On Capacitor this is
+  // routed to the system browser by the default external-URL handler
+  // because the domain isn't whitelisted in server.allowNavigation.
+  const startedAt = Date.now()
+  setTimeout(() => {
+    if (document.hidden || document.visibilityState === 'hidden') return
+    if (Date.now() - startedAt > 4000) return
+    try { window.open(web, '_blank', 'noopener') } catch { /* ignore */ }
+  }, 1200)
 }
