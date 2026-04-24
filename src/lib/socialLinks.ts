@@ -104,30 +104,41 @@ export function buildSocialUrls(platform: SocialPlatform, handle: string): { app
 }
 
 /**
- * Client-only: open the platform's app if installed, otherwise the
- * web profile. Uses the "try scheme, fall back to https after a short
- * delay" pattern so we don't crash on devices without the app.
+ * Open the platform's app if installed, otherwise the web profile.
  *
- *   - document.hidden after the scheme attempt => app took over, done.
- *   - still visible after 1200ms             => nothing caught the
- *                                                scheme, open the web
- *                                                URL as fallback.
+ * On native (Capacitor): hands the URL to the OS via App.openUrl —
+ * the WebView is NOT navigated, so React state is preserved on return.
+ * Tries the app scheme first; if the OS reports no handler
+ * (`completed: false` on iOS, thrown error on Android), falls back to
+ * the HTTPS URL which routes through the system browser or Universal
+ * Links / App Links.
+ *
+ * On web: opens the HTTPS profile in a new tab (Universal Links on
+ * iOS Safari + App Links on Android Chrome still route to the app
+ * when installed, so this is sufficient).
+ *
+ * Previously used window.location.href = appScheme, which actually
+ * navigated the Capacitor WebView — that wiped React state so
+ * returning to the app showed a blank page.
  */
-export function openSocial(platform: SocialPlatform, handle: string) {
+export async function openSocial(platform: SocialPlatform, handle: string): Promise<void> {
   if (typeof window === 'undefined') return
   const { app, web } = buildSocialUrls(platform, handle)
 
-  // Start by trying the app scheme. iOS and Android hand off the
-  // navigation to the owning app if installed; otherwise nothing
-  // visible happens and we fall through to the web open.
-  const startedAt = Date.now()
-  try { window.location.href = app } catch { /* ignore */ }
+  const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+  if (cap?.isNativePlatform?.()) {
+    try {
+      const { App } = await import('@capacitor/app')
+      const appResult = await App.openUrl({ url: app }).catch(() => ({ completed: false as const }))
+      if (appResult && 'completed' in appResult && appResult.completed) return
+      // App scheme didn't resolve — fall back to the HTTPS profile.
+      await App.openUrl({ url: web }).catch(() => undefined)
+      return
+    } catch {
+      // @capacitor/app import failed for some reason — degrade to web.
+    }
+  }
 
-  setTimeout(() => {
-    // If the app took over, the page will be hidden / backgrounded.
-    if (document.hidden || document.visibilityState === 'hidden') return
-    // If a long time has passed we're already scrolled past the moment.
-    if (Date.now() - startedAt > 4000) return
-    try { window.open(web, '_blank', 'noopener') } catch { /* ignore */ }
-  }, 1200)
+  // Pure web fallback: new tab avoids navigating the current page.
+  try { window.open(web, '_blank', 'noopener') } catch { /* ignore */ }
 }

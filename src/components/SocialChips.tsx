@@ -23,12 +23,44 @@ import { openSocial, type SocialPlatform } from '@/lib/socialLinks'
  * the profile layout without introducing new tokens.
  */
 
-const META: Record<SocialPlatform, { icon: typeof SiInstagram; color: string; label: string }> = {
-  instagram: { icon: SiInstagram, color: '#E4405F', label: 'Instagram' },
-  tiktok:    { icon: SiTiktok,    color: '#000000', label: 'TikTok' },
-  x:         { icon: SiX,         color: '#000000', label: 'X' },
-  snapchat:  { icon: SiSnapchat,  color: '#FFFC00', label: 'Snapchat' },
-  whatsapp:  { icon: SiWhatsapp,  color: '#25D366', label: 'WhatsApp' },
+/** Per-platform icon meta. Static Tailwind classes drive color so
+ *  the JIT picks them up at build time; black-brand platforms
+ *  (TikTok / X) flip to white in dark mode to stay visible on the
+ *  dark tile. Snapchat uses its yellow tile to avoid that trap. */
+const META: Record<
+  SocialPlatform,
+  { icon: typeof SiInstagram; iconClass: string; tileClass: string; label: string }
+> = {
+  instagram: {
+    icon: SiInstagram,
+    iconClass: 'text-[#E4405F]',
+    tileClass: 'bg-gray-100 dark:bg-gray-700',
+    label: 'Instagram',
+  },
+  tiktok: {
+    icon: SiTiktok,
+    iconClass: 'text-black dark:text-white',
+    tileClass: 'bg-gray-100 dark:bg-gray-700',
+    label: 'TikTok',
+  },
+  x: {
+    icon: SiX,
+    iconClass: 'text-black dark:text-white',
+    tileClass: 'bg-gray-100 dark:bg-gray-700',
+    label: 'X',
+  },
+  snapchat: {
+    icon: SiSnapchat,
+    iconClass: 'text-black',
+    tileClass: 'bg-[#FFFC00]',
+    label: 'Snapchat',
+  },
+  whatsapp: {
+    icon: SiWhatsapp,
+    iconClass: 'text-[#25D366]',
+    tileClass: 'bg-gray-100 dark:bg-gray-700',
+    label: 'WhatsApp',
+  },
 }
 
 export default function SocialChips({
@@ -52,7 +84,7 @@ export default function SocialChips({
   return (
     <div className="flex items-center gap-2 flex-wrap">
       {entries.map(([platform, handle]) => {
-        const { icon: Icon, color, label } = META[platform]
+        const { icon: Icon, iconClass, tileClass, label } = META[platform]
         return (
           <button
             key={platform}
@@ -63,10 +95,9 @@ export default function SocialChips({
               openSocial(platform, handle)
             }}
             aria-label={`${label} — ${handle}`}
-            className={`${btnClass} bg-gray-100 dark:bg-gray-700 active:scale-95 transition-transform`}
-            style={{ color: platform === 'snapchat' ? '#111' : color }}
+            className={`${btnClass} ${tileClass} active:scale-95 transition-transform`}
           >
-            <Icon size={iconSize} />
+            <Icon size={iconSize} className={iconClass} />
           </button>
         )
       })}
