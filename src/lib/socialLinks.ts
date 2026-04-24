@@ -138,5 +138,9 @@ export async function openSocial(platform: SocialPlatform, handle: string): Prom
     }
   }
 
-  try { window.open(web, '_blank', 'noopener') } catch { /* ignore */ }
+  // Match the exact signature that ContactChip's WhatsApp button uses
+  // (no noopener). With `noopener` some Capacitor WebView builds
+  // navigate the main window instead of opening a new one, which
+  // caused the popup to tear down on return from Instagram.
+  try { window.open(web, '_blank') } catch { /* ignore */ }
 }

@@ -214,7 +214,27 @@ export default function PostCard({
   const [bouncingReaction, setBouncingReaction] = useState<string | null>(null)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [commentLightbox, setCommentLightbox] = useState<string | null>(null)
-  const [showUserPopup, setShowUserPopup] = useState(false)
+  // Persist the "is this post's profile popup open?" flag in
+  // sessionStorage so it survives a WebView reload after the user
+  // returns from an external app (Instagram etc.). Capacitor with
+  // server.url sometimes reloads the WebView on visibilitychange;
+  // without this, React state was being thrown out and the popup
+  // looked like it vanished after tapping a social chip.
+  const popupKey = `hai_popup_${post.id}`
+  const [showUserPopup, _setShowUserPopup] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    try { return sessionStorage.getItem(popupKey) === '1' } catch { return false }
+  })
+  const setShowUserPopup = (v: boolean | ((prev: boolean) => boolean)) => {
+    _setShowUserPopup(prev => {
+      const next = typeof v === 'function' ? (v as (p: boolean) => boolean)(prev) : v
+      try {
+        if (next) sessionStorage.setItem(popupKey, '1')
+        else sessionStorage.removeItem(popupKey)
+      } catch { /* ignore */ }
+      return next
+    })
+  }
   const [showFullAvatar, setShowFullAvatar] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(post.title)
