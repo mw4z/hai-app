@@ -194,16 +194,22 @@ export default function AppSplash() {
         /* ── Root ──────────────────────────────────────────── */
         ._sp {
           position: fixed;
-          /* Explicit viewport sizing instead of inset:0. iPad WKWebView
-             with html { overflow-x: hidden; padding: env(safe-area…) }
-             mis-resolved inset:0 to the padded box, so the splash shrank
-             and docked at one corner (the 'green tile in bottom-right'
-             glitch). 100dvh pins to the dynamic viewport height so it
-             follows rotation/keyboard. */
+          /* Pin all four edges explicitly — most bulletproof way to
+             fill the viewport on every iOS/iPadOS version. inset:0
+             and width:100vw/height:100dvh each failed on some iPads
+             (inset was resolved against html's padded box, dvh needs
+             iOS 15.4+ and collapses the element on older OSes). With
+             top/right/bottom/left set, the browser derives width and
+             height from the viewport regardless of ancestor styles
+             and regardless of dvh support. */
           top: 0;
+          right: 0;
+          bottom: 0;
           left: 0;
-          width: 100vw;
-          height: 100dvh;
+          width: auto;
+          height: auto;
+          min-width: 100%;
+          min-height: 100%;
           z-index: 9990;
           display: flex;
           flex-direction: column;

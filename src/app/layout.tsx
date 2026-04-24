@@ -93,7 +93,8 @@ export default function RootLayout({
             animated AppSplash is the only visible intro. */}
         <div id="__hai_preload" style={{
           position: 'fixed',
-          top: 0, left: 0, width: '100vw', height: '100dvh',
+          top: 0, right: 0, bottom: 0, left: 0,
+          minWidth: '100%', minHeight: '100%',
           zIndex: 99999,
           background: 'radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #e0f7f2 40%, #fff 100%)',
         }} />
