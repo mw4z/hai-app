@@ -45,13 +45,13 @@ interface Msg {
 }
 
 function WhatsAppCheck({ double, read }: { double: boolean; read: boolean }) {
-  // WhatsApp-style checkmark paths. Colors tuned for legibility on
-  // the dark green outgoing bubble (#00a884): the old #90F0FF
-  // read-tick was a pale cyan that blended with the bubble and the
-  // unread rgba(255,255,255,0.45) was too faint to see at all.
-  //   read     → #4FC3F7 (bright sky-blue, same family WhatsApp uses)
-  //   unread   → rgba(255,255,255,0.85) (solid white, high contrast)
-  const color = read ? '#4FC3F7' : 'rgba(255,255,255,0.85)'
+  // Checkmark paths tuned for legibility on the green outgoing
+  // bubble (#00a884):
+  //   read     → #1E88E5 (deep saturated blue). Darker than the
+  //              previous sky-blue so the 'seen' signal really
+  //              pops against the green instead of blending.
+  //   unread   → rgba(255,255,255,0.85) (solid white).
+  const color = read ? '#1E88E5' : 'rgba(255,255,255,0.85)'
   if (double) {
     return (
       <svg width="16" height="11" viewBox="0 0 16 11" className="ml-1 inline-block flex-shrink-0" style={{ marginBottom: -1 }}>
