@@ -18,6 +18,7 @@ import ReportUserSheet from './ReportUserSheet'
 import { showApiError } from '@/lib/apiError'
 import { detectLang } from '@/lib/detectLang'
 import { HaiSpinner } from './HaiLoader'
+import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import type { TranslationKey } from '@/lib/i18n'
 import { canStartPrivateThread } from '@/lib/thread-rules'
 import { getRepLevel } from '@/lib/reputation-levels'
@@ -291,6 +292,14 @@ export default function PostCard({
     }
   }, [showMenu])
   const [showComments, setShowComments] = useState(false)
+  // Drag-to-dismiss on the comments sheet. Only touches that start on
+  // the handleRef (grab bar + header) trigger the drag — inner scroll
+  // lists stay interactive.
+  const { sheetRef: commentsSheetRef, handleRef: commentsHandleRef } =
+    useDragToDismiss<HTMLDivElement, HTMLDivElement>({
+      open: showComments,
+      onDismiss: () => setShowComments(false),
+    })
   // Seed from SSR preview so the comment row paints with the post card
   // instead of popping in ~1s later. `commentsLoaded` stays false so the
   // full thread is still lazy-fetched when the user opens the sheet.
@@ -1109,21 +1118,28 @@ export default function PostCard({
           onClick={() => setShowComments(false)}
         >
           <div
+            ref={commentsSheetRef}
             className="hai-sheet animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="hai-sheet__handle" />
-            <div className="hai-sheet__header">
-              <h3 className="hai-sheet__header-title">
-                {lang === 'en' ? 'Comments' : 'التعليقات'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowComments(false)}
-                className="hai-sheet__close"
-              >
-                <FiX className="hai-icon-lg" />
-              </button>
+            {/* Drag handle — grab bar + header, everything the finger
+                needs to catch to drag-dismiss the sheet. Touches that
+                land inside the scrollable body below are unaffected
+                because the hook only listens on this ref. */}
+            <div ref={commentsHandleRef} style={{ touchAction: 'none' }}>
+              <div className="hai-sheet__handle" />
+              <div className="hai-sheet__header">
+                <h3 className="hai-sheet__header-title">
+                  {lang === 'en' ? 'Comments' : 'التعليقات'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowComments(false)}
+                  className="hai-sheet__close"
+                >
+                  <FiX className="hai-icon-lg" />
+                </button>
+              </div>
             </div>
 
             <div className="hai-sheet__body">
