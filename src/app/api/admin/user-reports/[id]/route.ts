@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { ReportStatus } from '@prisma/client'
+import { logModAction } from '@/lib/modAudit'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,8 +53,9 @@ export async function PATCH(
       id: true,
       reportedUserId: true,
       status: true,
+      isModeratorTarget: true,
       reporter: { select: { neighborhoodId: true } },
-      reportedUser: { select: { neighborhoodId: true, role: true } },
+      reportedUser: { select: { neighborhoodId: true, role: true, modStatus: true, modReportCount: true } },
     },
   })
   if (!report) return NextResponse.json({ error: 'not_found' }, { status: 404 })
@@ -95,6 +97,31 @@ export async function PATCH(
         details: `target=${report.reportedUserId}`,
       },
     }).catch(() => {})
+
+    // Dedicated mod-action log (only when the admin IS a neighborhood
+    // mod — SUPER_ADMIN / PLATFORM_MOD actions aren't tracked here).
+    logModAction({
+      moderatorId: admin.id,
+      actionType: 'resolve_report',
+      targetType: 'user_report',
+      targetId: report.id,
+      details: `status=${statusRaw} target=${report.reportedUserId}`,
+    })
+
+    // Mod-report bookkeeping — when a report against a moderator is
+    // dismissed/resolved, drop the pending-count. If the mod was
+    // UNDER_REVIEW and their count is back below threshold, an admin
+    // still has to flip them back (no auto-clear of UNDER_REVIEW).
+    if (report.isModeratorTarget && report.status === 'PENDING' && statusRaw !== 'PENDING') {
+      try {
+        await db.user.update({
+          where: { id: report.reportedUserId },
+          data: { modReportCount: { decrement: 1 } },
+        })
+      } catch (err) {
+        console.error('[MOD_LIFECYCLE] mod-report decrement failed', err)
+      }
+    }
 
     console.log('[USER_REPORT] resolved', {
       id: updated.id,

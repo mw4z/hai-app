@@ -50,6 +50,7 @@ export default async function ProfilePage() {
         serviceLat: user.serviceLat,
         serviceLng: user.serviceLng,
         serviceAddress: user.serviceAddress,
+        modStatus: user.modStatus,
       }))}
       postCount={postCount}
     />

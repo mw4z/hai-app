@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { logModAction, assertModConflictFree } from '@/lib/modAudit'
 
 const ADMIN_ROLES = ['NEIGHBORHOOD_MOD', 'PLATFORM_MOD', 'SUPER_ADMIN']
 
 async function requireAdmin(session: { userId: string }) {
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { role: true, gender: true },
+    select: { id: true, role: true, gender: true, modStatus: true, neighborhoodId: true },
   })
   if (!user || !ADMIN_ROLES.includes(user.role)) return null
+  // Suspended neighborhood mods keep the role but cannot act.
+  if (user.role === 'NEIGHBORHOOD_MOD' && user.modStatus === 'SUSPENDED') return null
   return user
 }
 
@@ -32,22 +35,51 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Conflict-of-interest: neighborhood mods cannot act on their own
+  // posts or on users with whom they have a block relationship.
+  if (postId) {
+    const conflict = await assertModConflictFree({
+      moderatorId: admin.id,
+      moderatorRole: admin.role,
+      targetType: 'post',
+      targetId: postId,
+    })
+    if (conflict) {
+      return NextResponse.json({ error: 'conflict_of_interest', reason: conflict }, { status: 403 })
+    }
+  }
+  if (userId) {
+    const conflict = await assertModConflictFree({
+      moderatorId: admin.id,
+      moderatorRole: admin.role,
+      targetType: 'user',
+      targetId: userId,
+      subjectUserId: userId,
+    })
+    if (conflict) {
+      return NextResponse.json({ error: 'conflict_of_interest', reason: conflict }, { status: 403 })
+    }
+  }
+
   switch (action) {
     case 'hide_post': {
       if (!postId) return NextResponse.json({ error: 'postId required' }, { status: 400 })
       await db.post.update({ where: { id: postId }, data: { status: 'HIDDEN' } })
+      logModAction({ moderatorId: admin.id, actionType: 'hide_post', targetType: 'post', targetId: postId })
       return NextResponse.json({ success: true })
     }
 
     case 'remove_post': {
       if (!postId) return NextResponse.json({ error: 'postId required' }, { status: 400 })
       await db.post.update({ where: { id: postId }, data: { status: 'REMOVED' } })
+      logModAction({ moderatorId: admin.id, actionType: 'remove_post', targetType: 'post', targetId: postId })
       return NextResponse.json({ success: true })
     }
 
     case 'restore_post': {
       if (!postId) return NextResponse.json({ error: 'postId required' }, { status: 400 })
       await db.post.update({ where: { id: postId }, data: { status: 'ACTIVE' } })
+      logModAction({ moderatorId: admin.id, actionType: 'restore_post', targetType: 'post', targetId: postId })
       return NextResponse.json({ success: true })
     }
 
@@ -55,12 +87,14 @@ export async function POST(req: NextRequest) {
       if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
       const status = banType === 'permanent' ? 'BANNED_PERM' : 'BANNED_TEMP'
       await db.user.update({ where: { id: userId }, data: { status } })
+      logModAction({ moderatorId: admin.id, actionType: 'ban_user', targetType: 'user', targetId: userId, details: `banType=${banType || 'temp'}` })
       return NextResponse.json({ success: true })
     }
 
     case 'unban_user': {
       if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
       await db.user.update({ where: { id: userId }, data: { status: 'ACTIVE' } })
+      logModAction({ moderatorId: admin.id, actionType: 'unban_user', targetType: 'user', targetId: userId })
       return NextResponse.json({ success: true })
     }
 

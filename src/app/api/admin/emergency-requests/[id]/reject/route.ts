@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { logModAction } from '@/lib/modAudit'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,6 +86,15 @@ export async function POST(
     requestId: request.id,
     by: user.id,
     reason,
+  })
+
+  logModAction({
+    moderatorId: user.id,
+    actionType: 'reject_emergency',
+    targetType: 'emergency_request',
+    targetId: request.id,
+    neighborhoodId: request.neighborhoodId,
+    details: `reason=${reason}`,
   })
 
   return NextResponse.json({ ok: true })

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { kickNotifCron } from '@/lib/kickNotifCron'
+import { logModAction } from '@/lib/modAudit'
 
 export const dynamic = 'force-dynamic'
 
@@ -155,6 +156,15 @@ export async function POST(
       alertId: alert.id,
       approvedBy: user.id,
       requesterId: request.requesterId,
+    })
+
+    logModAction({
+      moderatorId: user.id,
+      actionType: 'approve_emergency',
+      targetType: 'emergency_request',
+      targetId: request.id,
+      neighborhoodId: request.neighborhoodId,
+      details: `alertId=${alert.id}`,
     })
 
     return NextResponse.json({

@@ -52,6 +52,8 @@ export async function GET() {
     adminUsers,
     neighborhoodStats,
     pendingUserReports,
+    modHealth,
+    pendingModReports,
   ] = await Promise.all([
     db.neighborhoodChangeRequest.count({ where: { status: 'pending' } }),
     db.post.count({ where: { ...nbhdFilter, ...womenOnlyFilter, status: 'HIDDEN' } }),
@@ -92,6 +94,40 @@ export async function GET() {
           : { reporter: { neighborhoodId: admin.neighborhoodId! } }),
       },
     }),
+    // Mod-health quick panel: scoped to this admin's view. Returns
+    // just the UNDER_REVIEW + INACTIVE + SUSPENDED mods (the ones an
+    // admin needs to see). The full list lives at /api/admin/mods.
+    db.user.findMany({
+      where: {
+        role: 'NEIGHBORHOOD_MOD',
+        deletedAt: null,
+        modStatus: { in: ['UNDER_REVIEW', 'INACTIVE', 'SUSPENDED'] },
+        ...(isPlatform ? {} : { neighborhoodId: admin.neighborhoodId! }),
+      },
+      select: {
+        id: true,
+        name: true,
+        avatarUrl: true,
+        neighborhoodId: true,
+        modStatus: true,
+        lastModActionAt: true,
+        modActionsCount: true,
+        modReportCount: true,
+      },
+      take: 25,
+    }),
+    // Count of PENDING reports where the target is a moderator —
+    // surfaced separately from the general pendingUserReports count
+    // so the dashboard can show "5 mod-abuse reports awaiting review".
+    db.userReport.count({
+      where: {
+        status: 'PENDING',
+        isModeratorTarget: true,
+        ...(isPlatform
+          ? {}
+          : { reporter: { neighborhoodId: admin.neighborhoodId! } }),
+      },
+    }),
   ])
 
   // Apply the same expiry rule the feed uses, so the dashboard "totalPosts"
@@ -100,9 +136,10 @@ export async function GET() {
 
   return NextResponse.json({
     role: admin.role,
-    stats: { pendingRequests, reportedPosts, hiddenPosts, totalUsers, bannedUsers, totalPosts, pendingUserReports },
+    stats: { pendingRequests, reportedPosts, hiddenPosts, totalUsers, bannedUsers, totalPosts, pendingUserReports, pendingModReports },
     recentLogs: JSON.parse(JSON.stringify(recentLogs)),
     adminUsers,
     neighborhoodStats,
+    modHealth,
   })
 }

@@ -92,6 +92,16 @@ model User {
   plan             String        @default("FREE") // FREE | PREMIUM (internal only, never shown to users)
   bio              String?       // free-text "about me" (max 300 chars)
   modApprovedAt    DateTime?     // when user was promoted to mod (for probation tracking)
+  // ── Moderator lifecycle (only meaningful when role=NEIGHBORHOOD_MOD) ──
+  // modStatus drives both the mod's own powers (SUSPENDED = role intact
+  // but cannot perform mod actions) and the admin-side review queue
+  // (UNDER_REVIEW = pending human decision after inactivity or abuse
+  // threshold). Resets to ACTIVE on promotion.
+  modStatus         ModStatus     @default(ACTIVE)
+  lastModActionAt   DateTime?     // last time the mod took any privileged action
+  modActionsCount   Int           @default(0)  // lifetime counter, cheap "are they doing anything" signal
+  modReportCount    Int           @default(0)  // pending (non-dismissed) reports filed against them as a mod
+  modActionLogs     ModActionLog[] @relation("modActionLogs")
   serviceDescription String?     // service providers: what they offer
   serviceLat       Float?        // service location (optional)
   serviceLng       Float?
@@ -368,12 +378,23 @@ model UserReport {
   conversationId String?
   listingId      String?
   status         ReportStatus       @default(PENDING)
+  // ── Moderator-aware fields ──
+  // isModeratorTarget is set when the reported user was a
+  // NEIGHBORHOOD_MOD at the time of the report. This lets the admin
+  // dashboard surface mod-abuse reports separately from regular user
+  // reports and drives the auto-review threshold. neighborhoodId is
+  // snapshotted from the reporter at file-time so the aggregation
+  // stays correct even if a mod later moves or is demoted.
+  isModeratorTarget Boolean        @default(false)
+  neighborhoodId    String?
   createdAt      DateTime           @default(now())
 
   @@index([reportedUserId])
   @@index([reporterId])
   @@index([status])
   @@index([createdAt])
+  @@index([reportedUserId, isModeratorTarget, status])
+  @@index([neighborhoodId, isModeratorTarget, status])
 }
 
 enum UserReportReason {
@@ -383,6 +404,11 @@ enum UserReportReason {
   ABUSIVE_LANGUAGE        // slurs, threats, hate speech
   SPAM                    // unsolicited advertising / mass-messaging
   INAPPROPRIATE_PROFILE   // offensive avatar, bio, cover image
+  // ── Moderator-specific reasons (only valid when isModeratorTarget) ──
+  MOD_ABUSE_OF_POWER      // removing content to silence, targeted bans
+  MOD_UNFAIR_MODERATION   // inconsistent / biased decisions
+  MOD_HARASSMENT          // mod personally harassing residents
+  MOD_INACTIVE            // never responds, dead mod seat
   OTHER
 }
 
@@ -631,6 +657,41 @@ model ModRequest {
 
   @@index([userId, status])
   @@index([status, createdAt])
+}
+
+// ─── Moderator lifecycle status ─────────────────────────────────────────────
+//
+// ACTIVE        — default, full mod powers
+// INACTIVE      — >30d since last mod action; still has powers but flagged
+// UNDER_REVIEW  — >60d inactive OR abuse-report threshold hit; admin must decide
+// SUSPENDED    — admin temporarily revoked powers (role still NEIGHBORHOOD_MOD)
+enum ModStatus {
+  ACTIVE
+  INACTIVE
+  UNDER_REVIEW
+  SUSPENDED
+}
+
+// ─── Moderator Action Audit Log ─────────────────────────────────────────────
+// Purpose-built audit log for NEIGHBORHOOD_MOD actions, separate from the
+// pre-existing ModerationLog (which is admin-oriented and keyed by adminId
+// as a string). ModActionLog is a typed relation so we can aggregate per
+// moderator, check for conflict-of-interest (acting on own post / blocked
+// user), and drive the mod-health dashboard cheaply.
+model ModActionLog {
+  id             String    @id @default(cuid())
+  moderator      User      @relation("modActionLogs", fields: [moderatorId], references: [id], onDelete: Cascade)
+  moderatorId    String
+  actionType     String    // hide_post | remove_post | resolve_report | approve_emergency | reject_emergency | warn_user | suspend_user | ...
+  targetType     String    // post | user_report | user | emergency_request | comment
+  targetId       String
+  neighborhoodId String?   // snapshot at action-time for scoped admin queries
+  details        String?   // free-form JSON/text (reason, metadata)
+  createdAt      DateTime  @default(now())
+
+  @@index([moderatorId, createdAt])
+  @@index([targetType, targetId])
+  @@index([neighborhoodId, createdAt])
 }
 
 // ─── Polls / Voting ─────────────────────────────────────────────────────────

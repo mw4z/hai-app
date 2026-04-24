@@ -9,9 +9,27 @@ export const dynamic = 'force-dynamic'
 
 const VALID_REASONS = Object.values(UserReportReason) as string[]
 const VALID_SOURCES = Object.values(UserReportSource) as string[]
-const DEDUP_WINDOW_MS = 6 * 60 * 60 * 1000 // 6h: same reporter+target+reason is a dup
+const DEDUP_WINDOW_MS = 6 * 60 * 60 * 1000 // 6h: same reporter+target+reason is a dup (non-mod targets)
+const MOD_DEDUP_WINDOW_MS = 24 * 60 * 60 * 1000 // 24h: reports against a mod are stricter
 const RATE_WINDOW_MS = 60 * 60 * 1000       // 1h burst cap
 const MAX_REPORTS_PER_HOUR = 10              // across all targets
+
+// Report-count threshold that flips a moderator's modStatus to
+// UNDER_REVIEW. Counts PENDING reports only (resolved/dismissed drop
+// out) so a mod can be cleared by the admin dashboard flipping their
+// reports to DISMISSED.
+const MOD_REPORT_REVIEW_THRESHOLD = 5
+
+// Only these reasons are valid when the target is a moderator being
+// reported in their capacity as a moderator. A regular reason (SPAM,
+// IMPERSONATION, etc.) can still be used against a mod — it just
+// won't flip isModeratorTarget.
+const MOD_REASONS = new Set<string>([
+  'MOD_ABUSE_OF_POWER',
+  'MOD_UNFAIR_MODERATION',
+  'MOD_HARASSMENT',
+  'MOD_INACTIVE',
+])
 
 /**
  * POST /api/users/[id]/report
@@ -60,12 +78,24 @@ export async function POST(
   const listingId = typeof body.listingId === 'string' && body.listingId ? body.listingId : null
 
   // Confirm the target exists so mods don't inherit ghost rows.
-  // Select neighborhoodId + name so we can route the mod-fanout below.
+  // Select neighborhoodId + name + role so we can (a) route the
+  // mod-fanout below and (b) decide whether this report should be
+  // flagged as a moderator-target report.
   const target = await db.user.findUnique({
     where: { id: targetUserId },
-    select: { id: true, name: true, neighborhoodId: true },
+    select: { id: true, name: true, neighborhoodId: true, role: true, modStatus: true },
   })
   if (!target) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+
+  // Mod-specific reasons are only meaningful when the target actually
+  // IS a NEIGHBORHOOD_MOD. Reject the mismatch explicitly so abusers
+  // can't pollute the mod-report aggregation with false positives
+  // against regular residents.
+  const isModReason = MOD_REASONS.has(reason)
+  if (isModReason && target.role !== 'NEIGHBORHOOD_MOD') {
+    return NextResponse.json({ error: 'invalid_reason_for_target' }, { status: 400 })
+  }
+  const isModeratorTarget = isModReason && target.role === 'NEIGHBORHOOD_MOD'
 
   // Reporter state — used for bypass + rate limiting + admin routing.
   // The reporter's own neighborhoodId drives the mod fan-out so that a
@@ -83,7 +113,10 @@ export async function POST(
   if (!bypass) {
     // Duplicate guard: same reporter+target+reason inside DEDUP_WINDOW_MS.
     // Silently treat as success so the UI doesn't expose the dedup rule.
-    const dupWindow = new Date(Date.now() - DEDUP_WINDOW_MS)
+    // Mod-target reports get a stricter 24h window to limit coordinated
+    // pile-ons against a single moderator.
+    const windowMs = isModeratorTarget ? MOD_DEDUP_WINDOW_MS : DEDUP_WINDOW_MS
+    const dupWindow = new Date(Date.now() - windowMs)
     const duplicate = await db.userReport.findFirst({
       where: {
         reporterId: session.userId,
@@ -121,9 +154,45 @@ export async function POST(
         postId,
         conversationId,
         listingId,
+        isModeratorTarget,
+        // Snapshot the reporter's neighborhood so the aggregation
+        // query for mod-report-health is O(1) and stays correct even
+        // if the mod is later moved or demoted.
+        neighborhoodId: reporter?.neighborhoodId || null,
       },
       select: { id: true, createdAt: true, status: true },
     })
+
+    // Moderator accountability — if this report is against a mod in
+    // their mod capacity, bump their pending-report count and, when
+    // the threshold is crossed, flip their modStatus to UNDER_REVIEW
+    // so the admin dashboard surfaces them for human judgment. Role
+    // stays NEIGHBORHOOD_MOD; only an admin action demotes.
+    if (isModeratorTarget) {
+      try {
+        const updated = await db.user.update({
+          where: { id: targetUserId },
+          data: { modReportCount: { increment: 1 } },
+          select: { modReportCount: true, modStatus: true },
+        })
+        if (
+          updated.modReportCount >= MOD_REPORT_REVIEW_THRESHOLD &&
+          updated.modStatus !== 'UNDER_REVIEW' &&
+          updated.modStatus !== 'SUSPENDED'
+        ) {
+          await db.user.update({
+            where: { id: targetUserId },
+            data: { modStatus: 'UNDER_REVIEW' },
+          })
+          console.log('[MOD_LIFECYCLE] auto-review triggered', {
+            modId: targetUserId,
+            reportCount: updated.modReportCount,
+          })
+        }
+      } catch (err) {
+        console.error('[MOD_LIFECYCLE] report-count update failed', err)
+      }
+    }
     console.log('[USER_REPORT] created', {
       id: created.id,
       reporter: session.userId,
@@ -253,5 +322,9 @@ const REASON_LABELS: Record<UserReportReason, { ar: string; en: string }> = {
   ABUSIVE_LANGUAGE:      { ar: 'إساءة أو تهديد',         en: 'Abusive language / threats' },
   SPAM:                  { ar: 'سبام',                    en: 'Spam' },
   INAPPROPRIATE_PROFILE: { ar: 'محتوى ملف غير لائق',      en: 'Inappropriate profile' },
+  MOD_ABUSE_OF_POWER:    { ar: 'إساءة استخدام صلاحيات',   en: 'Abuse of moderator power' },
+  MOD_UNFAIR_MODERATION: { ar: 'قرار إشراف غير عادل',     en: 'Unfair moderation' },
+  MOD_HARASSMENT:        { ar: 'تحرش من مشرف',            en: 'Harassment by a moderator' },
+  MOD_INACTIVE:          { ar: 'مشرف غير نشط',            en: 'Inactive moderator' },
   OTHER:                 { ar: 'سبب آخر',                 en: 'Other' },
 }

@@ -55,6 +55,7 @@ interface Props {
     serviceLat?: number | null
     serviceLng?: number | null
     serviceAddress?: string | null
+    modStatus?: 'ACTIVE' | 'INACTIVE' | 'UNDER_REVIEW' | 'SUSPENDED' | null
   }
   postCount: number
 }
@@ -1257,6 +1258,40 @@ export default function ProfileClient({ user, postCount }: Props) {
         setOpenSection={setOpenSection}
       >
       <div className="space-y-2">
+      {/* Moderator lifecycle banner — visible to the mod themselves
+          so they know their current standing without needing the
+          admin dashboard. Deliberately minimal: one line, no CTA. */}
+      {user.role === 'NEIGHBORHOOD_MOD' && user.modStatus && user.modStatus !== 'ACTIVE' && (
+        <div className={`rounded-xl py-3 px-4 flex items-center gap-2 border text-sm font-medium ${
+          user.modStatus === 'INACTIVE'      ? 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:text-amber-200' :
+          user.modStatus === 'UNDER_REVIEW'  ? 'bg-orange-50 border-orange-200 text-orange-800 dark:bg-orange-900/20 dark:text-orange-200' :
+                                                'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:text-red-200'
+        }`}>
+          <span>
+            {user.modStatus === 'INACTIVE'     ? '⏸️' :
+             user.modStatus === 'UNDER_REVIEW' ? '🔍' :
+                                                 '🚫'}
+          </span>
+          <span>
+            {user.modStatus === 'INACTIVE' && (lang === 'en'
+              ? 'You have been inactive as a moderator.'
+              : 'لم تقم بأي إجراء إشرافي منذ فترة.')}
+            {user.modStatus === 'UNDER_REVIEW' && (lang === 'en'
+              ? 'Your moderator account is under review.'
+              : 'حسابك كمشرف قيد المراجعة.')}
+            {user.modStatus === 'SUSPENDED' && (lang === 'en'
+              ? 'Your moderator powers are suspended.'
+              : 'تم تعليق صلاحياتك كمشرف.')}
+          </span>
+        </div>
+      )}
+      {user.role === 'NEIGHBORHOOD_MOD' && (!user.modStatus || user.modStatus === 'ACTIVE') && (
+        <div className="bg-green-50 border border-green-200 text-green-800 rounded-xl py-3 px-4 flex items-center gap-2 text-sm font-medium dark:bg-green-900/20 dark:text-green-200">
+          <span>🛡️</span>
+          <span>{lang === 'en' ? 'You are a neighborhood moderator.' : 'أنت مشرف حي.'}</span>
+        </div>
+      )}
+
       {/* Mod request — only for eligible RESIDENT users */}
       {user.role === 'RESIDENT' && user.neighborhood && user.reputation >= 20 && Math.floor((Date.now() - new Date(user.createdAt).getTime()) / 86400000) >= 7 && (
         <div>
