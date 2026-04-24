@@ -1,0 +1,75 @@
+'use client'
+
+import {
+  SiInstagram,
+  SiTiktok,
+  SiX,
+  SiSnapchat,
+  SiWhatsapp,
+} from 'react-icons/si'
+import { openSocial, type SocialPlatform } from '@/lib/socialLinks'
+
+/**
+ * Horizontal row of social-media icon buttons for service-provider
+ * profiles. Tapping any icon calls openSocial() which tries the
+ * platform's custom URL scheme first (opens the installed app) and
+ * falls back to the HTTPS profile if the app isn't installed.
+ *
+ * Used on:
+ *  - the user's own profile (viewer state of the service block)
+ *  - the provider popup inside PostCard
+ *
+ * Reuses existing hai-action-btn styling so it matches the rest of
+ * the profile layout without introducing new tokens.
+ */
+
+const META: Record<SocialPlatform, { icon: typeof SiInstagram; color: string; label: string }> = {
+  instagram: { icon: SiInstagram, color: '#E4405F', label: 'Instagram' },
+  tiktok:    { icon: SiTiktok,    color: '#000000', label: 'TikTok' },
+  x:         { icon: SiX,         color: '#000000', label: 'X' },
+  snapchat:  { icon: SiSnapchat,  color: '#FFFC00', label: 'Snapchat' },
+  whatsapp:  { icon: SiWhatsapp,  color: '#25D366', label: 'WhatsApp' },
+}
+
+export default function SocialChips({
+  links,
+  size = 'md',
+}: {
+  links: Partial<Record<SocialPlatform, string>> | null | undefined
+  size?: 'sm' | 'md'
+}) {
+  if (!links) return null
+  const entries = (Object.entries(links) as [SocialPlatform, string][]).filter(
+    ([k, v]) => !!v && k in META,
+  )
+  if (entries.length === 0) return null
+
+  const btnClass = size === 'sm'
+    ? 'w-7 h-7 rounded-lg flex items-center justify-center'
+    : 'w-9 h-9 rounded-xl flex items-center justify-center'
+  const iconSize = size === 'sm' ? 14 : 18
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      {entries.map(([platform, handle]) => {
+        const { icon: Icon, color, label } = META[platform]
+        return (
+          <button
+            key={platform}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              openSocial(platform, handle)
+            }}
+            aria-label={`${label} — ${handle}`}
+            className={`${btnClass} bg-gray-100 dark:bg-gray-700 active:scale-95 transition-transform`}
+            style={{ color: platform === 'snapchat' ? '#111' : color }}
+          >
+            <Icon size={iconSize} />
+          </button>
+        )
+      })}
+    </div>
+  )
+}

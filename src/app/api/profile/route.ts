@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getValidatedSession as getSession } from '@/lib/auth-server'
 import { log } from '@/lib/logger'
 import { computeProviderStatus } from '@/lib/provider'
+import { sanitizeSocialLinks } from '@/lib/socialLinks'
 
 export async function GET() {
   try {
@@ -29,6 +30,7 @@ export async function GET() {
         serviceLat: true,
         serviceLng: true,
         serviceAddress: true,
+        socialLinks: true,
         role: true,
         neighborhoodId: true,
       },
@@ -93,6 +95,23 @@ export async function PATCH(req: NextRequest) {
       data.serviceDescription = desc || null
     }
 
+    // Social links — service providers only. Silently validate each
+    // platform's handle; invalid entries drop from the set instead of
+    // failing the whole request. Empty object => explicit clear.
+    if (body.socialLinks !== undefined) {
+      const gate = await db.user.findUnique({
+        where: { id: session.userId },
+        select: { accountType: true, providerStatus: true },
+      })
+      const isProvider = gate?.accountType === 'SERVICE_PROVIDER' &&
+        (gate.providerStatus === 'ACTIVE' || gate.providerStatus === 'VERIFIED' || gate.providerStatus === 'PENDING')
+      if (!isProvider) {
+        return NextResponse.json({ error: 'متاح فقط لمقدمي الخدمات' }, { status: 403 })
+      }
+      const clean = sanitizeSocialLinks(body.socialLinks)
+      data.socialLinks = Object.keys(clean).length > 0 ? clean : null
+    }
+
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: 'لا يوجد بيانات للتحديث' }, { status: 400 })
     }
@@ -142,6 +161,7 @@ export async function PATCH(req: NextRequest) {
         serviceAddress: true,
         serviceLat: true,
         serviceLng: true,
+        socialLinks: true,
         bio: true,
       },
     })

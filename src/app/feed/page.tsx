@@ -51,7 +51,7 @@ export default async function FeedPage({
           ...categoryFilter,
         },
         include: {
-          author: { select: { id: true, name: true, reputation: true, accountType: true, providerStatus: true, role: true, avatarUrl: true, coverUrl: true, gender: true, showGender: true, createdAt: true, bio: true, serviceDescription: true, serviceAddress: true, serviceLat: true, serviceLng: true, neighborhood: { select: { name: true, nameEn: true } }, _count: { select: { posts: true } } } },
+          author: { select: { id: true, name: true, reputation: true, accountType: true, providerStatus: true, role: true, avatarUrl: true, coverUrl: true, gender: true, showGender: true, createdAt: true, bio: true, serviceDescription: true, serviceAddress: true, serviceLat: true, serviceLng: true, socialLinks: true, neighborhood: { select: { name: true, nameEn: true } }, _count: { select: { posts: true } } } },
           reactions: { select: { emoji: true, userId: true } },
           _count: { select: { comments: true, reactions: true } },
           // Preview comment — most-liked root comment, shipped with the

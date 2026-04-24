@@ -15,6 +15,7 @@ import { useAttachContact } from '@/hooks/useAttachContact'
 import ImageLightbox from './ImageLightbox'
 import SmartText from './SmartText'
 import ReportUserSheet from './ReportUserSheet'
+import SocialChips from './SocialChips'
 import { showApiError } from '@/lib/apiError'
 import { detectLang } from '@/lib/detectLang'
 import { HaiSpinner } from './HaiLoader'
@@ -104,6 +105,7 @@ interface Post {
     serviceAddress?: string | null
     serviceLat?: number | null
     serviceLng?: number | null
+    socialLinks?: Record<string, string> | null
     neighborhood?: { name: string; nameEn?: string } | null
     _count?: { posts: number }
   }
@@ -1837,6 +1839,15 @@ export default function PostCard({
                         )}
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Social links — providers only, rendered as tappable
+                    icon chips. Tapping opens the platform's app if
+                    installed, falls back to the web profile. */}
+                {post.author.socialLinks && Object.keys(post.author.socialLinks).length > 0 && (
+                  <div className="flex justify-center pt-1">
+                    <SocialChips links={post.author.socialLinks} />
                   </div>
                 )}
 

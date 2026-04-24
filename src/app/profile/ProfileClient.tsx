@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import UserBadgeDisplay from '@/components/UserBadge'
+import SocialChips from '@/components/SocialChips'
 import EmergencyRequestSheet from '@/components/EmergencyRequestSheet'
 import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useLanguage, LANGUAGE_CHANGE_EVENT } from '@/hooks/useLanguage'
@@ -52,6 +53,7 @@ interface Props {
     providerStatus?: string | null
     bio?: string | null
     serviceDescription?: string | null
+    socialLinks?: Record<string, string> | null
     serviceLat?: number | null
     serviceLng?: number | null
     serviceAddress?: string | null
@@ -114,6 +116,13 @@ export default function ProfileClient({ user, postCount }: Props) {
   const [tempBio, setTempBio] = useState('')
   const [serviceDescription, setServiceDescription] = useState(user.serviceDescription || '')
   const [tempServiceDesc, setTempServiceDesc] = useState('')
+  // Social links — providers only. Stored as a flat record so the
+  // editor can reset and diff easily. Viewer reads the live state
+  // so a save immediately reflects on the profile chips below.
+  const [socialLinks, setSocialLinks] = useState<Record<string, string>>(
+    (user.socialLinks as Record<string, string>) || {},
+  )
+  const [tempSocial, setTempSocial] = useState<Record<string, string>>({})
   const [serviceAddress, setServiceAddress] = useState(user.serviceAddress || '')
   const [tempServiceAddress, setTempServiceAddress] = useState('')
   const [serviceLat, setServiceLat] = useState(user.serviceLat || null)
@@ -867,6 +876,41 @@ export default function ProfileClient({ user, postCount }: Props) {
                       : 'منطقة الخدمة مربوطة بحيّك ولا يمكن تغييرها من هنا.'}
                   </p>
                 </div>
+
+                {/* Social links — paste handle or full URL. Backend
+                    (lib/socialLinks.ts) normalises both forms and
+                    rejects malformed input silently. */}
+                <div className="border-t border-gray-100 dark:border-gray-700 pt-3 mt-2 space-y-2">
+                  <label className="text-xs font-medium text-primary-600">
+                    {lang === 'en' ? 'Social links' : 'روابط التواصل'}
+                  </label>
+                  {([
+                    { key: 'instagram', label: 'Instagram',      ph: '@yourhandle' },
+                    { key: 'tiktok',    label: 'TikTok',         ph: '@yourhandle' },
+                    { key: 'x',         label: 'X (Twitter)',    ph: '@yourhandle' },
+                    { key: 'snapchat',  label: 'Snapchat',       ph: 'yourhandle' },
+                    { key: 'whatsapp',  label: 'WhatsApp',       ph: '05xxxxxxxx' },
+                  ] as const).map(({ key, label, ph }) => (
+                    <div key={key} className="flex items-center gap-2">
+                      <span className="w-20 flex-shrink-0 text-[11px] text-gray-500 dark:text-gray-400">{label}</span>
+                      <input
+                        type="text"
+                        inputMode={key === 'whatsapp' ? 'tel' : 'text'}
+                        value={tempSocial[key] || ''}
+                        onChange={(e) => setTempSocial({ ...tempSocial, [key]: e.target.value })}
+                        placeholder={ph}
+                        className="input-field text-sm flex-1"
+                        maxLength={80}
+                        dir="ltr"
+                      />
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {lang === 'en'
+                      ? 'Tapping a social icon opens the app directly if installed.'
+                      : 'الضغط على الأيقونة يفتح التطبيق مباشرة إذا كان مثبت على جهازك.'}
+                  </p>
+                </div>
               </>
             )}
 
@@ -882,6 +926,14 @@ export default function ProfileClient({ user, postCount }: Props) {
                     if (isProvider) {
                       payload.serviceDescription = tempServiceDesc
                       // Address/coords are not editable — backend derives from neighborhood.
+                      // Trim empty fields so the backend treats them
+                      // as "cleared" rather than "unset". Validation
+                      // lives in lib/socialLinks.ts.
+                      const cleanSocial: Record<string, string> = {}
+                      for (const [k, v] of Object.entries(tempSocial)) {
+                        if (v && v.trim()) cleanSocial[k] = v.trim()
+                      }
+                      payload.socialLinks = cleanSocial
                     }
                     const res = await fetch('/api/profile', {
                       method: 'PATCH',
@@ -892,6 +944,11 @@ export default function ProfileClient({ user, postCount }: Props) {
                       const data = await res.json().catch(() => ({}))
                       setBio(tempBio)
                       setServiceDescription(tempServiceDesc)
+                      if (isProvider) {
+                        // Server returns the sanitised set so the chips
+                        // below reflect exactly what was stored.
+                        setSocialLinks((data.user?.socialLinks as Record<string, string>) || {})
+                      }
                       // Sync accountType + providerStatus from the server's
                       // response so the banners (PENDING / ACTIVE / VERIFIED)
                       // update immediately without a refresh.
@@ -925,7 +982,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                 )}
               </div>
               <button
-                onClick={() => { setTempBio(bio); setTempServiceDesc(serviceDescription); setTempServiceAddress(serviceAddress || (isProvider ? defaultServiceAddress() : '')); setEditingBio(true) }}
+                onClick={() => { setTempBio(bio); setTempServiceDesc(serviceDescription); setTempSocial({ ...socialLinks }); setTempServiceAddress(serviceAddress || (isProvider ? defaultServiceAddress() : '')); setEditingBio(true) }}
                 className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-primary-600 bg-primary-50 dark:bg-primary-900/30 rounded-lg active:scale-95 transition-transform"
               >
                 <FiEdit2 className="w-3 h-3" />
@@ -952,7 +1009,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                     )}
                   </div>
                   <button
-                    onClick={() => { setTempBio(bio); setTempServiceDesc(serviceDescription); setTempServiceAddress(serviceAddress || defaultServiceAddress()); setEditingBio(true) }}
+                    onClick={() => { setTempBio(bio); setTempServiceDesc(serviceDescription); setTempSocial({ ...socialLinks }); setTempServiceAddress(serviceAddress || defaultServiceAddress()); setEditingBio(true) }}
                     className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium text-primary-600 bg-primary-50 dark:bg-primary-900/30 rounded-lg active:scale-95 transition-transform"
                   >
                     <FiEdit2 className="w-3 h-3" />
@@ -971,6 +1028,13 @@ export default function ProfileClient({ user, postCount }: Props) {
                 <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
                   <FiMapPin className="w-3 h-3 flex-shrink-0" /> {serviceAddress || defaultServiceAddress()}
                 </p>
+              </div>
+            )}
+
+            {/* ─── Social chips (providers only) ─── */}
+            {isProvider && Object.keys(socialLinks).length > 0 && (
+              <div className="pt-3 border-t border-gray-100 dark:border-gray-700">
+                <SocialChips links={socialLinks} />
               </div>
             )}
           </div>

@@ -107,6 +107,14 @@ model User {
   serviceLat       Float?        // service location (optional)
   serviceLng       Float?
   serviceAddress   String?       // human-readable service address
+  // Social links for service providers — keyed object:
+  //   { instagram: "handle", tiktok: "handle", x: "handle",
+  //     snapchat: "handle", whatsapp: "05xxxxxxxx" }
+  // Only persisted for providerStatus ACTIVE | VERIFIED. See
+  // lib/socialLinks.ts for the validator + deep-link builder used by
+  // both the editor and the viewer. null/missing is equivalent to "no
+  // links set".
+  socialLinks      Json?
   notifyComments   Boolean       @default(true)
   notifyReactions  Boolean       @default(true)
   notifyReplies    Boolean       @default(true)
