@@ -39,7 +39,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(apiError('حسابك موقوف', 403, 'BANNED'), { status: 403 })
     }
 
-    const { title, body, category, price, imageUrls, locationLat, locationLng, locationName } = await req.json()
+    const { title, body, category, price, imageUrls, locationLat, locationLng, locationName, neighborhoodId: requestedNeighborhoodId } = await req.json()
+
+    // SUPER_ADMIN can target any neighborhood by passing neighborhoodId in
+    // the body. Regular users (and all other roles) are always pinned to
+    // their own neighborhood. If the id is valid, we use it as the post's
+    // neighborhoodId for the create + feed-invalidation + push fanout.
+    let targetNeighborhoodId: string = user.neighborhoodId
+    if (bypass && typeof requestedNeighborhoodId === 'string' && requestedNeighborhoodId.trim() && requestedNeighborhoodId !== user.neighborhoodId) {
+      const nbhd = await db.neighborhood.findUnique({
+        where: { id: requestedNeighborhoodId.trim() },
+        select: { id: true },
+      })
+      if (!nbhd) {
+        return NextResponse.json(apiError('الحي غير موجود', 404), { status: 404 })
+      }
+      targetNeighborhoodId = nbhd.id
+    }
 
     // Category validation
     if (!category || !VALID_CATEGORIES.includes(category)) {
@@ -206,7 +222,7 @@ export async function POST(req: NextRequest) {
         locationLng: locationLng || null,
         locationName: locationName?.trim() || null,
         authorId: user.id,
-        neighborhoodId: user.neighborhoodId,
+        neighborhoodId: targetNeighborhoodId,
         status: 'ACTIVE',
       },
     })
@@ -218,7 +234,7 @@ export async function POST(req: NextRequest) {
         type: 'new_post',
         priority: 'normal',
         targetType: 'nbhd_topic',
-        targetRef: user.neighborhoodId,
+        targetRef: targetNeighborhoodId,
         payload: {
           postId: post.id,
           authorId: user.id,
@@ -238,14 +254,14 @@ export async function POST(req: NextRequest) {
         type: 'LOOKING_FOR_POST',
         actorId: user.id,
         actorName: user.name || undefined,
-        neighborhoodId: user.neighborhoodId,
+        neighborhoodId: targetNeighborhoodId,
         postId: post.id,
         postTitle: title.trim().slice(0, 80),
       })
     }
 
     // Invalidate feed cache for this neighborhood
-    cacheDeletePrefix(`feed:${user.neighborhoodId}`)
+    cacheDeletePrefix(`feed:${targetNeighborhoodId}`)
 
     return NextResponse.json({ success: true, postId: post.id })
   } catch (error) {

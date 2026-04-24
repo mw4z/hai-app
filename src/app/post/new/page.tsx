@@ -109,6 +109,12 @@ export default function NewPostPage() {
   const [isFemale, setIsFemale] = useState(false)
   // Only visible providers (ACTIVE/VERIFIED) may post in the SERVICES category.
   const [canPostServices, setCanPostServices] = useState(false)
+  // SUPER_ADMIN can post into any neighborhood. For everyone else this
+  // stays false and the server pins the post to their own neighborhood.
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [ownNeighborhoodId, setOwnNeighborhoodId] = useState<string | null>(null)
+  const [allNeighborhoods, setAllNeighborhoods] = useState<{ id: string; name: string; nameEn?: string; cityName?: string }[]>([])
+  const [targetNeighborhoodId, setTargetNeighborhoodId] = useState<string>('')
 
   useEffect(() => {
     fetch('/api/profile').then(r => r.json()).then(d => {
@@ -116,8 +122,30 @@ export default function NewPostPage() {
       if (d.providerStatus === 'ACTIVE' || d.providerStatus === 'VERIFIED') {
         setCanPostServices(true)
       }
+      if (d.role === 'SUPER_ADMIN') {
+        setIsSuperAdmin(true)
+        if (d.neighborhoodId) {
+          setOwnNeighborhoodId(d.neighborhoodId)
+          setTargetNeighborhoodId(d.neighborhoodId)
+        }
+      }
     }).catch(() => {})
   }, [])
+
+  // Super-admins: lazy-load the full neighborhood list once so they can
+  // pick any target neighborhood from a dropdown.
+  useEffect(() => {
+    if (!isSuperAdmin || allNeighborhoods.length > 0) return
+    fetch('/api/neighborhoods/all')
+      .then(r => r.json())
+      .then((data: any[]) => {
+        if (!Array.isArray(data)) return
+        setAllNeighborhoods(
+          data.map(n => ({ id: n.id, name: n.name, nameEn: n.nameEn, cityName: n.cityName })),
+        )
+      })
+      .catch(() => {})
+  }, [isSuperAdmin, allNeighborhoods.length])
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [price, setPrice] = useState('')
@@ -294,6 +322,11 @@ export default function NewPostPage() {
           locationLat: location?.lat || null,
           locationLng: location?.lng || null,
           locationName: location?.name || null,
+          // Server enforces: only SUPER_ADMIN may override neighborhoodId.
+          // For everyone else this field is ignored.
+          ...(isSuperAdmin && targetNeighborhoodId && targetNeighborhoodId !== ownNeighborhoodId
+            ? { neighborhoodId: targetNeighborhoodId }
+            : {}),
         }),
       })
 
@@ -437,6 +470,29 @@ export default function NewPostPage() {
               <span>{selected.icon}</span>
               <span className="text-primary-700 dark:text-primary-300 font-medium text-sm">{selected.label}</span>
             </div>
+
+            {/* SUPER_ADMIN — target neighborhood picker. Lets platform
+                owners publish into any neighborhood, not just their own. */}
+            {isSuperAdmin && allNeighborhoods.length > 0 && (
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40 rounded-xl p-3 space-y-2">
+                <label className="block text-xs font-semibold text-amber-900 dark:text-amber-200">
+                  {lang === 'en' ? 'Target neighborhood (Super Admin)' : 'الحي المستهدف (مشرف عام)'}
+                </label>
+                <select
+                  value={targetNeighborhoodId}
+                  onChange={(e) => setTargetNeighborhoodId(e.target.value)}
+                  className="input-field text-sm"
+                >
+                  {allNeighborhoods.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {(lang === 'en' && n.nameEn ? n.nameEn : n.name)}
+                      {n.cityName ? ` — ${n.cityName}` : ''}
+                      {n.id === ownNeighborhoodId ? (lang === 'en' ? ' (yours)' : ' (حيّك)') : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* For LOOKING_FOR: simplified single field */}
             {isLookingFor ? (

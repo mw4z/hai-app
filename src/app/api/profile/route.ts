@@ -29,6 +29,8 @@ export async function GET() {
         serviceLat: true,
         serviceLng: true,
         serviceAddress: true,
+        role: true,
+        neighborhoodId: true,
       },
     })
 
