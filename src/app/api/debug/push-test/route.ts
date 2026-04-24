@@ -95,7 +95,7 @@ export async function GET() {
         ? 'FCM credentials missing. Set FCM_SERVICE_ACCOUNT_BASE64 (or FCM_PROJECT_ID/_CLIENT_EMAIL/_PRIVATE_KEY) in Vercel env.'
         : null,
       apnsHint: !apnsCreds && tokens.some((t) => t.platform === 'ios')
-        ? 'APNs credentials missing. Set APNS_KEY_BASE64 / APNS_KEY_ID / APNS_TEAM_ID / APNS_BUNDLE_ID in Vercel env to push to iOS directly (no FCM-iOS required).'
+        ? 'APNs direct is not configured. iOS devices will be routed through FCM (works as long as the APNs key is uploaded in Firebase Console → Cloud Messaging). Set APNS_KEY_BASE64 / APNS_KEY_ID / APNS_TEAM_ID / APNS_BUNDLE_ID in Vercel env to switch to APNs-direct.'
         : null,
       cronHint:
         jobsByStatus.find((g) => g.status === 'pending')?._count._all
@@ -134,9 +134,15 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // ── Split by platform: iOS → APNs-direct, everything else → FCM ──
-  const iosTokens = tokens.filter((t) => t.platform === 'ios')
-  const otherTokens = tokens.filter((t) => t.platform !== 'ios')
+  // ── Split by platform: iOS → APNs-direct when available, otherwise
+  //    fall back to FCM (Firebase can deliver to iOS as long as the
+  //    APNs key was uploaded in Firebase Console → Cloud Messaging).
+  //    This lets the test work without extra Vercel env vars when the
+  //    Firebase-side APNs setup is already done.
+  const iosTokens = apnsCreds ? tokens.filter((t) => t.platform === 'ios') : []
+  const otherTokens = apnsCreds
+    ? tokens.filter((t) => t.platform !== 'ios')
+    : tokens // no APNs creds → route every token through FCM
   const results: Array<{
     tokenId: string
     platform: string

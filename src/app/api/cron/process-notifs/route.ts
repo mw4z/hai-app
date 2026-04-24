@@ -100,29 +100,31 @@ async function sendPushBatch(
   tokens: Array<{ token: string; platform: string }>,
   content: NotificationContent,
 ): Promise<FcmSendResult> {
-  const iosTokens = tokens.filter((t) => t.platform === 'ios').map((t) => t.token)
-  const otherTokens = tokens.filter((t) => t.platform !== 'ios').map((t) => t.token)
+  const apnsCreds = loadApnsCredentials()
+  // When APNs direct is not configured, fall back to FCM for iOS too —
+  // FCM can still deliver to iOS as long as the APNs key is uploaded in
+  // Firebase Console → Cloud Messaging. This keeps notifications flowing
+  // on installs that never had APNS_* env vars on the server.
+  const iosTokens = apnsCreds
+    ? tokens.filter((t) => t.platform === 'ios').map((t) => t.token)
+    : []
+  const otherTokens = apnsCreds
+    ? tokens.filter((t) => t.platform !== 'ios').map((t) => t.token)
+    : tokens.map((t) => t.token)
 
   const combined: FcmSendResult = { success: 0, failed: 0, invalidTokens: [] }
 
-  if (iosTokens.length > 0) {
-    const apnsCreds = loadApnsCredentials()
-    if (!apnsCreds) {
-      // No APNs key on the server — skip rather than fail the whole job.
-      combined.failed += iosTokens.length
-      if (!combined.firstError) combined.firstError = 'apns_not_configured'
-    } else {
-      const apns = await sendApnsBatch(iosTokens, {
-        title: content.title,
-        body: content.body,
-        priority: content.priority === 'high' ? 'high' : 'normal',
-        data: content.data,
-      }, apnsCreds)
-      combined.success += apns.success
-      combined.failed += apns.failed
-      combined.invalidTokens.push(...apns.invalidTokens)
-      if (!combined.firstError && apns.firstError) combined.firstError = apns.firstError
-    }
+  if (iosTokens.length > 0 && apnsCreds) {
+    const apns = await sendApnsBatch(iosTokens, {
+      title: content.title,
+      body: content.body,
+      priority: content.priority === 'high' ? 'high' : 'normal',
+      data: content.data,
+    }, apnsCreds)
+    combined.success += apns.success
+    combined.failed += apns.failed
+    combined.invalidTokens.push(...apns.invalidTokens)
+    if (!combined.firstError && apns.firstError) combined.firstError = apns.firstError
   }
 
   if (otherTokens.length > 0) {
