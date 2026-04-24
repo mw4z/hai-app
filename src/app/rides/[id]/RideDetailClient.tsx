@@ -569,17 +569,60 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                         </div>
 
                         {isRequester && (
-                          <button
-                            data-tour={idx === 0 ? 'ride-select' : undefined}
-                            onClick={() => { setSelecting(offer.id); apiAction(`/api/rides/${rideId}/select`, { offerId: offer.id }).then(() => setSelecting(null)) }}
-                            disabled={selecting !== null}
-                            className={`mt-3 w-full py-3 rounded-xl text-sm font-bold active:scale-[0.97] transition-all ${
-                              isRecommended
-                                ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30'
-                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                            } disabled:opacity-40`}>
-                            {selecting === offer.id ? <HaiSpinner /> : t('ride_select')}
-                          </button>
+                          <div className="mt-3 flex items-center gap-2">
+                            <button
+                              data-tour={idx === 0 ? 'ride-select' : undefined}
+                              onClick={() => { setSelecting(offer.id); apiAction(`/api/rides/${rideId}/select`, { offerId: offer.id }).then(() => setSelecting(null)) }}
+                              disabled={selecting !== null}
+                              className={`flex-1 py-3 rounded-xl text-sm font-bold active:scale-[0.97] transition-all ${
+                                isRecommended
+                                  ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30'
+                                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                              } disabled:opacity-40`}>
+                              {selecting === offer.id ? <HaiSpinner /> : t('ride_select')}
+                            </button>
+                            {/* Reject a single offer — keeps the ride
+                                open, just marks this one OFFER_PASSED
+                                and notifies that driver. */}
+                            <button
+                              onClick={async () => {
+                                const ok = typeof window !== 'undefined' && window.confirm(
+                                  lang === 'en'
+                                    ? 'Reject this offer? The ride stays open for other offers.'
+                                    : lang === 'ur'
+                                      ? 'اس پیشکش کو مسترد کریں؟ درخواست دوسری پیشکشوں کیلئے کھلی رہے گی۔'
+                                      : 'رفض هذا العرض؟ الطلب يبقى مفتوحاً لعروض أخرى.'
+                                )
+                                if (!ok) return
+                                setSelecting(offer.id)
+                                try {
+                                  const res = await fetch(`/api/rides/${rideId}/reject-offer`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ offerId: offer.id }),
+                                  })
+                                  const data = await res.json().catch(() => null)
+                                  if (!res.ok) {
+                                    toast.error(translateApiError(data, lang as 'ar' | 'en' | 'ur'), { duration: 4500 })
+                                    if (data?.shouldRefresh) fetchRide()
+                                    return
+                                  }
+                                  toast.success(lang === 'en' ? 'Offer rejected' : lang === 'ur' ? 'پیشکش مسترد ہو گئی' : 'تم رفض العرض')
+                                  fetchRide()
+                                } catch {
+                                  toast.error(lang === 'en' ? 'Connection error' : lang === 'ur' ? 'رابطہ ناکام' : 'تعذر الاتصال')
+                                } finally {
+                                  setSelecting(null)
+                                }
+                              }}
+                              disabled={selecting !== null}
+                              aria-label={lang === 'en' ? 'Reject offer' : 'رفض'}
+                              title={lang === 'en' ? 'Reject offer' : lang === 'ur' ? 'پیشکش مسترد کریں' : 'رفض العرض'}
+                              className="py-3 px-3 rounded-xl text-sm font-bold bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 active:scale-[0.95] transition-all disabled:opacity-40"
+                            >
+                              <FiX className="w-4 h-4" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     )
