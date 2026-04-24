@@ -449,7 +449,7 @@ async function processNewPost(job: JobRow): Promise<JobOutcome> {
       type: 'new_post',
       postId,
       category,
-      deeplink: `hai://post/${postId}`,
+      deeplink: `hai://feed?post=${postId}`,
     },
   })
 
@@ -519,7 +519,7 @@ async function processCommentOnPost(job: JobRow): Promise<JobOutcome> {
       type: 'comment_on_post',
       postId,
       commentId,
-      deeplink: `hai://post/${postId}?comment=${commentId}`,
+      deeplink: `hai://feed?post=${postId}&comment=${commentId}`,
     },
   })
 
@@ -605,7 +605,7 @@ async function processReplyToComment(job: JobRow): Promise<JobOutcome> {
       postId,
       commentId,
       parentCommentId,
-      deeplink: `hai://post/${postId}?comment=${commentId}`,
+      deeplink: `hai://feed?post=${postId}&comment=${commentId}`,
     },
   })
 
@@ -675,7 +675,7 @@ async function processReactionOnPost(job: JobRow): Promise<JobOutcome> {
       type: 'reaction_on_post',
       postId,
       count: String(count),
-      deeplink: `hai://post/${postId}`,
+      deeplink: `hai://feed?post=${postId}`,
     },
   })
 
@@ -762,7 +762,7 @@ async function processWeeklyDigest(job: JobRow): Promise<JobOutcome> {
       type: 'weekly_digest',
       weekStart,
       ...(validTopPostId ? { postId: validTopPostId } : {}),
-      deeplink: validTopPostId ? `hai://post/${validTopPostId}` : 'hai://feed',
+      deeplink: validTopPostId ? `hai://feed?post=${validTopPostId}` : 'hai://feed',
     },
   })
 

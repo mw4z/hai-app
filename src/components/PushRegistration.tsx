@@ -201,9 +201,23 @@ function resolveDeeplink(data: Record<string, string>): string {
   const deeplink = data.deeplink || ''
 
   // hai://<host><path>[?query]  →  /<host><path>[?query]
+  // BUT: the server sometimes emits 'hai://post/<id>?comment=<id>'.
+  // The app has no /post/[id] route (posts live inside /feed), so a
+  // raw conversion would 404. Rewrite post paths to /feed with the
+  // post/comment ids as query params.
   if (deeplink.startsWith('hai://')) {
     const rest = deeplink.slice('hai://'.length)
-    if (rest.length > 0) return '/' + rest
+    if (rest.length > 0) {
+      const [rawPath, rawQuery = ''] = rest.split('?', 2)
+      const seg = rawPath.split('/').filter(Boolean)
+      if (seg[0] === 'post' && seg[1]) {
+        const q = new URLSearchParams(rawQuery)
+        q.set('post', seg[1])
+        return `/feed?${q.toString()}`
+      }
+      // Other host/path combos map 1:1 to web routes.
+      return '/' + rest
+    }
   }
 
   switch (type) {
