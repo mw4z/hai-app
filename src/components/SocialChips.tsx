@@ -81,8 +81,23 @@ export default function SocialChips({
     : 'w-9 h-9 rounded-xl flex items-center justify-center'
   const iconSize = size === 'sm' ? 14 : 18
 
+  // Defensive event-stop wrapper: parent dismissable sheets (like the
+  // profile popup) often have onClick={() => close()} on their
+  // backdrop. Some Android WebViews fire the anchor's native
+  // navigation without dispatching a React click, so an inner
+  // stopPropagation isn't enough. Trapping pointerdown, mousedown,
+  // and touchstart here guarantees no close-the-parent event bubbles
+  // out when the user taps a chip.
+  const trap = (e: React.SyntheticEvent) => e.stopPropagation()
+
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div
+      className="flex items-center gap-2 flex-wrap"
+      onClick={trap}
+      onPointerDown={trap}
+      onMouseDown={trap}
+      onTouchStart={trap}
+    >
       {entries.map(([platform, handle]) => {
         const { icon: Icon, iconClass, tileClass, label } = META[platform]
         const { web } = buildSocialUrls(platform, handle)
@@ -92,7 +107,6 @@ export default function SocialChips({
             href={web}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={(e) => { e.stopPropagation() }}
             aria-label={`${label} — ${handle}`}
             className={`${btnClass} ${tileClass} active:scale-95 transition-transform`}
           >
