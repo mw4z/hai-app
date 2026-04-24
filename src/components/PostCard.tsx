@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiImage, FiUser } from 'react-icons/fi'
+import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiBell, FiBellOff, FiImage, FiUser } from 'react-icons/fi'
 import { uploadFiles } from '@/lib/upload'
 import { playSend, playReaction, playDelete } from '@/lib/sound'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
@@ -139,6 +139,7 @@ export default function PostCard({
   currentUserPhone,
   currentUserRole,
   isBookmarked: initialBookmarked = false,
+  isFollowing: initialFollowing = false,
   onDelete,
 }: {
   post: Post
@@ -146,6 +147,7 @@ export default function PostCard({
   currentUserPhone?: string
   currentUserRole?: string
   isBookmarked?: boolean
+  isFollowing?: boolean
   onDelete?: (postId: string) => void
 }) {
   const { t, lang } = useLanguage()
@@ -333,6 +335,7 @@ export default function PostCard({
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editCommentBody, setEditCommentBody] = useState('')
   const [bookmarked, setBookmarked] = useState(initialBookmarked)
+  const [following, setFollowing] = useState(initialFollowing)
   const [replyText, setReplyText] = useState('')
   const [submittingReply, setSubmittingReply] = useState(false)
   const [supportsContacts] = useState(
@@ -793,6 +796,46 @@ export default function PostCard({
                   >
                     <FiFlag className="hai-icon-sm hai-menu-item__icon" />
                     <span className="hai-menu-item__label">{lang !== 'en' ? 'استعادة' : 'Restore'}</span>
+                  </button>
+                )}
+                {/* Follow / unfollow this post — interest tracking, not
+                    engagement. Subscribers get a (rate-limited) push on
+                    new comments. Author is excluded; they already get
+                    every comment notification via the author path. */}
+                {post.author.id !== currentUserId && (
+                  <button
+                    onClick={async () => {
+                      const next = !following
+                      setFollowing(next) // optimistic
+                      setShowMenu(false)
+                      try {
+                        const res = await fetch(`/api/posts/${post.id}/subscribe`, {
+                          method: next ? 'POST' : 'DELETE',
+                        })
+                        if (!res.ok) {
+                          setFollowing(!next) // revert
+                          toast.error(lang === 'en' ? 'Could not update' : lang === 'ur' ? 'اپ ڈیٹ نہیں ہو سکا' : 'تعذر التحديث')
+                          return
+                        }
+                        toast.success(
+                          next
+                            ? (lang === 'en' ? 'Following this post' : lang === 'ur' ? 'اب آپ اس پوسٹ کو فالو کر رہے ہیں' : 'أنت تتابع هذا المنشور')
+                            : (lang === 'en' ? 'Unfollowed' : lang === 'ur' ? 'فالو ختم' : 'تم إلغاء المتابعة'),
+                        )
+                      } catch {
+                        setFollowing(!next)
+                      }
+                    }}
+                    className="hai-menu-item"
+                  >
+                    {following
+                      ? <FiBellOff className="hai-icon-sm hai-menu-item__icon" />
+                      : <FiBell className="hai-icon-sm hai-menu-item__icon" />}
+                    <span className="hai-menu-item__label">
+                      {following
+                        ? (lang === 'en' ? 'Unfollow post' : lang === 'ur' ? 'پوسٹ ان فالو کریں' : 'إلغاء المتابعة')
+                        : (lang === 'en' ? 'Follow post' : lang === 'ur' ? 'پوسٹ فالو کریں' : 'متابعة المنشور')}
+                    </span>
                   </button>
                 )}
                 {/* Report post */}

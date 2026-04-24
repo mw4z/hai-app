@@ -541,6 +541,65 @@ async function processCommentOnPost(job: JobRow): Promise<JobOutcome> {
   return 'done'
 }
 
+/**
+ * follow_post_comment push → users who subscribed to the post (via
+ * PostSubscription). Each job targets one subscriber (targetRef).
+ * The creator has already been filtered out at enqueue time; we just
+ * double-check the post is still live and the user still has tokens.
+ * Rate limiting is handled at enqueue time via PostSubscription.
+ * lastNotifiedAt, so this handler is a pure sender.
+ */
+async function processFollowPostComment(job: JobRow): Promise<JobOutcome> {
+  const p = (job.payload || {}) as {
+    postId?: string
+    commentId?: string
+    actorId?: string
+    actorName?: string | null
+    postTitle?: string
+    snippet?: string
+  }
+  const { postId, commentId, actorName, postTitle, snippet } = p
+  if (!postId || !commentId) return 'dropped'
+
+  const [post, comment] = await Promise.all([
+    db.post.findUnique({ where: { id: postId }, select: { id: true, status: true } }),
+    db.comment.findUnique({ where: { id: commentId }, select: { id: true, postId: true } }),
+  ])
+  if (!post || !comment) return 'dropped'
+  if (comment.postId !== postId) return 'dropped'
+  if (post.status !== 'ACTIVE' && post.status !== 'IN_PROGRESS') return 'dropped'
+
+  // Subscribers opted into this post's activity explicitly — route via
+  // the 'commentsOnFollowed' preference slot if resolveUserTokens
+  // exposes one, otherwise reuse the generic comments preference to
+  // stay inside the existing prefs contract.
+  const { tokens, userExists } = await resolveUserTokens(job.targetRef, 'commentOnYours')
+  if (!userExists) return 'dropped'
+  if (tokens.length === 0) return 'dropped'
+
+  const actor = actorName?.trim() || 'جار'
+  const pushTitle = `💬 ${actor} علّق على منشور تتابعه`
+  const body = (snippet || postTitle || '').trim().slice(0, 180) || 'اضغط لقراءة التعليق'
+
+  const result = await sendPushBatch(tokens, {
+    title: pushTitle,
+    body,
+    priority: 'normal',
+    data: {
+      type: 'follow_post_comment',
+      postId,
+      commentId,
+      deeplink: `hai://feed?post=${postId}&comment=${commentId}`,
+    },
+  })
+
+  await cleanupInvalidTokens(result.invalidTokens, job.id, job.type)
+  if (result.success === 0 && result.failed > 0) {
+    throw new Error(result.firstError || 'all push sends failed')
+  }
+  return 'done'
+}
+
 async function processReplyToComment(job: JobRow): Promise<JobOutcome> {
   const p = (job.payload || {}) as {
     postId?: string
@@ -1434,6 +1493,9 @@ async function handle(req: NextRequest) {
           break
         case 'mod_request_submitted':
           outcome = await processModRequestSubmitted(job)
+          break
+        case 'follow_post_comment':
+          outcome = await processFollowPostComment(job)
           break
         case 'mod_request_resolved':
           outcome = await processModRequestResolved(job)

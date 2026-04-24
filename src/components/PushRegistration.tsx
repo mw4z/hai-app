@@ -260,6 +260,7 @@ function resolveDeeplink(data: Record<string, string>): string {
   switch (type) {
     case 'comment_on_post':
     case 'reply_to_comment':
+    case 'follow_post_comment':
       if (data.postId) {
         const c = data.commentId ? `?comment=${encodeURIComponent(data.commentId)}` : ''
         return `/feed?post=${encodeURIComponent(data.postId)}${c ? '&' + c.slice(1) : ''}`

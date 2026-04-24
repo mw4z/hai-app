@@ -229,5 +229,83 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     kickNotifCron()
   }
 
+  // ── Follow-post subscribers fan-out ────────────────────────────────
+  // Anyone who subscribed to this post (other than the author, who
+  // already gets comment_on_post above, and the commenter themselves)
+  // gets an in-app bell row every time. For phone push we apply a
+  // per-subscriber-per-post cooldown: no more than one push every
+  // FOLLOW_NOTIFY_COOLDOWN_MS so a lively comment thread doesn't
+  // carpet-bomb anyone who tapped "Follow post". Missed pushes are
+  // absorbed by the bell count — not spammy, but not silently dropped.
+  const FOLLOW_NOTIFY_COOLDOWN_MS = 10 * 60_000 // 10 minutes per subscriber per post
+
+  try {
+    const subs = await db.postSubscription.findMany({
+      where: {
+        postId: params.id,
+        userId: {
+          notIn: [
+            session.userId,
+            post.authorId, // covered by the author-push path above
+            ...(parentId && parentComment ? [parentComment.authorId] : []),
+          ],
+        },
+      },
+      select: { id: true, userId: true, lastNotifiedAt: true },
+    })
+
+    if (subs.length > 0) {
+      // Bell rows — always, so the in-app unread badge stays accurate
+      // even when the push was throttled.
+      await db.notification.createMany({
+        data: subs.map((s) => ({
+          type: 'COMMENT_ON_POST' as const,
+          userId: s.userId,
+          actorId: session.userId,
+          actorName: actorNameForPush || undefined,
+          postId: params.id,
+          postTitle: post.title.slice(0, 80),
+          commentId: comment.id,
+        })),
+      })
+
+      // Push jobs — only for subscribers whose last push on this post
+      // landed longer than the cooldown ago (or never).
+      const now = Date.now()
+      const pushable = subs.filter((s) => {
+        if (!s.lastNotifiedAt) return true
+        return now - new Date(s.lastNotifiedAt).getTime() >= FOLLOW_NOTIFY_COOLDOWN_MS
+      })
+
+      if (pushable.length > 0) {
+        await db.notifJob.createMany({
+          data: pushable.map((s) => ({
+            type: 'follow_post_comment',
+            priority: 'normal',
+            targetType: 'user',
+            targetRef: s.userId,
+            payload: {
+              postId: params.id,
+              commentId: comment.id,
+              actorId: session.userId,
+              actorName: actorNameForPush,
+              postTitle: post.title.slice(0, 80),
+              snippet: pushSnippet,
+            },
+          })),
+        })
+        // Bump cooldown clock for this batch so a second comment within
+        // the window skips the push path.
+        await db.postSubscription.updateMany({
+          where: { id: { in: pushable.map((s) => s.id) } },
+          data: { lastNotifiedAt: new Date() },
+        })
+        kickNotifCron()
+      }
+    }
+  } catch (err) {
+    console.error('[NOTIF_JOB] enqueue follow_post_comment failed:', err)
+  }
+
   return NextResponse.json(comment)
 }

@@ -41,7 +41,7 @@ export default async function FeedPage({
   }
 
   // Run all DB queries in parallel
-  const [posts, unreadNotifCount, browseNeighborhood, bookmarkedIds] = await Promise.all([
+  const [posts, unreadNotifCount, browseNeighborhood, bookmarkedIds, followedIds] = await Promise.all([
     // Posts — cache 30s per neighborhood+category combo
     cached(`feed:${activeNeighborhoodId}:${category}:${isFemale}`, 30_000, () =>
       db.post.findMany({
@@ -104,6 +104,15 @@ export default async function FeedPage({
         where: { userId: session.userId },
         select: { postId: true },
       }).then(b => b.map(x => x.postId))
+    ),
+    // Post IDs the user has subscribed to — drives the "Follow post"
+    // overflow-menu state so the button shows the right label on
+    // first paint instead of flashing from "Follow" to "Unfollow".
+    cached(`postsubs:${session.userId}`, 60_000, () =>
+      db.postSubscription.findMany({
+        where: { userId: session.userId },
+        select: { postId: true },
+      }).then(s => s.map(x => x.postId))
     ),
   ])
 
@@ -216,6 +225,7 @@ export default async function FeedPage({
       } : null}
       allNeighborhoods={[]}
       bookmarkedIds={bookmarkedIds || []}
+      followedIds={followedIds || []}
       unreadNotifCount={unreadNotifCount}
       hasNeighborhoodMod={true}
       addressVerified={!!user.addressVerified}
