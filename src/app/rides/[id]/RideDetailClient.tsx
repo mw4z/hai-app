@@ -396,8 +396,11 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                         open and the offer hasn't been selected yet.
                         After that, the driver must cancel through the
                         formal cancel flow (which has its own reputation
-                        rules) instead of just pulling out. */}
-                    {(existingOffer || myOffer) && ride?.status === 'RIDE_OPEN' && (
+                        rules) instead of just pulling out.
+                        Uses the computed `status` (pollData > ride) so
+                        this tracks real-time status changes, not just
+                        the initial ride fetch. */}
+                    {(existingOffer || myOffer) && status === 'RIDE_OPEN' && (
                       <button
                         onClick={async () => {
                           const ok = typeof window !== 'undefined' && window.confirm(
