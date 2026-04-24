@@ -48,10 +48,27 @@ export function normalizeHandle(platform: SocialPlatform, raw: unknown): string 
   s = s.replace(/\/+$/, '')  // trailing slashes
 
   if (platform === 'whatsapp') {
-    // Keep digits + leading +; drop formatting
-    const digits = s.replace(/[^\d+]/g, '')
+    // Strip everything except digits. Leading + is ignored since the
+    // stored form is always the international number WITHOUT + (that's
+    // what wa.me expects).
+    let digits = s.replace(/\D/g, '')
     if (!digits) return null
-    if (digits.length < 7 || digits.length > 16) return null
+
+    // Saudi-first normalization so residents can paste any local
+    // format and the viewer-side wa.me link still routes correctly:
+    //   05xxxxxxxx   (10 digits, 0 prefix)   → 9665xxxxxxxx
+    //   5xxxxxxxx    (9 digits, no prefix)   → 9665xxxxxxxx
+    //   9665xxxxxxxx (12 digits, country)    → kept as-is
+    //   00966…       (E.164 with 00)         → stripped to 966…
+    // Any other country code is kept verbatim (already international).
+    if (digits.startsWith('00')) digits = digits.slice(2)
+    if (digits.length === 10 && digits.startsWith('05')) {
+      digits = '966' + digits.slice(1)
+    } else if (digits.length === 9 && digits.startsWith('5')) {
+      digits = '966' + digits
+    }
+
+    if (digits.length < 8 || digits.length > 15) return null
     return digits
   }
 
