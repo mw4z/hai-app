@@ -39,6 +39,11 @@ export function hashIp(req: NextRequest): string | null {
 }
 
 export function shareUrl(code: string): string {
-  const base = process.env.HAI_SHARE_BASE || 'https://hai-app.net'
+  // Default to the app subdomain because the /i/<code> route is served
+  // by the Next.js app, not the marketing landing site at hai-app.net.
+  // Shipping the apex domain here produced a 404 when the landing site
+  // had no matching route. Override via HAI_SHARE_BASE if the invite
+  // path ever moves (e.g. via a landing-site redirect rule).
+  const base = process.env.HAI_SHARE_BASE || 'https://app.hai-app.net'
   return `${base}/i/${encodeURIComponent(code)}`
 }
