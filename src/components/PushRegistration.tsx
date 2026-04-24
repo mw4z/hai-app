@@ -17,10 +17,73 @@ import toast from 'react-hot-toast'
  */
 export default function PushRegistration() {
   const registeredRef = useRef(false)
+  const deeplinkReadyRef = useRef(false)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (!window.Capacitor?.isNativePlatform()) return
+
+    // ── Eager deeplink listener ───────────────────────────────────────
+    // Runs BEFORE auth gating. When the user taps a DM push on Android
+    // and the app was cold-killed, Capacitor's Push plugin dispatches
+    // the cached actionPerformed event once any listener is attached.
+    // If we wait for the auth round-trip to finish, Samsung/Xiaomi
+    // WebViews have already navigated to the cached last-URL (usually
+    // /feed) and the tap is effectively lost. This listener has no
+    // auth dependency — it just translates the deeplink and navigates —
+    // so it's safe to attach immediately. The auth-gated token
+    // registration below still waits for isSignedIn().
+    const installDeeplinkListener = async () => {
+      if (deeplinkReadyRef.current) return
+      deeplinkReadyRef.current = true
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications')
+
+        await PushNotifications.addListener(
+          'pushNotificationActionPerformed',
+          (action) => {
+            const data = (action?.notification?.data || {}) as Record<string, string>
+            console.log('[PUSH] tap → resolving deeplink:', data?.type, data?.deeplink)
+            const target = resolveDeeplink(data)
+            if (!target) return
+            try {
+              // Skip re-nav if we're already on the exact target — avoids
+              // an unnecessary reload if the app was already on the page.
+              const currentPath = window.location.pathname + window.location.search
+              if (currentPath === target) return
+              window.location.href = target
+            } catch (err) {
+              console.error('[PUSH] navigation failed:', err)
+            }
+          },
+        )
+
+        // Foreground: Android (and iOS by default) suppresses the system
+        // banner when the app is open. Surface the push as an in-app
+        // toast so the user actually sees it.
+        await PushNotifications.addListener(
+          'pushNotificationReceived',
+          (notification) => {
+            console.log(
+              '[PUSH] foreground received:',
+              notification?.data?.type,
+            )
+            try {
+              const title = notification?.title || (notification?.data as any)?.title
+              const body = notification?.body || (notification?.data as any)?.body
+              const text = [title, body].filter(Boolean).join(' — ')
+              if (text) toast(text, { duration: 5000, icon: '🔔' })
+            } catch (err) {
+              console.error('[PUSH] foreground toast failed:', err)
+            }
+          },
+        )
+      } catch (err) {
+        console.error('[PUSH] deeplink listener install failed:', err)
+        deeplinkReadyRef.current = false
+      }
+    }
+    installDeeplinkListener()
 
     // The hai_token cookie is HttpOnly, so we can't see it from JS.
     // Probe a real authenticated endpoint instead — /api/notifications/unread
@@ -104,52 +167,10 @@ export default function PushRegistration() {
           console.error('[PUSH] registrationError:', err)
         })
 
-        // Foreground: Android (and iOS by default) suppresses the system
-        // banner when the app is open. Surface the push as an in-app
-        // toast so the user actually sees it — without it, tapping the
-        // diagnostic "send test" button with the app foregrounded looks
-        // like nothing happened.
-        await PushNotifications.addListener(
-          'pushNotificationReceived',
-          (notification) => {
-            console.log(
-              '[PUSH] foreground received:',
-              notification?.data?.type,
-            )
-            try {
-              const title = notification?.title || (notification?.data as any)?.title
-              const body = notification?.body || (notification?.data as any)?.body
-              const text = [title, body].filter(Boolean).join(' — ')
-              if (text) toast(text, { duration: 5000, icon: '🔔' })
-            } catch (err) {
-              console.error('[PUSH] foreground toast failed:', err)
-            }
-          },
-        )
-
-        // Tap → deeplink navigation. Every push sets data.deeplink
-        // using the `hai://…` scheme (e.g. `hai://rides/abc`,
-        // `hai://post/xyz?comment=k`, `hai://mod?tab=user_reports`).
-        // We translate that scheme to a web path so the in-app
-        // WebView routes straight to the relevant page. If the push
-        // is from an older version without `data.deeplink`, we
-        // infer from the type + other payload fields. Only as a
-        // very last resort do we land on `/feed`.
-        await PushNotifications.addListener(
-          'pushNotificationActionPerformed',
-          (action) => {
-            const data = (action?.notification?.data || {}) as Record<
-              string,
-              string
-            >
-            const target = resolveDeeplink(data)
-            if (target) {
-              try {
-                window.location.href = target
-              } catch {}
-            }
-          },
-        )
+        // Foreground toast + tap→deeplink listeners are attached
+        // eagerly above by installDeeplinkListener(), before auth — so
+        // a cold-start tap on Android OEMs that race the auth probe
+        // doesn't lose the event. Don't re-attach here.
       } catch (err) {
         console.error('[PUSH] init failed:', err)
         registeredRef.current = false
