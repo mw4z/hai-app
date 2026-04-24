@@ -294,27 +294,21 @@ input, textarea, [contenteditable="true"] {
   }
 }
 
-/* ── Page transition — iOS-style push ──────────────────────────────
-   Applied by src/app/template.tsx so every route change animates
-   its newly mounted tree. Trailing-edge push (right→0 in LTR, left→0
-   in RTL) with iOS easing. overflow-x:hidden on the wrapper keeps the
-   off-screen start position from producing a horizontal scrollbar
-   flash mid-animation. */
-@keyframes hai-page-push-ltr {
-  from { transform: translate3d(24%, 0, 0); opacity: 0.4; }
-  to   { transform: translate3d(0,   0, 0); opacity: 1;   }
-}
-@keyframes hai-page-push-rtl {
-  from { transform: translate3d(-24%, 0, 0); opacity: 0.4; }
-  to   { transform: translate3d(0,    0, 0); opacity: 1;   }
+/* ── Page transition — crossfade on every route change ─────────────
+   Applied by src/app/template.tsx so a newly mounted route fades in
+   instead of flash-swapping.
+
+   NOTE: keep this animation opacity-only. CSS transforms / filters /
+   will-change on an ancestor create a new containing block for
+   position:fixed descendants, which breaks the BottomNav + the
+   sticky headers (they get anchored to the wrapper instead of the
+   viewport). Opacity has no such side-effect. */
+@keyframes hai-page-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 .hai-page-enter {
-  animation: hai-page-push-ltr 280ms cubic-bezier(0.32, 0.72, 0.35, 1);
-  will-change: transform, opacity;
-  overflow-x: hidden;
-}
-[dir="rtl"] .hai-page-enter {
-  animation: hai-page-push-rtl 280ms cubic-bezier(0.32, 0.72, 0.35, 1);
+  animation: hai-page-fade 220ms cubic-bezier(0.32, 0.72, 0.35, 1);
 }
 @media (prefers-reduced-motion: reduce) {
   .hai-page-enter { animation: none; }
