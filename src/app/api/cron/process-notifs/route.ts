@@ -1003,6 +1003,75 @@ async function processEmergencyAlertRequest(job: JobRow): Promise<JobOutcome> {
   return 'done'
 }
 
+/**
+ * Ride status push → a single party of the ride (requester OR
+ * driver, whichever the caller passed as targetRef). All ride
+ * events are time-critical, so priority is always high.
+ * notifPreference is bypassed — these are operational, not social.
+ */
+async function processRideStatus(job: JobRow): Promise<JobOutcome> {
+  const p = (job.payload || {}) as {
+    rideRequestId?: string
+    notifType?: string
+    titleAr?: string
+    titleEn?: string
+    bodyAr?: string
+    bodyEn?: string
+  }
+  const { rideRequestId, notifType, titleAr, titleEn, bodyAr, bodyEn } = p
+  if (!rideRequestId) return 'dropped'
+
+  const userId = job.targetRef
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      status: true,
+      deviceTokens: { select: { token: true, platform: true } },
+    },
+  })
+  if (!user) return 'dropped'
+  if (user.status === 'BANNED_TEMP' || user.status === 'BANNED_PERM') return 'dropped'
+  if (user.deviceTokens.length === 0) return 'dropped'
+
+  const tokens: TokenWithPlatform[] = user.deviceTokens.map((t) => ({
+    token: t.token,
+    platform: t.platform,
+  }))
+
+  const pushTitle = (titleAr || titleEn || '').slice(0, 80) || 'تحديث الرحلة'
+  const pushBody = (bodyAr || bodyEn || '').slice(0, 180) || ''
+
+  const result = await sendPushBatch(tokens, {
+    title: pushTitle,
+    body: pushBody,
+    priority: 'high',
+    data: {
+      type: 'ride_status',
+      notifType: notifType || '',
+      rideRequestId,
+      deeplink: `hai://rides/${rideRequestId}`,
+    },
+  })
+
+  await cleanupInvalidTokens(result.invalidTokens, job.id, job.type)
+
+  console.log('[NOTIF_CRON] job delivered', {
+    jobId: job.id,
+    type: job.type,
+    targetRef: job.targetRef,
+    attempts: job.attempts,
+    tokensSent: tokens.length,
+    success: result.success,
+    failed: result.failed,
+  })
+
+  if (result.success === 0 && result.failed > 0) {
+    throw new Error(result.firstError || 'all push sends failed')
+  }
+  return 'done'
+}
+
 // ── Main handler ─────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   return handle(req)
@@ -1103,6 +1172,9 @@ async function handle(req: NextRequest) {
           break
         case 'emergency_alert_request':
           outcome = await processEmergencyAlertRequest(job)
+          break
+        case 'ride_status':
+          outcome = await processRideStatus(job)
           break
         default:
           console.warn('[NOTIF_CRON] unsupported type', {

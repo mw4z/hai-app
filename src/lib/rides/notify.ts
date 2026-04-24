@@ -1,9 +1,14 @@
 /**
  * Ride-specific notification helper.
  * Wraps the existing notification system with ride-aware defaults.
+ * Creates an in-app bell Notification AND enqueues a NotifJob so the
+ * push actually lands on the user's phone — previously only the bell
+ * row was written, which is why every ride step rang inside the app
+ * but never fired a system notification.
  */
 
 import { db } from '@/lib/db'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 
 interface RideNotifyParams {
   userId: string
@@ -29,6 +34,35 @@ export async function notifyRide(params: RideNotifyParams): Promise<void> {
       rideRequestId: params.rideRequestId,
     },
   })
+
+  // Phone push — targeted at this single user via targetRef=userId.
+  // 'system' actor means a cron/background event, not user-triggered;
+  // still pushed because these are time-critical ride events.
+  try {
+    await db.notifJob.create({
+      data: {
+        type: 'ride_status',
+        // All ride events are time-sensitive (offer selected,
+        // driver arrived, confirm timeout) → priority high so the
+        // banner fires immediately instead of waiting for Doze mode.
+        priority: 'high',
+        targetType: 'user',
+        targetRef: params.userId,
+        payload: {
+          rideRequestId: params.rideRequestId,
+          notifType: params.type,
+          titleAr: params.titleAr,
+          titleEn: params.titleEn,
+          bodyAr: params.bodyAr,
+          bodyEn: params.bodyEn,
+          actorId: params.actorId,
+        },
+      },
+    })
+    kickNotifCron()
+  } catch (err) {
+    console.error('[RIDE_NOTIFY] notifJob enqueue failed', err)
+  }
 }
 
 /**
