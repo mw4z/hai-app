@@ -314,9 +314,14 @@ input, textarea, [contenteditable="true"] {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+/* NO will-change here. will-change:transform creates a new containing
+   block for position:fixed descendants regardless of whether the
+   animation is currently playing — which would pin every sheet and
+   modal inside a page to this wrapper instead of the viewport, and
+   cut them off vertically. The 280ms translate is cheap enough that
+   the browser doesn't need the GPU-promotion hint. */
 .hai-page-enter {
   animation: hai-page-push-ltr 280ms cubic-bezier(0.32, 0.72, 0.35, 1);
-  will-change: transform, opacity;
 }
 [dir="rtl"] .hai-page-enter {
   animation: hai-page-push-rtl 280ms cubic-bezier(0.32, 0.72, 0.35, 1);
@@ -327,7 +332,6 @@ input, textarea, [contenteditable="true"] {
    that doesn't create a containing block. */
 body[data-full-screen="true"] .hai-page-enter {
   animation: hai-page-fade 220ms cubic-bezier(0.32, 0.72, 0.35, 1);
-  will-change: opacity;
 }
 /* Android WebView opt-out — the translate animation visibly glitches
    page content on Android (jumpy text, sticky header flicker). Force
@@ -336,7 +340,6 @@ body[data-full-screen="true"] .hai-page-enter {
    + web keep the trailing-edge push. Tag comes from CapacitorBridge. */
 html[data-platform="android"] .hai-page-enter {
   animation: hai-page-fade 220ms cubic-bezier(0.32, 0.72, 0.35, 1);
-  will-change: opacity;
 }
 /* Horizontal clip at <html> so the slide's off-screen start never
    flashes a horizontal scrollbar. Using body here coerces overflow-y
