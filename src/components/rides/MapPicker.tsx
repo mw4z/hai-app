@@ -84,13 +84,43 @@ export default function MapPicker({ centerLat, centerLng, lang, maptilerKey, onC
       if (!mounted.current || !containerRef.current) return
       const maplibregl = (window as any).maplibregl
 
+      // Request the Arabic-localized variant of the MapTiler style
+      // when the UI is Arabic, otherwise default. Also set once the
+      // map loads so every symbol layer pulls 'name:ar' where
+      // available — fixes the hard-to-read halo'd Latin labels that
+      // appeared over Arabic neighborhoods (الهنداوية / الخالدية).
+      const styleUrl = maptilerKey
+        ? `https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}${lang === 'ar' ? '&language=ar' : lang === 'ur' ? '&language=ur' : ''}`
+        : 'https://demotiles.maplibre.org/style.json'
       map = new maplibregl.Map({
         container: containerRef.current,
-        style: maptilerKey
-          ? `https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}`
-          : 'https://demotiles.maplibre.org/style.json',
+        style: styleUrl,
         center: [centerLng, centerLat],
         zoom: 14,
+      })
+
+      // Belt-and-suspenders: after load, force every label layer to
+      // prefer the localized name, then fall back to the default.
+      // Also narrows the text-halo so Arabic ligatures aren't broken
+      // by the thick white stroke the default style applies.
+      map.on('load', () => {
+        if (!mounted.current) return
+        const target = lang === 'ar' ? 'name:ar' : lang === 'ur' ? 'name:ur' : 'name:latin'
+        try {
+          const style = map.getStyle()
+          for (const layer of style.layers || []) {
+            if (layer.type !== 'symbol') continue
+            const layout: any = layer.layout || {}
+            if (!layout['text-field']) continue
+            map.setLayoutProperty(layer.id, 'text-field', [
+              'coalesce',
+              ['get', target],
+              ['get', 'name'],
+            ])
+            // Keep a halo but slim it so RTL scripts read cleanly.
+            map.setPaintProperty(layer.id, 'text-halo-width', 1)
+          }
+        } catch { /* non-fatal — style may not allow it */ }
       })
 
       mapRef.current = map
@@ -164,8 +194,15 @@ export default function MapPicker({ centerLat, centerLng, lang, maptilerKey, onC
         </div>
       )}
 
-      {/* Hint */}
-      <div className="absolute top-[70px] left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+      {/* Hint — pinned below the header. 'top-[70px]' previously
+          didn't account for the iOS safe-area-inset-top, so on
+          notched phones the hint overlapped the header title.
+          Offset against env(safe-area-inset-top) so the hint always
+          clears the header regardless of device. */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none"
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 64px)' }}
+      >
         <p className="bg-black/60 text-white text-[10px] px-3 py-1.5 rounded-full whitespace-nowrap">
           {lang === 'ar' ? 'انقر على الخريطة أو اسحب الدبوس' : 'Tap the map or drag the pin'}
         </p>
