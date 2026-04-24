@@ -1426,7 +1426,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
     <button type="button"
       onClick={(e) => { e.stopPropagation(); if (msg.replyTo) onJumpToReply(msg.replyTo.id) }}
       className={`mb-1 w-full text-start px-2.5 py-1.5 rounded-lg border-s-2 active:opacity-70 transition-opacity ${
-        isMe ? 'bg-primary-700/40 border-white/40' : 'bg-gray-100 dark:bg-gray-200/60 border-primary-500'
+        isMe ? 'bg-primary-700/40 border-white/40' : 'bg-gray-100 dark:bg-white/10 border-primary-500'
       }`}>
       <p className={`text-[10px] font-bold ${isMe ? 'text-primary-100' : 'text-primary-600 dark:text-primary-400'}`}>
         {msg.replyTo.senderId === currentUserId
@@ -1496,7 +1496,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
           </div>
         ) : msg.type === 'DELETED' ? (
           <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 ${
-            isMe ? `bg-primary-600/30 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white/30 dark:bg-gray-300/50 ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
+            isMe ? `bg-primary-600/30 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white/30 dark:bg-[#242625]/60 ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
           } border border-dashed ${isMe ? 'border-primary-400/30' : 'border-gray-300/30 dark:border-gray-600/30'}`}>
             <p className={`text-[13px] italic ${isMe ? 'text-primary-200/70' : 'text-gray-400 dark:text-gray-500'}`}>
               🚫 {isMe
@@ -1516,9 +1516,11 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
             </div>
           </div>
         ) : (
-          <div {...longPress} data-msg-id={msg.id} className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 shadow-sm select-none ${
-            isMe ? `bg-primary-600 text-white ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white dark:bg-gray-300 text-gray-800 dark:text-gray-900 ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
-          } ${selectedMsg === msg.id ? 'relative z-[52] ring-2 ring-white/50' : ''}`}>
+          <div {...longPress} data-msg-id={msg.id}
+            style={!isMe ? { backgroundColor: 'var(--chat-incoming-bg, #fff)' } : undefined}
+            className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 shadow-sm select-none ${
+              isMe ? `bg-primary-600 text-white ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `text-gray-800 dark:text-gray-100 ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
+            } ${selectedMsg === msg.id ? 'relative z-[52] ring-2 ring-white/50' : ''}`}>
             {replyQuote}
             {msg.type === 'LOCATION' ? (
               <div>
