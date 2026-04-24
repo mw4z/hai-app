@@ -1203,8 +1203,12 @@ export default function ProfileClient({ user, postCount }: Props) {
           onToggle={toggleNotifPref}
         />
 
-        {/* ── Diagnostic: live test push ── */}
+        {/* ── Diagnostic: live test push — hidden for now.
+            Kept the PushTestButton component + /api/debug/push-test
+            route for future debugging; just not rendered. Re-enable
+            by uncommenting this line.
         <PushTestButton lang={lang} />
+        */}
       </div>
 
       </AccordionSection>
