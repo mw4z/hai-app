@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { ReportStatus } from '@prisma/client'
 import { logModAction } from '@/lib/modAudit'
+import { scoreModReports, applyModReportDecision } from '@/lib/modReportWeighting'
 
 export const dynamic = 'force-dynamic'
 
@@ -108,18 +109,18 @@ export async function PATCH(
       details: `status=${statusRaw} target=${report.reportedUserId}`,
     })
 
-    // Mod-report bookkeeping — when a report against a moderator is
-    // dismissed/resolved, drop the pending-count. If the mod was
-    // UNDER_REVIEW and their count is back below threshold, an admin
-    // still has to flip them back (no auto-clear of UNDER_REVIEW).
+    // Mod-report bookkeeping — re-run the weighted evaluator after
+    // the resolve. If this dismissal drops the weighted score back
+    // under threshold, the mod auto-lifts from UNDER_REVIEW back to
+    // ACTIVE (a pile-on that fizzled out shouldn't leave them stuck).
+    // The evaluator also refreshes modReportCount to stay in sync
+    // with the live pending-count.
     if (report.isModeratorTarget && report.status === 'PENDING' && statusRaw !== 'PENDING') {
       try {
-        await db.user.update({
-          where: { id: report.reportedUserId },
-          data: { modReportCount: { decrement: 1 } },
-        })
+        const score = await scoreModReports(report.reportedUserId)
+        await applyModReportDecision(report.reportedUserId, score)
       } catch (err) {
-        console.error('[MOD_LIFECYCLE] mod-report decrement failed', err)
+        console.error('[MOD_LIFECYCLE] rescore-on-resolve failed', err)
       }
     }
 

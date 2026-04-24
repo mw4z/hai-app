@@ -387,6 +387,18 @@ model UserReport {
   // stays correct even if a mod later moves or is demoted.
   isModeratorTarget Boolean        @default(false)
   neighborhoodId    String?
+  // ── Abuse resistance ──
+  // reporterIpHash: HMAC-SHA256(ip + secret) captured at POST time.
+  // Used only to detect coordinated pile-ons against the same mod —
+  // never exposed, never stored alongside the raw IP. Hash is the
+  // salted output so the column is safe even if leaked.
+  // abuseFlags: comma-separated set of signals attached at create
+  // time by lib/modReportWeighting — LOW_REP | BURST_CLUSTER |
+  // REP_NEGATIVE. The weighted evaluator uses these to decide which
+  // reports count fully, partially, or not at all. Non-authoritative;
+  // the evaluator always re-reads the report + reporter at eval time.
+  reporterIpHash String?
+  abuseFlags     String?
   createdAt      DateTime           @default(now())
 
   @@index([reportedUserId])
@@ -395,6 +407,7 @@ model UserReport {
   @@index([createdAt])
   @@index([reportedUserId, isModeratorTarget, status])
   @@index([neighborhoodId, isModeratorTarget, status])
+  @@index([reportedUserId, reporterIpHash, createdAt])
 }
 
 enum UserReportReason {

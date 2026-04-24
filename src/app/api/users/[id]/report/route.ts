@@ -4,6 +4,13 @@ import { getSession } from '@/lib/auth'
 import { UserReportReason, UserReportSource } from '@prisma/client'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { kickNotifCron } from '@/lib/kickNotifCron'
+import {
+  hashReporterIp,
+  classifyIncomingReport,
+  flagsToString,
+  scoreModReports,
+  applyModReportDecision,
+} from '@/lib/modReportWeighting'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,12 +20,6 @@ const DEDUP_WINDOW_MS = 6 * 60 * 60 * 1000 // 6h: same reporter+target+reason is
 const MOD_DEDUP_WINDOW_MS = 24 * 60 * 60 * 1000 // 24h: reports against a mod are stricter
 const RATE_WINDOW_MS = 60 * 60 * 1000       // 1h burst cap
 const MAX_REPORTS_PER_HOUR = 10              // across all targets
-
-// Report-count threshold that flips a moderator's modStatus to
-// UNDER_REVIEW. Counts PENDING reports only (resolved/dismissed drop
-// out) so a mod can be cleared by the admin dashboard flipping their
-// reports to DISMISSED.
-const MOD_REPORT_REVIEW_THRESHOLD = 5
 
 // Only these reasons are valid when the target is a moderator being
 // reported in their capacity as a moderator. A regular reason (SPAM,
@@ -97,15 +98,27 @@ export async function POST(
   }
   const isModeratorTarget = isModReason && target.role === 'NEIGHBORHOOD_MOD'
 
-  // Reporter state — used for bypass + rate limiting + admin routing.
-  // The reporter's own neighborhoodId drives the mod fan-out so that a
-  // resident's reports land with their local mod team, not with mods
-  // of whichever neighborhood the target happens to live in.
+  // Reporter state — used for bypass + rate limiting + admin routing
+  // + credibility weighting. The reporter's own neighborhoodId drives
+  // the mod fan-out so that a resident's reports land with their
+  // local mod team, not with mods of whichever neighborhood the target
+  // happens to live in. `reputation` is consumed by the weighted
+  // evaluator — low-rep / negative-rep reporters don't get to solo-
+  // flip a moderator into review.
   const reporter = await db.user.findUnique({
     where: { id: session.userId },
-    select: { role: true, status: true, name: true, neighborhoodId: true },
+    select: { role: true, status: true, name: true, neighborhoodId: true, reputation: true },
   })
   const bypass = isSuperAdminRole(reporter?.role)
+
+  // Request-origin IP for cluster detection — hashed before persist,
+  // raw IP never touches the DB. Best-effort: Vercel supplies
+  // x-forwarded-for; local dev / tests fall through as null.
+  const reporterIpHash = hashReporterIp(
+    req.headers.get('x-forwarded-for') ||
+    req.headers.get('x-real-ip') ||
+    null,
+  )
   if (!bypass && (reporter?.status === 'BANNED_TEMP' || reporter?.status === 'BANNED_PERM')) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
@@ -143,6 +156,17 @@ export async function POST(
     }
   }
 
+  // Abuse-signal tagging at create time. Re-evaluated at score time,
+  // but pre-tagging is cheap and gives the admin dashboard something
+  // to explain why a report was discounted.
+  const abuseFlags = isModeratorTarget
+    ? await classifyIncomingReport({
+        reporterReputation: reporter?.reputation ?? 0,
+        reportedUserId: targetUserId,
+        reporterIpHash,
+      })
+    : []
+
   try {
     const created = await db.userReport.create({
       data: {
@@ -159,38 +183,24 @@ export async function POST(
         // query for mod-report-health is O(1) and stays correct even
         // if the mod is later moved or demoted.
         neighborhoodId: reporter?.neighborhoodId || null,
+        reporterIpHash,
+        abuseFlags: flagsToString(abuseFlags),
       },
       select: { id: true, createdAt: true, status: true },
     })
 
-    // Moderator accountability — if this report is against a mod in
-    // their mod capacity, bump their pending-report count and, when
-    // the threshold is crossed, flip their modStatus to UNDER_REVIEW
-    // so the admin dashboard surfaces them for human judgment. Role
-    // stays NEIGHBORHOOD_MOD; only an admin action demotes.
+    // Moderator accountability — weighted evaluator decides whether
+    // to flip modStatus to UNDER_REVIEW based on unique reporters,
+    // rolling window, credibility, and cluster detection. Replaces
+    // the earlier fixed 5-report threshold, which was trivially
+    // gameable by a coordinated group or a throwaway-account spree.
+    // Role stays NEIGHBORHOOD_MOD; only an admin action demotes.
     if (isModeratorTarget) {
       try {
-        const updated = await db.user.update({
-          where: { id: targetUserId },
-          data: { modReportCount: { increment: 1 } },
-          select: { modReportCount: true, modStatus: true },
-        })
-        if (
-          updated.modReportCount >= MOD_REPORT_REVIEW_THRESHOLD &&
-          updated.modStatus !== 'UNDER_REVIEW' &&
-          updated.modStatus !== 'SUSPENDED'
-        ) {
-          await db.user.update({
-            where: { id: targetUserId },
-            data: { modStatus: 'UNDER_REVIEW' },
-          })
-          console.log('[MOD_LIFECYCLE] auto-review triggered', {
-            modId: targetUserId,
-            reportCount: updated.modReportCount,
-          })
-        }
+        const score = await scoreModReports(targetUserId)
+        await applyModReportDecision(targetUserId, score)
       } catch (err) {
-        console.error('[MOD_LIFECYCLE] report-count update failed', err)
+        console.error('[MOD_LIFECYCLE] score/apply failed', err)
       }
     }
     console.log('[USER_REPORT] created', {
