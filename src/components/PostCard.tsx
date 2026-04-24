@@ -159,6 +159,38 @@ export default function PostCard({
   const [reported, setReported] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [reportingUser, setReportingUser] = useState(false)
+  // Reporting a comment or reply author: opens the same sheet with a
+  // different target. Kept separate from `reportingUser` (post author)
+  // so one doesn't clobber the other.
+  const [commentReportTarget, setCommentReportTarget] = useState<{ id: string; name: string | null; commentId: string } | null>(null)
+  // Per-comment translation state keyed by comment id. Lets each row
+  // toggle independently and caches the translated body after the
+  // first fetch so re-toggling doesn't re-hit the API.
+  const [commentTx, setCommentTx] = useState<Record<string, { body: string; show: boolean; loading: boolean }>>({})
+  async function toggleCommentTranslate(commentId: string, originalBody: string) {
+    const existing = commentTx[commentId]
+    if (existing?.show) {
+      setCommentTx((prev) => ({ ...prev, [commentId]: { ...existing, show: false } }))
+      return
+    }
+    if (existing?.body) {
+      setCommentTx((prev) => ({ ...prev, [commentId]: { ...existing, show: true } }))
+      return
+    }
+    setCommentTx((prev) => ({ ...prev, [commentId]: { body: '', show: false, loading: true } }))
+    try {
+      const r = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: originalBody, target: lang }),
+      }).then((res) => res.json())
+      const translatedBody = typeof r?.translated === 'string' ? r.translated : originalBody
+      setCommentTx((prev) => ({ ...prev, [commentId]: { body: translatedBody, show: true, loading: false } }))
+    } catch {
+      setCommentTx((prev) => ({ ...prev, [commentId]: { body: originalBody, show: false, loading: false } }))
+      toast.error(lang === 'en' ? 'Translation failed' : lang === 'ur' ? 'ترجمہ ناکام' : 'فشل الترجمة')
+    }
+  }
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Initialize reactions from server data
@@ -1138,12 +1170,17 @@ export default function PostCard({
                           </div>
                         ) : (
                           <>
-                            {c.body && (
-                              <p className="hai-comment__text selectable-text">
-                                <SmartText text={c.body} />
-                                {c.editedAt && <span className="hai-meta hai-comment__edited"> {lang === 'en' ? '(edited)' : '(معدّل)'}</span>}
-                              </p>
-                            )}
+                            {c.body && (() => {
+                              const tx = commentTx[c.id]
+                              const showTx = !!tx?.show
+                              const displayBody = showTx && tx?.body ? tx.body : c.body
+                              return (
+                                <p className="hai-comment__text selectable-text">
+                                  <SmartText text={displayBody} />
+                                  {c.editedAt && <span className="hai-meta hai-comment__edited"> {lang === 'en' ? '(edited)' : '(معدّل)'}</span>}
+                                </p>
+                              )
+                            })()}
                             {c.imageUrl && (
                               <img
                                 src={c.imageUrl}
@@ -1187,6 +1224,30 @@ export default function PostCard({
                               </button>
                             </>
                           )}
+                          {/* Translate — shows only when the comment's
+                              detected language differs from the UI. */}
+                          {c.body && detectLang(c.body) !== lang && (
+                            <button
+                              onClick={() => toggleCommentTranslate(c.id, c.body)}
+                              disabled={commentTx[c.id]?.loading}
+                              className="hai-comment__action"
+                            >
+                              {commentTx[c.id]?.loading
+                                ? <HaiSpinner />
+                                : commentTx[c.id]?.show
+                                  ? (lang === 'en' ? 'Original' : lang === 'ur' ? 'اصل' : 'الأصل')
+                                  : (lang === 'en' ? 'Translate' : lang === 'ur' ? 'ترجمہ' : 'ترجمة')}
+                            </button>
+                          )}
+                          {/* Report — only on other people's comments. */}
+                          {c.author.id !== currentUserId && (
+                            <button
+                              onClick={() => setCommentReportTarget({ id: c.author.id, name: c.author.name, commentId: c.id })}
+                              className="hai-comment__action is-danger"
+                            >
+                              {lang === 'en' ? 'Report' : lang === 'ur' ? 'رپورٹ' : 'إبلاغ'}
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1208,11 +1269,16 @@ export default function PostCard({
                                 <span className="hai-comment__author">{reply.author.name || t('post_neighbor')}</span>
                                 <UserBadgeDisplay accountType={reply.author.accountType} providerStatus={reply.author.providerStatus} reputation={reply.author.reputation} />
                               </div>
-                              {reply.body && (
-                                <p className="hai-comment__text selectable-text">
-                                  <SmartText text={reply.body} />
-                                </p>
-                              )}
+                              {reply.body && (() => {
+                                const tx = commentTx[reply.id]
+                                const showTx = !!tx?.show
+                                const displayBody = showTx && tx?.body ? tx.body : reply.body
+                                return (
+                                  <p className="hai-comment__text selectable-text">
+                                    <SmartText text={displayBody} />
+                                  </p>
+                                )
+                              })()}
                               {reply.imageUrl && (
                                 <img
                                   src={reply.imageUrl}
@@ -1236,6 +1302,27 @@ export default function PostCard({
                                     className="hai-comment__action is-danger"
                                   >
                                     {lang === 'en' ? 'Delete' : 'حذف'}
+                                  </button>
+                                )}
+                                {reply.body && detectLang(reply.body) !== lang && (
+                                  <button
+                                    onClick={() => toggleCommentTranslate(reply.id, reply.body)}
+                                    disabled={commentTx[reply.id]?.loading}
+                                    className="hai-comment__action"
+                                  >
+                                    {commentTx[reply.id]?.loading
+                                      ? <HaiSpinner />
+                                      : commentTx[reply.id]?.show
+                                        ? (lang === 'en' ? 'Original' : lang === 'ur' ? 'اصل' : 'الأصل')
+                                        : (lang === 'en' ? 'Translate' : lang === 'ur' ? 'ترجمہ' : 'ترجمة')}
+                                  </button>
+                                )}
+                                {reply.author.id !== currentUserId && (
+                                  <button
+                                    onClick={() => setCommentReportTarget({ id: reply.author.id, name: reply.author.name, commentId: reply.id })}
+                                    className="hai-comment__action is-danger"
+                                  >
+                                    {lang === 'en' ? 'Report' : lang === 'ur' ? 'رپورٹ' : 'إبلاغ'}
                                   </button>
                                 )}
                               </div>
@@ -1610,6 +1697,33 @@ export default function PostCard({
               toast.success(lang === 'en' ? 'User blocked' : lang === 'ur' ? 'صارف بلاک ہو گیا' : 'تم حظر المستخدم')
             }
           } catch { /* ignore — block is best-effort post-report */ }
+        }}
+      />
+
+      {/* Separate sheet for comment/reply author reports — keeps
+          the post-author target untouched while a different target
+          can be open at the same time via the comment's Report
+          action. */}
+      <ReportUserSheet
+        open={!!commentReportTarget}
+        onClose={() => setCommentReportTarget(null)}
+        targetUserId={commentReportTarget?.id || ''}
+        targetName={commentReportTarget?.name}
+        source="POST"
+        postId={post.id}
+        onBlockRequested={async () => {
+          const target = commentReportTarget
+          if (!target) return
+          try {
+            const res = await fetch('/api/users/block', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: target.id }),
+            })
+            if (res.ok) {
+              toast.success(lang === 'en' ? 'User blocked' : lang === 'ur' ? 'صارف بلاک ہو گیا' : 'تم حظر المستخدم')
+            }
+          } catch { /* ignore */ }
         }}
       />
     </div>

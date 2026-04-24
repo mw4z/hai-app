@@ -518,7 +518,7 @@ export default function ProfileClient({ user, postCount }: Props) {
             />
             <div className="flex gap-2">
               <button onClick={saveName} disabled={saving} className="flex-1 bg-primary-600 text-white text-sm font-medium py-2 rounded-xl disabled:opacity-50">
-                {saving ? t('profile_saving') : t('profile_save')}
+                {saving ? <HaiSpinner /> : t('profile_save')}
               </button>
               <button onClick={() => setEditingName(false)} className="flex-1 border border-gray-200 text-gray-600 text-sm py-2 rounded-xl">
                 {t('profile_cancel')}
@@ -647,7 +647,7 @@ export default function ProfileClient({ user, postCount }: Props) {
             />
             <div className="flex gap-2">
               <button onClick={verifyEmail} disabled={saving} className="flex-1 bg-primary-600 text-white text-sm font-medium py-2 rounded-xl disabled:opacity-50">
-                {saving ? t('profile_saving') : t('profile_verify_btn')}
+                {saving ? <HaiSpinner /> : t('profile_verify_btn')}
               </button>
               <button onClick={() => setVerifyingEmail(false)} className="flex-1 border border-gray-200 text-gray-600 text-sm py-2 rounded-xl">
                 {t('profile_cancel')}
@@ -667,7 +667,7 @@ export default function ProfileClient({ user, postCount }: Props) {
             />
             <div className="flex gap-2">
               <button onClick={sendEmailCode} disabled={saving} className="flex-1 bg-primary-600 text-white text-sm font-medium py-2 rounded-xl disabled:opacity-50">
-                {saving ? t('profile_saving') : t('profile_send_code')}
+                {saving ? <HaiSpinner /> : t('profile_send_code')}
               </button>
               <button onClick={() => setEditingEmail(false)} className="flex-1 border border-gray-200 text-gray-600 text-sm py-2 rounded-xl">
                 {t('profile_cancel')}
@@ -796,7 +796,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                 }}
                 className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-primary-600 disabled:opacity-50"
               >
-                {saving ? t('profile_saving') : t('profile_save')}
+                {saving ? <HaiSpinner /> : t('profile_save')}
               </button>
             </div>
           </div>
@@ -957,7 +957,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                 }}
                 className="w-full py-2.5 rounded-xl text-sm font-semibold text-white bg-primary-600 disabled:opacity-50"
               >
-                {applySaving ? t('profile_saving') : t('profile_provider_apply_submit')}
+                {applySaving ? <HaiSpinner /> : t('profile_provider_apply_submit')}
               </button>
             </div>
           )}
@@ -1732,7 +1732,11 @@ function BookmarkedPosts({ lang, currentUserId }: { lang: string; currentUserId:
     } catch { /* ignore */ }
   }
 
-  if (!loaded) return <div className="py-4 text-center text-gray-400 text-sm">...</div>
+  if (!loaded) return (
+    <div className="flex justify-center py-4 text-primary-600">
+      <HaiLoader size="sm" />
+    </div>
+  )
 
   if (posts.length === 0) {
     return (
@@ -1983,7 +1987,11 @@ function PrivacySettings({ lang }: { lang: string }) {
     })
   }
 
-  if (!loaded) return <div className="py-4 text-center text-gray-400 text-sm">...</div>
+  if (!loaded) return (
+    <div className="flex justify-center py-4 text-primary-600">
+      <HaiLoader size="sm" />
+    </div>
+  )
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 divide-y divide-gray-50 dark:divide-gray-700 overflow-hidden">
