@@ -86,16 +86,21 @@ export default function BottomNav({
 
   return (
     <nav
-      className="fixed bottom-0 right-0 left-0 mx-auto z-10"
+      className="fixed bottom-0 right-0 left-0 z-10"
       style={{
-        maxWidth: 'var(--hai-max-width)',
+        // Full-width background on tablets/iPad so the tab bar spans
+        // the screen like a standard system bar, instead of floating as
+        // a 480px pill with empty gutters on either side.
         paddingBottom: 'max(env(safe-area-inset-bottom), var(--hai-space-2))',
         background: 'var(--hai-surface-1)',
         borderTop: '1px solid var(--hai-border)',
         boxShadow: 'var(--hai-shadow-md)',
       }}
     >
-      <div className="flex items-stretch">
+      <div
+        className="flex items-stretch mx-auto"
+        style={{ maxWidth: 'var(--hai-max-width)' }}
+      >
         {/* Left two tabs: Home, Market */}
         {NAV_ITEMS.slice(0, 2).map((item) => {
           const Icon = item.icon
