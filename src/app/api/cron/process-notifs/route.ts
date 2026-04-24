@@ -1153,6 +1153,67 @@ async function processNewRideRequest(job: JobRow): Promise<JobOutcome> {
   return 'done'
 }
 
+/**
+ * new_message push → direct message recipient. Single-user target.
+ * Respects notifPreference.directMessage (users who muted DMs don't
+ * get a push, but the in-app bell row still lands so they see it
+ * when they open the app).
+ */
+async function processNewMessage(job: JobRow): Promise<JobOutcome> {
+  const p = (job.payload || {}) as {
+    threadId?: string
+    senderId?: string
+    senderName?: string | null
+    snippet?: string
+    messageType?: string
+  }
+  const { threadId, senderName, snippet, messageType } = p
+  if (!threadId) return 'dropped'
+
+  const { tokens, userExists } = await resolveUserTokens(
+    job.targetRef,
+    'directMessage',
+  )
+  if (!userExists) return 'dropped'
+  if (tokens.length === 0) return 'dropped'
+
+  const who = senderName?.trim() || 'جار'
+  const pushTitle = `💬 ${who}`
+  const body = messageType === 'IMAGE'
+    ? '📷 صورة'
+    : messageType === 'LOCATION'
+      ? '📍 موقع'
+      : (snippet || '').trim().slice(0, 180) || 'رسالة جديدة'
+
+  const result = await sendPushBatch(tokens, {
+    title: pushTitle,
+    body,
+    priority: 'high',
+    data: {
+      type: 'new_message',
+      threadId,
+      deeplink: `hai://threads/${threadId}`,
+    },
+  })
+
+  await cleanupInvalidTokens(result.invalidTokens, job.id, job.type)
+
+  console.log('[NOTIF_CRON] job delivered', {
+    jobId: job.id,
+    type: job.type,
+    targetRef: job.targetRef,
+    attempts: job.attempts,
+    tokensSent: tokens.length,
+    success: result.success,
+    failed: result.failed,
+  })
+
+  if (result.success === 0 && result.failed > 0) {
+    throw new Error(result.firstError || 'all push sends failed')
+  }
+  return 'done'
+}
+
 // ── Main handler ─────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   return handle(req)
@@ -1259,6 +1320,9 @@ async function handle(req: NextRequest) {
           break
         case 'new_ride_request':
           outcome = await processNewRideRequest(job)
+          break
+        case 'new_message':
+          outcome = await processNewMessage(job)
           break
         default:
           console.warn('[NOTIF_CRON] unsupported type', {

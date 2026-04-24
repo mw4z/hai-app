@@ -228,6 +228,10 @@ function resolveDeeplink(data: Record<string, string>): string {
       if (data.rideRequestId) return `/rides/${encodeURIComponent(data.rideRequestId)}`
       return '/rides'
 
+    case 'new_message':
+      if (data.threadId) return `/threads/${encodeURIComponent(data.threadId)}`
+      return '/threads'
+
     case 'emergency_alert_request':
       return '/mod?tab=emergency_requests'
 

@@ -5,6 +5,7 @@ import { log } from '@/lib/logger'
 import { moderateContent } from '@/lib/moderation'
 import { requireVerified } from '@/lib/requireVerified'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 
 // GET /api/threads/[id]/messages
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -210,17 +211,47 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Update thread timestamp
     await db.thread.update({ where: { id: params.id }, data: { updatedAt: new Date() } })
 
-    // Notify the recipient
+    // Notify the recipient — bell (in-app) AND push (phone). Previously
+    // only the bell row was written, so the recipient got no phone
+    // banner when the app was closed. Now both fire together.
+    const senderName = sender?.name || null
+    const snippet = type === 'LOCATION'
+      ? '📍'
+      : type === 'IMAGE'
+        ? '📷'
+        : (text?.trim().slice(0, 120) || '')
+
     await db.notification.create({
       data: {
         type: 'NEW_MESSAGE',
         userId: recipientId,
         actorId: session.userId,
-        actorName: sender?.name || null,
-        postTitle: type === 'LOCATION' ? '📍' : type === 'IMAGE' ? '📷' : (text?.trim().slice(0, 50) || ''),
+        actorName: senderName,
+        postTitle: snippet.slice(0, 50),
         threadId: params.id,
       },
     })
+
+    // Phone push — single-user target, priority high so the banner
+    // fires immediately instead of being batched by Doze mode.
+    db.notifJob.create({
+      data: {
+        type: 'new_message',
+        priority: 'high',
+        targetType: 'user',
+        targetRef: recipientId,
+        payload: {
+          threadId: params.id,
+          senderId: session.userId,
+          senderName,
+          snippet,
+          messageType: type || 'TEXT',
+        },
+      },
+    }).catch((err) => {
+      console.error('[NOTIF_JOB] enqueue new_message failed:', err)
+    })
+    kickNotifCron()
 
     return NextResponse.json(message)
   } catch (error) {
