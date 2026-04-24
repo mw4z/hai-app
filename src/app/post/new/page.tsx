@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { FiArrowRight, FiArrowLeft } from 'react-icons/fi'
@@ -103,6 +103,10 @@ const ALL_ITEMS = CATEGORIES.flatMap(g => g.items)
 
 export default function NewPostPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // SUPER_ADMIN deep-link target: /post/new?neighborhood=<id> pre-selects
+  // that neighborhood in the picker once the list has loaded.
+  const initialNeighborhoodParam = searchParams?.get('neighborhood') || ''
   const { lang } = useLanguage()
   const [step, setStep] = useState<'category' | 'content'>('category')
   const [category, setCategory] = useState('')
@@ -133,19 +137,23 @@ export default function NewPostPage() {
   }, [])
 
   // Super-admins: lazy-load the full neighborhood list once so they can
-  // pick any target neighborhood from a dropdown.
+  // pick any target neighborhood from a dropdown. If a ?neighborhood=<id>
+  // was passed in the URL (e.g. from the feed's + button while browsing
+  // another neighborhood), pre-select it once the list lands.
   useEffect(() => {
     if (!isSuperAdmin || allNeighborhoods.length > 0) return
     fetch('/api/neighborhoods/all')
       .then(r => r.json())
       .then((data: any[]) => {
         if (!Array.isArray(data)) return
-        setAllNeighborhoods(
-          data.map(n => ({ id: n.id, name: n.name, nameEn: n.nameEn, cityName: n.cityName })),
-        )
+        const list = data.map(n => ({ id: n.id, name: n.name, nameEn: n.nameEn, cityName: n.cityName }))
+        setAllNeighborhoods(list)
+        if (initialNeighborhoodParam && list.some(n => n.id === initialNeighborhoodParam)) {
+          setTargetNeighborhoodId(initialNeighborhoodParam)
+        }
       })
       .catch(() => {})
-  }, [isSuperAdmin, allNeighborhoods.length])
+  }, [isSuperAdmin, allNeighborhoods.length, initialNeighborhoodParam])
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [price, setPrice] = useState('')

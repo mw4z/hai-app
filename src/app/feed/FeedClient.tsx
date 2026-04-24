@@ -682,7 +682,12 @@ export default function FeedClient({
         )}
       </div>
 
-      <BottomNav active="feed" isReadOnly={isReadOnly} />
+      <BottomNav
+        active="feed"
+        isReadOnly={isReadOnly}
+        userRole={user.role}
+        browseNeighborhoodId={isReadOnly && browseNeighborhood ? browseNeighborhood.id : null}
+      />
 
       {showAsk && <QuickAskSheet onClose={() => setShowAsk(false)} />}
 

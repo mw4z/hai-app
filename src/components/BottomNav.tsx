@@ -18,18 +18,37 @@ const NAV_ITEMS: { key: string; href: string; icon: React.ComponentType<{ classN
   { key: 'profile', href: '/profile', icon: FiUser,          tKey: 'nav_profile' },
 ]
 
-export default function BottomNav({ active, isReadOnly = false }: { active: string; isReadOnly?: boolean }) {
+export default function BottomNav({
+  active,
+  isReadOnly = false,
+  userRole,
+  browseNeighborhoodId,
+}: {
+  active: string
+  isReadOnly?: boolean
+  userRole?: string
+  browseNeighborhoodId?: string | null
+}) {
   const { t, lang } = useLanguage()
   const router = useRouter()
   const confirm = useConfirm()
   const [msgCount, setMsgCount] = useState(0)
 
+  const isSuperAdmin = userRole === 'SUPER_ADMIN'
+
   async function handleNewPost() {
     hapticMedium()
     playTap()
     if (isReadOnly) {
-      // Browsing another neighborhood — posting belongs to your own.
-      // Prompt and offer to go back to the user's home feed.
+      // SUPER_ADMIN can post into any neighborhood — skip the confirm
+      // and deep-link straight to the post-new form with the currently
+      // browsed neighborhood pre-selected in the picker.
+      if (isSuperAdmin && browseNeighborhoodId) {
+        router.push(`/post/new?neighborhood=${encodeURIComponent(browseNeighborhoodId)}`)
+        return
+      }
+      // Everyone else: posting belongs to your own neighborhood. Prompt
+      // and offer to go back to the user's home feed.
       const ok = await confirm({
         title: lang === 'en'
           ? 'Not your neighborhood'
