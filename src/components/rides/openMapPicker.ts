@@ -150,22 +150,36 @@ export function openMapPicker(options: {
 
       const ml = (window as any).maplibregl
 
-      // RTL text plugin — required so Arabic/Urdu labels render in
-      // correct script direction (without this, MapLibre lays out
-      // glyphs in logical order and 'الرصيفة' comes out reversed).
-      // Idempotent, lazy-loaded, must be called BEFORE map construction.
-      try {
-        if (typeof ml.setRTLTextPlugin === 'function') {
+      // RTL text plugin — required for Arabic/Urdu labels. Without it
+      // MapLibre renders isolated Arabic glyph forms left-to-right,
+      // which looks like reversed, disconnected letters. Load EAGERLY
+      // (deferred=false) so the plugin is available before the map
+      // starts shaping any labels. Wrapped in a Promise so we wait for
+      // the plugin to finish before creating the map. Idempotent —
+      // calling setRTLTextPlugin twice in a session is a no-op after
+      // the first success.
+      await new Promise<void>((rtlResolve) => {
+        try {
           const status = ml.getRTLTextPluginStatus?.()
-          if (!status || status === 'unavailable' || status === 'deferred') {
-            ml.setRTLTextPlugin(
-              'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.3.0/mapbox-gl-rtl-text.js',
-              null,
-              true, // lazy
-            )
-          }
+          if (status === 'loaded') { rtlResolve(); return }
+          if (typeof ml.setRTLTextPlugin !== 'function') { rtlResolve(); return }
+          // Short timeout in case the plugin CDN is unreachable — we
+          // still want the map to render, even if Arabic looks wrong.
+          const t = setTimeout(() => rtlResolve(), 2500)
+          ml.setRTLTextPlugin(
+            'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js',
+            (err: Error | null) => {
+              clearTimeout(t)
+              if (err) console.warn('[MAP] RTL plugin load failed:', err)
+              rtlResolve()
+            },
+            false, // eager
+          )
+        } catch (e) {
+          console.warn('[MAP] RTL plugin setup failed:', e)
+          rtlResolve()
         }
-      } catch { /* non-fatal */ }
+      })
 
       map = new ml.Map({
         container: mapContainer,
