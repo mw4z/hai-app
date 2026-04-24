@@ -6,7 +6,6 @@ import toast from 'react-hot-toast'
 import Link from 'next/link'
 import { useLanguage } from '@/hooks/useLanguage'
 import { FiArrowRight, FiArrowLeft, FiAlertTriangle, FiEyeOff, FiUserX, FiActivity, FiFileText } from 'react-icons/fi'
-import BottomNav from '@/components/BottomNav'
 import EmergencyCreator from '@/components/EmergencyCreator'
 
 const ACTION_LABELS: Record<string, { ar: string; en: string }> = {
@@ -385,7 +384,7 @@ export default function ModDashboard({ data }: Props) {
         )}
       </div>
 
-      <BottomNav active="mod" />
+      {/* BottomNav is mounted globally in src/app/layout.tsx */}
     </div>
   )
 }

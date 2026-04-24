@@ -6,7 +6,6 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import PostCard from '@/components/PostCard'
 import PollCard from '@/components/PollCard'
-import BottomNav from '@/components/BottomNav'
 import EmergencyBanner from '@/components/EmergencyBanner'
 import InviteLeaderboardCard from '@/components/InviteLeaderboardCard'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
@@ -682,12 +681,7 @@ export default function FeedClient({
         )}
       </div>
 
-      <BottomNav
-        active="feed"
-        isReadOnly={isReadOnly}
-        userRole={user.role}
-        browseNeighborhoodId={isReadOnly && browseNeighborhood ? browseNeighborhood.id : null}
-      />
+      {/* BottomNav is mounted globally in src/app/layout.tsx */}
 
       {showAsk && <QuickAskSheet onClose={() => setShowAsk(false)} />}
 

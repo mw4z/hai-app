@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { cached } from '@/lib/cache'
-import BottomNav from '@/components/BottomNav'
 import ProfileClient from './ProfileClient'
 
 export default async function ProfilePage() {

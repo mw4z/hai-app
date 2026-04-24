@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import BottomNav from '@/components/BottomNav'
 import UserBadgeDisplay from '@/components/UserBadge'
 import EmergencyRequestSheet from '@/components/EmergencyRequestSheet'
 import { pickImageOrFallback } from '@/lib/imagePicker'
@@ -1693,7 +1692,7 @@ export default function ProfileClient({ user, postCount }: Props) {
         </div>
       )}
 
-      <BottomNav active="profile" />
+      {/* BottomNav is mounted globally in src/app/layout.tsx */}
     </div>
   )
 }

@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useLanguage } from '@/hooks/useLanguage'
-import BottomNav from '@/components/BottomNav'
 import StatusBadge from '@/components/rides/StatusBadge'
 import RiyalIcon from '@/components/RiyalIcon'
 import { FiPlus, FiMapPin, FiNavigation, FiClock, FiAlertTriangle } from 'react-icons/fi'
@@ -183,7 +182,7 @@ export default function RidesFeedClient({ userId }: { userId: string }) {
         )}
       </div>
 
-      <BottomNav active="rides" />
+      {/* BottomNav is mounted globally in src/app/layout.tsx */}
     </div>
   )
 }

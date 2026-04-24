@@ -6,7 +6,6 @@ import { useLanguage } from '@/hooks/useLanguage'
 import { uploadFiles } from '@/lib/upload'
 import { pickImagesOrFallback } from '@/lib/imagePicker'
 import BackButton from '@/components/BackButton'
-import BottomNav from '@/components/BottomNav'
 import { hapticSuccess } from '@/lib/haptic'
 
 const TYPES = [
@@ -240,7 +239,7 @@ export default function SupportPage() {
         )}
       </div>
 
-      <BottomNav active="profile" />
+      {/* BottomNav is mounted globally in src/app/layout.tsx */}
     </div>
   )
 }

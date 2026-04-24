@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/hooks/useLanguage'
 import { FiMessageSquare } from 'react-icons/fi'
-import BottomNav from '@/components/BottomNav'
 
 interface Thread {
   id: string
@@ -143,7 +142,7 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
         </div>
       )}
 
-      <BottomNav active="threads" />
+      {/* BottomNav is mounted globally in src/app/layout.tsx */}
     </div>
   )
 }

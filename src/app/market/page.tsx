@@ -3,7 +3,6 @@ import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { cached } from '@/lib/cache'
 import { PostCategory } from '@prisma/client'
-import BottomNav from '@/components/BottomNav'
 import PostCard from '@/components/PostCard'
 import Link from 'next/link'
 import MarketTab from './MarketTab'
@@ -106,7 +105,7 @@ export default async function MarketPage({
         )}
       </div>
 
-      <BottomNav active="market" />
+      {/* BottomNav is mounted globally in src/app/layout.tsx */}
     </div>
   )
 }

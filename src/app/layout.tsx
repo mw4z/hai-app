@@ -5,6 +5,7 @@ import RepToast from '@/components/RepToast'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import AppSplash from '@/components/AppSplash'
 import RouteTransition from '@/components/RouteTransition'
+import BottomNav from '@/components/BottomNav'
 import ArrivalAlert from '@/components/ArrivalAlert'
 import CapacitorBridge from '@/components/CapacitorBridge'
 import PushRegistration from '@/components/PushRegistration'
@@ -127,6 +128,15 @@ export default function RootLayout({
           <ErrorBoundary>
               {children}
           </ErrorBoundary>
+          {/* Global bottom tab bar — mounted ONCE here so it lives
+              outside src/app/template.tsx's animated wrapper. That
+              matters because template.tsx uses a CSS transform during
+              route transitions, and a transformed ancestor would
+              otherwise re-anchor position:fixed children (like the
+              BottomNav) to the wrapper instead of the viewport. The
+              component hides itself on routes that shouldn't have a
+              bottom tab (auth pages, detail screens, etc). */}
+          <BottomNav />
           <ScrollReset />
           <PullToRefresh />
           <ArrivalAlert />

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { hapticMedium } from '@/lib/haptic'
@@ -18,13 +18,41 @@ const NAV_ITEMS: { key: string; href: string; icon: React.ComponentType<{ classN
   { key: 'profile', href: '/profile', icon: FiUser,          tKey: 'nav_profile' },
 ]
 
+// Only show the bottom tab bar on these top-level routes. Detail
+// pages (post/[id], threads/[id], login, register, onboarding, …)
+// don't get a nav. Kept as an allow-list so new detail pages are
+// excluded by default.
+const SHOW_BOTTOM_NAV_ON = new Set([
+  '/feed',
+  '/market',
+  '/threads',
+  '/profile',
+  '/rides',
+  '/mod',
+  '/contests',
+  '/neighborhood-reports',
+  '/support',
+])
+
+function activeKeyForPath(path: string): string {
+  if (path.startsWith('/feed')) return 'feed'
+  if (path.startsWith('/market')) return 'market'
+  if (path === '/threads') return 'threads'
+  if (path.startsWith('/profile') || path.startsWith('/support')) return 'profile'
+  return ''
+}
+
 export default function BottomNav({
-  active,
-  isReadOnly = false,
-  userRole,
-  browseNeighborhoodId,
+  active: activeOverride,
+  isReadOnly: isReadOnlyOverride,
+  userRole: userRoleOverride,
+  browseNeighborhoodId: browseNeighborhoodIdOverride,
 }: {
-  active: string
+  /** All four props are optional — when this component is mounted
+   *  globally from layout.tsx it derives everything from hooks. The
+   *  props remain so existing per-page mounts keep compiling during
+   *  the hoist transition. */
+  active?: string
   isReadOnly?: boolean
   userRole?: string
   browseNeighborhoodId?: string | null
@@ -32,7 +60,29 @@ export default function BottomNav({
   const { t, lang } = useLanguage()
   const router = useRouter()
   const confirm = useConfirm()
+  const pathname = usePathname() || '/'
+  const searchParams = useSearchParams()
   const [msgCount, setMsgCount] = useState(0)
+
+  const active = activeOverride ?? activeKeyForPath(pathname)
+  const queryNbhdId = searchParams?.get('neighborhood') || null
+  const browseNeighborhoodId = browseNeighborhoodIdOverride ?? queryNbhdId
+  const isReadOnly = isReadOnlyOverride ?? (pathname.startsWith('/feed') && !!queryNbhdId)
+
+  // Role is fetched in-line on first mount when not supplied — the
+  // /api/profile endpoint already returns it and is cheap.
+  const [userRole, setUserRole] = useState<string | undefined>(userRoleOverride)
+  useEffect(() => {
+    if (userRole) return
+    let cancelled = false
+    fetch('/api/profile', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.role) setUserRole(d.role)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [userRole])
 
   const isSuperAdmin = userRole === 'SUPER_ADMIN'
 
@@ -83,6 +133,11 @@ export default function BottomNav({
     const interval = setInterval(check, 5000)
     return () => clearInterval(interval)
   }, [])
+
+  // Self-hide on routes that shouldn't have a bottom tab bar. Allow
+  // legacy callers that pass an explicit `active` to force-render
+  // (e.g. a one-off screen that opts in).
+  if (!activeOverride && !SHOW_BOTTOM_NAV_ON.has(pathname)) return null
 
   return (
     <nav

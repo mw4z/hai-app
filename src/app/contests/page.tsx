@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
-import BottomNav from '@/components/BottomNav'
 import ContestsClient from './ContestsClient'
 
 export default async function ContestsPage() {
@@ -18,7 +17,7 @@ export default async function ContestsPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
       <ContestsClient isAdmin={isAdmin} />
-      <BottomNav active="feed" />
+      {/* BottomNav is mounted globally in src/app/layout.tsx */}
     </div>
   )
 }
