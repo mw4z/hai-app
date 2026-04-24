@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { calculateRoute, validateDistance } from '@/lib/rides/distance'
 import { estimatePrice } from '@/lib/rides/pricing'
 import { logRideEvent } from '@/lib/rides/events'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 import { log } from '@/lib/logger'
 import { getLimits } from '@/lib/capabilities'
 import { requireVerified } from '@/lib/requireVerified'
@@ -148,6 +149,32 @@ export async function POST(req: NextRequest) {
       actorId: session.userId,
       metadata: { distanceKm: route.distanceKm, durationMin: route.durationMin, priceEst },
     })
+
+    // Fan-out: every neighbor in the same neighborhood gets a push so
+    // potential drivers see the request instantly. Dedicated job type
+    // 'new_ride_request' — the cron processor validates against the
+    // ride row (not a post row) and reuses the new-post fan-out logic
+    // for filtering (author exclusion, notif prefs, quiet hours,
+    // gender). priority:'high' so the banner fires immediately.
+    if (ride.neighborhoodId) {
+      db.notifJob.create({
+        data: {
+          type: 'new_ride_request',
+          priority: 'high',
+          targetType: 'nbhd_topic',
+          targetRef: ride.neighborhoodId,
+          payload: {
+            rideRequestId: ride.id,
+            requesterId: session.userId,
+            pickupArea,
+            dropoffArea,
+          },
+        },
+      }).catch((err) => {
+        console.error('[NOTIF_JOB] enqueue new_ride_request failed:', err)
+      })
+      kickNotifCron()
+    }
 
     return NextResponse.json({
       id: ride.id,

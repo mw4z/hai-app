@@ -1072,6 +1072,87 @@ async function processRideStatus(job: JobRow): Promise<JobOutcome> {
   return 'done'
 }
 
+/**
+ * new_ride_request → broadcast to every neighbor in the ride's
+ * neighborhood so potential drivers see the request immediately.
+ * Same filter model as processNewPost (author exclusion, notif
+ * prefs, quiet hours, gender filter), but sourced from the
+ * RideRequest row instead of Post.
+ */
+async function processNewRideRequest(job: JobRow): Promise<JobOutcome> {
+  const p = (job.payload || {}) as {
+    rideRequestId?: string
+    requesterId?: string
+    pickupArea?: string
+    dropoffArea?: string
+  }
+  const { rideRequestId, requesterId, pickupArea, dropoffArea } = p
+  if (!rideRequestId || !requesterId) return 'dropped'
+
+  const ride = await db.rideRequest.findUnique({
+    where: { id: rideRequestId },
+    select: {
+      id: true,
+      status: true,
+      neighborhoodId: true,
+      requester: { select: { id: true, name: true, status: true } },
+    },
+  })
+  if (!ride) return 'dropped'
+  if (ride.status !== 'RIDE_OPEN') return 'dropped'
+  if (!ride.neighborhoodId) return 'dropped'
+  if (ride.neighborhoodId !== job.targetRef) return 'dropped'
+  if (ride.requester.status === 'BANNED_TEMP' || ride.requester.status === 'BANNED_PERM') return 'dropped'
+
+  // Reuse the existing new-post fan-out: same prefs, quiet hours,
+  // gender filtering, token collection. Category RIDE_REQUEST
+  // slots into the standard feed-preference pipeline.
+  const { tokens, recipientUserCount } = await resolveNewPostTokens(
+    ride.neighborhoodId,
+    requesterId,
+    'RIDE_REQUEST',
+  )
+  if (tokens.length === 0) {
+    console.log('[NOTIF_CRON] drop: no recipients (new_ride_request)', { jobId: job.id })
+    return 'dropped'
+  }
+
+  const author = ride.requester.name?.trim() || 'جار'
+  const pushTitle = `🚗 طلب توصيل · ${author}`
+  const pushBody = pickupArea && dropoffArea
+    ? `${pickupArea} → ${dropoffArea}`
+    : 'طلب مشوار جديد في حيّك'
+
+  const result = await sendPushBatch(tokens, {
+    title: pushTitle,
+    body: pushBody.slice(0, 180),
+    priority: 'high',
+    data: {
+      type: 'new_ride_request',
+      rideRequestId,
+      deeplink: `hai://rides/${rideRequestId}`,
+    },
+  })
+
+  await cleanupInvalidTokens(result.invalidTokens, job.id, job.type)
+
+  console.log('[NOTIF_CRON] job delivered', {
+    jobId: job.id,
+    type: job.type,
+    targetRef: job.targetRef,
+    attempts: job.attempts,
+    recipients: recipientUserCount,
+    tokensSent: tokens.length,
+    success: result.success,
+    failed: result.failed,
+  })
+
+  if (result.success === 0 && result.failed > 0) {
+    throw new Error(result.firstError || 'all push sends failed')
+  }
+  return 'done'
+}
+
 // ── Main handler ─────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   return handle(req)
@@ -1175,6 +1256,9 @@ async function handle(req: NextRequest) {
           break
         case 'ride_status':
           outcome = await processRideStatus(job)
+          break
+        case 'new_ride_request':
+          outcome = await processNewRideRequest(job)
           break
         default:
           console.warn('[NOTIF_CRON] unsupported type', {

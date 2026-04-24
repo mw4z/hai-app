@@ -229,10 +229,12 @@ export async function POST(req: NextRequest) {
 
     // Fire-and-forget: enqueue neighborhood push fanout via NotifJob.
     // Processor applies filtering (author exclusion, prefs, quiet hours, gender).
+    // priority:'high' so every neighbor's phone gets the banner the
+    // moment the post is published instead of being batched by Doze/FCM.
     db.notifJob.create({
       data: {
         type: 'new_post',
-        priority: 'normal',
+        priority: 'high',
         targetType: 'nbhd_topic',
         targetRef: targetNeighborhoodId,
         payload: {

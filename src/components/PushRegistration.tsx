@@ -224,6 +224,7 @@ function resolveDeeplink(data: Record<string, string>): string {
     case 'ride_offer':
     case 'ride_message':
     case 'ride_rating':
+    case 'new_ride_request':
       if (data.rideRequestId) return `/rides/${encodeURIComponent(data.rideRequestId)}`
       return '/rides'
 
