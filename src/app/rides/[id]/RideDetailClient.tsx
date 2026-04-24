@@ -392,6 +392,48 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                         </div>
                       </div>
                     )}
+                    {/* Withdraw offer — only while the ride is still
+                        open and the offer hasn't been selected yet.
+                        After that, the driver must cancel through the
+                        formal cancel flow (which has its own reputation
+                        rules) instead of just pulling out. */}
+                    {(existingOffer || myOffer) && ride?.status === 'RIDE_OPEN' && (
+                      <button
+                        onClick={async () => {
+                          const ok = typeof window !== 'undefined' && window.confirm(
+                            lang === 'en'
+                              ? "Withdraw your offer? The requester won't see it anymore."
+                              : lang === 'ur'
+                                ? 'پیشکش واپس لیں؟ طالب کو یہ نہیں دکھے گی۔'
+                                : 'سحب عرضك؟ لن يراه صاحب الطلب بعد الآن.'
+                          )
+                          if (!ok) return
+                          setActionLoading(true)
+                          try {
+                            const res = await fetch(`/api/rides/${rideId}/offers`, { method: 'DELETE' })
+                            const data = await res.json().catch(() => null)
+                            if (!res.ok) {
+                              toast.error(translateApiError(data, lang as 'ar' | 'en' | 'ur'), { duration: 4500 })
+                              if (data?.shouldRefresh) fetchRide()
+                              return
+                            }
+                            setMyOffer(null)
+                            toast.success(lang === 'en' ? 'Offer withdrawn' : lang === 'ur' ? 'پیشکش واپس لے لی' : 'تم سحب العرض')
+                            fetchRide()
+                          } catch {
+                            toast.error(lang === 'en' ? 'Connection error' : lang === 'ur' ? 'رابطہ ناکام' : 'تعذر الاتصال')
+                          } finally {
+                            setActionLoading(false)
+                          }
+                        }}
+                        disabled={actionLoading}
+                        className="mt-4 text-xs font-medium text-red-500 dark:text-red-400 underline-offset-2 hover:underline disabled:opacity-50"
+                      >
+                        {actionLoading
+                          ? <HaiSpinner />
+                          : (lang === 'en' ? 'Withdraw offer' : lang === 'ur' ? 'پیشکش واپس لیں' : 'سحب العرض')}
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <>

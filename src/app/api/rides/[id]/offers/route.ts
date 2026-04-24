@@ -251,3 +251,118 @@ export async function PATCH(
     return NextResponse.json({ error: 'خطأ في الخادم' }, { status: 500 })
   }
 }
+
+/**
+ * DELETE — Withdraw the caller's offer on this ride.
+ *
+ * Only allowed while the offer is still OFFER_PENDING. After the
+ * requester has selected a driver (OFFER_ACCEPTED) the driver has to
+ * go through the formal cancel path in /api/rides/[id]/status instead,
+ * because accepted offers carry reputation consequences.
+ *
+ * Soft-retire the offer (status → OFFER_WITHDRAWN) rather than hard-
+ * deleting so the audit trail stays intact and the requester's
+ * dashboard can show "withdrawn" if needed.
+ */
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    log.api('DELETE', '/api/rides/[id]/offers', session.userId)
+
+    const ride = await db.rideRequest.findUnique({
+      where: { id: params.id },
+      select: { id: true, status: true, requesterId: true },
+    })
+    if (!ride) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    // Ride must still be open for offers. Once the requester moves
+    // past OPEN (selected someone, confirmed, en-route…) a driver
+    // can't just pull out their offer — they'd affect someone else's
+    // trip. The formal cancel endpoint handles those cases.
+    if (ride.status !== 'RIDE_OPEN') {
+      return NextResponse.json(
+        {
+          error: 'OFFER_NOT_WITHDRAWABLE',
+          message: 'لا يمكن سحب العرض بعد بدء التنسيق',
+          messageEn: 'Cannot withdraw offer after coordination started',
+          shouldRefresh: true,
+          currentStatus: ride.status,
+        },
+        { status: 409 },
+      )
+    }
+
+    const existing = await db.rideOffer.findUnique({
+      where: {
+        rideRequestId_driverId: {
+          rideRequestId: ride.id,
+          driverId: session.userId,
+        },
+      },
+    })
+    if (!existing) {
+      return NextResponse.json(
+        { error: 'لا يوجد عرض لك على هذا الطلب' },
+        { status: 404 },
+      )
+    }
+    if (existing.status !== 'OFFER_PENDING') {
+      return NextResponse.json(
+        {
+          error: 'OFFER_NOT_WITHDRAWABLE',
+          message: 'العرض لم يعد قابلاً للسحب',
+          messageEn: 'Offer can no longer be withdrawn',
+          shouldRefresh: true,
+        },
+        { status: 409 },
+      )
+    }
+
+    await db.rideOffer.update({
+      where: { id: existing.id },
+      data: { status: 'OFFER_WITHDRAWN' },
+    })
+
+    await logRideEvent({
+      rideRequestId: ride.id,
+      eventType: 'OFFER_WITHDRAWN',
+      actorType: 'driver',
+      actorId: session.userId,
+      metadata: { offerId: existing.id, price: existing.price },
+    })
+
+    // Let the requester know an offer disappeared — same helper the
+    // other ride touchpoints use, so the push + in-app bell fire
+    // together. The requester's offer list will also refresh on its
+    // next poll since the offer's status is now WITHDRAWN.
+    try {
+      const driver = await db.user.findUnique({
+        where: { id: session.userId },
+        select: { name: true },
+      })
+      const { notifyRide } = await import('@/lib/rides/notify')
+      await notifyRide({
+        userId: ride.requesterId,
+        type: 'RIDE_OFFER',
+        titleAr: '🔄 تم سحب عرض',
+        titleEn: '🔄 Offer withdrawn',
+        bodyAr: `${driver?.name || 'سائق'} سحب عرضه — تصفّح العروض الأخرى`,
+        bodyEn: `${driver?.name || 'A driver'} withdrew their offer — check other offers`,
+        actorId: session.userId,
+        rideRequestId: ride.id,
+      })
+    } catch {
+      // notification is best-effort — withdrawal itself already persisted
+    }
+
+    return NextResponse.json({ ok: true, id: existing.id })
+  } catch (error) {
+    log.error('Handler failed', error, { route: '/api/rides/[id]/offers DELETE' })
+    return NextResponse.json({ error: 'خطأ في الخادم' }, { status: 500 })
+  }
+}
