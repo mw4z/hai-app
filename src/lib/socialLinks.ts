@@ -104,15 +104,39 @@ export function buildSocialUrls(platform: SocialPlatform, handle: string): { app
 }
 
 /**
- * Imperative open (fallback for code that can't render an <a>). The
- * viewer itself now uses plain <a target="_blank"> (see SocialChips)
- * because Universal Links / App Links on modern iOS/Android already
- * route these HTTPS URLs to the installed app — no custom scheme
- * trick needed, and no risk of navigating the Capacitor WebView or
- * losing popup state.
+ * Open a provider's social profile.
+ *
+ * On native: uses @capacitor/browser to launch an in-app overlay
+ * (Chrome Custom Tabs on Android, SFSafariViewController on iOS).
+ * The main WebView is NEVER navigated, so the profile popup and all
+ * React state stay intact when the user dismisses the overlay.
+ * Chrome Custom Tabs also respects Android App Links — the link is
+ * handed off to the Instagram/TikTok/etc. app automatically if
+ * installed.
+ *
+ * On web: plain window.open in a new tab. Browsers Universal-Link
+ * mobile web triggers the app too.
+ *
+ * Previously used <a target="_blank">, which on Capacitor WebView
+ * (with a remote server.url) could navigate the main window — the
+ * popup state was lost on "back" because the WebView had unwound
+ * the page.
  */
-export function openSocial(platform: SocialPlatform, handle: string): void {
+export async function openSocial(platform: SocialPlatform, handle: string): Promise<void> {
   if (typeof window === 'undefined') return
   const { web } = buildSocialUrls(platform, handle)
+
+  const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+  if (cap?.isNativePlatform?.()) {
+    try {
+      const { Browser } = await import('@capacitor/browser')
+      await Browser.open({ url: web, presentationStyle: 'popover' })
+      return
+    } catch (err) {
+      console.error('[SOCIAL] Browser.open failed', err)
+      // Fall through to web fallback.
+    }
+  }
+
   try { window.open(web, '_blank', 'noopener') } catch { /* ignore */ }
 }

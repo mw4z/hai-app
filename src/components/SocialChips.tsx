@@ -7,7 +7,7 @@ import {
   SiSnapchat,
   SiWhatsapp,
 } from 'react-icons/si'
-import { buildSocialUrls, type SocialPlatform } from '@/lib/socialLinks'
+import { openSocial, type SocialPlatform } from '@/lib/socialLinks'
 
 /**
  * Horizontal row of social-media icon buttons for service-provider
@@ -85,18 +85,22 @@ export default function SocialChips({
     <div className="flex items-center gap-2 flex-wrap">
       {entries.map(([platform, handle]) => {
         const { icon: Icon, iconClass, tileClass, label } = META[platform]
-        const { web } = buildSocialUrls(platform, handle)
         return (
-          <a
+          <button
             key={platform}
-            href={web}
-            target="_blank"
-            rel="noopener noreferrer"
+            type="button"
+            onClick={(e) => {
+              // Stop bubbling so the profile popup's backdrop close
+              // handler never sees this click — popup stays open while
+              // Capacitor's in-app browser overlay is visible.
+              e.stopPropagation()
+              void openSocial(platform, handle)
+            }}
             aria-label={`${label} — ${handle}`}
             className={`${btnClass} ${tileClass} active:scale-95 transition-transform`}
           >
             <Icon size={iconSize} className={iconClass} />
-          </a>
+          </button>
         )
       })}
     </div>
