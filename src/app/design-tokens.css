@@ -257,28 +257,28 @@
      ═══════════════════════════════════════════════════════════════════ */
 
   /* ── Trust / identity ──────────────────────────────────────────── */
-  --hai-state-verified-bg:      rgba(59, 130, 246, 0.08);
-  --hai-state-verified-fg:      #2563eb;
-  --hai-state-verified-border:  rgba(59, 130, 246, 0.28);
-  --hai-state-provider-bg:      rgba(0, 168, 132, 0.10);
-  --hai-state-provider-fg:      var(--hai-primary-700);
-  --hai-state-provider-border:  rgba(0, 168, 132, 0.28);
-  --hai-state-mod-bg:           rgba(245, 158, 11, 0.10);
-  --hai-state-mod-fg:           #b45309;
-  --hai-state-mod-border:       rgba(245, 158, 11, 0.30);
-  --hai-state-admin-bg:         rgba(168, 85, 247, 0.10);
-  --hai-state-admin-fg:         #7e22ce;
-  --hai-state-admin-border:     rgba(168, 85, 247, 0.30);
+  --hai-state-verified-bg:      rgba(59, 130, 246, 0.14);
+  --hai-state-verified-fg:      #1e40af;
+  --hai-state-verified-border:  rgba(59, 130, 246, 0.32);
+  --hai-state-provider-bg:      rgba(0, 168, 132, 0.18);
+  --hai-state-provider-fg:      #004d3e;              /* primary-900 — readable on green tint */
+  --hai-state-provider-border:  rgba(0, 168, 132, 0.38);
+  --hai-state-mod-bg:           rgba(245, 158, 11, 0.14);
+  --hai-state-mod-fg:           #92400e;
+  --hai-state-mod-border:       rgba(245, 158, 11, 0.34);
+  --hai-state-admin-bg:         rgba(168, 85, 247, 0.14);
+  --hai-state-admin-fg:         #6b21a8;
+  --hai-state-admin-border:     rgba(168, 85, 247, 0.34);
 
   /* ── Tier (reputation) ─────────────────────────────────────────── */
   --hai-state-tier-new-bg:              #f3f4f6;
-  --hai-state-tier-new-fg:              #6b7280;
-  --hai-state-tier-active-bg:           #eff6ff;
-  --hai-state-tier-active-fg:           #2563eb;
-  --hai-state-tier-trusted-bg:          #e0f7f2;
-  --hai-state-tier-trusted-fg:          #006d57;
-  --hai-state-tier-distinguished-bg:    #fffbeb;
-  --hai-state-tier-distinguished-fg:    #b45309;
+  --hai-state-tier-new-fg:              #4b5563;         /* darker grey — readable */
+  --hai-state-tier-active-bg:           #dbeafe;
+  --hai-state-tier-active-fg:           #1e40af;         /* deeper blue */
+  --hai-state-tier-trusted-bg:          #ccebe0;
+  --hai-state-tier-trusted-fg:          #004d3e;         /* primary-900 — readable on green */
+  --hai-state-tier-distinguished-bg:    #fef3c7;
+  --hai-state-tier-distinguished-fg:    #92400e;         /* deeper amber */
 
   /* ── Visibility / promotion ────────────────────────────────────── */
   --hai-state-featured-bg:      rgba(245, 158, 11, 0.10);
@@ -457,28 +457,31 @@
   --hai-category-GENERAL-bg:            rgba(255, 255, 255, 0.05);
   --hai-category-GENERAL-fg:            #9ca3af;
 
-  /* Product-state palette — muted dark-mode counterparts */
-  --hai-state-verified-bg:      rgba(96, 165, 250, 0.12);
-  --hai-state-verified-fg:      #93c5fd;
-  --hai-state-verified-border:  rgba(96, 165, 250, 0.28);
-  --hai-state-provider-bg:      rgba(0, 168, 132, 0.14);
-  --hai-state-provider-fg:      #00a884;
-  --hai-state-provider-border:  rgba(0, 168, 132, 0.32);
-  --hai-state-mod-bg:           rgba(251, 191, 36, 0.12);
-  --hai-state-mod-fg:           #fcd34d;
-  --hai-state-mod-border:       rgba(251, 191, 36, 0.30);
-  --hai-state-admin-bg:         rgba(192, 132, 252, 0.12);
-  --hai-state-admin-fg:         #d8b4fe;
-  --hai-state-admin-border:     rgba(192, 132, 252, 0.30);
+  /* Product-state palette — dark-mode. Foregrounds lightened to
+     readable pastel tones on darker backgrounds (the previous
+     primary-hue foregrounds had insufficient contrast against
+     their own tinted backgrounds). */
+  --hai-state-verified-bg:      rgba(96, 165, 250, 0.18);
+  --hai-state-verified-fg:      #dbeafe;
+  --hai-state-verified-border:  rgba(96, 165, 250, 0.40);
+  --hai-state-provider-bg:      rgba(0, 168, 132, 0.22);
+  --hai-state-provider-fg:      #b3ebdc;                  /* primary-100 — pops on green tint */
+  --hai-state-provider-border:  rgba(0, 168, 132, 0.44);
+  --hai-state-mod-bg:           rgba(251, 191, 36, 0.18);
+  --hai-state-mod-fg:           #fef3c7;
+  --hai-state-mod-border:       rgba(251, 191, 36, 0.38);
+  --hai-state-admin-bg:         rgba(192, 132, 252, 0.18);
+  --hai-state-admin-fg:         #f3e8ff;
+  --hai-state-admin-border:     rgba(192, 132, 252, 0.38);
 
-  --hai-state-tier-new-bg:              rgba(255, 255, 255, 0.06);
-  --hai-state-tier-new-fg:              #94a3b8;
-  --hai-state-tier-active-bg:           rgba(96, 165, 250, 0.12);
-  --hai-state-tier-active-fg:           #93c5fd;
-  --hai-state-tier-trusted-bg:          rgba(0, 168, 132, 0.16);
-  --hai-state-tier-trusted-fg:          #00a884;
-  --hai-state-tier-distinguished-bg:    rgba(251, 191, 36, 0.12);
-  --hai-state-tier-distinguished-fg:    #fcd34d;
+  --hai-state-tier-new-bg:              rgba(255, 255, 255, 0.08);
+  --hai-state-tier-new-fg:              #cbd5e1;
+  --hai-state-tier-active-bg:           rgba(96, 165, 250, 0.18);
+  --hai-state-tier-active-fg:           #dbeafe;
+  --hai-state-tier-trusted-bg:          rgba(0, 168, 132, 0.22);
+  --hai-state-tier-trusted-fg:          #b3ebdc;
+  --hai-state-tier-distinguished-bg:    rgba(251, 191, 36, 0.18);
+  --hai-state-tier-distinguished-fg:    #fef3c7;
 
   --hai-state-featured-bg:      rgba(251, 191, 36, 0.12);
   --hai-state-featured-fg:      #fcd34d;
