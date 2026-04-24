@@ -66,9 +66,43 @@ export function openMapPicker(options: {
     bottomCard.appendChild(addressText)
     bottomCard.appendChild(confirmBtn)
 
+    // Full-cover loading screen — satellite tiles + the RTL plugin
+    // fetch can take a few seconds, and the default MapLibre canvas
+    // is blank black until the first tile paints, which feels broken.
+    // This shows the branded HaiLoader over the map container until
+    // map.on('load') fires, then fades itself out.
+    const loadingCover = document.createElement('div')
+    loadingCover.style.cssText = 'position:absolute;inset:0;top:0;background:#0f172a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:3;transition:opacity 220ms ease-out;pointer-events:none;'
+    loadingCover.innerHTML = `
+      <div style="color:#00a884;width:56px;height:56px;">
+        <svg viewBox="0 0 64 64" fill="none" width="56" height="56">
+          <circle cx="32" cy="35" r="6" fill="currentColor">
+            <animate attributeName="opacity" values="1;0.35;1" dur="1.2s" repeatCount="indefinite" />
+          </circle>
+          <circle cx="32" cy="15" r="4" fill="currentColor">
+            <animate attributeName="opacity" values="0.4;1;0.4" dur="1.2s" begin="0s" repeatCount="indefinite" />
+          </circle>
+          <circle cx="48" cy="47" r="4" fill="currentColor">
+            <animate attributeName="opacity" values="0.4;1;0.4" dur="1.2s" begin="0.4s" repeatCount="indefinite" />
+          </circle>
+          <circle cx="16" cy="47" r="4" fill="currentColor">
+            <animate attributeName="opacity" values="0.4;1;0.4" dur="1.2s" begin="0.8s" repeatCount="indefinite" />
+          </circle>
+        </svg>
+      </div>
+      <p style="color:#9ca3af;font-size:12px;margin:0;">${
+        lang === 'en'
+          ? 'Loading map…'
+          : lang === 'ur'
+            ? 'نقشہ لوڈ ہو رہا ہے…'
+            : 'جاري تحميل الخريطة…'
+      }</p>
+    `
+
     overlay.appendChild(header)
     overlay.appendChild(mapContainer)
     overlay.appendChild(bottomCard)
+    overlay.appendChild(loadingCover)
     document.body.appendChild(overlay)
 
     let pin = { lat: centerLat, lng: centerLng }
@@ -214,6 +248,19 @@ export function openMapPicker(options: {
             map.setPaintProperty(layer.id, 'text-color', '#ffffff')
           }
         } catch { /* style may not allow it — non-fatal */ }
+
+        // Fade the loading cover out once the basemap is drawn.
+        // 'load' fires after the style is parsed and the first
+        // viewport tiles finish rendering, which is when the user
+        // can actually see the map.
+        loadingCover.style.opacity = '0'
+        setTimeout(() => { loadingCover.remove() }, 260)
+      })
+      // Also remove the cover if load errors out, so the user isn't
+      // stuck staring at a spinner forever.
+      map.on('error', () => {
+        loadingCover.style.opacity = '0'
+        setTimeout(() => { loadingCover.remove() }, 260)
       })
 
       map.addControl(new ml.NavigationControl({ showCompass: false }), 'top-right')
