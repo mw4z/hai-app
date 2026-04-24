@@ -595,6 +595,16 @@ const SERVER_MSG_MAP: Record<string, { ar: string; en: string; ur: string }> = {
     en: 'Maximum ride distance is 500 km.',
     ur: 'سفر کی زیادہ سے زیادہ مسافت 500 کلومیٹر ہے۔',
   },
+  'Price unrealistically low': {
+    ar: 'السعر منخفض جداً — راجع الإحصاء المقترح وأعد المحاولة.',
+    en: 'Price too low — check the suggested estimate and try again.',
+    ur: 'قیمت بہت کم ہے — تجویز کردہ قیمت دیکھ کر دوبارہ کوشش کریں۔',
+  },
+  'Price unrealistically high': {
+    ar: 'السعر مرتفع جداً — راجع الإحصاء المقترح وأعد المحاولة.',
+    en: 'Price too high — check the suggested estimate and try again.',
+    ur: 'قیمت بہت زیادہ ہے — تجویز کردہ قیمت دیکھ کر دوبارہ کوشش کریں۔',
+  },
 
   // ── Posts: comments ──────────────────────────────────────────────
   'لا يمكنك التعليق على منشورات حي آخر': {
