@@ -84,13 +84,15 @@ export default function MapPicker({ centerLat, centerLng, lang, maptilerKey, onC
       if (!mounted.current || !containerRef.current) return
       const maplibregl = (window as any).maplibregl
 
-      // Request the Arabic-localized variant of the MapTiler style
-      // when the UI is Arabic, otherwise default. Also set once the
-      // map loads so every symbol layer pulls 'name:ar' where
-      // available — fixes the hard-to-read halo'd Latin labels that
-      // appeared over Arabic neighborhoods (الهنداوية / الخالدية).
+      // For Arabic UI use MapTiler's dedicated 'ar' map style —
+      // it ships with a font that renders Arabic ligatures cleanly
+      // (the default streets-v2 has a Latin-tuned halo that broke
+      // Arabic labels like الهنداوية / الخالدية). Other UI languages
+      // keep the default streets-v2.
       const styleUrl = maptilerKey
-        ? `https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}${lang === 'ar' ? '&language=ar' : lang === 'ur' ? '&language=ur' : ''}`
+        ? (lang === 'ar'
+            ? `https://api.maptiler.com/maps/ar/style.json?key=${maptilerKey}`
+            : `https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}${lang === 'ur' ? '&language=ur' : ''}`)
         : 'https://demotiles.maplibre.org/style.json'
       map = new maplibregl.Map({
         container: containerRef.current,
@@ -173,14 +175,31 @@ export default function MapPicker({ centerLat, centerLng, lang, maptilerKey, onC
 
   return (
     <div className="fixed inset-0 z-50 bg-white dark:bg-gray-900 flex flex-col">
-      {/* Header — static, not overlapping map */}
-      <div className="flex-shrink-0 bg-white dark:bg-gray-800 px-4 py-3 flex items-center gap-3 border-b border-gray-100 dark:border-gray-700">
+      {/* Header — static, not overlapping map. Title + subtitle are
+          stacked as a single flex column so the hint can never
+          collide with the title regardless of device notch. The
+          previous absolute-positioned hint at 'top-[70px]' overlapped
+          the header on iPhones with a different header height than
+          the value assumed. */}
+      <div
+        className="flex-shrink-0 bg-white dark:bg-gray-800 px-4 flex items-center gap-3 border-b border-gray-100 dark:border-gray-700"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)', paddingBottom: 10 }}
+      >
         <button onClick={onClose} className="text-gray-400 p-1">
           <FiX className="w-5 h-5" />
         </button>
-        <h2 className="flex-1 text-sm font-bold text-gray-900 dark:text-white text-center">
-          {lang === 'en' ? 'Pick location on map' : lang === 'ur' ? 'نقشے پر مقام منتخب کریں' : 'اختر الموقع على الخريطة'}
-        </h2>
+        <div className="flex-1 flex flex-col items-center gap-0.5">
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">
+            {lang === 'en' ? 'Pick location on map' : lang === 'ur' ? 'نقشے پر مقام منتخب کریں' : 'اختر الموقع على الخريطة'}
+          </h2>
+          <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+            {lang === 'en'
+              ? 'Tap the map or drag the pin'
+              : lang === 'ur'
+                ? 'نقشے پر ٹیپ کریں یا پن گھسیٹیں'
+                : 'انقر على الخريطة أو اسحب الدبوس'}
+          </p>
+        </div>
         <div className="w-6" />
       </div>
 
@@ -193,20 +212,6 @@ export default function MapPicker({ centerLat, centerLng, lang, maptilerKey, onC
           <div className="hai-loader text-primary-600" style={{width:48,height:48}}><svg viewBox="0 0 64 64" fill="none" className="w-full h-full"><circle className="hai-dot hai-dot-center" cx="32" cy="35" r="6" fill="currentColor"/><circle className="hai-dot hai-dot-top" cx="32" cy="15" r="4" fill="currentColor"/><circle className="hai-dot hai-dot-br" cx="48" cy="47" r="4" fill="currentColor"/><circle className="hai-dot hai-dot-bl" cx="16" cy="47" r="4" fill="currentColor"/></svg></div>
         </div>
       )}
-
-      {/* Hint — pinned below the header. 'top-[70px]' previously
-          didn't account for the iOS safe-area-inset-top, so on
-          notched phones the hint overlapped the header title.
-          Offset against env(safe-area-inset-top) so the hint always
-          clears the header regardless of device. */}
-      <div
-        className="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none"
-        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 64px)' }}
-      >
-        <p className="bg-black/60 text-white text-[10px] px-3 py-1.5 rounded-full whitespace-nowrap">
-          {lang === 'ar' ? 'انقر على الخريطة أو اسحب الدبوس' : 'Tap the map or drag the pin'}
-        </p>
-      </div>
 
       {/* Bottom card */}
       <div className="absolute bottom-0 left-0 right-0 z-10 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl px-4 pt-4 pb-6 border-t border-gray-100 dark:border-gray-700">
