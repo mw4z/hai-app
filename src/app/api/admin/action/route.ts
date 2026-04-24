@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { log } from '@/lib/logger'
 import { isOnProbation, getModRestrictions, validateRepReward, checkActionRate, checkConflictOfInterest, logConflictBlock } from '@/lib/mod-safety'
 import { sendSupportReply, sendAdminEmail } from '@/lib/email'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 
 const ADMIN_ROLES = ['NEIGHBORHOOD_MOD', 'PLATFORM_MOD', 'SUPER_ADMIN']
 
@@ -305,10 +306,27 @@ export async function POST(req: NextRequest) {
       if (!mr || mr.status !== 'pending') return NextResponse.json({ error: 'Not found' }, { status: 404 })
       await db.user.update({ where: { id: mr.userId }, data: { role: 'NEIGHBORHOOD_MOD', modApprovedAt: new Date() } })
       await db.modRequest.update({ where: { id: targetId }, data: { status: 'approved', reviewedBy: session.userId, reviewedAt: new Date() } })
-      // Notify the user
+      // Bell row for the bell dropdown
       await db.notification.create({
         data: { userId: mr.userId, type: 'SYSTEM', actorId: session.userId, title: 'تم قبول طلبك', titleEn: 'Request Approved', body: 'أصبحت مشرف حي! يمكنك الآن إدارة حيّك من لوحة التحكم', bodyEn: 'You are now a Neighborhood Mod! Manage your neighborhood from the admin panel.' },
       })
+      // Realtime push to the applicant — the profile banner re-fetches
+      // /api/mod-request on push receipt so the decision lands without
+      // a manual refresh.
+      try {
+        await db.notifJob.create({
+          data: {
+            type: 'mod_request_resolved',
+            priority: 'high',
+            targetType: 'user',
+            targetRef: mr.userId,
+            payload: { requestId: mr.id, status: 'approved' },
+          },
+        })
+        kickNotifCron()
+      } catch (err) {
+        console.error('[MOD_REQUEST] approve push enqueue failed', err)
+      }
       await logAction(session.userId, admin.name, 'approve_mod_request', 'request', targetId, undefined, `user=${mr.userId}`)
       return NextResponse.json({ success: true })
     }
@@ -321,6 +339,22 @@ export async function POST(req: NextRequest) {
       await db.notification.create({
         data: { userId: mr2.userId, type: 'SYSTEM', actorId: session.userId, title: 'تم رفض طلبك', titleEn: 'Request Rejected', body: 'لم يتم قبول طلبك لتكون مشرف حي. يمكنك التقديم مرة أخرى لاحقاً', bodyEn: 'Your mod request was not accepted. You can apply again later.' },
       })
+      // Realtime push to the applicant with the rejection reason so
+      // they see the decision instantly on their phone.
+      try {
+        await db.notifJob.create({
+          data: {
+            type: 'mod_request_resolved',
+            priority: 'high',
+            targetType: 'user',
+            targetRef: mr2.userId,
+            payload: { requestId: mr2.id, status: 'rejected', reason: reason || null },
+          },
+        })
+        kickNotifCron()
+      } catch (err) {
+        console.error('[MOD_REQUEST] reject push enqueue failed', err)
+      }
       await logAction(session.userId, admin.name, 'reject_mod_request', 'request', targetId, reason, `user=${mr2.userId}`)
       return NextResponse.json({ success: true })
     }

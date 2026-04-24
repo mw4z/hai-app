@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { log } from '@/lib/logger'
 import { getModCapacity } from '@/lib/mod-allocation'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 
 /** POST — submit a request to become neighborhood mod */
 export async function POST(req: NextRequest) {
@@ -110,6 +111,66 @@ export async function POST(req: NextRequest) {
         reason: reason.trim(),
       },
     })
+
+    // Notify platform admins so no request sits untriaged. Scoped to
+    // SUPER_ADMIN + PLATFORM_MOD (they're the only roles allowed to
+    // approve/reject). Bell row + push job — same pattern as
+    // user-report fan-out. NEIGHBORHOOD_MODs don't review these
+    // (can't peer-review applicants to their own seat), so they're
+    // intentionally not on this fan-out.
+    try {
+      const requesterRow = await db.user.findUnique({
+        where: { id: session.userId },
+        select: { name: true },
+      })
+      const requesterName = requesterRow?.name || null
+
+      const platformAdmins = await db.user.findMany({
+        where: {
+          status: 'ACTIVE',
+          role: { in: ['SUPER_ADMIN', 'PLATFORM_MOD'] },
+        },
+        select: { id: true },
+      })
+
+      if (platformAdmins.length > 0) {
+        const bellTitle = `طلب مشرف جديد${requesterName ? ` — ${requesterName}` : ''}`
+        const bellTitleEn = `New moderator request${requesterName ? ` — ${requesterName}` : ''}`
+        const bodySnippet = reason.trim().slice(0, 140)
+
+        await db.notification.createMany({
+          data: platformAdmins.map((a) => ({
+            type: 'SYSTEM' as const,
+            userId: a.id,
+            actorId: session.userId,
+            actorName: requesterName || 'النظام',
+            title: bellTitle,
+            titleEn: bellTitleEn,
+            body: bodySnippet,
+            bodyEn: bodySnippet,
+          })),
+        })
+
+        await db.notifJob.createMany({
+          data: platformAdmins.map((a) => ({
+            type: 'mod_request_submitted',
+            priority: 'normal',
+            targetType: 'user',
+            targetRef: a.id,
+            payload: {
+              requestId: request.id,
+              requesterId: session.userId,
+              requesterName,
+              neighborhoodId: user.neighborhoodId,
+              snippet: bodySnippet,
+            },
+          })),
+        })
+        kickNotifCron()
+      }
+    } catch (err) {
+      console.error('[MOD_REQUEST] admin notify failed:', err)
+    }
 
     return NextResponse.json({ id: request.id, capacity: { active: capacity.activeMods, max: capacity.maxMods, level: capacity.level } })
   } catch (error) {

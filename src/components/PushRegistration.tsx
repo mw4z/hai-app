@@ -64,10 +64,8 @@ export default function PushRegistration() {
         await PushNotifications.addListener(
           'pushNotificationReceived',
           (notification) => {
-            console.log(
-              '[PUSH] foreground received:',
-              notification?.data?.type,
-            )
+            const type = notification?.data?.type
+            console.log('[PUSH] foreground received:', type)
             try {
               const title = notification?.title || (notification?.data as any)?.title
               const body = notification?.body || (notification?.data as any)?.body
@@ -76,6 +74,18 @@ export default function PushRegistration() {
             } catch (err) {
               console.error('[PUSH] foreground toast failed:', err)
             }
+
+            // Bridge push → DOM events so screens can react live
+            // without polling. Profile uses hai:mod-request-resolved
+            // to refetch /api/mod-request the instant the admin
+            // approves or rejects.
+            try {
+              if (type === 'mod_request_resolved') {
+                window.dispatchEvent(new CustomEvent('hai:mod-request-resolved', {
+                  detail: notification?.data,
+                }))
+              }
+            } catch {}
           },
         )
       } catch (err) {
@@ -272,6 +282,14 @@ function resolveDeeplink(data: Record<string, string>): string {
 
     case 'user_report':
       return '/mod?tab=user_reports'
+
+    case 'mod_request_submitted':
+      return '/admin?tab=mod_requests'
+
+    case 'mod_request_resolved':
+      // The applicant lands on their profile, where the banner is
+      // the source of truth and re-fetches on focus + push.
+      return '/profile'
 
     case 'emergency_alert':
       return '/feed'

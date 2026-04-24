@@ -172,13 +172,34 @@ export default function ProfileClient({ user, postCount }: Props) {
     setLanguage((localStorage.getItem('hai_language') as Language) || 'ar')
     setSoundsOn(localStorage.getItem('hai_sounds') !== '0')
     setHapticsOn(localStorage.getItem('hai_haptics') !== '0')
-    // Fetch mod request status for RESIDENT users
-    if (user.role === 'RESIDENT') {
-      fetch('/api/mod-request').then(r => r.json()).then(d => {
-        if (d.request) setModRequestStatus(d.request.status)
-      }).catch(() => {})
+
+    // Shared fetcher so we can re-run on focus + on push arrival.
+    const refreshModRequest = () => {
+      if (user.role !== 'RESIDENT') return
+      fetch('/api/mod-request', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(d => { setModRequestStatus(d?.request?.status ?? null) })
+        .catch(() => {})
     }
-  }, [])
+
+    refreshModRequest()
+
+    // Realtime update when an admin decides the request. The server
+    // emits a `mod_request_resolved` push; Capacitor fires
+    // pushNotificationReceived in foreground AND pushNotificationActionPerformed
+    // on tap. Listen for both via a window event bridge dispatched by
+    // PushRegistration. Also refresh on focus as a belt-and-suspenders
+    // for when the push was delivered while the app was suspended.
+    const onPushResolved = () => refreshModRequest()
+    const onFocus = () => refreshModRequest()
+    window.addEventListener('hai:mod-request-resolved', onPushResolved)
+    window.addEventListener('focus', onFocus)
+
+    return () => {
+      window.removeEventListener('hai:mod-request-resolved', onPushResolved)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [user.role])
 
   function applyTheme(t: Theme) {
     setTheme(t)
@@ -492,6 +513,91 @@ export default function ProfileClient({ user, postCount }: Props) {
           <div className="text-xs text-gray-400 mt-0.5">{t('profile_joined')}</div>
         </div>
       </div>
+
+      {/* Mod-request CTA, lifted above the fold so eligible residents
+          see it immediately instead of scrolling to the settings tail.
+          All four states (pending / approved / rejected / form open)
+          share the same logic as the settings version. */}
+      {user.role === 'RESIDENT' && user.neighborhood && user.reputation >= 20 && Math.floor((Date.now() - new Date(user.createdAt).getTime()) / 86400000) >= 7 && (
+        <div className="mx-4 mt-3">
+          {modRequestStatus === 'pending' ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl py-3 px-4 flex items-center gap-2 dark:bg-amber-900/20 dark:border-amber-800">
+              <span className="text-amber-500">⏳</span>
+              <span className="text-sm text-amber-700 dark:text-amber-200 font-medium">{t('mod_request_pending')}</span>
+            </div>
+          ) : modRequestStatus === 'approved' ? (
+            <div className="bg-green-50 border border-green-200 rounded-xl py-3 px-4 flex items-center gap-2 dark:bg-green-900/20 dark:border-green-800">
+              <span className="text-green-500">✅</span>
+              <span className="text-sm text-green-700 dark:text-green-200 font-medium">{t('mod_request_approved')}</span>
+            </div>
+          ) : modRequestStatus === 'rejected' ? (
+            <div className="space-y-2">
+              <div className="bg-red-50 border border-red-200 rounded-xl py-3 px-4 flex items-center gap-2 dark:bg-red-900/20 dark:border-red-800">
+                <span className="text-red-500">❌</span>
+                <span className="text-sm text-red-700 dark:text-red-200 font-medium">{t('mod_request_rejected')}</span>
+              </div>
+              <button
+                onClick={() => { setModRequestStatus(null); setShowModForm(false) }}
+                className="text-xs text-primary-600 font-medium px-4"
+              >{t('mod_request_btn')}</button>
+            </div>
+          ) : showModForm ? (
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">{t('mod_request_title')}</p>
+              <div className="text-xs text-gray-500 space-y-1">
+                <p>• {t('mod_request_req_days')}</p>
+                <p>• {t('mod_request_req_rep')}</p>
+              </div>
+              <textarea
+                value={modReason}
+                onChange={e => setModReason(e.target.value)}
+                placeholder={t('mod_request_reason')}
+                className="w-full border border-gray-200 dark:border-gray-600 rounded-xl p-3 text-sm bg-transparent text-gray-900 dark:text-white resize-none"
+                rows={3}
+                maxLength={500}
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    setModRequestLoading(true)
+                    try {
+                      const res = await fetch('/api/mod-request', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reason: modReason }),
+                      })
+                      const data = await res.json()
+                      if (res.ok) {
+                        setModRequestStatus('pending')
+                        toast.success(t('mod_request_pending'))
+                        setShowModForm(false)
+                      } else {
+                        toast.error(data.error)
+                      }
+                    } catch { toast.error('Error') }
+                    finally { setModRequestLoading(false) }
+                  }}
+                  disabled={modRequestLoading || modReason.trim().length < 10}
+                  className="flex-1 bg-primary-600 text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-50"
+                >{modRequestLoading ? <HaiSpinner /> : t('mod_request_submit')}</button>
+                <button
+                  onClick={() => setShowModForm(false)}
+                  className="px-4 py-2.5 text-sm text-gray-500 font-medium"
+                >{t('mod_request_cancel')}</button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowModForm(true)}
+              className="w-full bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border border-blue-100 dark:border-blue-800 rounded-xl py-3 px-4 flex items-center gap-2 active:bg-blue-100 dark:active:bg-blue-900/50 transition-colors"
+            >
+              <FiStar className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <span className="text-sm text-blue-700 dark:text-blue-300 font-medium flex-1 text-start">{t('mod_request_desc')}</span>
+              <FiChevronLeft className="w-4 h-4 text-blue-300 dark:text-blue-500 ltr:rotate-180" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ═══ Account ═══ */}
       <AccordionSection
@@ -1289,88 +1395,6 @@ export default function ProfileClient({ user, postCount }: Props) {
         <div className="bg-green-50 border border-green-200 text-green-800 rounded-xl py-3 px-4 flex items-center gap-2 text-sm font-medium dark:bg-green-900/20 dark:text-green-200">
           <span>🛡️</span>
           <span>{lang === 'en' ? 'You are a neighborhood moderator.' : 'أنت مشرف حي.'}</span>
-        </div>
-      )}
-
-      {/* Mod request — only for eligible RESIDENT users */}
-      {user.role === 'RESIDENT' && user.neighborhood && user.reputation >= 20 && Math.floor((Date.now() - new Date(user.createdAt).getTime()) / 86400000) >= 7 && (
-        <div>
-          {modRequestStatus === 'pending' ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl py-3 px-4 flex items-center gap-2">
-              <span className="text-amber-500">⏳</span>
-              <span className="text-sm text-amber-700 font-medium">{t('mod_request_pending')}</span>
-            </div>
-          ) : modRequestStatus === 'approved' ? (
-            <div className="bg-green-50 border border-green-200 rounded-xl py-3 px-4 flex items-center gap-2">
-              <span className="text-green-500">✅</span>
-              <span className="text-sm text-green-700 font-medium">{t('mod_request_approved')}</span>
-            </div>
-          ) : modRequestStatus === 'rejected' ? (
-            <div className="space-y-2">
-              <div className="bg-red-50 border border-red-200 rounded-xl py-3 px-4 flex items-center gap-2">
-                <span className="text-red-500">❌</span>
-                <span className="text-sm text-red-700 font-medium">{t('mod_request_rejected')}</span>
-              </div>
-              <button
-                onClick={() => { setModRequestStatus(null); setShowModForm(false) }}
-                className="text-xs text-primary-600 font-medium px-4"
-              >{t('mod_request_btn')}</button>
-            </div>
-          ) : showModForm ? (
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">{t('mod_request_title')}</p>
-              <div className="text-xs text-gray-500 space-y-1">
-                <p>• {t('mod_request_req_days')}</p>
-                <p>• {t('mod_request_req_rep')}</p>
-              </div>
-              <textarea
-                value={modReason}
-                onChange={e => setModReason(e.target.value)}
-                placeholder={t('mod_request_reason')}
-                className="w-full border border-gray-200 dark:border-gray-600 rounded-xl p-3 text-sm bg-transparent text-gray-900 dark:text-white resize-none"
-                rows={3}
-                maxLength={500}
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={async () => {
-                    setModRequestLoading(true)
-                    try {
-                      const res = await fetch('/api/mod-request', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ reason: modReason }),
-                      })
-                      const data = await res.json()
-                      if (res.ok) {
-                        setModRequestStatus('pending')
-                        toast.success(t('mod_request_pending'))
-                        setShowModForm(false)
-                      } else {
-                        toast.error(data.error)
-                      }
-                    } catch { toast.error('Error') }
-                    finally { setModRequestLoading(false) }
-                  }}
-                  disabled={modRequestLoading || modReason.trim().length < 10}
-                  className="flex-1 bg-primary-600 text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-50"
-                >{modRequestLoading ? <HaiSpinner /> : t('mod_request_submit')}</button>
-                <button
-                  onClick={() => setShowModForm(false)}
-                  className="px-4 py-2.5 text-sm text-gray-500 font-medium"
-                >{t('mod_request_cancel')}</button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowModForm(true)}
-              className="w-full bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded-xl py-3 px-4 flex items-center gap-2 active:bg-blue-100 dark:active:bg-blue-900/50 transition-colors"
-            >
-              <FiStar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span className="text-sm text-blue-700 dark:text-blue-300 font-medium flex-1 text-start">{t('mod_request_desc')}</span>
-              <FiChevronLeft className="w-4 h-4 text-blue-300 dark:text-blue-500" />
-            </button>
-          )}
         </div>
       )}
 

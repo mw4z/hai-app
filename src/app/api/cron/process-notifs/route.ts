@@ -917,6 +917,114 @@ async function processUserReport(job: JobRow): Promise<JobOutcome> {
   return 'done'
 }
 
+/**
+ * mod_request_submitted push → platform admin. Fires when a resident
+ * submits a new /api/mod-request. Same delivery shape as user_report:
+ * one job per admin (targetRef), admin-prefs bypassed since this is
+ * operational, banned admins skipped. Deeplinks to /admin so the
+ * admin lands on the review queue directly.
+ */
+async function processModRequestSubmitted(job: JobRow): Promise<JobOutcome> {
+  const p = (job.payload || {}) as {
+    requestId?: string
+    requesterId?: string
+    requesterName?: string | null
+    snippet?: string
+  }
+  const { requestId, requesterName, snippet } = p
+  if (!requestId) return 'dropped'
+
+  const admin = await db.user.findUnique({
+    where: { id: job.targetRef },
+    select: { id: true, role: true, status: true, deviceTokens: true },
+  })
+  if (!admin) return 'dropped'
+  if (admin.status === 'BANNED_TEMP' || admin.status === 'BANNED_PERM') return 'dropped'
+  if (!['SUPER_ADMIN', 'PLATFORM_MOD'].includes(admin.role)) return 'dropped'
+  if (admin.deviceTokens.length === 0) return 'dropped'
+
+  const tokens: TokenWithPlatform[] = admin.deviceTokens.map((t) => ({
+    token: t.token,
+    platform: t.platform,
+  }))
+
+  const title = `🛡️ طلب مشرف جديد${requesterName ? ` — ${requesterName}` : ''}`
+  const body = (snippet || 'طلب جديد لدور مشرف الحي').slice(0, 180)
+
+  const result = await sendPushBatch(tokens, {
+    title,
+    body,
+    priority: 'normal',
+    data: {
+      type: 'mod_request_submitted',
+      requestId,
+      deeplink: 'hai://admin?tab=mod_requests',
+    },
+  })
+
+  await cleanupInvalidTokens(result.invalidTokens, job.id, job.type)
+  if (result.success === 0 && result.failed > 0) {
+    throw new Error(result.firstError || 'all push sends failed')
+  }
+  return 'done'
+}
+
+/**
+ * mod_request_resolved push → the applicant. Fires when an admin
+ * approves or rejects a /api/mod-request. Single-user target
+ * (targetRef = applicantId). The decision flows in realtime because
+ * the push arrives instantly AND the client listens on
+ * pushNotificationReceived to refetch /api/mod-request — so the
+ * profile banner updates without a manual refresh.
+ */
+async function processModRequestResolved(job: JobRow): Promise<JobOutcome> {
+  const p = (job.payload || {}) as {
+    requestId?: string
+    status?: 'approved' | 'rejected'
+    reason?: string | null
+  }
+  const { requestId, status, reason } = p
+  if (!requestId || (status !== 'approved' && status !== 'rejected')) return 'dropped'
+
+  const user = await db.user.findUnique({
+    where: { id: job.targetRef },
+    select: { id: true, status: true, deviceTokens: true },
+  })
+  if (!user) return 'dropped'
+  if (user.status === 'BANNED_TEMP' || user.status === 'BANNED_PERM') return 'dropped'
+  if (user.deviceTokens.length === 0) return 'dropped'
+
+  const tokens: TokenWithPlatform[] = user.deviceTokens.map((t) => ({
+    token: t.token,
+    platform: t.platform,
+  }))
+
+  const title = status === 'approved'
+    ? '✅ تمت الموافقة — أنت الآن مشرف الحي'
+    : '❌ تم رفض طلب الإشراف'
+  const body = status === 'approved'
+    ? 'يمكنك الآن إدارة منشورات حيّك.'
+    : (reason || 'يمكنك إعادة المحاولة لاحقاً.').slice(0, 180)
+
+  const result = await sendPushBatch(tokens, {
+    title,
+    body,
+    priority: 'high',
+    data: {
+      type: 'mod_request_resolved',
+      requestId,
+      status,
+      deeplink: 'hai://profile',
+    },
+  })
+
+  await cleanupInvalidTokens(result.invalidTokens, job.id, job.type)
+  if (result.success === 0 && result.failed > 0) {
+    throw new Error(result.firstError || 'all push sends failed')
+  }
+  return 'done'
+}
+
 /** Short Arabic copy used inside the user-report push body. */
 function reasonCopyForPush(reason: string | undefined): string {
   switch (reason) {
@@ -1323,6 +1431,12 @@ async function handle(req: NextRequest) {
           break
         case 'new_message':
           outcome = await processNewMessage(job)
+          break
+        case 'mod_request_submitted':
+          outcome = await processModRequestSubmitted(job)
+          break
+        case 'mod_request_resolved':
+          outcome = await processModRequestResolved(job)
           break
         default:
           console.warn('[NOTIF_CRON] unsupported type', {
