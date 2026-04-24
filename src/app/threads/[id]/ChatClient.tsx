@@ -170,33 +170,52 @@ export default function ChatClient({
     const root = rootRef.current
     if (!vv || !root) return
 
-    const isNative = !!(window as any).Capacitor?.isNativePlatform?.()
-    let keyboardOpen = false
-
-    const setHeight = (visibleHeight: number) => {
-      root.style.height = `calc(${visibleHeight}px - env(safe-area-inset-top, 0px))`
-      bottomRef.current?.scrollIntoView({ block: 'end' })
-    }
+    const platform = (window as any).Capacitor?.getPlatform?.() || 'web'
+    const isIos = platform === 'ios'
+    const isAndroid = platform === 'android'
 
     const safePad = 'calc(env(safe-area-inset-bottom, 0px) + 10px)'
     const setComposerPad = (pad: string) => {
       if (composerRef.current) composerRef.current.style.paddingBottom = pad
     }
 
+    const setHeight = (visibleHeight: number) => {
+      root.style.height = `calc(${visibleHeight}px - env(safe-area-inset-top, 0px))`
+      bottomRef.current?.scrollIntoView({ block: 'end' })
+    }
+
+    // Android (resize mode: body) — the WebView is resized for us when
+    // the keyboard opens, so visualViewport is the single source of
+    // truth. Keyboard events are noisy and fire after the resize
+    // already happened, so we don't attach them on Android.
+    // iOS (resize mode: native) — visualViewport DOESN'T fire when
+    // the keyboard shows (WKWebView's frame doesn't change), so we
+    // must derive the visible height from Keyboard.willShow's
+    // keyboardHeight value.
+    let keyboardOpen = false
+
     setHeight(vv.height)
     const onVV = () => {
-      // On native, the keyboard events own the height while the
-      // keyboard is up — ignore visualViewport so we don't overwrite
-      // the correct keyboardHeight-based sizing with a slightly
-      // different vv.height.
-      if (isNative && keyboardOpen) return
+      // On iOS while the keyboard is up, the keyboard listener owns
+      // the height. Let vv take over again on keyboardWillHide.
+      if (isIos && keyboardOpen) return
       setHeight(vv.height)
+      // Android: when the keyboard opens the WebView shrinks, so the
+      // composer naturally sits flush to the keyboard top. Keep its
+      // bottom padding tight while keyboard is up, restore safe-area
+      // when fully hidden.
+      if (isAndroid) {
+        // crude-but-reliable: if the viewport is notably shorter than
+        // the window it's because the keyboard is up
+        const keyboardIsOpen = (window.innerHeight - vv.height) > 150
+        setComposerPad(keyboardIsOpen ? '10px' : safePad)
+      }
     }
     vv.addEventListener('resize', onVV)
     vv.addEventListener('scroll', onVV)
 
     let cleanupKb: (() => void) | null = null
-    if (isNative) {
+    if (isIos) {
       import('@capacitor/keyboard').then(({ Keyboard }) => {
         const h1 = Keyboard.addListener('keyboardWillShow', (info) => {
           keyboardOpen = true

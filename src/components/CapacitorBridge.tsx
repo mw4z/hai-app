@@ -44,13 +44,24 @@ export default function CapacitorBridge() {
         await StatusBar.setBackgroundColor({ color: '#00000000' })
       } catch {}
 
-      // Native resize mode makes iOS adjust the WKWebView's content inset
-      // in sync with the keyboard animation (no delay). Default 'body'
-      // mode fires the resize only after the animation finishes, which
-      // causes the composer to lag behind the rising keyboard.
+      // Keyboard resize mode, per-platform:
+      //  iOS → 'native'  — WKWebView content inset tracks the
+      //                    keyboard animation frame-for-frame.
+      //                    Gives the no-delay feel iOS users expect.
+      //  Android → 'body' — with windowSoftInputMode='adjustResize'
+      //                    in the manifest, the OS shrinks the
+      //                    Activity + WebView cleanly. 'body' mode
+      //                    then resizes document.body to match, which
+      //                    is what visualViewport listeners read.
+      //                    'native' on Android caused the composer to
+      //                    float in mid-screen because the inset
+      //                    wasn't being fed back into CSS layout.
       try {
         const { Keyboard, KeyboardResize } = await import('@capacitor/keyboard')
-        await Keyboard.setResizeMode({ mode: KeyboardResize.Native })
+        const platform = window.Capacitor?.getPlatform?.() || 'web'
+        await Keyboard.setResizeMode({
+          mode: platform === 'ios' ? KeyboardResize.Native : KeyboardResize.Body,
+        })
       } catch {}
     }
 
