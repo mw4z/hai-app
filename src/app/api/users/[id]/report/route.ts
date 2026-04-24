@@ -142,19 +142,35 @@ export async function POST(
     const targetName = target.name || null
     const reasonLabel = REASON_LABELS[reason as UserReportReason] || reason
 
-    const admins = await db.user.findMany({
-      where: {
-        status: 'ACTIVE',
-        OR: [
-          { role: 'SUPER_ADMIN' },
-          { role: 'PLATFORM_MOD' },
-          ...(target.neighborhoodId
-            ? [{ role: 'NEIGHBORHOOD_MOD' as const, neighborhoodId: target.neighborhoodId }]
-            : []),
-        ],
-      },
-      select: { id: true },
-    })
+    // Strict neighborhood scoping: each report pings ONLY the mod(s)
+    // of the reported user's own neighborhood. Other neighborhoods'
+    // mods should never get phone/bell notifications about an incident
+    // that isn't theirs. Platform-level admins (SUPER_ADMIN /
+    // PLATFORM_MOD) are used ONLY as a fallback when the reported
+    // user's neighborhood has no active neighborhood mod — otherwise
+    // a report would be silently dropped. SUPER_ADMIN can still see
+    // every report via the dashboard view (unscoped); that's a
+    // separate visibility channel and isn't affected here.
+    let admins: { id: string }[] = []
+    if (target.neighborhoodId) {
+      admins = await db.user.findMany({
+        where: {
+          status: 'ACTIVE',
+          role: 'NEIGHBORHOOD_MOD',
+          neighborhoodId: target.neighborhoodId,
+        },
+        select: { id: true },
+      })
+    }
+    if (admins.length === 0) {
+      admins = await db.user.findMany({
+        where: {
+          status: 'ACTIVE',
+          OR: [{ role: 'SUPER_ADMIN' }, { role: 'PLATFORM_MOD' }],
+        },
+        select: { id: true },
+      })
+    }
 
     if (admins.length > 0) {
       const bellTitle = `🚩 بلاغ جديد عن ${targetName || 'مستخدم'}`
