@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useConfirm } from '@/components/ConfirmProvider'
 import { useRidePoll } from '@/hooks/useRidePoll'
 import { hapticSuccess, hapticMedium, hapticError, hapticWarning } from '@/lib/haptic'
 import StatusBadge from '@/components/rides/StatusBadge'
@@ -45,6 +46,7 @@ const TRIP_STATUS_DISPLAY: Record<string, { icon: string; ar: string; en: string
 export default function RideDetailClient({ rideId, currentUserId }: Props) {
   const router = useRouter()
   const { t, lang } = useLanguage()
+  const confirmDialog = useConfirm()
   const { data: pollData, refetch } = useRidePoll(rideId)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -401,13 +403,17 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                         client poll and the server's truth. */}
                     <button
                       onClick={async () => {
-                        const ok = typeof window !== 'undefined' && window.confirm(
-                          lang === 'en'
-                            ? "Withdraw your offer? The requester won't see it anymore."
+                        const ok = await confirmDialog({
+                          title: lang === 'en' ? 'Withdraw your offer?' : lang === 'ur' ? 'اپنی پیشکش واپس لیں؟' : 'سحب عرضك؟',
+                          message: lang === 'en'
+                            ? "The requester won't see your offer anymore. You can submit a new one later while the ride is still open."
                             : lang === 'ur'
-                              ? 'پیشکش واپس لیں؟ طالب کو یہ نہیں دکھے گی۔'
-                              : 'سحب عرضك؟ لن يراه صاحب الطلب بعد الآن.'
-                        )
+                              ? 'طالب کو آپ کی پیشکش نہیں دکھے گی۔ جب تک درخواست کھلی ہے نئی پیشکش دے سکتے ہیں۔'
+                              : 'لن يرى صاحب الطلب عرضك. يمكنك تقديم عرض جديد لاحقاً ما دام الطلب مفتوحاً.',
+                          confirmText: lang === 'en' ? 'Withdraw' : lang === 'ur' ? 'واپس لیں' : 'سحب العرض',
+                          cancelText: lang === 'en' ? 'Keep it' : lang === 'ur' ? 'رہنے دیں' : 'الاحتفاظ',
+                          variant: 'danger',
+                        })
                         if (!ok) return
                         setActionLoading(true)
                         try {
@@ -588,13 +594,17 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                                 and notifies that driver. */}
                             <button
                               onClick={async () => {
-                                const ok = typeof window !== 'undefined' && window.confirm(
-                                  lang === 'en'
-                                    ? 'Reject this offer? The ride stays open for other offers.'
+                                const ok = await confirmDialog({
+                                  title: lang === 'en' ? 'Reject this offer?' : lang === 'ur' ? 'اس پیشکش کو مسترد کریں؟' : 'رفض هذا العرض؟',
+                                  message: lang === 'en'
+                                    ? 'The ride stays open for other offers.'
                                     : lang === 'ur'
-                                      ? 'اس پیشکش کو مسترد کریں؟ درخواست دوسری پیشکشوں کیلئے کھلی رہے گی۔'
-                                      : 'رفض هذا العرض؟ الطلب يبقى مفتوحاً لعروض أخرى.'
-                                )
+                                      ? 'درخواست دوسری پیشکشوں کیلئے کھلی رہے گی۔'
+                                      : 'الطلب يبقى مفتوحاً لعروض أخرى.',
+                                  confirmText: lang === 'en' ? 'Reject' : lang === 'ur' ? 'مسترد' : 'رفض',
+                                  cancelText: lang === 'en' ? 'Keep' : lang === 'ur' ? 'رہنے دیں' : 'الاحتفاظ',
+                                  variant: 'danger',
+                                })
                                 if (!ok) return
                                 setSelecting(offer.id)
                                 try {
