@@ -172,6 +172,17 @@ export default function NewPostPage() {
     if (draftHasContent(d)) setDraftAvailable(d)
   }, [])
 
+  // Mark the body as full-screen so globals.css swaps the template's
+  // translate slide for a pure opacity crossfade. The slide's transform
+  // creates a containing block that would briefly reparent this page's
+  // `fixed inset-0` <main> during the 280ms animation, making the
+  // whole form look broken on route-in.
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    document.body.setAttribute('data-full-screen', 'true')
+    return () => { document.body.removeAttribute('data-full-screen') }
+  }, [])
+
   function restoreDraft(d: PostDraft) {
     setCategory(d.category || '')
     setTitle(d.title || '')
