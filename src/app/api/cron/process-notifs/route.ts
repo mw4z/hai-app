@@ -930,6 +930,79 @@ function reasonCopyForPush(reason: string | undefined): string {
   }
 }
 
+/**
+ * Emergency-request push → the mod team. Same targeting model as
+ * processUserReport: single admin per job (targetRef), admin-prefs
+ * bypassed because these are operational, critical severity uses
+ * the 'emergency' Android channel for the loud banner.
+ */
+async function processEmergencyAlertRequest(job: JobRow): Promise<JobOutcome> {
+  const p = (job.payload || {}) as {
+    requestId?: string
+    severity?: string
+    requesterName?: string | null
+    title?: string
+  }
+  const { requestId, severity, requesterName, title } = p
+  if (!requestId) return 'dropped'
+
+  const adminId = job.targetRef
+  const admin = await db.user.findUnique({
+    where: { id: adminId },
+    select: {
+      id: true,
+      status: true,
+      role: true,
+      deviceTokens: { select: { token: true, platform: true } },
+    },
+  })
+  if (!admin) return 'dropped'
+  if (admin.status === 'BANNED_TEMP' || admin.status === 'BANNED_PERM') return 'dropped'
+  if (!['SUPER_ADMIN', 'PLATFORM_MOD', 'NEIGHBORHOOD_MOD'].includes(admin.role)) return 'dropped'
+  if (admin.deviceTokens.length === 0) return 'dropped'
+
+  const tokens: TokenWithPlatform[] = admin.deviceTokens.map((t) => ({
+    token: t.token,
+    platform: t.platform,
+  }))
+
+  const emoji = severity === 'critical' ? '🚨' : severity === 'warning' ? '⚠️' : 'ℹ️'
+  const who = requesterName?.trim() || 'جار'
+  const pushTitle = `${emoji} طلب تنبيه طوارئ — ${who}`
+  const pushBody = (title || '').trim().slice(0, 180) || 'راجع قائمة الانتظار'
+  const isCritical = severity === 'critical'
+
+  const result = await sendPushBatch(tokens, {
+    title: pushTitle,
+    body: pushBody,
+    priority: isCritical ? 'high' : 'normal',
+    androidChannel: isCritical ? 'emergency' : undefined,
+    data: {
+      type: 'emergency_alert_request',
+      requestId,
+      severity: severity || 'info',
+      deeplink: 'hai://mod?tab=emergency_requests',
+    },
+  })
+
+  await cleanupInvalidTokens(result.invalidTokens, job.id, job.type)
+
+  console.log('[NOTIF_CRON] job delivered', {
+    jobId: job.id,
+    type: job.type,
+    targetRef: job.targetRef,
+    attempts: job.attempts,
+    tokensSent: tokens.length,
+    success: result.success,
+    failed: result.failed,
+  })
+
+  if (result.success === 0 && result.failed > 0) {
+    throw new Error(result.firstError || 'all push sends failed')
+  }
+  return 'done'
+}
+
 // ── Main handler ─────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   return handle(req)
@@ -1027,6 +1100,9 @@ async function handle(req: NextRequest) {
           break
         case 'user_report':
           outcome = await processUserReport(job)
+          break
+        case 'emergency_alert_request':
+          outcome = await processEmergencyAlertRequest(job)
           break
         default:
           console.warn('[NOTIF_CRON] unsupported type', {

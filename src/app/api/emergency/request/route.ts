@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { requireVerified } from '@/lib/requireVerified'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { id: true, status: true, neighborhoodId: true, role: true },
+    select: { id: true, name: true, status: true, neighborhoodId: true, role: true },
   })
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const bypass = isSuperAdminRole(user.role)
@@ -127,6 +128,84 @@ export async function POST(req: NextRequest) {
       neighborhoodId: user.neighborhoodId,
       severity,
     })
+
+    // ── Notify the mod team ──────────────────────────────────────
+    // Strictly the requester's own NEIGHBORHOOD_MOD(s) + every
+    // SUPER_ADMIN. Mods for other neighborhoods never receive a
+    // notification about another neighborhood's emergency request.
+    ;(async () => {
+      try {
+        const [superAdmins, nbhdMods] = await Promise.all([
+          db.user.findMany({
+            where: { status: 'ACTIVE', role: 'SUPER_ADMIN' },
+            select: { id: true },
+          }),
+          db.user.findMany({
+            where: {
+              status: 'ACTIVE',
+              role: 'NEIGHBORHOOD_MOD',
+              neighborhoodId: user.neighborhoodId!,
+            },
+            select: { id: true },
+          }),
+        ])
+        const seen = new Set<string>()
+        const admins = [...superAdmins, ...nbhdMods].filter((a) => {
+          if (seen.has(a.id)) return false
+          seen.add(a.id)
+          return true
+        })
+        if (admins.length === 0) return
+
+        const severityEmoji = severity === 'critical' ? '🚨' : severity === 'warning' ? '⚠️' : 'ℹ️'
+        const requesterName = user.name || 'جار'
+        const bellTitle = `${severityEmoji} طلب تنبيه طوارئ — ${requesterName}`
+        const bellTitleEn = `${severityEmoji} Emergency request — ${requesterName}`
+        const bodySnippet = title.slice(0, 140)
+
+        await db.notification.createMany({
+          data: admins.map((a) => ({
+            type: 'SYSTEM' as const,
+            userId: a.id,
+            actorId: user.id,
+            actorName: requesterName,
+            title: bellTitle,
+            titleEn: bellTitleEn,
+            body: bodySnippet,
+            bodyEn: bodySnippet,
+          })),
+        })
+        await db.notifJob.createMany({
+          data: admins.map((a) => ({
+            type: 'emergency_alert_request',
+            // critical → high priority so mods get an immediate banner
+            priority: severity === 'critical' ? 'high' : 'normal',
+            targetType: 'user',
+            targetRef: a.id,
+            payload: {
+              requestId: request.id,
+              severity,
+              requesterId: user.id,
+              requesterName,
+              neighborhoodId: user.neighborhoodId,
+              title,
+            },
+          })),
+        })
+        console.log('[EMERGENCY_REQUEST] fan-out computed', {
+          requestId: request.id,
+          requesterId: user.id,
+          requesterNeighborhoodId: user.neighborhoodId,
+          superAdminCount: superAdmins.length,
+          nbhdModCount: nbhdMods.length,
+          totalRecipients: admins.length,
+        })
+        kickNotifCron()
+      } catch (err) {
+        console.error('[EMERGENCY_REQUEST] admin notify failed', err)
+      }
+    })()
+
     return NextResponse.json(request)
   } catch (err) {
     console.error('[EMERGENCY_REQUEST] create failed', err)
