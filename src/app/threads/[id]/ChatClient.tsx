@@ -128,7 +128,47 @@ export default function ChatClient({
   const confirmDialog = useConfirm()
   const attachContact = useAttachContact()
   const router = useRouter()
-  const [messages, setMessages] = useState(initialMessages)
+  // Seed messages from a localStorage cache synchronously on first
+  // render. If the cache has strictly MORE (newer) messages than the
+  // server-rendered initialMessages — meaning the user just sent
+  // something before bouncing out and back — we prefer the cache.
+  // Otherwise we trust initialMessages (server is authoritative on a
+  // cold navigation). Either way the imperative refreshOnce() below
+  // reconciles with the server within a few hundred ms.
+  const [messages, setMessages] = useState<Msg[]>(() => {
+    if (typeof window === 'undefined') return initialMessages
+    try {
+      const raw = localStorage.getItem(`hai_chat_cache_${threadId}`)
+      if (!raw) return initialMessages
+      const cached: Msg[] = JSON.parse(raw)
+      if (!Array.isArray(cached) || cached.length === 0) return initialMessages
+      const cachedIds = new Set(cached.map((m: any) => m.id))
+      const initialIds = new Set(initialMessages.map((m: any) => m.id))
+      // Prefer cache when it's a strict superset of initial (has
+      // recently-sent messages the server render hadn't captured yet).
+      const cacheIsAheadOfInitial = cached.some((m: any) => !initialIds.has(m.id))
+      const initialHasNew = initialMessages.some((m: any) => !cachedIds.has(m.id))
+      if (cacheIsAheadOfInitial && !initialHasNew) return cached
+      return initialMessages
+    } catch { return initialMessages }
+  })
+
+  // Persist the current message list to localStorage so the next visit
+  // can seed instantly. Debounced by React's batching — effects run
+  // after every commit, but the work is cheap (stringify + set item).
+  useEffect(() => {
+    try {
+      // Strip volatile/local-only fields that shouldn't outlive the session
+      const serializable = messages.map((m: any) => {
+        const { localPreview, pending, ...rest } = m
+        return rest
+      })
+      localStorage.setItem(
+        `hai_chat_cache_${threadId}`,
+        JSON.stringify(serializable.slice(-100)), // cap at 100 msgs
+      )
+    } catch { /* quota / disabled storage — non-fatal */ }
+  }, [messages, threadId])
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [replyingTo, setReplyingTo] = useState<Msg | null>(null)
@@ -1139,7 +1179,7 @@ export default function ChatClient({
           </div>
         )
       ) : (
-        <div ref={composerRef} className="glass-bottom px-3 w-full max-w-[480px] mx-auto z-20 overflow-hidden flex-shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
+        <div ref={composerRef} className="glass-bottom px-3 w-full max-w-[480px] mx-auto z-20 flex-shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
           {/* Reply preview bar */}
           {replyingTo && (
             <div className="flex items-center gap-2 px-1 pt-2 pb-1">
@@ -1172,7 +1212,7 @@ export default function ChatClient({
               }} />
             <div className="flex items-center gap-1">
               <button onClick={() => setShowImageSheet(true)} disabled={sendingImage}
-                className="p-2.5 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50">
+                className="p-2 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50 flex-shrink-0">
                 <FiCamera className={`w-5 h-5 ${sendingImage ? 'animate-pulse' : ''}`} />
               </button>
               <button onClick={async () => {
@@ -1183,11 +1223,11 @@ export default function ChatClient({
                 }}
                 aria-label={t('attach_contact')}
                 title={t('attach_contact')}
-                className="p-2.5 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all">
+                className="p-2 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all flex-shrink-0">
                 <FiUser className="w-5 h-5" />
               </button>
               <button data-tour="chat-location" onClick={() => setShowLocationConfirm(true)} disabled={sendingLocation}
-                className="p-2.5 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50">
+                className="p-2 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50 flex-shrink-0">
                 <FiMapPin className={`w-5 h-5 ${sendingLocation ? 'animate-pulse' : ''}`} />
               </button>
             </div>
