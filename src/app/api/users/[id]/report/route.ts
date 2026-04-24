@@ -148,17 +148,50 @@ export async function POST(
     // about an incident that isn't theirs. PLATFORM_MOD is not in the
     // fan-out; they can still view everything from the mod dashboard
     // but won't receive per-report pushes.
-    const admins = await db.user.findMany({
-      where: {
-        status: 'ACTIVE',
-        OR: [
-          { role: 'SUPER_ADMIN' },
-          ...(target.neighborhoodId
-            ? [{ role: 'NEIGHBORHOOD_MOD' as const, neighborhoodId: target.neighborhoodId }]
-            : []),
-        ],
-      },
-      select: { id: true },
+    //
+    // Implemented as two separate queries (SUPER_ADMIN, then scoped
+    // NEIGHBORHOOD_MOD) and merged, so the neighborhood filter is
+    // applied unambiguously — the compound OR above has tripped
+    // people before when a Prisma client cache returned a matching
+    // row from the wrong branch.
+    const [superAdmins, nbhdMods] = await Promise.all([
+      db.user.findMany({
+        where: { status: 'ACTIVE', role: 'SUPER_ADMIN' },
+        select: { id: true, role: true, neighborhoodId: true },
+      }),
+      target.neighborhoodId
+        ? db.user.findMany({
+            where: {
+              status: 'ACTIVE',
+              role: 'NEIGHBORHOOD_MOD',
+              neighborhoodId: target.neighborhoodId,
+            },
+            select: { id: true, role: true, neighborhoodId: true },
+          })
+        : Promise.resolve([] as { id: string; role: string; neighborhoodId: string | null }[]),
+    ])
+    const adminDetails = [...superAdmins, ...nbhdMods]
+    // Defensive de-dup in case the same user shows up in both lists
+    // somehow (e.g. a SUPER_ADMIN who also has neighborhoodId set).
+    const seen = new Set<string>()
+    const admins = adminDetails.filter((a) => {
+      if (seen.has(a.id)) return false
+      seen.add(a.id)
+      return true
+    })
+
+    console.log('[USER_REPORT] fan-out computed', {
+      reportId: created.id,
+      reportedUserId: targetUserId,
+      reportedNeighborhoodId: target.neighborhoodId,
+      superAdminCount: superAdmins.length,
+      nbhdModCount: nbhdMods.length,
+      totalRecipients: admins.length,
+      recipients: admins.map((a) => ({
+        id: a.id,
+        role: a.role,
+        neighborhoodId: a.neighborhoodId,
+      })),
     })
 
     if (admins.length > 0) {
