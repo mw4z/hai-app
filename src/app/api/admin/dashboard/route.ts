@@ -82,13 +82,14 @@ export async function GET() {
     db.city.findMany({
       select: { name: true, _count: { select: { neighborhoods: true } } },
     }),
-    // Pending user-level reports — scoped like the post count above
+    // Pending user-level reports — scoped by REPORTER's neighborhood
+    // to match the mod dashboard's list view.
     db.userReport.count({
       where: {
         status: 'PENDING',
         ...(isPlatform
           ? {}
-          : { reportedUser: { neighborhoodId: admin.neighborhoodId! } }),
+          : { reporter: { neighborhoodId: admin.neighborhoodId! } }),
       },
     }),
   ])

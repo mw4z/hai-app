@@ -67,10 +67,13 @@ export async function POST(
   })
   if (!target) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
-  // Reporter state — used for bypass + rate limiting
+  // Reporter state — used for bypass + rate limiting + admin routing.
+  // The reporter's own neighborhoodId drives the mod fan-out so that a
+  // resident's reports land with their local mod team, not with mods
+  // of whichever neighborhood the target happens to live in.
   const reporter = await db.user.findUnique({
     where: { id: session.userId },
-    select: { role: true, status: true },
+    select: { role: true, status: true, name: true, neighborhoodId: true },
   })
   const bypass = isSuperAdminRole(reporter?.role)
   if (!bypass && (reporter?.status === 'BANNED_TEMP' || reporter?.status === 'BANNED_PERM')) {
@@ -130,41 +133,30 @@ export async function POST(
     })
 
     // ── Notify the mod team ─────────────────────────────────────────
-    // Scope: the reported user's own neighborhood mods (if any) + every
-    // platform-level admin. Fire-and-forget so a slow push provider
-    // doesn't block the reporter's UI. Each admin gets both an in-app
-    // Notification (bell badge) and a NotifJob row (phone push).
-    const reporterUser = await db.user.findUnique({
-      where: { id: session.userId },
-      select: { name: true },
-    })
-    const reporterName = reporterUser?.name || null
+    // Scope: the REPORTER's own neighborhood mods plus every
+    // SUPER_ADMIN. The reporter is the resident the mod team serves,
+    // so their local mods see the report even when the reported user
+    // belongs to a different neighborhood. SUPER_ADMIN is always
+    // included as platform-wide backstop. PLATFORM_MOD does not
+    // receive per-report pushes; they can still view everything via
+    // the mod dashboard. Mods for any other neighborhood never get
+    // pinged.
+    const reporterName = reporter?.name || null
+    const reporterNeighborhoodId = reporter?.neighborhoodId || null
     const targetName = target.name || null
     const reasonLabel = REASON_LABELS[reason as UserReportReason] || reason
 
-    // Strict scoping: a report pings ONLY the NEIGHBORHOOD_MOD(s) of
-    // the reported user's own neighborhood plus every SUPER_ADMIN.
-    // Other neighborhoods' mods never get a phone push or bell ping
-    // about an incident that isn't theirs. PLATFORM_MOD is not in the
-    // fan-out; they can still view everything from the mod dashboard
-    // but won't receive per-report pushes.
-    //
-    // Implemented as two separate queries (SUPER_ADMIN, then scoped
-    // NEIGHBORHOOD_MOD) and merged, so the neighborhood filter is
-    // applied unambiguously — the compound OR above has tripped
-    // people before when a Prisma client cache returned a matching
-    // row from the wrong branch.
     const [superAdmins, nbhdMods] = await Promise.all([
       db.user.findMany({
         where: { status: 'ACTIVE', role: 'SUPER_ADMIN' },
         select: { id: true, role: true, neighborhoodId: true },
       }),
-      target.neighborhoodId
+      reporterNeighborhoodId
         ? db.user.findMany({
             where: {
               status: 'ACTIVE',
               role: 'NEIGHBORHOOD_MOD',
-              neighborhoodId: target.neighborhoodId,
+              neighborhoodId: reporterNeighborhoodId,
             },
             select: { id: true, role: true, neighborhoodId: true },
           })
@@ -182,6 +174,8 @@ export async function POST(
 
     console.log('[USER_REPORT] fan-out computed', {
       reportId: created.id,
+      reporterId: session.userId,
+      reporterNeighborhoodId,
       reportedUserId: targetUserId,
       reportedNeighborhoodId: target.neighborhoodId,
       superAdminCount: superAdmins.length,

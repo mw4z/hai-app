@@ -18,11 +18,13 @@ export default async function ModPage() {
   const nbId = user.neighborhoodId
   const isPlatform = user.role === 'PLATFORM_MOD' || user.role === 'SUPER_ADMIN'
 
-  // Account-level user reports. Neighborhood mods only see reports
-  // against users in their neighborhood; platform-level admins see all.
+  // Account-level user reports. Routed by the REPORTER's neighborhood
+  // — the mod team serves residents, so their local mods see reports
+  // filed by those residents, regardless of which neighborhood the
+  // reported user lives in. Platform-level admins see everything.
   const userReportWhere = isPlatform
     ? { status: 'PENDING' as const }
-    : { status: 'PENDING' as const, reportedUser: { neighborhoodId: nbId } }
+    : { status: 'PENDING' as const, reporter: { neighborhoodId: nbId } }
 
   const [reportedPosts, hiddenPosts, bannedUsers, recentLogs, userReports, stats] = await Promise.all([
     // Reported posts in their neighborhood

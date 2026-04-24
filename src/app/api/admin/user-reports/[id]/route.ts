@@ -52,17 +52,19 @@ export async function PATCH(
       id: true,
       reportedUserId: true,
       status: true,
+      reporter: { select: { neighborhoodId: true } },
       reportedUser: { select: { neighborhoodId: true, role: true } },
     },
   })
   if (!report) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
-  // Scope: NEIGHBORHOOD_MOD can only resolve reports against users in
-  // their own neighborhood. Also, no admin below SUPER_ADMIN can resolve
-  // a report against another admin account.
+  // Scope: NEIGHBORHOOD_MOD can only resolve reports filed by a
+  // resident of their own neighborhood (matches the fan-out + list
+  // view). Also, no admin below SUPER_ADMIN can resolve a report
+  // against another admin account.
   const isPlatform = admin.role === 'PLATFORM_MOD' || admin.role === 'SUPER_ADMIN'
   if (!isPlatform) {
-    if (report.reportedUser.neighborhoodId !== admin.neighborhoodId) {
+    if (report.reporter?.neighborhoodId !== admin.neighborhoodId) {
       return NextResponse.json({ error: 'forbidden' }, { status: 403 })
     }
   }
