@@ -13,7 +13,7 @@ import {
   FiMapPin, FiStar, FiFileText, FiLogOut, FiCamera,
   FiUser, FiPhone, FiMail, FiGlobe, FiSun, FiMoon,
   FiMonitor, FiCheck, FiChevronLeft, FiChevronDown, FiEdit2, FiBell,
-  FiSettings, FiHelpCircle, FiAward, FiShield, FiBookmark, FiX, FiShare2, FiUpload,
+  FiSettings, FiHelpCircle, FiAward, FiShield, FiBookmark, FiX, FiShare2, FiUpload, FiSlash,
   FiVolume2, FiVolumeX
 } from 'react-icons/fi'
 import { setSoundsEnabled, playTap } from '@/lib/sound'
@@ -1215,6 +1215,18 @@ export default function ProfileClient({ user, postCount }: Props) {
       </AccordionSection>
       </div>
 
+      {/* ═══ Blocked users — manage people you've blocked ═══ */}
+      <AccordionSection
+        icon={<FiSlash className="w-4 h-4" />}
+        label={lang === 'en' ? 'Blocked Users' : lang === 'ur' ? 'بلاک شدہ صارفین' : 'المستخدمون المحظورون'}
+        hint={lang === 'en' ? 'View and unblock anyone you blocked' : lang === 'ur' ? 'جن کو بلاک کیا انہیں ان بلاک کریں' : 'عرض وإلغاء حظر من حظرتهم'}
+        sectionKey="blocked"
+        openSection={openSection}
+        setOpenSection={setOpenSection}
+      >
+        <BlockedUsersSettings lang={lang} />
+      </AccordionSection>
+
       {/* ═══ Invite / Share App ═══ */}
       <div data-tour="profile-invite">
       <AccordionSection
@@ -1845,6 +1857,95 @@ function BookmarkedPosts({ lang, currentUserId }: { lang: string; currentUserId:
         </>
       )}
     </>
+  )
+}
+
+/**
+ * List of users this person has blocked, with an unblock button per row.
+ * Backed by GET/DELETE /api/users/block which already existed — this is
+ * purely the missing UI surface for the existing server endpoints.
+ */
+function BlockedUsersSettings({ lang }: { lang: string }) {
+  const [items, setItems] = useState<Array<{ userId: string; name: string | null; avatarUrl: string | null; blockedAt: string }> | null>(null)
+  const [pending, setPending] = useState<string | null>(null)
+  const dn = (ar: string, en: string, ur?: string) => lang === 'en' ? en : lang === 'ur' ? (ur ?? ar) : ar
+
+  useEffect(() => {
+    fetch('/api/users/block', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setItems(Array.isArray(data) ? data : []))
+      .catch(() => setItems([]))
+  }, [])
+
+  async function unblock(userId: string) {
+    if (pending) return
+    setPending(userId)
+    try {
+      const res = await fetch(`/api/users/block?userId=${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        setItems((prev) => (prev ? prev.filter((b) => b.userId !== userId) : prev))
+        toast.success(dn('تم إلغاء الحظر', 'Unblocked', 'ان بلاک ہو گیا'))
+      } else {
+        toast.error(dn('تعذر إلغاء الحظر', 'Could not unblock', 'ان بلاک نہیں ہو سکا'))
+      }
+    } catch {
+      toast.error(dn('تعذر إلغاء الحظر', 'Could not unblock', 'ان بلاک نہیں ہو سکا'))
+    } finally {
+      setPending(null)
+    }
+  }
+
+  if (items === null) {
+    return <p className="text-xs text-gray-400 py-2">{dn('جاري التحميل…', 'Loading…', 'لوڈ ہو رہا ہے…')}</p>
+  }
+  if (items.length === 0) {
+    return (
+      <p className="text-xs text-gray-500 dark:text-gray-400 py-2">
+        {dn(
+          'لا يوجد مستخدمون محظورون.',
+          'You haven’t blocked anyone.',
+          'آپ نے کسی کو بلاک نہیں کیا۔',
+        )}
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {items.map((b) => (
+        <div
+          key={b.userId}
+          className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl px-3 py-2"
+        >
+          {b.avatarUrl ? (
+            <img src={b.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300 flex-shrink-0">
+              {b.name?.[0] || '؟'}
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+              {b.name || dn('مستخدم', 'User', 'صارف')}
+            </p>
+            <p className="text-[10px] text-gray-400">
+              {dn('تم الحظر', 'Blocked', 'بلاک کیا گیا')} {new Date(b.blockedAt).toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-SA', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </p>
+          </div>
+          <button
+            onClick={() => unblock(b.userId)}
+            disabled={pending === b.userId}
+            className="text-xs font-medium text-primary-600 dark:text-primary-400 px-3 py-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/30 disabled:opacity-50 flex-shrink-0"
+          >
+            {pending === b.userId
+              ? dn('جارٍ…', '…', '…')
+              : dn('إلغاء الحظر', 'Unblock', 'ان بلاک')}
+          </button>
+        </div>
+      ))}
+    </div>
   )
 }
 
