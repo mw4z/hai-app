@@ -78,10 +78,10 @@ export async function notifyNewOffer(
   await notifyRide({
     userId: requesterId,
     type: 'RIDE_OFFER',
-    titleAr: 'عرض جديد على طلبك',
-    titleEn: 'New offer on your ride',
-    bodyAr: `${driverName} عرض ${price} ريال`,
-    bodyEn: `${driverName} offered ${price} SAR`,
+    titleAr: `🚗 عرض جديد — ${driverName}`,
+    titleEn: `🚗 New offer — ${driverName}`,
+    bodyAr: `${price} ريال • اضغط للتفاصيل`,
+    bodyEn: `${price} SAR • tap to view`,
     actorId: driverId,
     rideRequestId,
   })
@@ -98,10 +98,10 @@ export async function notifyDriverSelected(
   await notifyRide({
     userId: driverId,
     type: 'RIDE_STATUS',
-    titleAr: 'تم اختيارك!',
-    titleEn: 'You were selected!',
-    bodyAr: 'أكّد خلال 5 دقائق',
-    bodyEn: 'Confirm within 5 minutes',
+    titleAr: '🎯 تم اختيارك!',
+    titleEn: '🎯 You were selected!',
+    bodyAr: 'أكّد خلال 5 دقائق — اضغط الآن',
+    bodyEn: 'Confirm within 5 minutes — tap now',
     actorId: requesterId,
     rideRequestId,
   })
@@ -118,10 +118,10 @@ export async function notifyOffersPassed(
     await notifyRide({
       userId: driverId,
       type: 'RIDE_STATUS',
-      titleAr: 'تم اختيار شخص آخر',
-      titleEn: 'Another person was selected',
-      bodyAr: 'يمكنك تقديم عروض على طلبات أخرى',
-      bodyEn: 'You can submit offers on other rides',
+      titleAr: '🫶 شكراً على العرض',
+      titleEn: '🫶 Thanks for offering',
+      bodyAr: 'تم اختيار جار آخر هذه المرة — في أمان الله',
+      bodyEn: "Another neighbor was picked this time — you'll get the next one",
       actorId: 'system',
       rideRequestId,
     })
@@ -157,10 +157,10 @@ export async function notifyTripCompleted(
   driverId: string,
   rideRequestId: string,
 ): Promise<void> {
-  const titleAr = 'اكتمل المشوار'
-  const titleEn = 'Ride completed'
-  const bodyAr = 'قيّم تجربتك'
-  const bodyEn = 'Rate your experience'
+  const titleAr = '🎉 اكتمل المشوار بأمان'
+  const titleEn = '🎉 Ride completed safely'
+  const bodyAr = 'قيّم تجربتك بنجمة أو أكثر ⭐'
+  const bodyEn = 'Rate your experience ⭐'
 
   await Promise.all([
     notifyRide({ userId: requesterId, type: 'RIDE_STATUS', titleAr, titleEn, bodyAr, bodyEn, actorId: driverId, rideRequestId }),
@@ -178,10 +178,10 @@ export async function notifyConfirmTimeout(
   await notifyRide({
     userId: requesterId,
     type: 'RIDE_STATUS',
-    titleAr: 'لم يتم الرد',
-    titleEn: 'No response received',
-    bodyAr: 'طلبك مفتوح مجدداً للعروض',
-    bodyEn: 'Your request is open for offers again',
+    titleAr: '⏰ السائق لم يؤكّد في الوقت',
+    titleEn: '⏰ Driver didn’t confirm in time',
+    bodyAr: 'طلبك مفتوح مجدداً — في انتظار عروض جديدة',
+    bodyEn: 'Your ride is open again — waiting for new offers',
     actorId: 'system',
     rideRequestId,
   })

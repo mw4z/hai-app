@@ -377,20 +377,20 @@ interface JobRow {
 }
 
 const CATEGORY_LABEL_AR: Record<string, string> = {
-  ALERT: 'تنبيه',
-  NEIGHBORHOOD_ISSUE: 'مشكلة بالحي',
-  LOST_FOUND: 'مفقودات',
-  MARKETPLACE: 'سوق',
-  FOOD_HOME: 'طبخ منزلي',
-  REAL_ESTATE: 'عقار',
-  SERVICES: 'خدمة',
-  LOOKING_FOR: 'أبحث عن',
-  MOSQUE: 'مسجد',
-  EID_RAMADAN: 'مناسبات',
-  CONTESTS: 'مسابقة',
-  RIDE_REQUEST: 'توصيل',
-  WOMEN_ONLY: 'للنساء',
-  GENERAL: 'عام',
+  ALERT: '🔔 تنبيه',
+  NEIGHBORHOOD_ISSUE: '⚠️ مشكلة بالحي',
+  LOST_FOUND: '🔍 مفقودات',
+  MARKETPLACE: '🛒 سوق',
+  FOOD_HOME: '🍱 طبخ منزلي',
+  REAL_ESTATE: '🏠 عقار',
+  SERVICES: '🔧 خدمة',
+  LOOKING_FOR: '🙋 أبحث عن',
+  MOSQUE: '🕌 مسجد',
+  EID_RAMADAN: '🎉 مناسبات',
+  CONTESTS: '🏆 مسابقة',
+  RIDE_REQUEST: '🚗 توصيل',
+  WOMEN_ONLY: '👩 للنساء',
+  GENERAL: '💬 عام',
 }
 
 async function processNewPost(job: JobRow): Promise<JobOutcome> {
@@ -508,8 +508,8 @@ async function processCommentOnPost(job: JobRow): Promise<JobOutcome> {
   if (tokens.length === 0) return 'dropped'
 
   const actor = actorName?.trim() || 'جار'
-  const pushTitle = `${actor} علّق على منشورك`
-  const pushBody = (snippet || '').trim().slice(0, 180) || 'اضغط للعرض'
+  const pushTitle = `💬 ${actor} علّق على منشورك`
+  const pushBody = (snippet || '').trim().slice(0, 180) || 'اضغط لقراءة التعليق'
 
   const result = await sendPushBatch(tokens, {
     title: pushTitle,
@@ -593,8 +593,8 @@ async function processReplyToComment(job: JobRow): Promise<JobOutcome> {
   if (tokens.length === 0) return 'dropped'
 
   const actor = actorName?.trim() || 'جار'
-  const pushTitle = `${actor} رد على تعليقك`
-  const pushBody = (snippet || '').trim().slice(0, 180) || 'اضغط للعرض'
+  const pushTitle = `↩️ ${actor} رد على تعليقك`
+  const pushBody = (snippet || '').trim().slice(0, 180) || 'اضغط لقراءة الرد'
 
   const result = await sendPushBatch(tokens, {
     title: pushTitle,
@@ -661,11 +661,11 @@ async function processReactionOnPost(job: JobRow): Promise<JobOutcome> {
   let pushTitle: string
   if (count === 1) {
     const actor = (actorNames[0] || '').trim() || 'جار'
-    pushTitle = `${actor} تفاعل مع منشورك`
+    pushTitle = `❤️ ${actor} تفاعل مع منشورك`
   } else {
-    pushTitle = `${count} جيران تفاعلوا مع منشورك`
+    pushTitle = `❤️ ${count} جيران تفاعلوا مع منشورك`
   }
-  const pushBody = 'اضغط للعرض'
+  const pushBody = 'اضغط لرؤية المنشور'
 
   const result = await sendPushBatch(tokens, {
     title: pushTitle,
