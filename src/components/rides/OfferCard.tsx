@@ -4,6 +4,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import RiyalIcon from '@/components/RiyalIcon'
 import UserBadgeDisplay from '@/components/UserBadge'
 import { FiStar, FiClock, FiTruck } from 'react-icons/fi'
+import { HaiSpinner } from '@/components/HaiLoader'
 
 interface Offer {
   id: string
@@ -99,7 +100,7 @@ export default function OfferCard({ offer, badge, isRequester, rideStatus, onSel
           disabled={selecting}
           className="mt-3 w-full bg-primary-600 text-white rounded-xl py-2.5 text-sm font-semibold active:scale-[0.98] transition-transform disabled:opacity-50"
         >
-          {selecting ? '...' : t('ride_select')}
+          {selecting ? <HaiSpinner /> : t('ride_select')}
         </button>
       )}
 

@@ -12,6 +12,7 @@ import {
 } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useConfirm, usePrompt } from './ConfirmProvider'
+import { HaiSpinner } from './HaiLoader'
 
 type Severity = 'critical' | 'warning' | 'info'
 
@@ -307,7 +308,7 @@ export default function EmergencyCreator() {
                     className="py-2 bg-red-600 text-white font-bold text-xs rounded-lg active:scale-95 transition-transform disabled:opacity-50 flex items-center justify-center gap-1"
                   >
                     <FiCheck className="w-3 h-3" />
-                    {busy ? dn('...', '...') : dn('موافقة وإرسال', 'Approve & send')}
+                    {busy ? <HaiSpinner /> : dn('موافقة وإرسال', 'Approve & send')}
                   </button>
                 </div>
               </div>

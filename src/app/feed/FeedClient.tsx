@@ -6,6 +6,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import PostCard from '@/components/PostCard'
 import PollCard from '@/components/PollCard'
+import { HaiSpinner } from '@/components/HaiLoader'
 import EmergencyBanner from '@/components/EmergencyBanner'
 import InviteLeaderboardCard from '@/components/InviteLeaderboardCard'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
@@ -597,7 +598,7 @@ export default function FeedClient({
                   setPollLoading(false)
                 }} disabled={pollLoading}
                   className="flex-1 bg-purple-600 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-40 active:scale-[0.97]">
-                  {pollLoading ? '...' : t('poll_publish')}
+                  {pollLoading ? <HaiSpinner /> : t('poll_publish')}
                 </button>
                 <button onClick={() => setShowPollForm(false)} className="px-4 py-2.5 text-sm text-gray-500">{lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء'}</button>
               </div>

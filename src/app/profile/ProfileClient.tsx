@@ -17,6 +17,7 @@ import {
   FiVolume2, FiVolumeX
 } from 'react-icons/fi'
 import { setSoundsEnabled, playTap } from '@/lib/sound'
+import HaiLoader, { HaiSpinner } from '@/components/HaiLoader'
 import { setHapticsEnabled, hapticMedium } from '@/lib/haptic'
 const ImageCropper = lazy(() => import('@/components/ImageCropper'))
 import { DEFAULT_AVATARS, AVATAR_CATEGORIES } from '@/lib/defaultAvatars'
@@ -573,7 +574,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                     disabled={saving || newPhone.length < 10}
                     className="flex-1 bg-primary-600 text-white text-sm font-medium py-2 rounded-xl disabled:opacity-50"
                   >
-                    {saving ? '...' : t('phone_send_code')}
+                    {saving ? <HaiSpinner /> : t('phone_send_code')}
                   </button>
                   <button onClick={() => { setEditingPhone(false); setPhoneStep('input'); setNewPhone(''); setPhoneCode('') }} className="flex-1 border border-gray-200 text-gray-600 text-sm py-2 rounded-xl">
                     {t('profile_cancel')}
@@ -618,7 +619,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                     disabled={saving || phoneCode.length < 6}
                     className="flex-1 bg-primary-600 text-white text-sm font-medium py-2 rounded-xl disabled:opacity-50"
                   >
-                    {saving ? '...' : t('phone_verify')}
+                    {saving ? <HaiSpinner /> : t('phone_verify')}
                   </button>
                   <button onClick={() => { setPhoneStep('input'); setPhoneCode('') }} className="flex-1 border border-gray-200 text-gray-600 text-sm py-2 rounded-xl">
                     {t('common_back')}
@@ -1313,7 +1314,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                   }}
                   disabled={modRequestLoading || modReason.trim().length < 10}
                   className="flex-1 bg-primary-600 text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-50"
-                >{modRequestLoading ? '...' : t('mod_request_submit')}</button>
+                >{modRequestLoading ? <HaiSpinner /> : t('mod_request_submit')}</button>
                 <button
                   onClick={() => setShowModForm(false)}
                   className="px-4 py-2.5 text-sm text-gray-500 font-medium"
@@ -1898,7 +1899,11 @@ function BlockedUsersSettings({ lang }: { lang: string }) {
   }
 
   if (items === null) {
-    return <p className="text-xs text-gray-400 py-2">{dn('جاري التحميل…', 'Loading…', 'لوڈ ہو رہا ہے…')}</p>
+    return (
+      <div className="flex justify-center py-4 text-primary-600">
+        <HaiLoader size="sm" />
+      </div>
+    )
   }
   if (items.length === 0) {
     return (
@@ -1940,7 +1945,7 @@ function BlockedUsersSettings({ lang }: { lang: string }) {
             className="text-xs font-medium text-primary-600 dark:text-primary-400 px-3 py-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/30 disabled:opacity-50 flex-shrink-0"
           >
             {pending === b.userId
-              ? dn('جارٍ…', '…', '…')
+              ? <HaiSpinner />
               : dn('إلغاء الحظر', 'Unblock', 'ان بلاک')}
           </button>
         </div>

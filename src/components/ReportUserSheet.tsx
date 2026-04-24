@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { FiX, FiFlag, FiSlash } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { showApiError } from '@/lib/apiError'
+import { HaiSpinner } from './HaiLoader'
 
 /**
  * Account-level report sheet. Reused across every surface where a
@@ -269,7 +270,7 @@ export default function ReportUserSheet({
                   onClick={submit}
                 >
                   {submitting
-                    ? (lang === 'en' ? 'Sending…' : lang === 'ur' ? 'بھیجا جا رہا…' : 'جاري الإرسال…')
+                    ? <HaiSpinner />
                     : (lang === 'en' ? 'Submit report' : lang === 'ur' ? 'رپورٹ بھیجیں' : 'إرسال البلاغ')}
                 </button>
                 <button

@@ -7,6 +7,7 @@ import { uploadFiles } from '@/lib/upload'
 import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useLanguage } from '@/hooks/useLanguage'
 import { FiArrowRight, FiArrowLeft, FiPlus, FiTrash2, FiCamera } from 'react-icons/fi'
+import { HaiSpinner } from '@/components/HaiLoader'
 
 const DEFAULT_LIMIT = 3 // Matches FREE plan. Actual enforcement is in API.
 
@@ -136,7 +137,7 @@ export default function CatalogPage() {
               }} disabled={uploading}
                 className="w-full h-32 border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-xl flex flex-col items-center justify-center gap-2 text-gray-400 active:bg-gray-50 dark:active:bg-gray-700 disabled:opacity-50">
                 <FiCamera className={`w-6 h-6 ${uploading ? 'animate-pulse' : ''}`} />
-                <span className="text-xs">{uploading ? '...' : dn('أضف صورة', 'Add photo')}</span>
+                <span className="text-xs">{uploading ? <HaiSpinner /> : dn('أضف صورة', 'Add photo')}</span>
               </button>
             )}
 
@@ -159,7 +160,7 @@ export default function CatalogPage() {
               </button>
               <button onClick={addItem} disabled={saving || !title.trim()}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary-600 disabled:opacity-50">
-                {saving ? '...' : dn('إضافة', 'Add')}
+                {saving ? <HaiSpinner /> : dn('إضافة', 'Add')}
               </button>
             </div>
           </div>

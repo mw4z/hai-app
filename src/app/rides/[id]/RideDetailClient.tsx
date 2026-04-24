@@ -8,6 +8,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import { useRidePoll } from '@/hooks/useRidePoll'
 import { hapticSuccess, hapticMedium, hapticError, hapticWarning } from '@/lib/haptic'
 import StatusBadge from '@/components/rides/StatusBadge'
+import { HaiSpinner } from '@/components/HaiLoader'
 import { uploadFiles } from '@/lib/upload'
 import { pickImageOrFallback } from '@/lib/imagePicker'
 import RiyalIcon from '@/components/RiyalIcon'
@@ -453,7 +454,7 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                         disabled={offerSubmitting || !offerPrice || !offerArrival}
                         className="w-full bg-primary-600 text-white rounded-xl py-3.5 font-bold text-sm active:scale-[0.97] disabled:opacity-40 shadow-lg shadow-primary-600/20"
                       >
-                        {offerSubmitting ? '...' : t('ride_submit_offer')}
+                        {offerSubmitting ? <HaiSpinner /> : t('ride_submit_offer')}
                       </button>
                     </div>
                   </>
@@ -532,7 +533,7 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                                 ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30'
                                 : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                             } disabled:opacity-40`}>
-                            {selecting === offer.id ? '...' : t('ride_select')}
+                            {selecting === offer.id ? <HaiSpinner /> : t('ride_select')}
                           </button>
                         )}
                       </div>
@@ -559,7 +560,7 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                 </p>
                 <button onClick={() => apiAction(`/api/rides/${rideId}/confirm`, {})} disabled={actionLoading}
                   className="w-full bg-primary-600 text-white rounded-xl py-4 font-bold text-base shadow-lg shadow-primary-600/30 active:scale-[0.97] disabled:opacity-50">
-                  {actionLoading ? '...' : lang !== 'en' ? '✓ تأكيد القبول' : '✓ Confirm Acceptance'}
+                  {actionLoading ? <HaiSpinner /> : lang !== 'en' ? '✓ تأكيد القبول' : '✓ Confirm Acceptance'}
                 </button>
               </>
             ) : (
@@ -684,7 +685,7 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                 )}
                 <button onClick={() => apiAction(`/api/rides/${rideId}/status`, { action: 'complete' })} disabled={actionLoading}
                   className="w-full bg-green-600 text-white rounded-2xl py-4 font-bold text-base shadow-lg shadow-green-600/30 active:scale-[0.97] disabled:opacity-50">
-                  {actionLoading ? '...' : `✓ ${t('ride_confirm_arrival')}`}
+                  {actionLoading ? <HaiSpinner /> : `✓ ${t('ride_confirm_arrival')}`}
                 </button>
 
                 {!showDispute ? (
@@ -709,7 +710,7 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                         }}
                         disabled={actionLoading}
                         className="flex-1 bg-red-600 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50">
-                        {actionLoading ? '...' : t('ride_dispute')}
+                        {actionLoading ? <HaiSpinner /> : t('ride_dispute')}
                       </button>
                       <button onClick={() => setShowDispute(false)}
                         className="px-4 py-2.5 text-sm text-gray-500">{t('common_close')}</button>
@@ -775,7 +776,7 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                       lang !== 'en' ? 'تم سحب النزاع' : 'Dispute withdrawn')}
                     disabled={actionLoading}
                     className="mt-5 bg-yellow-600 text-white rounded-xl px-6 py-3 font-bold text-sm active:scale-[0.97] disabled:opacity-50">
-                    {actionLoading ? '...' : (lang === 'en' ? 'Withdraw Dispute' : lang === 'ur' ? 'تنازعہ واپس لیں' : 'سحب النزاع والعودة')}
+                    {actionLoading ? <HaiSpinner /> : (lang === 'en' ? 'Withdraw Dispute' : lang === 'ur' ? 'تنازعہ واپس لیں' : 'سحب النزاع والعودة')}
                   </button>
                 )}
               </div>
@@ -800,7 +801,7 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
             <button onClick={() => { apiAction(`/api/rides/${rideId}/rate`, { score: rating, comment: ratingComment }, lang === 'en' ? 'Thanks for rating' : lang === 'ur' ? 'آپ کی درجہ بندی کا شکریہ' : 'شكراً لتقييمك').then(ok => { if (ok) router.push('/rides') }) }}
               disabled={actionLoading || rating === 0}
               className="w-full bg-primary-600 text-white rounded-xl py-3 font-bold disabled:opacity-40 active:scale-[0.97]">
-              {actionLoading ? '...' : t('ride_send_rating')}
+              {actionLoading ? <HaiSpinner /> : t('ride_send_rating')}
             </button>
           </div>
         )}
@@ -926,7 +927,7 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                       if (!cancelReason.trim()) { toast.error(lang === 'en' ? 'Enter cancel reason' : lang === 'ur' ? 'منسوخی کی وجہ لکھیں' : 'اكتب سبب الإلغاء'); return }
                       apiAction(`/api/rides/${rideId}/status`, { action: 'cancel', reason: cancelReason }).then(ok => ok && setShowCancel(false))
                     }} disabled={actionLoading}
-                      className="flex-1 bg-red-600 text-white rounded-xl py-2 text-sm font-semibold disabled:opacity-50">{actionLoading ? '...' : (lang === 'en' ? 'Confirm Cancel' : lang === 'ur' ? 'منسوخی کی تصدیق' : 'تأكيد الإلغاء')}</button>
+                      className="flex-1 bg-red-600 text-white rounded-xl py-2 text-sm font-semibold disabled:opacity-50">{actionLoading ? <HaiSpinner /> : (lang === 'en' ? 'Confirm Cancel' : lang === 'ur' ? 'منسوخی کی تصدیق' : 'تأكيد الإلغاء')}</button>
                     <button onClick={() => setShowCancel(false)} className="px-3 py-2 text-sm text-gray-400">{t('common_close')}</button>
                   </div>
                 </div>
@@ -951,7 +952,7 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                   if (!cancelReason.trim()) { toast.error(lang === 'en' ? 'Enter cancel reason' : lang === 'ur' ? 'منسوخی کی وجہ لکھیں' : 'اكتب سبب الإلغاء'); return }
                   apiAction(`/api/rides/${rideId}/status`, { action: 'cancel', reason: cancelReason }).then(ok => ok && setShowCancel(false))
                 }} disabled={actionLoading}
-                  className="flex-1 bg-red-600 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50">{actionLoading ? '...' : (lang === 'en' ? 'Confirm Cancel' : lang === 'ur' ? 'منسوخی کی تصدیق' : 'تأكيد الإلغاء')}</button>
+                  className="flex-1 bg-red-600 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-50">{actionLoading ? <HaiSpinner /> : (lang === 'en' ? 'Confirm Cancel' : lang === 'ur' ? 'منسوخی کی تصدیق' : 'تأكيد الإلغاء')}</button>
                 <button onClick={() => setShowCancel(false)} className="px-4 py-2.5 text-sm text-gray-500">{t('common_close')}</button>
               </div>
             </div>

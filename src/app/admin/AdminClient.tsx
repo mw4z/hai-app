@@ -5,6 +5,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { FiShield, FiUsers, FiFileText, FiMapPin, FiActivity, FiStar } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import { HaiSpinner } from '@/components/HaiLoader'
 import { useConfirm, usePrompt } from '@/components/ConfirmProvider'
 import { getPrimaryBadge, getSecondaryBadge } from '@/lib/user-badge'
 import type { TranslationKey } from '@/lib/i18n'
@@ -872,7 +873,7 @@ export default function AdminClient({ role, adminName }: { role: string; adminNa
                           className="flex-1 py-1.5 bg-primary-600 text-white text-[10px] font-bold rounded-lg active:scale-95 disabled:opacity-50"
                         >
                           {seedActionOn === n.id
-                            ? '...'
+                            ? <HaiSpinner />
                             : (lang === 'en' ? '+ Seed' : '+ بذر')}
                         </button>
                         <button

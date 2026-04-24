@@ -6,6 +6,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import { uploadFiles } from '@/lib/upload'
 import { pickImagesOrFallback } from '@/lib/imagePicker'
 import BackButton from '@/components/BackButton'
+import { HaiSpinner } from '@/components/HaiLoader'
 import { hapticSuccess } from '@/lib/haptic'
 
 const TYPES = [
@@ -160,7 +161,7 @@ export default function NeighborhoodReportsPage() {
             <div className="flex gap-2">
               <button onClick={handleSubmit} disabled={loading || !type || !subject.trim()}
                 className="flex-1 bg-primary-600 text-white rounded-xl py-3 font-semibold text-sm disabled:opacity-40 active:scale-[0.97]">
-                {loading ? '...' : (lang === 'en' ? 'Submit Report' : lang === 'ur' ? 'رپورٹ بھیجیں' : 'إرسال البلاغ')}
+                {loading ? <HaiSpinner /> : (lang === 'en' ? 'Submit Report' : lang === 'ur' ? 'رپورٹ بھیجیں' : 'إرسال البلاغ')}
               </button>
               <button onClick={() => setShowForm(false)} className="px-4 py-3 text-sm text-gray-500">{lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء'}</button>
             </div>

@@ -17,6 +17,7 @@ import SmartText from './SmartText'
 import ReportUserSheet from './ReportUserSheet'
 import { showApiError } from '@/lib/apiError'
 import { detectLang } from '@/lib/detectLang'
+import { HaiSpinner } from './HaiLoader'
 import type { TranslationKey } from '@/lib/i18n'
 import { canStartPrivateThread } from '@/lib/thread-rules'
 import { getRepLevel } from '@/lib/reputation-levels'
@@ -793,7 +794,7 @@ export default function PostCard({
               }}
               className="hai-btn-primary hai-btn-sm hai-flex-1"
             >
-              {editLoading ? '...' : (lang === 'en' ? 'Save' : lang === 'ur' ? 'محفوظ' : 'حفظ')}
+              {editLoading ? <HaiSpinner /> : (lang === 'en' ? 'Save' : lang === 'ur' ? 'محفوظ' : 'حفظ')}
             </button>
             <button
               onClick={() => { setEditing(false); setEditTitle(postData.title); setEditBody(postData.body) }}
@@ -816,7 +817,7 @@ export default function PostCard({
               style={{ cursor: 'pointer' }}
             >
               {translating
-                ? (lang === 'en' ? 'Translating…' : lang === 'ur' ? 'ترجمہ جاری…' : 'جاري الترجمة…')
+                ? <HaiSpinner />
                 : showTranslated
                   ? (lang === 'en' ? 'Show original' : lang === 'ur' ? 'اصل متن دکھائیں' : 'إظهار الأصلي')
                   : (lang === 'en' ? 'Translate' : lang === 'ur' ? 'ترجمہ کریں' : 'ترجمة')}

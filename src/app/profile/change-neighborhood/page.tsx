@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import { FiMapPin, FiNavigation } from 'react-icons/fi'
 import BackButton from '@/components/BackButton'
+import { HaiSpinner } from '@/components/HaiLoader'
 
 const REASONS = [
   { key: 'MOVED', ar: 'انتقلت إلى حي جديد', en: 'I moved to a new neighborhood' },
@@ -354,7 +355,7 @@ export default function ChangeNeighborhoodPage() {
               disabled={loading || !reason}
               className="btn-primary w-full disabled:opacity-50"
             >
-              {loading ? '...' : t('nbhd_change_submit')}
+              {loading ? <HaiSpinner /> : t('nbhd_change_submit')}
             </button>
           </div>
         )}
