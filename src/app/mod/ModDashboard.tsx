@@ -147,7 +147,7 @@ export default function ModDashboard({ data }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+    <div className="min-h-dvh bg-gray-50 dark:bg-gray-900 pb-4">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-4 py-3">
         <div className="flex items-center gap-3">
