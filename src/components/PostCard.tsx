@@ -215,8 +215,13 @@ export default function PostCard({
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(post.title)
   const [editBody, setEditBody] = useState(post.body)
+  // Separate edit-mode image list so the user can add/remove/reorder
+  // without touching the original post.imageUrls until they hit Save.
+  const [editImages, setEditImages] = useState<string[]>(post.imageUrls || [])
+  const [editImageUploading, setEditImageUploading] = useState(false)
+  const editImageInputRef = useRef<HTMLInputElement>(null)
   const [editLoading, setEditLoading] = useState(false)
-  const [postData, setPostData] = useState({ title: post.title, body: post.body, editedAt: post.editedAt })
+  const [postData, setPostData] = useState({ title: post.title, body: post.body, editedAt: post.editedAt, imageUrls: post.imageUrls || [] as string[] })
   // Auto-translation. Detected language comes from the raw title+body;
   // the translate button only surfaces if it differs from the user's
   // UI language. Cached per-card in state so toggling off/on is free.
@@ -835,19 +840,137 @@ export default function PostCard({
             className="hai-input"
             rows={3}
           />
+
+          {/* Image editor — thumbnail strip of current photos + add
+              button. Tapping the X on a thumbnail drops it from the
+              draft list; tapping + opens the image picker. Changes
+              only persist after Save. */}
+          <div>
+            <input
+              ref={editImageInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hai-hidden"
+              onChange={async (e) => {
+                const files = Array.from(e.target.files || [])
+                if (!files.length) return
+                setEditImageUploading(true)
+                try {
+                  const urls = await uploadFiles(files)
+                  setEditImages((prev) => [...prev, ...urls].slice(0, 5))
+                } catch {
+                  toast.error(lang === 'en' ? 'Upload failed' : lang === 'ur' ? 'اپ لوڈ ناکام' : 'فشل رفع الصورة')
+                } finally {
+                  setEditImageUploading(false)
+                  if (editImageInputRef.current) editImageInputRef.current.value = ''
+                }
+              }}
+            />
+            <div className="hai-row-2" style={{ flexWrap: 'wrap', gap: 8 }}>
+              {editImages.map((url, i) => (
+                <div key={url + i} style={{ position: 'relative' }}>
+                  <img
+                    src={url}
+                    alt=""
+                    style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: 8,
+                      objectFit: 'cover',
+                      border: '1px solid var(--hai-border)',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setEditImages((prev) => prev.filter((_, idx) => idx !== i))}
+                    aria-label="remove"
+                    style={{
+                      position: 'absolute',
+                      top: -6,
+                      insetInlineEnd: -6,
+                      width: 20,
+                      height: 20,
+                      borderRadius: '50%',
+                      background: 'rgba(0,0,0,0.75)',
+                      color: '#fff',
+                      border: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <FiX className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              {editImages.length < 5 && (
+                <button
+                  type="button"
+                  disabled={editImageUploading}
+                  onClick={async () => {
+                    const file = await pickImageOrFallback(lang as any, editImageInputRef)
+                    if (!file) return
+                    setEditImageUploading(true)
+                    try {
+                      const urls = await uploadFiles([file])
+                      setEditImages((prev) => [...prev, ...urls].slice(0, 5))
+                    } catch {
+                      toast.error(lang === 'en' ? 'Upload failed' : lang === 'ur' ? 'اپ لوڈ ناکام' : 'فشل رفع الصورة')
+                    } finally {
+                      setEditImageUploading(false)
+                    }
+                  }}
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 8,
+                    border: '1px dashed var(--hai-border)',
+                    background: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--hai-text-muted)',
+                    cursor: 'pointer',
+                  }}
+                  aria-label="add photo"
+                >
+                  {editImageUploading ? <HaiSpinner /> : <FiImage className="w-5 h-5" />}
+                </button>
+              )}
+            </div>
+            <p className="hai-meta hai-mt-1">
+              {lang === 'en'
+                ? `${editImages.length}/5 photos`
+                : lang === 'ur'
+                  ? `${editImages.length}/5 تصاویر`
+                  : `${editImages.length}/5 صور`}
+            </p>
+          </div>
+
           <div className="hai-row-2">
             <button
-              disabled={editLoading}
+              disabled={editLoading || editImageUploading}
               onClick={async () => {
                 setEditLoading(true)
                 const res = await fetch(`/api/posts/${post.id}`, {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ title: editTitle.trim(), body: editBody.trim() }),
+                  body: JSON.stringify({
+                    title: editTitle.trim(),
+                    body: editBody.trim(),
+                    imageUrls: editImages,
+                  }),
                 })
                 if (res.ok) {
                   const d = await res.json()
-                  setPostData({ title: d.title, body: d.body, editedAt: d.editedAt })
+                  setPostData({
+                    title: d.title,
+                    body: d.body,
+                    editedAt: d.editedAt,
+                    imageUrls: Array.isArray(d.imageUrls) ? d.imageUrls : editImages,
+                  })
                   setEditing(false)
                   toast.success(lang === 'en' ? 'Updated' : lang === 'ur' ? 'ترمیم شدہ' : 'تم التعديل')
                 } else {
@@ -861,7 +984,12 @@ export default function PostCard({
               {editLoading ? <HaiSpinner /> : (lang === 'en' ? 'Save' : lang === 'ur' ? 'محفوظ' : 'حفظ')}
             </button>
             <button
-              onClick={() => { setEditing(false); setEditTitle(postData.title); setEditBody(postData.body) }}
+              onClick={() => {
+                setEditing(false)
+                setEditTitle(postData.title)
+                setEditBody(postData.body)
+                setEditImages(postData.imageUrls || [])
+              }}
               className="hai-btn-ghost hai-btn-sm"
             >
               {lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء'}
@@ -915,11 +1043,13 @@ export default function PostCard({
         </a>
       )}
 
-      {post.imageUrls.length > 0 && (
+      {/* Render from postData.imageUrls (not post.imageUrls) so the
+          grid + lightbox update immediately after a successful edit. */}
+      {postData.imageUrls.length > 0 && (
         <>
-          <div className="hai-media-grid" data-count={Math.min(post.imageUrls.length, 4)}>
-            {post.imageUrls.slice(0, 3).map((url, i) => {
-              const extra = post.imageUrls.length - 3
+          <div className="hai-media-grid" data-count={Math.min(postData.imageUrls.length, 4)}>
+            {postData.imageUrls.slice(0, 3).map((url, i) => {
+              const extra = postData.imageUrls.length - 3
               const showOverlay = i === 2 && extra > 0
               return (
                 <div key={i} className="hai-media-grid__item" onClick={() => setLightboxIndex(i)}>
@@ -936,7 +1066,7 @@ export default function PostCard({
 
           {/* Fullscreen lightbox with pinch/swipe/double-tap gestures */}
           <ImageLightbox
-            images={post.imageUrls}
+            images={postData.imageUrls}
             initialIndex={lightboxIndex ?? 0}
             open={lightboxIndex !== null}
             onClose={() => setLightboxIndex(null)}

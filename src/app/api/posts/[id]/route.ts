@@ -43,6 +43,21 @@ export async function PATCH(
     updates.price = body.price === null ? null : parseFloat(body.price)
   }
 
+  // Image edit — the author can add/remove/reorder photos on an
+  // already-published post. Validate the array the same way the
+  // create route does (max 5, https:// or /uploads/ prefix, total
+  // URL length cap). Sending an empty array explicitly clears all
+  // photos.
+  if (Array.isArray(body.imageUrls)) {
+    const cleaned: string[] = []
+    for (const url of body.imageUrls.slice(0, 5)) {
+      if (typeof url === 'string' && (url.startsWith('/uploads/') || url.startsWith('https://')) && url.length < 500) {
+        cleaned.push(url)
+      }
+    }
+    updates.imageUrls = cleaned
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'لا يوجد تغييرات' }, { status: 400 })
   }
@@ -52,7 +67,7 @@ export async function PATCH(
   const updated = await db.post.update({
     where: { id: params.id },
     data: updates as any,
-    select: { id: true, title: true, body: true, price: true, editedAt: true },
+    select: { id: true, title: true, body: true, price: true, editedAt: true, imageUrls: true },
   })
 
   return NextResponse.json(updated)
