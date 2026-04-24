@@ -163,7 +163,7 @@ export default function PostCard({
   // Reporting a comment or reply author: opens the same sheet with a
   // different target. Kept separate from `reportingUser` (post author)
   // so one doesn't clobber the other.
-  const [commentReportTarget, setCommentReportTarget] = useState<{ id: string; name: string | null; commentId: string } | null>(null)
+  const [commentReportTarget, setCommentReportTarget] = useState<{ id: string; name: string | null; commentId: string; role?: string | null } | null>(null)
   // Per-comment translation state keyed by comment id. Lets each row
   // toggle independently and caches the translated body after the
   // first fetch so re-toggling doesn't re-hit the API.
@@ -1853,6 +1853,7 @@ export default function PostCard({
         onClose={() => setReportingUser(false)}
         targetUserId={post.author.id}
         targetName={post.author.name}
+        targetRole={post.author.role}
         source="POST"
         postId={post.id}
         onBlockRequested={async () => {
@@ -1878,6 +1879,7 @@ export default function PostCard({
         onClose={() => setCommentReportTarget(null)}
         targetUserId={commentReportTarget?.id || ''}
         targetName={commentReportTarget?.name}
+        targetRole={commentReportTarget?.role ?? null}
         source="POST"
         postId={post.id}
         onBlockRequested={async () => {

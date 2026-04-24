@@ -22,6 +22,10 @@ type Reason =
   | 'ABUSIVE_LANGUAGE'
   | 'SPAM'
   | 'INAPPROPRIATE_PROFILE'
+  | 'MOD_ABUSE_OF_POWER'
+  | 'MOD_UNFAIR_MODERATION'
+  | 'MOD_HARASSMENT'
+  | 'MOD_INACTIVE'
   | 'OTHER'
 
 type Source = 'PROFILE' | 'POST' | 'CHAT' | 'MARKETPLACE' | 'PROVIDER'
@@ -42,6 +46,17 @@ const REASONS: { key: Reason; label: ReasonLabel }[] = [
   { key: 'OTHER',                 label: { ar: 'سبب آخر',                     en: 'Other',                         ur: 'کوئی اور وجہ' } },
 ]
 
+// Mod-specific reasons are only offered when the reported account is
+// currently a NEIGHBORHOOD_MOD. Picking one of these sets
+// isModeratorTarget=true on the server and routes the report into the
+// weighted mod-review pipeline (lib/modReportWeighting).
+const MOD_REASONS: { key: Reason; label: ReasonLabel }[] = [
+  { key: 'MOD_ABUSE_OF_POWER',    label: { ar: 'إساءة استخدام صلاحيات الإشراف', en: 'Abuse of moderator power',  ur: 'منتظم کے اختیارات کا غلط استعمال' } },
+  { key: 'MOD_UNFAIR_MODERATION', label: { ar: 'قرار إشراف غير عادل',             en: 'Unfair moderation decision', ur: 'غیر منصفانہ انتظامی فیصلہ' } },
+  { key: 'MOD_HARASSMENT',        label: { ar: 'تحرش من قبل مشرف',                en: 'Harassment by a moderator',  ur: 'منتظم کی جانب سے ہراسانی' } },
+  { key: 'MOD_INACTIVE',          label: { ar: 'مشرف غير نشط',                    en: 'Inactive moderator',         ur: 'غیر فعال منتظم' } },
+]
+
 export interface ReportUserSheetProps {
   open: boolean
   onClose: () => void
@@ -55,6 +70,13 @@ export interface ReportUserSheetProps {
   postId?: string
   conversationId?: string
   listingId?: string
+  /**
+   * Target's current role. When passed and equal to 'NEIGHBORHOOD_MOD'
+   * the sheet appends the 4 mod-specific reasons. Omitted or any other
+   * value keeps the original generic-only list so normal accounts
+   * never see mod reasons.
+   */
+  targetRole?: string | null
   /** Fires when the user taps "Block too" in the success confirmation. */
   onBlockRequested?: () => void
 }
@@ -68,10 +90,18 @@ export default function ReportUserSheet({
   postId,
   conversationId,
   listingId,
+  targetRole,
   onBlockRequested,
 }: ReportUserSheetProps) {
   const { lang } = useLanguage()
   const [reason, setReason] = useState<Reason | null>(null)
+  // Mod-specific reasons are only rendered when the target is
+  // actually a neighborhood mod — keeps the sheet identical for
+  // normal users, and matches the server-side guard in
+  // /api/users/[id]/report which rejects mod reasons against
+  // non-mod accounts with 400.
+  const isTargetMod = targetRole === 'NEIGHBORHOOD_MOD'
+  const reasonsToShow = isTargetMod ? [...REASONS.slice(0, -1), ...MOD_REASONS, REASONS[REASONS.length - 1]] : REASONS
   const [details, setDetails] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
@@ -209,7 +239,7 @@ export default function ReportUserSheet({
                   {lang === 'en' ? 'Why are you reporting this account?' : lang === 'ur' ? 'آپ اس اکاؤنٹ کو کیوں رپورٹ کر رہے ہیں؟' : 'لماذا تبلّغ عن هذا الحساب؟'}
                 </p>
                 <div className="hai-stack-1">
-                  {REASONS.map((r) => {
+                  {reasonsToShow.map((r) => {
                     const selected = reason === r.key
                     return (
                       <button

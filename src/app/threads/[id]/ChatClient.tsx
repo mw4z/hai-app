@@ -124,7 +124,7 @@ export default function ChatClient({
 }: {
   threadId: string
   currentUserId: string
-  other: { id: string; name: string | null; avatarUrl: string | null }
+  other: { id: string; name: string | null; avatarUrl: string | null; role?: string | null }
   initialMessages: Msg[]
   isClosed?: boolean
   canRate?: boolean
@@ -1327,6 +1327,7 @@ export default function ChatClient({
         onClose={() => setReportingUser(false)}
         targetUserId={other.id}
         targetName={other.name}
+        targetRole={other.role ?? null}
         source="CHAT"
         conversationId={threadId}
         onBlockRequested={async () => {
