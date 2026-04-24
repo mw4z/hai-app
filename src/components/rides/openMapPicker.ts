@@ -181,31 +181,28 @@ export function openMapPicker(options: {
         }
       })
 
+      // 'hybrid' = satellite imagery with street/neighborhood labels
+      // overlaid. Gives the user real aerial context when picking a
+      // location, without losing the ability to read place names.
       map = new ml.Map({
         container: mapContainer,
         style: maptilerKey
-          ? `https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}${lang === 'ar' ? '&language=ar' : lang === 'ur' ? '&language=ur' : ''}`
+          ? `https://api.maptiler.com/maps/hybrid/style.json?key=${maptilerKey}${lang === 'ar' ? '&language=ar' : lang === 'ur' ? '&language=ur' : ''}`
           : 'https://demotiles.maplibre.org/style.json',
         center: [centerLng, centerLat],
-        zoom: 14,
+        zoom: 16,
       })
 
-      // Once the style loads, bump label legibility: larger text
-      // (1.25x), stronger white halo (2px), darker text color. The
-      // default streets-v2 sizes/halos are tuned for Latin where a
-      // thin grey label on a beige background reads fine; Arabic
-      // ligatures at the same weight look faded and hard to parse.
+      // On satellite imagery the original style's light labels get
+      // lost against buildings / roofs / shadows. Boost every label:
+      // larger text (1.25x), WHITE fill, and a strong BLACK halo so
+      // the text is legible over any imagery tone.
       map.on('load', () => {
         try {
           for (const layer of map.getStyle().layers || []) {
             if (layer.type !== 'symbol') continue
             const layout: any = layer.layout || {}
             if (!layout['text-field']) continue
-            // Upscale whatever text-size the style set. We can't read
-            // the resolved expression reliably across types, so we
-            // write a "larger" expression: coalesce current value
-            // (via style spec) into a multiplied literal when it's a
-            // plain number, else bump to a readable default 14.
             const current = layout['text-size']
             if (typeof current === 'number') {
               map.setLayoutProperty(layer.id, 'text-size', current * 1.25)
@@ -213,8 +210,8 @@ export function openMapPicker(options: {
               map.setLayoutProperty(layer.id, 'text-size', 14)
             }
             map.setPaintProperty(layer.id, 'text-halo-width', 2)
-            map.setPaintProperty(layer.id, 'text-halo-color', '#ffffff')
-            map.setPaintProperty(layer.id, 'text-color', '#111827')
+            map.setPaintProperty(layer.id, 'text-halo-color', '#000000')
+            map.setPaintProperty(layer.id, 'text-color', '#ffffff')
           }
         } catch { /* style may not allow it — non-fatal */ }
       })
