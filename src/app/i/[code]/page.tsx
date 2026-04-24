@@ -21,7 +21,7 @@ type Preview = {
  */
 const IOS_STORE_URL =
   process.env.NEXT_PUBLIC_IOS_STORE_URL ||
-  'https://apps.apple.com/app/hai/id6753196418'
+  'https://apps.apple.com/us/app/%D8%AD%D9%8A/id6761731680'
 const ANDROID_STORE_URL =
   process.env.NEXT_PUBLIC_ANDROID_STORE_URL ||
   'https://play.google.com/store/apps/details?id=net.hai_app.hai'
