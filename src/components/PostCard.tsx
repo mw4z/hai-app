@@ -1701,11 +1701,22 @@ export default function PostCard({
         const postCount = post.author._count?.posts || 0
 
         return (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={() => setShowUserPopup(false)}>
-            <div className="absolute inset-0 bg-black/50" />
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
+            onClick={(e) => {
+              // Only close when the click lands on THIS element itself
+              // (the backdrop), never from bubbling. Android WebViews
+              // occasionally dispatch a late touchend/click whose target
+              // is a parent after an <a target="_blank"> tap — that
+              // stray event was closing the popup right after social
+              // chips were pressed. Comparing target vs currentTarget
+              // is the one pattern that always gets it right regardless
+              // of event type or event.stopPropagation timing.
+              if (e.target === e.currentTarget) setShowUserPopup(false)
+            }}
+          >
             <div
               className="relative bg-white dark:bg-gray-800 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-sm mx-auto pb-8 animate-slide-up max-h-[85vh] overflow-y-auto"
-              onClick={e => e.stopPropagation()}
             >
               {/* Cover header — uses user's cover or default */}
               <div className="relative h-28 rounded-t-3xl sm:rounded-t-2xl"
