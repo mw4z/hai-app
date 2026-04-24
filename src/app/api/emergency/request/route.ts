@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { requireVerified } from '@/lib/requireVerified'
+import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,10 +38,11 @@ export async function POST(req: NextRequest) {
 
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { id: true, status: true, neighborhoodId: true },
+    select: { id: true, status: true, neighborhoodId: true, role: true },
   })
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  if (user.status === 'BANNED_TEMP' || user.status === 'BANNED_PERM') {
+  const bypass = isSuperAdminRole(user.role)
+  if (!bypass && (user.status === 'BANNED_TEMP' || user.status === 'BANNED_PERM')) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
   if (!user.neighborhoodId) {
@@ -64,35 +66,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'invalid_severity' }, { status: 400 })
   }
 
-  // Rate limit: 1 active PENDING request per user at a time
-  const activePending = await db.emergencyAlertRequest.findFirst({
-    where: {
-      requesterId: user.id,
-      status: 'PENDING',
-      expiresAt: { gt: new Date() },
-    },
-    select: { id: true },
-  })
-  if (activePending) {
-    return NextResponse.json(
-      { error: 'pending_exists', message: 'You already have a pending emergency request' },
-      { status: 409 },
-    )
-  }
+  if (!bypass) {
+    // Rate limit: 1 active PENDING request per user at a time
+    const activePending = await db.emergencyAlertRequest.findFirst({
+      where: {
+        requesterId: user.id,
+        status: 'PENDING',
+        expiresAt: { gt: new Date() },
+      },
+      select: { id: true },
+    })
+    if (activePending) {
+      return NextResponse.json(
+        { error: 'pending_exists', message: 'You already have a pending emergency request' },
+        { status: 409 },
+      )
+    }
 
-  // Rate limit: max 3 requests per rolling 24h
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
-  const recent = await db.emergencyAlertRequest.count({
-    where: {
-      requesterId: user.id,
-      createdAt: { gte: since },
-    },
-  })
-  if (recent >= MAX_PER_24H) {
-    return NextResponse.json(
-      { error: 'rate_limited', message: 'Too many requests in the last 24 hours' },
-      { status: 429 },
-    )
+    // Rate limit: max 3 requests per rolling 24h
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const recent = await db.emergencyAlertRequest.count({
+      where: {
+        requesterId: user.id,
+        createdAt: { gte: since },
+      },
+    })
+    if (recent >= MAX_PER_24H) {
+      return NextResponse.json(
+        { error: 'rate_limited', message: 'Too many requests in the last 24 hours' },
+        { status: 429 },
+      )
+    }
   }
 
   const now = new Date()

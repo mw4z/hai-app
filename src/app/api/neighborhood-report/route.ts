@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { log } from '@/lib/logger'
+import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
 const VALID_TYPES = ['complaint', 'suggestion', 'issue', 'other']
 
@@ -13,8 +14,9 @@ export async function POST(req: NextRequest) {
 
     log.api('POST', '/api/neighborhood-report', session.userId)
 
-    const user = await db.user.findUnique({ where: { id: session.userId }, select: { name: true, neighborhoodId: true } })
+    const user = await db.user.findUnique({ where: { id: session.userId }, select: { name: true, neighborhoodId: true, role: true } })
     if (!user?.neighborhoodId) return NextResponse.json({ error: 'يجب أن تكون مسجلاً في حي' }, { status: 400 })
+    const bypass = isSuperAdminRole(user.role)
 
     let body: any
     try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid request' }, { status: 400 }) }
@@ -24,9 +26,11 @@ export async function POST(req: NextRequest) {
     if (!subject?.trim() || subject.trim().length < 3) return NextResponse.json({ error: 'الموضوع قصير جداً' }, { status: 400 })
     if (!reportBody?.trim() || reportBody.trim().length < 10) return NextResponse.json({ error: 'الوصف قصير جداً' }, { status: 400 })
 
-    // Max 5 open reports
-    const openCount = await db.neighborhoodReport.count({ where: { userId: session.userId, status: { in: ['open', 'reviewed'] } } })
-    if (openCount >= 5) return NextResponse.json({ error: 'لديك بلاغات مفتوحة كثيرة' }, { status: 429 })
+    // Max 5 open reports (SUPER_ADMIN bypasses)
+    if (!bypass) {
+      const openCount = await db.neighborhoodReport.count({ where: { userId: session.userId, status: { in: ['open', 'reviewed'] } } })
+      if (openCount >= 5) return NextResponse.json({ error: 'لديك بلاغات مفتوحة كثيرة' }, { status: 429 })
+    }
 
     const report = await db.neighborhoodReport.create({
       data: {

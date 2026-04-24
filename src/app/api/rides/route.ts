@@ -7,6 +7,7 @@ import { logRideEvent } from '@/lib/rides/events'
 import { log } from '@/lib/logger'
 import { getLimits } from '@/lib/capabilities'
 import { requireVerified } from '@/lib/requireVerified'
+import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
 const REQUESTS_PER_HOUR = 3
 const IMMEDIATE_EXPIRY_HOURS = 2
@@ -74,28 +75,31 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Rate limits (capability-based) ──────────────────────────────────────────
+    // ── Rate limits (capability-based, bypassed for SUPER_ADMIN) ────────────────
 
-    const rideUser = await db.user.findUnique({ where: { id: session.userId }, select: { plan: true } })
+    const rideUser = await db.user.findUnique({ where: { id: session.userId }, select: { plan: true, role: true } })
+    const bypass = isSuperAdminRole(rideUser?.role)
     const limits = getLimits(rideUser?.plan || 'FREE')
 
-    const activeCount = await db.rideRequest.count({
-      where: {
-        requesterId: session.userId,
-        status: { in: ['RIDE_OPEN', 'RIDE_SELECTED', 'RIDE_CONFIRMED', 'RIDE_EN_ROUTE', 'RIDE_ARRIVED', 'RIDE_IN_PROGRESS'] },
-      },
-    })
-    if (activeCount >= limits.activeRideRequests) {
-      return NextResponse.json({ error: 'لديك طلب نشط بالفعل' }, { status: 429 })
-    }
+    if (!bypass) {
+      const activeCount = await db.rideRequest.count({
+        where: {
+          requesterId: session.userId,
+          status: { in: ['RIDE_OPEN', 'RIDE_SELECTED', 'RIDE_CONFIRMED', 'RIDE_EN_ROUTE', 'RIDE_ARRIVED', 'RIDE_IN_PROGRESS'] },
+        },
+      })
+      if (activeCount >= limits.activeRideRequests) {
+        return NextResponse.json({ error: 'لديك طلب نشط بالفعل' }, { status: 429 })
+      }
 
-    // Max 3 requests per hour
-    const hourAgo = new Date(Date.now() - 3600 * 1000)
-    const recentCount = await db.rideRequest.count({
-      where: { requesterId: session.userId, createdAt: { gte: hourAgo } },
-    })
-    if (recentCount >= REQUESTS_PER_HOUR) {
-      return NextResponse.json({ error: 'تجاوزت الحد الأقصى (3 طلبات بالساعة)' }, { status: 429 })
+      // Max 3 requests per hour
+      const hourAgo = new Date(Date.now() - 3600 * 1000)
+      const recentCount = await db.rideRequest.count({
+        where: { requesterId: session.userId, createdAt: { gte: hourAgo } },
+      })
+      if (recentCount >= REQUESTS_PER_HOUR) {
+        return NextResponse.json({ error: 'تجاوزت الحد الأقصى (3 طلبات بالساعة)' }, { status: 429 })
+      }
     }
 
     // ── Calculate pricing ───────────────────────────────────────────────────────

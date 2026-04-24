@@ -6,6 +6,7 @@ import { apiError } from '@/lib/validation'
 import { moderateContent } from '@/lib/moderation'
 import { requireVerified } from '@/lib/requireVerified'
 import { kickNotifCron } from '@/lib/kickNotifCron'
+import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
@@ -55,10 +56,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { status: true, neighborhoodId: true },
+    select: { status: true, neighborhoodId: true, role: true },
   })
+  const bypass = isSuperAdminRole(user?.role)
 
-  if (user?.status === 'BANNED_TEMP' || user?.status === 'BANNED_PERM') {
+  if (!bypass && (user?.status === 'BANNED_TEMP' || user?.status === 'BANNED_PERM')) {
     return NextResponse.json({ error: 'حسابك موقوف' }, { status: 403 })
   }
 
@@ -68,18 +70,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     select: { authorId: true, title: true, neighborhoodId: true },
   })
   if (!post) return NextResponse.json({ error: 'المنشور غير موجود' }, { status: 404 })
-  if (post.neighborhoodId !== user?.neighborhoodId) {
+  if (!bypass && post.neighborhoodId !== user?.neighborhoodId) {
     return NextResponse.json({ error: 'لا يمكنك التعليق على منشورات حي آخر' }, { status: 403 })
   }
 
-  // Rate limit: max 10 comments per minute
-  const oneMinuteAgo = new Date(Date.now() - 60_000)
-  const recentComments = await db.comment.count({
-    where: { authorId: session.userId, createdAt: { gte: oneMinuteAgo } },
-  })
-  if (recentComments >= 10) {
-    console.log(`[RATE_LIMIT] comments: user=${session.userId}, count=${recentComments}`)
-    return NextResponse.json(apiError('حاول مجدداً بعد قليل', 429), { status: 429 })
+  if (!bypass) {
+    // Rate limit: max 10 comments per minute
+    const oneMinuteAgo = new Date(Date.now() - 60_000)
+    const recentComments = await db.comment.count({
+      where: { authorId: session.userId, createdAt: { gte: oneMinuteAgo } },
+    })
+    if (recentComments >= 10) {
+      console.log(`[RATE_LIMIT] comments: user=${session.userId}, count=${recentComments}`)
+      return NextResponse.json(apiError('حاول مجدداً بعد قليل', 429), { status: 429 })
+    }
   }
 
   const { body, parentId, imageUrl } = await req.json()
@@ -103,29 +107,34 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
   }
 
-  // ── Profanity check (skip when image-only) ────────────────────────────
+  // ── Profanity check (skip when image-only, and skip entirely for
+  //    SUPER_ADMIN — they bypass moderation) ─────────────────────────
   let censoredBody = ''
   if (hasText) {
-    const mod = moderateContent(body.trim())
-    if (mod.action === 'block') {
-      return NextResponse.json(apiError(mod.reason || 'تم حظر التعليق', 403), { status: 403 })
+    if (bypass) {
+      censoredBody = body.trim()
+    } else {
+      const mod = moderateContent(body.trim())
+      if (mod.action === 'block') {
+        return NextResponse.json(apiError(mod.reason || 'تم حظر التعليق', 403), { status: 403 })
+      }
+      if (mod.reputationPenalty < 0) {
+        db.user.update({
+          where: { id: session.userId },
+          data: { reputation: { increment: mod.reputationPenalty } },
+        }).catch(() => {})
+        db.notification.create({
+          data: {
+            type: 'SYSTEM',
+            userId: session.userId,
+            actorId: session.userId,
+            actorName: 'النظام',
+            postTitle: `تم خصم ${Math.abs(mod.reputationPenalty)} نقطة سمعة بسبب تعليق مخالف`,
+          },
+        }).catch(() => {})
+      }
+      censoredBody = mod.censored
     }
-    if (mod.reputationPenalty < 0) {
-      db.user.update({
-        where: { id: session.userId },
-        data: { reputation: { increment: mod.reputationPenalty } },
-      }).catch(() => {})
-      db.notification.create({
-        data: {
-          type: 'SYSTEM',
-          userId: session.userId,
-          actorId: session.userId,
-          actorName: 'النظام',
-          postTitle: `تم خصم ${Math.abs(mod.reputationPenalty)} نقطة سمعة بسبب تعليق مخالف`,
-        },
-      }).catch(() => {})
-    }
-    censoredBody = mod.censored
   }
 
   const comment = await db.comment.create({

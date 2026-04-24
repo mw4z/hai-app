@@ -6,6 +6,7 @@ import { logRideEvent } from '@/lib/rides/events'
 import { notifyNewOffer } from '@/lib/rides/notify'
 import { log } from '@/lib/logger'
 import { requireVerified } from '@/lib/requireVerified'
+import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
 const MIN_ACCOUNT_AGE_DAYS = 0 // TODO: set back to 3 for production
 const MAX_OFFERS_PER_HOUR = 10
@@ -47,22 +48,25 @@ export async function POST(
     // Account age check
     const user = await db.user.findUnique({
       where: { id: session.userId },
-      select: { name: true, createdAt: true },
+      select: { name: true, createdAt: true, role: true },
     })
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const bypass = isSuperAdminRole(user.role)
 
-    const ageDays = Math.floor((Date.now() - user.createdAt.getTime()) / 86400000)
-    if (ageDays < MIN_ACCOUNT_AGE_DAYS) {
-      return NextResponse.json({ error: `حسابك يجب أن يكون عمره ${MIN_ACCOUNT_AGE_DAYS} أيام على الأقل` }, { status: 403 })
-    }
+    if (!bypass) {
+      const ageDays = Math.floor((Date.now() - user.createdAt.getTime()) / 86400000)
+      if (ageDays < MIN_ACCOUNT_AGE_DAYS) {
+        return NextResponse.json({ error: `حسابك يجب أن يكون عمره ${MIN_ACCOUNT_AGE_DAYS} أيام على الأقل` }, { status: 403 })
+      }
 
-    // Rate limit: max offers per hour
-    const hourAgo = new Date(Date.now() - 3600 * 1000)
-    const recentOffers = await db.rideOffer.count({
-      where: { driverId: session.userId, createdAt: { gte: hourAgo } },
-    })
-    if (recentOffers >= MAX_OFFERS_PER_HOUR) {
-      return NextResponse.json({ error: 'تجاوزت الحد الأقصى للعروض' }, { status: 429 })
+      // Rate limit: max offers per hour
+      const hourAgo = new Date(Date.now() - 3600 * 1000)
+      const recentOffers = await db.rideOffer.count({
+        where: { driverId: session.userId, createdAt: { gte: hourAgo } },
+      })
+      if (recentOffers >= MAX_OFFERS_PER_HOUR) {
+        return NextResponse.json({ error: 'تجاوزت الحد الأقصى للعروض' }, { status: 429 })
+      }
     }
 
     // Already offered check (@@unique will also catch this, but better UX)

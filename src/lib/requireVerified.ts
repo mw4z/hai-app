@@ -23,18 +23,25 @@ import { cacheGet, cacheSet, cacheDelete } from './cache'
 export async function requireVerified(userId: string): Promise<NextResponse | null> {
   // Tiny 30s cache to avoid re-querying on every write within a short window
   const cacheKey = `verify:${userId}`
-  const cached = cacheGet<boolean>(cacheKey)
+  const cached = cacheGet<{ verified: boolean; isSuperAdmin: boolean }>(cacheKey)
   let verified: boolean
+  let isSuperAdmin: boolean
   if (cached === null) {
     const user = await db.user.findUnique({
       where: { id: userId },
-      select: { addressVerified: true },
+      select: { addressVerified: true, role: true },
     })
     verified = !!user?.addressVerified
-    cacheSet(cacheKey, verified, 30_000)
+    isSuperAdmin = user?.role === 'SUPER_ADMIN'
+    cacheSet(cacheKey, { verified, isSuperAdmin }, 30_000)
   } else {
-    verified = cached
+    verified = cached.verified
+    isSuperAdmin = cached.isSuperAdmin
   }
+
+  // SUPER_ADMIN bypasses every gate — their account is a platform-owner
+  // account and must never be blocked by verification/rate/content checks.
+  if (isSuperAdmin) return null
 
   if (!verified) {
     return NextResponse.json(

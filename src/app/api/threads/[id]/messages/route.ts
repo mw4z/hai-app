@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { log } from '@/lib/logger'
 import { moderateContent } from '@/lib/moderation'
 import { requireVerified } from '@/lib/requireVerified'
+import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
 // GET /api/threads/[id]/messages
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -150,7 +151,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     const recipientId = thread.user1Id === session.userId ? thread.user2Id : thread.user1Id
-    const sender = await db.user.findUnique({ where: { id: session.userId }, select: { name: true } })
+    const sender = await db.user.findUnique({ where: { id: session.userId }, select: { name: true, role: true } })
+    const bypass = isSuperAdminRole(sender?.role)
 
     let body: any
     try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid request' }, { status: 400 }) }
@@ -192,13 +194,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     } else {
       if (!text?.trim()) return NextResponse.json({ error: 'Empty message' }, { status: 400 })
       if (text.length > 1000) return NextResponse.json({ error: 'Too long' }, { status: 400 })
-      const mod = moderateContent(text.trim())
+      const finalText = bypass ? text.trim() : moderateContent(text.trim()).censored
       message = await db.message.create({
         data: {
           threadId: params.id,
           senderId: session.userId,
           type: 'TEXT',
-          text: mod.censored,
+          text: finalText,
           ...replyData,
         },
         include: { replyTo: { select: { id: true, text: true, senderId: true, type: true } } },

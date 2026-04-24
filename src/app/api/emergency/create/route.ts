@@ -77,7 +77,8 @@ export async function POST(req: NextRequest) {
   if (!user || !ADMIN_ROLES.includes(user.role as AdminRole)) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
-  if (user.status === 'BANNED_TEMP' || user.status === 'BANNED_PERM') {
+  const isSuperAdmin = user.role === 'SUPER_ADMIN'
+  if (!isSuperAdmin && (user.status === 'BANNED_TEMP' || user.status === 'BANNED_PERM')) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
 
@@ -135,20 +136,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'invalid_confirm' }, { status: 400 })
   }
 
-  const windowStart = new Date(Date.now() - NBHD_RATE_LIMIT_MINUTES * 60_000)
-  const existing = await db.emergencyAlert.findFirst({
-    where: {
-      neighborhoodId,
-      createdAt: { gte: windowStart },
-      revokedAt: null,
-    },
-    select: { id: true },
-  })
-  if (existing) {
-    return NextResponse.json(
-      { error: 'rate_limited', reason: 'one_per_hour' },
-      { status: 429 },
-    )
+  if (!isSuperAdmin) {
+    const windowStart = new Date(Date.now() - NBHD_RATE_LIMIT_MINUTES * 60_000)
+    const existing = await db.emergencyAlert.findFirst({
+      where: {
+        neighborhoodId,
+        createdAt: { gte: windowStart },
+        revokedAt: null,
+      },
+      select: { id: true },
+    })
+    if (existing) {
+      return NextResponse.json(
+        { error: 'rate_limited', reason: 'one_per_hour' },
+        { status: 429 },
+      )
+    }
   }
 
   const now = new Date()

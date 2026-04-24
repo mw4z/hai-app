@@ -5,6 +5,7 @@ import { ReportReason } from '@prisma/client'
 import { apiError } from '@/lib/validation'
 import { addReputation, REP_POINTS, getReportThreshold } from '@/lib/reputation'
 import { requireVerified } from '@/lib/requireVerified'
+import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
 const HIDE_THRESHOLD = 3
 const REMOVE_THRESHOLD = 5
@@ -32,14 +33,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(apiError('سبب غير صالح', 400), { status: 400 })
     }
 
-    // Rate limit: max 5 reports per hour
-    const oneHourAgo = new Date(Date.now() - 3600_000)
-    const recentReports = await db.report.count({
-      where: { reporterId: session.userId, createdAt: { gte: oneHourAgo } },
+    // Rate limit: max 5 reports per hour (bypassed for SUPER_ADMIN)
+    const reporter = await db.user.findUnique({
+      where: { id: session.userId },
+      select: { role: true },
     })
-    if (recentReports >= MAX_REPORTS_PER_HOUR) {
-      console.log(`[RATE_LIMIT] reports: user=${session.userId}, count=${recentReports}`)
-      return NextResponse.json(apiError('حاول لاحقاً', 429), { status: 429 })
+    const bypass = isSuperAdminRole(reporter?.role)
+    if (!bypass) {
+      const oneHourAgo = new Date(Date.now() - 3600_000)
+      const recentReports = await db.report.count({
+        where: { reporterId: session.userId, createdAt: { gte: oneHourAgo } },
+      })
+      if (recentReports >= MAX_REPORTS_PER_HOUR) {
+        console.log(`[RATE_LIMIT] reports: user=${session.userId}, count=${recentReports}`)
+        return NextResponse.json(apiError('حاول لاحقاً', 429), { status: 429 })
+      }
     }
 
     const post = await db.post.findUnique({ where: { id: postId } })

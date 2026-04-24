@@ -5,6 +5,7 @@ import { createNotification } from '@/lib/notifications'
 import { addReputation, REP_POINTS } from '@/lib/reputation'
 import { requireVerified } from '@/lib/requireVerified'
 import { kickNotifCron } from '@/lib/kickNotifCron'
+import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
 function isValidEmoji(str: string) {
   return typeof str === 'string' && str.trim().length > 0 && str.length <= 8
@@ -25,9 +26,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // Neighborhood isolation: verify post belongs to user's neighborhood
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { neighborhoodId: true, name: true, status: true },
+    select: { neighborhoodId: true, name: true, status: true, role: true },
   })
-  if (user?.status === 'BANNED_TEMP' || user?.status === 'BANNED_PERM') {
+  const bypass = isSuperAdminRole(user?.role)
+  if (!bypass && (user?.status === 'BANNED_TEMP' || user?.status === 'BANNED_PERM')) {
     return NextResponse.json({ error: 'حسابك موقوف' }, { status: 403 })
   }
   const post = await db.post.findUnique({
@@ -35,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     select: { neighborhoodId: true, authorId: true, title: true, category: true },
   })
   if (!post) return NextResponse.json({ error: 'المنشور غير موجود' }, { status: 404 })
-  if (post.neighborhoodId !== user?.neighborhoodId) {
+  if (!bypass && post.neighborhoodId !== user?.neighborhoodId) {
     return NextResponse.json({ error: 'لا يمكنك التفاعل مع منشورات حي آخر' }, { status: 403 })
   }
 

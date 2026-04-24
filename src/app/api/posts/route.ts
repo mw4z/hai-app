@@ -10,6 +10,7 @@ import { cacheDeletePrefix } from '@/lib/cache'
 import { moderateContent } from '@/lib/moderation'
 import { kickNotifCron } from '@/lib/kickNotifCron'
 import { requireVerified } from '@/lib/requireVerified'
+import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
 const DEFAULT_POST_LIMIT = 5
 const POST_COOLDOWN_SECONDS = 60
@@ -33,7 +34,8 @@ export async function POST(req: NextRequest) {
     if (!user?.neighborhoodId) {
       return NextResponse.json(apiError('أكمل ملفك الشخصي أولاً', 403), { status: 403 })
     }
-    if (user.status === 'BANNED_TEMP' || user.status === 'BANNED_PERM') {
+    const bypass = isSuperAdminRole(user.role)
+    if (!bypass && (user.status === 'BANNED_TEMP' || user.status === 'BANNED_PERM')) {
       return NextResponse.json(apiError('حسابك موقوف', 403, 'BANNED'), { status: 403 })
     }
 
@@ -61,60 +63,62 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Women-only check
-    if (category === 'WOMEN_ONLY' && user.gender !== 'FEMALE') {
+    // Women-only check (SUPER_ADMIN bypasses category gender restriction)
+    if (!bypass && category === 'WOMEN_ONLY' && user.gender !== 'FEMALE') {
       return NextResponse.json(apiError('هذا القسم للنساء فقط', 403), { status: 403 })
     }
 
     // SERVICES is reserved for publicly-visible providers. NORMAL users and
     // PENDING providers can't post there even if they bypass the client.
-    if (category === 'SERVICES' && user.providerStatus !== 'ACTIVE' && user.providerStatus !== 'VERIFIED') {
+    if (!bypass && category === 'SERVICES' && user.providerStatus !== 'ACTIVE' && user.providerStatus !== 'VERIFIED') {
       return NextResponse.json(apiError('هذا القسم متاح فقط لمقدمي الخدمات', 403), { status: 403 })
     }
 
-    // Contests — admin only
+    // Contests — admin only (SUPER_ADMIN always allowed by the allowlist)
     if (category === 'CONTESTS' && !['SUPER_ADMIN', 'PLATFORM_MOD', 'NEIGHBORHOOD_MOD'].includes(user.role)) {
       return NextResponse.json(apiError('المسابقات متاحة فقط للمشرفين', 403), { status: 403 })
     }
 
-    // Cooldown: 60 seconds between posts
-    const cooldownAgo = new Date(Date.now() - POST_COOLDOWN_SECONDS * 1000)
-    const recentPost = await db.post.findFirst({
-      where: { authorId: user.id, createdAt: { gte: cooldownAgo } },
-      select: { id: true },
-    })
-    if (recentPost) {
-      console.log(`[RATE_LIMIT] post cooldown: user=${user.id}`)
-      return NextResponse.json(apiError('انتظر قليلاً قبل نشر منشور جديد', 429), { status: 429 })
-    }
+    if (!bypass) {
+      // Cooldown: 60 seconds between posts
+      const cooldownAgo = new Date(Date.now() - POST_COOLDOWN_SECONDS * 1000)
+      const recentPost = await db.post.findFirst({
+        where: { authorId: user.id, createdAt: { gte: cooldownAgo } },
+        select: { id: true },
+      })
+      if (recentPost) {
+        console.log(`[RATE_LIMIT] post cooldown: user=${user.id}`)
+        return NextResponse.json(apiError('انتظر قليلاً قبل نشر منشور جديد', 429), { status: 429 })
+      }
 
-    // Daily post limit
-    const todayPosts = await db.post.count({
-      where: {
-        authorId: user.id,
-        createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
-      },
-    })
-    const repLimit = getPostLimit(user.reputation)
-    const planLimit = getLimits(user.plan).postsPerDay
-    const dailyLimit = Math.max(repLimit, planLimit) // use whichever is higher
-    if (todayPosts >= dailyLimit) {
-      return NextResponse.json(apiError('وصلت الحد الأقصى للمنشورات اليوم', 429), { status: 429 })
-    }
+      // Daily post limit
+      const todayPosts = await db.post.count({
+        where: {
+          authorId: user.id,
+          createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+        },
+      })
+      const repLimit = getPostLimit(user.reputation)
+      const planLimit = getLimits(user.plan).postsPerDay
+      const dailyLimit = Math.max(repLimit, planLimit) // use whichever is higher
+      if (todayPosts >= dailyLimit) {
+        return NextResponse.json(apiError('وصلت الحد الأقصى للمنشورات اليوم', 429), { status: 429 })
+      }
 
-    // Duplicate/similarity detection: check last 3 hours
-    const threeHoursAgo = new Date(Date.now() - 3 * 3600_000)
-    const recentUserPosts = await db.post.findMany({
-      where: { authorId: user.id, createdAt: { gte: threeHoursAgo } },
-      select: { title: true, body: true },
-    })
-    for (const p of recentUserPosts) {
-      if (isSimilar(title.trim(), p.title) || isSimilar(body.trim(), p.body)) {
-        console.log(`[SPAM] duplicate detected: user=${user.id}`)
-        return NextResponse.json(
-          { error: 'DUPLICATE_POST' },
-          { status: 409 },
-        )
+      // Duplicate/similarity detection: check last 3 hours
+      const threeHoursAgo = new Date(Date.now() - 3 * 3600_000)
+      const recentUserPosts = await db.post.findMany({
+        where: { authorId: user.id, createdAt: { gte: threeHoursAgo } },
+        select: { title: true, body: true },
+      })
+      for (const p of recentUserPosts) {
+        if (isSimilar(title.trim(), p.title) || isSimilar(body.trim(), p.body)) {
+          console.log(`[SPAM] duplicate detected: user=${user.id}`)
+          return NextResponse.json(
+            { error: 'DUPLICATE_POST' },
+            { status: 409 },
+          )
+        }
       }
     }
 
@@ -122,9 +126,9 @@ export async function POST(req: NextRequest) {
     const titleMod = moderateContent(title.trim())
     const bodyMod = moderateContent(body.trim())
 
-    // Block if either title or body is flagged. Return the specific words
-    // that triggered so the user knows exactly what to remove.
-    if (titleMod.action === 'block' || bodyMod.action === 'block') {
+    // Block if either title or body is flagged. SUPER_ADMIN bypasses
+    // moderation entirely — they are the moderators.
+    if (!bypass && (titleMod.action === 'block' || bodyMod.action === 'block')) {
       const words = Array.from(new Set([
         ...(titleMod.offensiveWords || []),
         ...(bodyMod.offensiveWords || []),
@@ -139,13 +143,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Apply censoring if needed
-    const finalTitle = titleMod.censored
-    const finalBody = bodyMod.censored
+    // Apply censoring if needed. SUPER_ADMIN posts raw content; everyone
+    // else gets the moderator's censored version.
+    const finalTitle = bypass ? title.trim() : titleMod.censored
+    const finalBody = bypass ? body.trim() : bodyMod.censored
 
-    // Apply reputation penalty + notify user
+    // Apply reputation penalty + notify user (skipped for SUPER_ADMIN)
     const totalPenalty = titleMod.reputationPenalty + bodyMod.reputationPenalty
-    if (totalPenalty < 0) {
+    if (!bypass && totalPenalty < 0) {
       db.user.update({
         where: { id: user.id },
         data: { reputation: { increment: totalPenalty } },
