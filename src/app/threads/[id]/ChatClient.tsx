@@ -1179,7 +1179,7 @@ export default function ChatClient({
           </div>
         )
       ) : (
-        <div ref={composerRef} className="glass-bottom px-3 w-full max-w-[480px] mx-auto z-20 flex-shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
+        <div ref={composerRef} className="glass-bottom px-4 w-full max-w-[480px] mx-auto z-20 flex-shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
           {/* Reply preview bar */}
           {replyingTo && (
             <div className="flex items-center gap-2 px-1 pt-2 pb-1">
@@ -1458,7 +1458,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
         className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} ${isLastInGroup ? 'mb-2' : 'mb-[3px]'} ${isFirstInGroup && !showDate ? 'mt-3' : ''}`}
       >
         {msg.type === 'IMAGE' && (msg.imageUrl || (msg as any).localPreview) ? (
-          <div className={`max-w-[70%]`} data-msg-id={msg.id} {...longPress}>
+          <div className={`max-w-[85%]`} data-msg-id={msg.id} {...longPress}>
             {replyQuote && <div className="mb-1">{replyQuote}</div>}
             <div onClick={() => msg.imageUrl && onImageTap(msg.imageUrl)} className={`relative ${msg.imageUrl ? 'cursor-pointer' : ''}`}>
               {/* Render the blob preview whenever we have one (sent in this
@@ -1489,7 +1489,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
             </p>
           </div>
         ) : msg.type === 'DELETED' ? (
-          <div className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 ${
+          <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 ${
             isMe ? `bg-primary-600/30 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white/30 dark:bg-gray-800/30 ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
           } border border-dashed ${isMe ? 'border-primary-400/30' : 'border-gray-300/30 dark:border-gray-600/30'}`}>
             <p className={`text-[13px] italic ${isMe ? 'text-primary-200/70' : 'text-gray-400 dark:text-gray-500'}`}>
@@ -1500,7 +1500,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
             <p className={`text-[10px] mt-1 ${isMe ? 'text-primary-200/50' : 'text-gray-400/50'}`}>{timeStr}</p>
           </div>
         ) : editingMsg === msg.id ? (
-          <div className="max-w-[75%] w-full">
+          <div className="max-w-[85%] w-full">
             <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-2xl px-3 py-2 shadow-sm border-2 border-primary-400">
               <input ref={editInputRef} type="text" value={editText} onChange={e => setEditText(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') onSaveEdit(); if (e.key === 'Escape') onCancelEdit() }}
@@ -1510,7 +1510,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
             </div>
           </div>
         ) : (
-          <div {...longPress} data-msg-id={msg.id} className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 shadow-sm select-none ${
+          <div {...longPress} data-msg-id={msg.id} className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 shadow-sm select-none ${
             isMe ? `bg-primary-600 text-white ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
           } ${selectedMsg === msg.id ? 'relative z-[52] ring-2 ring-white/50' : ''}`}>
             {replyQuote}
