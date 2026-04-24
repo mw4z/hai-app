@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { UserReportReason, UserReportSource } from '@prisma/client'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,10 +59,11 @@ export async function POST(
   const conversationId = typeof body.conversationId === 'string' && body.conversationId ? body.conversationId : null
   const listingId = typeof body.listingId === 'string' && body.listingId ? body.listingId : null
 
-  // Confirm the target exists so mods don't inherit ghost rows
+  // Confirm the target exists so mods don't inherit ghost rows.
+  // Select neighborhoodId + name so we can route the mod-fanout below.
   const target = await db.user.findUnique({
     where: { id: targetUserId },
-    select: { id: true },
+    select: { id: true, name: true, neighborhoodId: true },
   })
   if (!target) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
@@ -126,9 +128,98 @@ export async function POST(
       reason,
       source,
     })
+
+    // ── Notify the mod team ─────────────────────────────────────────
+    // Scope: the reported user's own neighborhood mods (if any) + every
+    // platform-level admin. Fire-and-forget so a slow push provider
+    // doesn't block the reporter's UI. Each admin gets both an in-app
+    // Notification (bell badge) and a NotifJob row (phone push).
+    const reporterUser = await db.user.findUnique({
+      where: { id: session.userId },
+      select: { name: true },
+    })
+    const reporterName = reporterUser?.name || null
+    const targetName = target.name || null
+    const reasonLabel = REASON_LABELS[reason as UserReportReason] || reason
+
+    const admins = await db.user.findMany({
+      where: {
+        status: 'ACTIVE',
+        OR: [
+          { role: 'SUPER_ADMIN' },
+          { role: 'PLATFORM_MOD' },
+          ...(target.neighborhoodId
+            ? [{ role: 'NEIGHBORHOOD_MOD' as const, neighborhoodId: target.neighborhoodId }]
+            : []),
+        ],
+      },
+      select: { id: true },
+    })
+
+    if (admins.length > 0) {
+      const bellTitle = `🚩 بلاغ جديد عن ${targetName || 'مستخدم'}`
+      const bellTitleEn = `🚩 New user report: ${targetName || 'a user'}`
+      const bellBody = `${reasonLabel.ar}${reporterName ? ` — من ${reporterName}` : ''}`
+      const bellBodyEn = `${reasonLabel.en}${reporterName ? ` — by ${reporterName}` : ''}`
+
+      ;(async () => {
+        try {
+          // In-app notifications for the bell dropdown / notifications page
+          await db.notification.createMany({
+            data: admins.map((a) => ({
+              type: 'SYSTEM' as const,
+              userId: a.id,
+              actorId: session.userId,
+              actorName: reporterName || 'النظام',
+              title: bellTitle,
+              titleEn: bellTitleEn,
+              body: bellBody,
+              bodyEn: bellBodyEn,
+            })),
+          })
+          // Push jobs — one per admin so the cron processor can target
+          // each device token individually. type='user_report' is handled
+          // in /api/cron/process-notifs.
+          await db.notifJob.createMany({
+            data: admins.map((a) => ({
+              type: 'user_report',
+              priority: 'normal',
+              targetType: 'user',
+              targetRef: a.id,
+              payload: {
+                reportId: created.id,
+                reportedUserId: targetUserId,
+                reportedUserName: targetName,
+                reporterId: session.userId,
+                reporterName,
+                reason,
+                source,
+              },
+            })),
+          })
+          kickNotifCron()
+        } catch (err) {
+          console.error('[USER_REPORT] admin notify failed', err)
+        }
+      })()
+    }
+
     return NextResponse.json({ ok: true, id: created.id, status: created.status })
   } catch (err) {
     console.error('[USER_REPORT] create failed', err)
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
+}
+
+/** Human-readable reason labels used in the admin-facing notification
+ *  copy. Full AR/EN trilingual pair; UR falls back to AR for the push
+ *  title since the reporter's language isn't available here. */
+const REASON_LABELS: Record<UserReportReason, { ar: string; en: string }> = {
+  IMPERSONATION:         { ar: 'حساب مزيف',             en: 'Fake account / impersonation' },
+  SCAM_FRAUD:            { ar: 'احتيال أو نصب',          en: 'Scam or fraud' },
+  HARASSMENT:            { ar: 'تحرش',                   en: 'Harassment' },
+  ABUSIVE_LANGUAGE:      { ar: 'إساءة أو تهديد',         en: 'Abusive language / threats' },
+  SPAM:                  { ar: 'سبام',                    en: 'Spam' },
+  INAPPROPRIATE_PROFILE: { ar: 'محتوى ملف غير لائق',      en: 'Inappropriate profile' },
+  OTHER:                 { ar: 'سبب آخر',                 en: 'Other' },
 }

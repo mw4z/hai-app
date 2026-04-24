@@ -51,6 +51,7 @@ export async function GET() {
     recentLogs,
     adminUsers,
     neighborhoodStats,
+    pendingUserReports,
   ] = await Promise.all([
     db.neighborhoodChangeRequest.count({ where: { status: 'pending' } }),
     db.post.count({ where: { ...nbhdFilter, ...womenOnlyFilter, status: 'HIDDEN' } }),
@@ -81,6 +82,15 @@ export async function GET() {
     db.city.findMany({
       select: { name: true, _count: { select: { neighborhoods: true } } },
     }),
+    // Pending user-level reports — scoped like the post count above
+    db.userReport.count({
+      where: {
+        status: 'PENDING',
+        ...(isPlatform
+          ? {}
+          : { reportedUser: { neighborhoodId: admin.neighborhoodId! } }),
+      },
+    }),
   ])
 
   // Apply the same expiry rule the feed uses, so the dashboard "totalPosts"
@@ -89,7 +99,7 @@ export async function GET() {
 
   return NextResponse.json({
     role: admin.role,
-    stats: { pendingRequests, reportedPosts, hiddenPosts, totalUsers, bannedUsers, totalPosts },
+    stats: { pendingRequests, reportedPosts, hiddenPosts, totalUsers, bannedUsers, totalPosts, pendingUserReports },
     recentLogs: JSON.parse(JSON.stringify(recentLogs)),
     adminUsers,
     neighborhoodStats,

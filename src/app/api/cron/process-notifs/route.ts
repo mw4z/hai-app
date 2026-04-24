@@ -845,6 +845,91 @@ async function processEmergencyAlert(job: JobRow): Promise<JobOutcome> {
   return 'done'
 }
 
+/**
+ * User-report push → the mod team. Targets a single admin user
+ * (targetRef). Bypasses notifPreference — admin notifications are
+ * always delivered regardless of the admin's personal prefs, because
+ * they're operational, not social. Banned admins still shouldn't
+ * receive pushes so we do keep that guard.
+ */
+async function processUserReport(job: JobRow): Promise<JobOutcome> {
+  const p = (job.payload || {}) as {
+    reportId?: string
+    reportedUserName?: string | null
+    reporterName?: string | null
+    reason?: string
+  }
+  const { reportId, reportedUserName, reporterName, reason } = p
+  if (!reportId) return 'dropped'
+
+  const adminId = job.targetRef
+  const admin = await db.user.findUnique({
+    where: { id: adminId },
+    select: {
+      id: true,
+      status: true,
+      role: true,
+      deviceTokens: { select: { token: true, platform: true } },
+    },
+  })
+  if (!admin) return 'dropped'
+  if (admin.status === 'BANNED_TEMP' || admin.status === 'BANNED_PERM') return 'dropped'
+  if (!['SUPER_ADMIN', 'PLATFORM_MOD', 'NEIGHBORHOOD_MOD'].includes(admin.role)) return 'dropped'
+  if (admin.deviceTokens.length === 0) return 'dropped'
+
+  const tokens: TokenWithPlatform[] = admin.deviceTokens.map((t) => ({
+    token: t.token,
+    platform: t.platform,
+  }))
+
+  const who = reportedUserName || 'مستخدم'
+  const by = reporterName ? ` — من ${reporterName}` : ''
+  const reasonLine = reasonCopyForPush(reason)
+  const pushTitle = `🚩 بلاغ جديد عن ${who}`
+  const pushBody = `${reasonLine}${by}`.slice(0, 180)
+
+  const result = await sendPushBatch(tokens, {
+    title: pushTitle,
+    body: pushBody,
+    priority: 'high',
+    data: {
+      type: 'user_report',
+      reportId,
+      deeplink: 'hai://mod?tab=user_reports',
+    },
+  })
+
+  await cleanupInvalidTokens(result.invalidTokens, job.id, job.type)
+
+  console.log('[NOTIF_CRON] job delivered', {
+    jobId: job.id,
+    type: job.type,
+    targetRef: job.targetRef,
+    attempts: job.attempts,
+    tokensSent: tokens.length,
+    success: result.success,
+    failed: result.failed,
+  })
+
+  if (result.success === 0 && result.failed > 0) {
+    throw new Error(result.firstError || 'all push sends failed')
+  }
+  return 'done'
+}
+
+/** Short Arabic copy used inside the user-report push body. */
+function reasonCopyForPush(reason: string | undefined): string {
+  switch (reason) {
+    case 'IMPERSONATION':         return 'حساب مزيف'
+    case 'SCAM_FRAUD':            return 'احتيال أو نصب'
+    case 'HARASSMENT':            return 'تحرش'
+    case 'ABUSIVE_LANGUAGE':      return 'إساءة أو تهديد'
+    case 'SPAM':                  return 'سبام'
+    case 'INAPPROPRIATE_PROFILE': return 'محتوى ملف غير لائق'
+    default:                      return 'بلاغ جديد'
+  }
+}
+
 // ── Main handler ─────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   return handle(req)
@@ -939,6 +1024,9 @@ async function handle(req: NextRequest) {
           break
         case 'emergency_alert':
           outcome = await processEmergencyAlert(job)
+          break
+        case 'user_report':
+          outcome = await processUserReport(job)
           break
         default:
           console.warn('[NOTIF_CRON] unsupported type', {

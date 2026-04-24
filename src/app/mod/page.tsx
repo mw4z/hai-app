@@ -16,8 +16,15 @@ export default async function ModPage() {
 
   // Fetch mod dashboard data (scoped to their neighborhood)
   const nbId = user.neighborhoodId
+  const isPlatform = user.role === 'PLATFORM_MOD' || user.role === 'SUPER_ADMIN'
 
-  const [reportedPosts, hiddenPosts, bannedUsers, recentLogs, stats] = await Promise.all([
+  // Account-level user reports. Neighborhood mods only see reports
+  // against users in their neighborhood; platform-level admins see all.
+  const userReportWhere = isPlatform
+    ? { status: 'PENDING' as const }
+    : { status: 'PENDING' as const, reportedUser: { neighborhoodId: nbId } }
+
+  const [reportedPosts, hiddenPosts, bannedUsers, recentLogs, userReports, stats] = await Promise.all([
     // Reported posts in their neighborhood
     db.post.findMany({
       where: { neighborhoodId: nbId, reportCount: { gt: 0 }, status: { in: ['ACTIVE', 'IN_PROGRESS'] } },
@@ -54,6 +61,29 @@ export default async function ModPage() {
       select: { id: true, action: true, targetType: true, reason: true, createdAt: true },
     }),
 
+    // Pending account-level user reports
+    db.userReport.findMany({
+      where: userReportWhere,
+      orderBy: { createdAt: 'desc' },
+      take: 40,
+      select: {
+        id: true,
+        reason: true,
+        details: true,
+        source: true,
+        postId: true,
+        conversationId: true,
+        listingId: true,
+        createdAt: true,
+        reportedUser: {
+          select: { id: true, name: true, reputation: true, avatarUrl: true, neighborhood: { select: { name: true, nameEn: true } } },
+        },
+        reporter: {
+          select: { id: true, name: true, reputation: true },
+        },
+      },
+    }),
+
     // Stats
     Promise.all([
       db.post.count({ where: { neighborhoodId: nbId, status: 'ACTIVE' } }),
@@ -71,6 +101,7 @@ export default async function ModPage() {
         hiddenPosts,
         bannedUsers,
         recentLogs,
+        userReports,
         stats: {
           activePosts: stats[0],
           reportedPosts: stats[1],

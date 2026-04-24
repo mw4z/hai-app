@@ -36,7 +36,7 @@ const ACTION_LABELS: Record<string, { ar: string; en: string }> = {
   CONFLICT_BLOCKED: { ar: 'تم حظر الإجراء (تعارض)', en: 'Action blocked (conflict)' },
 }
 
-type Tab = 'reports' | 'hidden' | 'banned' | 'activity'
+type Tab = 'reports' | 'user_reports' | 'hidden' | 'banned' | 'activity'
 
 interface Props {
   data: {
@@ -45,8 +45,27 @@ interface Props {
     hiddenPosts: any[]
     bannedUsers: any[]
     recentLogs: any[]
+    userReports: any[]
     stats: { activePosts: number; reportedPosts: number; totalUsers: number; myActions: number }
   }
+}
+
+const USER_REPORT_REASON_LABELS: Record<string, { ar: string; en: string }> = {
+  IMPERSONATION:         { ar: 'حساب مزيف / انتحال شخصية',  en: 'Fake account / impersonation' },
+  SCAM_FRAUD:            { ar: 'احتيال أو نصب',              en: 'Scam or fraud' },
+  HARASSMENT:            { ar: 'تحرش أو تواصل غير مرغوب',    en: 'Harassment' },
+  ABUSIVE_LANGUAGE:      { ar: 'إساءة لفظية أو تهديد',        en: 'Abusive language / threats' },
+  SPAM:                  { ar: 'سبام أو إعلانات مزعجة',       en: 'Spam' },
+  INAPPROPRIATE_PROFILE: { ar: 'محتوى ملف شخصي غير لائق',     en: 'Inappropriate profile' },
+  OTHER:                 { ar: 'سبب آخر',                     en: 'Other' },
+}
+
+const USER_REPORT_SOURCE_LABELS: Record<string, { ar: string; en: string }> = {
+  PROFILE:     { ar: 'الملف الشخصي', en: 'Profile' },
+  POST:        { ar: 'منشور',         en: 'Post' },
+  CHAT:        { ar: 'محادثة',        en: 'Chat' },
+  MARKETPLACE: { ar: 'السوق',         en: 'Marketplace' },
+  PROVIDER:    { ar: 'مقدم خدمة',     en: 'Provider' },
 }
 
 export default function ModDashboard({ data }: Props) {
@@ -100,11 +119,32 @@ export default function ModDashboard({ data }: Props) {
   }
 
   const tabs: { key: Tab; icon: React.ReactNode; ar: string; en: string; count?: number }[] = [
-    { key: 'reports', icon: <FiAlertTriangle className="w-4 h-4" />, ar: 'البلاغات', en: 'Reports', count: data.reportedPosts.length },
+    { key: 'reports', icon: <FiAlertTriangle className="w-4 h-4" />, ar: 'بلاغات المنشورات', en: 'Post reports', count: data.reportedPosts.length },
+    { key: 'user_reports', icon: <FiUserX className="w-4 h-4" />, ar: 'بلاغات المستخدمين', en: 'User reports', count: data.userReports.length },
     { key: 'hidden', icon: <FiEyeOff className="w-4 h-4" />, ar: 'المخفية', en: 'Hidden', count: data.hiddenPosts.length },
     { key: 'banned', icon: <FiUserX className="w-4 h-4" />, ar: 'المحظورين', en: 'Banned', count: data.bannedUsers.length },
     { key: 'activity', icon: <FiActivity className="w-4 h-4" />, ar: 'نشاطي', en: 'My Activity' },
   ]
+
+  async function resolveUserReport(reportId: string, status: 'REVIEWED' | 'DISMISSED' | 'ACTION_TAKEN') {
+    if (actionLoading) return
+    setActionLoading(`ur-${status}-${reportId}`)
+    try {
+      const res = await fetch(`/api/admin/user-reports/${reportId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      if (res.ok) {
+        toast.success(dn('تم', 'Done'))
+        router.refresh()
+      } else {
+        const d = await res.json()
+        toast.error(d.error || 'Error')
+      }
+    } catch { toast.error('Error') }
+    finally { setActionLoading(null) }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
@@ -206,6 +246,78 @@ export default function ModDashboard({ data }: Props) {
                 </div>
               </div>
             ))
+          )
+        )}
+
+        {/* User Reports Tab */}
+        {tab === 'user_reports' && (
+          data.userReports.length === 0 ? (
+            <EmptyState icon="✅" text={dn('لا يوجد بلاغات عن مستخدمين', 'No user reports')} />
+          ) : (
+            data.userReports.map((r: any) => {
+              const reasonLabel = USER_REPORT_REASON_LABELS[r.reason] || { ar: r.reason, en: r.reason }
+              const sourceLabel = USER_REPORT_SOURCE_LABELS[r.source] || { ar: r.source, en: r.source }
+              return (
+                <div key={r.id} className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700">
+                  <div className="flex items-start justify-between mb-2 gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                        {r.reportedUser?.name || dn('مستخدم', 'User')}
+                      </p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        {dn(reasonLabel.ar, reasonLabel.en)} · {dn(sourceLabel.ar, sourceLabel.en)}
+                      </p>
+                    </div>
+                    <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0">
+                      {dn('بلاغ', 'Report')}
+                    </span>
+                  </div>
+                  {r.details && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-3 mb-2 bg-gray-50 dark:bg-gray-900/40 rounded-lg px-2 py-1.5">
+                      {r.details}
+                    </p>
+                  )}
+                  <p className="text-[11px] text-gray-400 mb-3">
+                    {dn('المُبلِّغ', 'Reporter')}: {r.reporter?.name || dn('مجهول', 'Unknown')}
+                    {typeof r.reporter?.reputation === 'number' && ` · ${r.reporter.reputation} rep`}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => resolveUserReport(r.id, 'ACTION_TAKEN')}
+                      disabled={!!actionLoading}
+                      className="flex-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 py-2 rounded-xl text-xs font-medium disabled:opacity-50"
+                    >
+                      {dn('اتخاذ إجراء', 'Action taken')}
+                    </button>
+                    <button
+                      onClick={() => resolveUserReport(r.id, 'REVIEWED')}
+                      disabled={!!actionLoading}
+                      className="flex-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 py-2 rounded-xl text-xs font-medium disabled:opacity-50"
+                    >
+                      {dn('مُراجَع', 'Reviewed')}
+                    </button>
+                    <button
+                      onClick={() => resolveUserReport(r.id, 'DISMISSED')}
+                      disabled={!!actionLoading}
+                      className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 py-2 rounded-xl text-xs font-medium disabled:opacity-50"
+                    >
+                      {dn('تجاهل', 'Dismiss')}
+                    </button>
+                    <Link
+                      href={r.postId
+                        ? `/post/${r.postId}`
+                        : r.conversationId
+                          ? `/threads/${r.conversationId}`
+                          : '#'}
+                      className={`bg-gray-100 dark:bg-gray-700 text-gray-500 p-2 rounded-xl ${(!r.postId && !r.conversationId) ? 'pointer-events-none opacity-40' : ''}`}
+                      title={dn('فتح السياق', 'Open context')}
+                    >
+                      <FiFileText className="w-4 h-4" />
+                    </Link>
+                  </div>
+                </div>
+              )
+            })
           )
         )}
 
