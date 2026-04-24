@@ -45,21 +45,26 @@ interface Msg {
 }
 
 function WhatsAppCheck({ double, read }: { double: boolean; read: boolean }) {
-  // Exact WhatsApp checkmark paths
-  const color = read ? '#90F0FF' : 'rgba(255,255,255,0.45)'
+  // WhatsApp-style checkmark paths. Colors tuned for legibility on
+  // the dark green outgoing bubble (#00a884): the old #90F0FF
+  // read-tick was a pale cyan that blended with the bubble and the
+  // unread rgba(255,255,255,0.45) was too faint to see at all.
+  //   read     → #4FC3F7 (bright sky-blue, same family WhatsApp uses)
+  //   unread   → rgba(255,255,255,0.85) (solid white, high contrast)
+  const color = read ? '#4FC3F7' : 'rgba(255,255,255,0.85)'
   if (double) {
     return (
       <svg width="16" height="11" viewBox="0 0 16 11" className="ml-1 inline-block flex-shrink-0" style={{ marginBottom: -1 }}>
         {/* First check */}
-        <path d="M11 .786l-4.764 7.07L4 5.394" fill="none" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M11 .786l-4.764 7.07L4 5.394" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         {/* Second check offset */}
-        <path d="M15 .786l-4.764 7.07L8 5.394" fill="none" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M15 .786l-4.764 7.07L8 5.394" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     )
   }
   return (
     <svg width="11" height="11" viewBox="0 0 11 11" className="ml-1 inline-block flex-shrink-0" style={{ marginBottom: -1 }}>
-      <path d="M9 .786L4.236 7.856 2 5.394" fill="none" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 .786L4.236 7.856 2 5.394" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
