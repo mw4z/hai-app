@@ -157,22 +157,24 @@ export async function POST(req: NextRequest) {
     // for filtering (author exclusion, notif prefs, quiet hours,
     // gender). priority:'high' so the banner fires immediately.
     if (ride.neighborhoodId) {
-      db.notifJob.create({
-        data: {
-          type: 'new_ride_request',
-          priority: 'high',
-          targetType: 'nbhd_topic',
-          targetRef: ride.neighborhoodId,
-          payload: {
-            rideRequestId: ride.id,
-            requesterId: session.userId,
-            pickupArea,
-            dropoffArea,
+      try {
+        await db.notifJob.create({
+          data: {
+            type: 'new_ride_request',
+            priority: 'high',
+            targetType: 'nbhd_topic',
+            targetRef: ride.neighborhoodId,
+            payload: {
+              rideRequestId: ride.id,
+              requesterId: session.userId,
+              pickupArea,
+              dropoffArea,
+            },
           },
-        },
-      }).catch((err) => {
+        })
+      } catch (err) {
         console.error('[NOTIF_JOB] enqueue new_ride_request failed:', err)
-      })
+      }
       kickNotifCron()
     }
 

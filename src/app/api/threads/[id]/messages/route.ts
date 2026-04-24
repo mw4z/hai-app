@@ -234,23 +234,29 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     // Phone push — single-user target, priority high so the banner
     // fires immediately instead of being batched by Doze mode.
-    db.notifJob.create({
-      data: {
-        type: 'new_message',
-        priority: 'high',
-        targetType: 'user',
-        targetRef: recipientId,
-        payload: {
-          threadId: params.id,
-          senderId: session.userId,
-          senderName,
-          snippet,
-          messageType: type || 'TEXT',
+    // IMPORTANT: await the insert before kickNotifCron(). Fire-and-
+    // forget here created a race where the cron read the queue
+    // before this row had committed, the job wasn't found, and the
+    // push then waited up to ~60s for the next scheduled cron tick.
+    try {
+      await db.notifJob.create({
+        data: {
+          type: 'new_message',
+          priority: 'high',
+          targetType: 'user',
+          targetRef: recipientId,
+          payload: {
+            threadId: params.id,
+            senderId: session.userId,
+            senderName,
+            snippet,
+            messageType: type || 'TEXT',
+          },
         },
-      },
-    }).catch((err) => {
+      })
+    } catch (err) {
       console.error('[NOTIF_JOB] enqueue new_message failed:', err)
-    })
+    }
     kickNotifCron()
 
     return NextResponse.json(message)

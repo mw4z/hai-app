@@ -227,27 +227,32 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Fire-and-forget: enqueue neighborhood push fanout via NotifJob.
-    // Processor applies filtering (author exclusion, prefs, quiet hours, gender).
-    // priority:'high' so every neighbor's phone gets the banner the
-    // moment the post is published instead of being batched by Doze/FCM.
-    db.notifJob.create({
-      data: {
-        type: 'new_post',
-        priority: 'high',
-        targetType: 'nbhd_topic',
-        targetRef: targetNeighborhoodId,
-        payload: {
-          postId: post.id,
-          authorId: user.id,
-          authorName: user.name || null,
-          title: finalTitle.slice(0, 140),
-          category,
+    // Enqueue neighborhood push fanout via NotifJob. Awaited so the
+    // row is committed BEFORE kickNotifCron fires — otherwise the
+    // cron can read the queue before the insert commits and the
+    // push waits up to ~60s for the next scheduled tick.
+    // Processor applies filtering (author exclusion, prefs, quiet
+    // hours, gender). priority:'high' so every neighbor's phone gets
+    // the banner the moment the post is published.
+    try {
+      await db.notifJob.create({
+        data: {
+          type: 'new_post',
+          priority: 'high',
+          targetType: 'nbhd_topic',
+          targetRef: targetNeighborhoodId,
+          payload: {
+            postId: post.id,
+            authorId: user.id,
+            authorName: user.name || null,
+            title: finalTitle.slice(0, 140),
+            category,
+          },
         },
-      },
-    }).catch((err) => {
+      })
+    } catch (err) {
       console.error('[NOTIF_JOB] enqueue new_post failed:', err)
-    })
+    }
     kickNotifCron()
 
     // Notify all neighbors when someone posts in LOOKING_FOR

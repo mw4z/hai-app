@@ -182,46 +182,50 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (parentId && parentComment) {
     const recipientId = parentComment.authorId
     if (recipientId !== session.userId) {
-      db.notifJob.create({
-        data: {
-          type: 'reply_to_comment',
-          priority: 'normal',
-          targetType: 'user',
-          targetRef: recipientId,
-          payload: {
-            postId: params.id,
-            commentId: comment.id,
-            parentCommentId: parentId,
-            actorId: session.userId,
-            actorName: actorNameForPush,
-            recipientId,
-            snippet: pushSnippet,
+      try {
+        await db.notifJob.create({
+          data: {
+            type: 'reply_to_comment',
+            priority: 'high',
+            targetType: 'user',
+            targetRef: recipientId,
+            payload: {
+              postId: params.id,
+              commentId: comment.id,
+              parentCommentId: parentId,
+              actorId: session.userId,
+              actorName: actorNameForPush,
+              recipientId,
+              snippet: pushSnippet,
+            },
           },
-        },
-      }).catch((err) => {
+        })
+      } catch (err) {
         console.error('[NOTIF_JOB] enqueue reply_to_comment failed:', err)
-      })
+      }
       kickNotifCron()
     }
   } else if (post.authorId !== session.userId) {
-    db.notifJob.create({
-      data: {
-        type: 'comment_on_post',
-        priority: 'normal',
-        targetType: 'user',
-        targetRef: post.authorId,
-        payload: {
-          postId: params.id,
-          commentId: comment.id,
-          actorId: session.userId,
-          actorName: actorNameForPush,
-          postAuthorId: post.authorId,
-          snippet: pushSnippet,
+    try {
+      await db.notifJob.create({
+        data: {
+          type: 'comment_on_post',
+          priority: 'high',
+          targetType: 'user',
+          targetRef: post.authorId,
+          payload: {
+            postId: params.id,
+            commentId: comment.id,
+            actorId: session.userId,
+            actorName: actorNameForPush,
+            postAuthorId: post.authorId,
+            snippet: pushSnippet,
+          },
         },
-      },
-    }).catch((err) => {
+      })
+    } catch (err) {
       console.error('[NOTIF_JOB] enqueue comment_on_post failed:', err)
-    })
+    }
     kickNotifCron()
   }
 
