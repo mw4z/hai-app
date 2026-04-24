@@ -176,6 +176,35 @@ export function openMapPicker(options: {
         zoom: 14,
       })
 
+      // Once the style loads, bump label legibility: larger text
+      // (1.25x), stronger white halo (2px), darker text color. The
+      // default streets-v2 sizes/halos are tuned for Latin where a
+      // thin grey label on a beige background reads fine; Arabic
+      // ligatures at the same weight look faded and hard to parse.
+      map.on('load', () => {
+        try {
+          for (const layer of map.getStyle().layers || []) {
+            if (layer.type !== 'symbol') continue
+            const layout: any = layer.layout || {}
+            if (!layout['text-field']) continue
+            // Upscale whatever text-size the style set. We can't read
+            // the resolved expression reliably across types, so we
+            // write a "larger" expression: coalesce current value
+            // (via style spec) into a multiplied literal when it's a
+            // plain number, else bump to a readable default 14.
+            const current = layout['text-size']
+            if (typeof current === 'number') {
+              map.setLayoutProperty(layer.id, 'text-size', current * 1.25)
+            } else if (!current) {
+              map.setLayoutProperty(layer.id, 'text-size', 14)
+            }
+            map.setPaintProperty(layer.id, 'text-halo-width', 2)
+            map.setPaintProperty(layer.id, 'text-halo-color', '#ffffff')
+            map.setPaintProperty(layer.id, 'text-color', '#111827')
+          }
+        } catch { /* style may not allow it — non-fatal */ }
+      })
+
       map.addControl(new ml.NavigationControl({ showCompass: false }), 'top-right')
       map.addControl(new ml.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: false }), 'top-right')
 
