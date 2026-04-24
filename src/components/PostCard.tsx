@@ -617,6 +617,32 @@ export default function PostCard({
     } catch { /* ignore */ }
   }
 
+  // Follow/unfollow toggle — optimistic; reverts on API failure. Shared
+  // by the action-bar button (visible next to Bookmark) so the feature
+  // is discoverable without opening the overflow menu.
+  async function toggleFollow() {
+    if (post.author.id === currentUserId) return // author auto-follows
+    const next = !following
+    setFollowing(next)
+    try {
+      const res = await fetch(`/api/posts/${post.id}/subscribe`, {
+        method: next ? 'POST' : 'DELETE',
+      })
+      if (!res.ok) {
+        setFollowing(!next)
+        toast.error(lang === 'en' ? 'Could not update' : lang === 'ur' ? 'اپ ڈیٹ نہیں ہو سکا' : 'تعذر التحديث')
+        return
+      }
+      toast.success(
+        next
+          ? (lang === 'en' ? 'Following this post' : lang === 'ur' ? 'اب آپ اس پوسٹ کو فالو کر رہے ہیں' : 'أنت تتابع هذا المنشور')
+          : (lang === 'en' ? 'Unfollowed' : lang === 'ur' ? 'فالو ختم' : 'تم إلغاء المتابعة'),
+      )
+    } catch {
+      setFollowing(!next)
+    }
+  }
+
   async function deleteComment(commentId: string, postId: string) {
     const ok = await confirmDialog({
       message: lang === 'en' ? 'Delete this comment?' : 'حذف هذا التعليق؟',
@@ -796,46 +822,6 @@ export default function PostCard({
                   >
                     <FiFlag className="hai-icon-sm hai-menu-item__icon" />
                     <span className="hai-menu-item__label">{lang !== 'en' ? 'استعادة' : 'Restore'}</span>
-                  </button>
-                )}
-                {/* Follow / unfollow this post — interest tracking, not
-                    engagement. Subscribers get a (rate-limited) push on
-                    new comments. Author is excluded; they already get
-                    every comment notification via the author path. */}
-                {post.author.id !== currentUserId && (
-                  <button
-                    onClick={async () => {
-                      const next = !following
-                      setFollowing(next) // optimistic
-                      setShowMenu(false)
-                      try {
-                        const res = await fetch(`/api/posts/${post.id}/subscribe`, {
-                          method: next ? 'POST' : 'DELETE',
-                        })
-                        if (!res.ok) {
-                          setFollowing(!next) // revert
-                          toast.error(lang === 'en' ? 'Could not update' : lang === 'ur' ? 'اپ ڈیٹ نہیں ہو سکا' : 'تعذر التحديث')
-                          return
-                        }
-                        toast.success(
-                          next
-                            ? (lang === 'en' ? 'Following this post' : lang === 'ur' ? 'اب آپ اس پوسٹ کو فالو کر رہے ہیں' : 'أنت تتابع هذا المنشور')
-                            : (lang === 'en' ? 'Unfollowed' : lang === 'ur' ? 'فالو ختم' : 'تم إلغاء المتابعة'),
-                        )
-                      } catch {
-                        setFollowing(!next)
-                      }
-                    }}
-                    className="hai-menu-item"
-                  >
-                    {following
-                      ? <FiBellOff className="hai-icon-sm hai-menu-item__icon" />
-                      : <FiBell className="hai-icon-sm hai-menu-item__icon" />}
-                    <span className="hai-menu-item__label">
-                      {following
-                        ? (lang === 'en' ? 'Unfollow post' : lang === 'ur' ? 'پوسٹ ان فالو کریں' : 'إلغاء المتابعة')
-                        : (lang === 'en' ? 'Follow post' : lang === 'ur' ? 'پوسٹ فالو کریں' : 'متابعة المنشور')}
-                    </span>
                   </button>
                 )}
                 {/* Report post */}
@@ -1231,6 +1217,25 @@ export default function PostCard({
           >
             <FiBookmark className={`hai-icon-md hai-action-btn__icon ${bookmarked ? 'hai-fill-current' : ''}`} />
           </button>
+
+          {/* Follow post — visible in the action bar so users discover
+              the feature without opening the overflow menu. Hidden for
+              the author (they implicitly follow their own post). Uses
+              the same hai-action-btn primitive as Bookmark/Share. */}
+          {post.author.id !== currentUserId && (
+            <button
+              onClick={toggleFollow}
+              data-selected={following ? 'true' : 'false'}
+              aria-label={following
+                ? (lang === 'en' ? 'Unfollow post' : 'إلغاء المتابعة')
+                : (lang === 'en' ? 'Follow post' : 'متابعة المنشور')}
+              className="hai-action-btn"
+            >
+              {following
+                ? <FiBell className="hai-icon-md hai-action-btn__icon hai-fill-current" />
+                : <FiBellOff className="hai-icon-md hai-action-btn__icon" />}
+            </button>
+          )}
 
           {/* Comment toggle */}
           {isLookingFor ? (
