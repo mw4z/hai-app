@@ -125,7 +125,13 @@ export interface ApnsSendResult {
   perToken: Array<{ token: string; ok: boolean; status: number; reason?: string }>
 }
 
-/** Send a single APNs push to N device tokens. */
+/** Send a single APNs push to N device tokens.
+ *
+ *  Uses Node's `http2` module because Apple's APNs server requires
+ *  HTTP/2. Node's global fetch (undici) speaks HTTP/1.1 only, which is
+ *  why the naive `fetch()` port of this code dies with `fetch failed`
+ *  — the TLS handshake succeeds but the HTTP/1.1 request is dropped.
+ */
 export async function sendApnsBatch(
   tokens: string[],
   opts: ApnsSendOptions,
@@ -162,50 +168,97 @@ export async function sendApnsBatch(
   }
   const jsonBody = JSON.stringify(payload)
 
-  // Sequential for now — APNs rate limits per-connection are generous
-  // but the undici fetch used here multiplexes over HTTP/2 automatically.
-  await Promise.all(
-    tokens.map(async (token) => {
-      try {
-        const res = await fetch(`https://${host}/3/device/${token}`, {
-          method: 'POST',
-          headers: {
-            authorization: `bearer ${jwt}`,
-            'apns-topic': topic,
-            'apns-push-type': apnsPushType,
-            'apns-priority': String(apnsPriority),
-            ...(opts.collapseId ? { 'apns-collapse-id': opts.collapseId } : {}),
-            'content-type': 'application/json',
-          },
-          body: jsonBody,
-        })
+  // Open one HTTP/2 session and multiplex every token request over it.
+  const http2 = await import('http2')
+  const session = http2.connect(`https://${host}`)
 
-        if (res.status === 200) {
+  const markAllFailed = (reason: string) => {
+    for (const token of tokens) {
+      result.failed++
+      result.perToken.push({ token, ok: false, status: 0, reason })
+    }
+    if (!result.firstError) result.firstError = reason
+  }
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error('apns_session_timeout')),
+        10_000,
+      )
+      session.once('connect', () => { clearTimeout(timer); resolve() })
+      session.once('error', (err) => { clearTimeout(timer); reject(err) })
+    })
+  } catch (err: any) {
+    markAllFailed(err?.message || 'apns_connect_failed')
+    try { session.close() } catch {}
+    return result
+  }
+
+  const sendOne = (token: string) =>
+    new Promise<void>((resolve) => {
+      const headers: Record<string, string> = {
+        ':method': 'POST',
+        ':path': `/3/device/${token}`,
+        authorization: `bearer ${jwt}`,
+        'apns-topic': topic,
+        'apns-push-type': apnsPushType,
+        'apns-priority': String(apnsPriority),
+        'content-type': 'application/json',
+        'content-length': String(Buffer.byteLength(jsonBody)),
+      }
+      if (opts.collapseId) headers['apns-collapse-id'] = opts.collapseId
+
+      const req = session.request(headers)
+      let status = 0
+      let body = ''
+      req.setEncoding('utf8')
+      req.on('response', (h) => {
+        status = Number(h[':status']) || 0
+      })
+      req.on('data', (chunk: string) => { body += chunk })
+      req.on('end', () => {
+        if (status === 200) {
           result.success++
           result.perToken.push({ token, ok: true, status: 200 })
+          resolve()
           return
         }
-        const errBody = (await res.json().catch(() => null)) as { reason?: string } | null
-        const reason = errBody?.reason || `HTTP ${res.status}`
+        let reason: string
+        try {
+          const parsed = body ? JSON.parse(body) : null
+          reason = parsed?.reason || `HTTP ${status}`
+        } catch {
+          reason = `HTTP ${status}`
+        }
         result.failed++
-        result.perToken.push({ token, ok: false, status: res.status, reason })
+        result.perToken.push({ token, ok: false, status, reason })
         if (!result.firstError) result.firstError = reason
         if (
           reason === 'BadDeviceToken' ||
           reason === 'Unregistered' ||
           reason === 'DeviceTokenNotForTopic' ||
-          res.status === 410
+          status === 410
         ) {
           result.invalidTokens.push(token)
         }
-      } catch (err: any) {
+        resolve()
+      })
+      req.on('error', (err: Error) => {
         result.failed++
         const reason = err?.message || String(err)
         result.perToken.push({ token, ok: false, status: 0, reason })
         if (!result.firstError) result.firstError = reason
-      }
-    }),
-  )
+        resolve()
+      })
+      req.end(jsonBody)
+    })
+
+  try {
+    await Promise.all(tokens.map(sendOne))
+  } finally {
+    try { session.close() } catch {}
+  }
 
   return result
 }
