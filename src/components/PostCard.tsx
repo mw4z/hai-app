@@ -16,6 +16,7 @@ import ImageLightbox from './ImageLightbox'
 import SmartText from './SmartText'
 import ReportUserSheet from './ReportUserSheet'
 import { showApiError } from '@/lib/apiError'
+import { detectLang } from '@/lib/detectLang'
 import type { TranslationKey } from '@/lib/i18n'
 import { canStartPrivateThread } from '@/lib/thread-rules'
 import { getRepLevel } from '@/lib/reputation-levels'
@@ -182,6 +183,50 @@ export default function PostCard({
   const [editBody, setEditBody] = useState(post.body)
   const [editLoading, setEditLoading] = useState(false)
   const [postData, setPostData] = useState({ title: post.title, body: post.body, editedAt: post.editedAt })
+  // Auto-translation. Detected language comes from the raw title+body;
+  // the translate button only surfaces if it differs from the user's
+  // UI language. Cached per-card in state so toggling off/on is free.
+  const postSourceLang = detectLang(`${postData.title} ${postData.body}`)
+  const canTranslate = postSourceLang !== lang
+  const [translated, setTranslated] = useState<{ title: string; body: string } | null>(null)
+  const [translating, setTranslating] = useState(false)
+  const [showTranslated, setShowTranslated] = useState(false)
+  async function toggleTranslate() {
+    if (showTranslated) {
+      // Toggle off — revert to original without refetching
+      setShowTranslated(false)
+      return
+    }
+    if (translated) {
+      setShowTranslated(true)
+      return
+    }
+    setTranslating(true)
+    try {
+      const [tRes, bRes] = await Promise.all([
+        fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: postData.title, target: lang }),
+        }).then((r) => r.json()),
+        fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: postData.body, target: lang }),
+        }).then((r) => r.json()),
+      ])
+      const title = typeof tRes?.translated === 'string' ? tRes.translated : postData.title
+      const body = typeof bRes?.translated === 'string' ? bRes.translated : postData.body
+      setTranslated({ title, body })
+      setShowTranslated(true)
+    } catch {
+      toast.error(lang === 'en' ? 'Translation failed' : lang === 'ur' ? 'ترجمہ ناکام' : 'فشل الترجمة')
+    } finally {
+      setTranslating(false)
+    }
+  }
+  const displayTitle = showTranslated && translated ? translated.title : postData.title
+  const displayBody  = showTranslated && translated ? translated.body  : postData.body
   const pickerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -760,8 +805,23 @@ export default function PostCard({
         </div>
       ) : (
         <>
-          <h3 className="hai-body-strong hai-mb-1 selectable-text">{postData.title}</h3>
-          <p className="hai-body hai-tc-sub line-clamp-3 selectable-text">{postData.body}</p>
+          <h3 className="hai-body-strong hai-mb-1 selectable-text">{displayTitle}</h3>
+          <p className="hai-body hai-tc-sub line-clamp-3 selectable-text">{displayBody}</p>
+          {canTranslate && (
+            <button
+              type="button"
+              onClick={toggleTranslate}
+              disabled={translating}
+              className="hai-meta hai-mt-1 text-primary-600 dark:text-primary-400 disabled:opacity-60"
+              style={{ cursor: 'pointer' }}
+            >
+              {translating
+                ? (lang === 'en' ? 'Translating…' : lang === 'ur' ? 'ترجمہ جاری…' : 'جاري الترجمة…')
+                : showTranslated
+                  ? (lang === 'en' ? 'Show original' : lang === 'ur' ? 'اصل متن دکھائیں' : 'إظهار الأصلي')
+                  : (lang === 'en' ? 'Translate' : lang === 'ur' ? 'ترجمہ کریں' : 'ترجمة')}
+            </button>
+          )}
           {postData.editedAt && (
             <p className="hai-meta hai-mt-1">
               {lang === 'en' ? 'Edited' : lang === 'ur' ? 'ترمیم شدہ' : 'تم التعديل'} {new Date(postData.editedAt).toLocaleDateString(lang !== 'en' ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
