@@ -78,10 +78,16 @@ export default function PushRegistration() {
             // Bridge push → DOM events so screens can react live
             // without polling. Profile uses hai:mod-request-resolved
             // to refetch /api/mod-request the instant the admin
-            // approves or rejects.
+            // approves/rejects. Threads list uses hai:new-message so
+            // an incoming DM flips the row state + check marks right
+            // away instead of waiting for the next 5s poll.
             try {
               if (type === 'mod_request_resolved') {
                 window.dispatchEvent(new CustomEvent('hai:mod-request-resolved', {
+                  detail: notification?.data,
+                }))
+              } else if (type === 'new_message') {
+                window.dispatchEvent(new CustomEvent('hai:new-message', {
                   detail: notification?.data,
                 }))
               }

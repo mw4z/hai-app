@@ -12,7 +12,37 @@ interface Thread {
   postTitle: string | null
   postCategory: string | null
   isExclusive: boolean
-  lastMessage: { text: string; isMe: boolean; createdAt: string } | null
+  lastMessage: {
+    text: string
+    isMe: boolean
+    createdAt: string
+    deliveredAt?: string | null
+    readAt?: string | null
+  } | null
+}
+
+/**
+ * WhatsApp-style check marks, sized for the conversation list row.
+ *  - unsent/sending   → nothing (the row just shows no tick)
+ *  - sent (server ack, not delivered)     → single grey tick
+ *  - delivered (recipient fetched it)     → double grey tick
+ *  - read (recipient opened + rr enabled) → double blue tick
+ */
+function ListCheck({ delivered, read }: { delivered: boolean; read: boolean }) {
+  const color = read ? '#1E88E5' : '#9ca3af'
+  if (!delivered) {
+    return (
+      <svg width="12" height="10" viewBox="0 0 11 11" className="inline-block flex-shrink-0" aria-hidden="true">
+        <path d="M9 .786L4.236 7.856 2 5.394" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+  return (
+    <svg width="16" height="10" viewBox="0 0 16 11" className="inline-block flex-shrink-0" aria-hidden="true">
+      <path d="M11 .786l-4.764 7.07L4 5.394" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15 .786l-4.764 7.07L8 5.394" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
 }
 
 function timeAgo(dateStr: string, lang: string): string {
@@ -52,22 +82,29 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
     // just closed a thread and navigated back.
     refresh()
 
-    // Poll every 10s while the tab is visible.
+    // Poll every 5s while the tab is visible. Tighter than before so
+    // the check-mark states (sent → delivered → seen) catch up without
+    // opening the chat. Polling pauses when the tab isn't visible.
     const id = setInterval(() => {
       if (document.visibilityState !== 'visible') return
       refresh()
-    }, 10000)
+    }, 5000)
 
-    // Also refresh immediately when the tab becomes visible (e.g. user
-    // returns from the chat page via back gesture or app switch).
+    // Refresh immediately on visibility + on realtime signals.
+    // PushRegistration dispatches 'hai:new-message' on foreground DM
+    // push receipt so an incoming message flips the row state (and
+    // bumps timestamp) without waiting for the next poll tick.
     function onVisibility() {
       if (document.visibilityState === 'visible') refresh()
     }
+    function onPushNewMessage() { refresh() }
     document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('hai:new-message', onPushNewMessage)
 
     return () => {
       clearInterval(id)
       document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('hai:new-message', onPushNewMessage)
     }
   }, [])
 
@@ -131,9 +168,17 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
                   </div>
                 )}
                 {thread.lastMessage && (
-                  <p className="text-[13px] text-gray-500 dark:text-gray-400 truncate leading-tight">
-                    {thread.lastMessage.isMe ? (lang === 'en' ? 'You: ' : 'أنت: ') : ''}
-                    {thread.lastMessage.text}
+                  <p className="text-[13px] text-gray-500 dark:text-gray-400 truncate leading-tight flex items-center gap-1">
+                    {thread.lastMessage.isMe && (
+                      <ListCheck
+                        delivered={!!thread.lastMessage.deliveredAt || !!thread.lastMessage.readAt}
+                        read={!!thread.lastMessage.readAt}
+                      />
+                    )}
+                    <span className="truncate">
+                      {thread.lastMessage.isMe ? '' : ''}
+                      {thread.lastMessage.text}
+                    </span>
                   </p>
                 )}
               </div>

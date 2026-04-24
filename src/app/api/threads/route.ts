@@ -20,12 +20,18 @@ export async function GET() {
         OR: [{ user1Id: session.userId }, { user2Id: session.userId }],
       },
       include: {
-        user1: { select: { id: true, name: true, avatarUrl: true } },
-        user2: { select: { id: true, name: true, avatarUrl: true } },
+        user1: { select: { id: true, name: true, avatarUrl: true, showReadReceipts: true } },
+        user2: { select: { id: true, name: true, avatarUrl: true, showReadReceipts: true } },
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          select: { text: true, type: true, createdAt: true, senderId: true },
+          // deliveredAt + readAt drive the conversation-list check marks
+          // so the user sees tick state (sent / delivered / seen) without
+          // opening the chat.
+          select: {
+            text: true, type: true, createdAt: true, senderId: true,
+            deliveredAt: true, readAt: true,
+          },
         },
       },
       orderBy: { updatedAt: 'desc' },
@@ -54,16 +60,26 @@ export async function GET() {
       const other = t.user1Id === session.userId ? t.user2 : t.user1
       const lastMsg = t.messages[0] || null
       const post = t.postId ? postMap.get(t.postId) : null
+      const isMe = lastMsg ? lastMsg.senderId === session.userId : false
+      // Strip readAt when the OTHER user has read-receipts disabled —
+      // matches the per-message rule in /api/threads/[id]/messages so
+      // the list never leaks a privacy-hidden signal back into the
+      // roster view. Delivered status is independent of the setting.
+      const readAtSafe = isMe && lastMsg?.readAt && other?.showReadReceipts
+        ? lastMsg.readAt
+        : null
       return {
         id: t.id,
-        other,
+        other: { id: other.id, name: other.name, avatarUrl: other.avatarUrl },
         postTitle: post?.title || null,
         postCategory: post?.category || null,
         isExclusive: post?.coordinationMode === 'EXCLUSIVE',
         lastMessage: lastMsg ? {
           text: lastMsg.type === 'LOCATION' ? '📍' : lastMsg.type === 'IMAGE' ? '📷' : (lastMsg.text?.slice(0, 50) || ''),
-          isMe: lastMsg.senderId === session.userId,
+          isMe,
           createdAt: lastMsg.createdAt,
+          deliveredAt: isMe ? lastMsg.deliveredAt : null,
+          readAt: readAtSafe,
         } : null,
         updatedAt: t.updatedAt,
       }

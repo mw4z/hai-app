@@ -22,12 +22,15 @@ export default async function ThreadsPage() {
         OR: [{ user1Id: session.userId }, { user2Id: session.userId }],
       },
       include: {
-        user1: { select: { id: true, name: true, avatarUrl: true } },
-        user2: { select: { id: true, name: true, avatarUrl: true } },
+        user1: { select: { id: true, name: true, avatarUrl: true, showReadReceipts: true } },
+        user2: { select: { id: true, name: true, avatarUrl: true, showReadReceipts: true } },
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1,
-          select: { text: true, type: true, createdAt: true, senderId: true },
+          select: {
+            text: true, type: true, createdAt: true, senderId: true,
+            deliveredAt: true, readAt: true,
+          },
         },
       },
       orderBy: { updatedAt: 'desc' },
@@ -50,6 +53,10 @@ export default async function ThreadsPage() {
     const other = t.user1Id === session.userId ? t.user2 : t.user1
     const lastMsg = t.messages[0] || null
     const post = t.postId ? postMap.get(t.postId) : null
+    const isMe = lastMsg ? lastMsg.senderId === session.userId : false
+    const readAtSafe = isMe && lastMsg?.readAt && other?.showReadReceipts
+      ? lastMsg.readAt.toISOString()
+      : null
     return {
       id: t.id,
       other: { id: other.id, name: other.name, avatarUrl: other.avatarUrl },
@@ -58,8 +65,10 @@ export default async function ThreadsPage() {
       isExclusive: post?.coordinationMode === 'EXCLUSIVE',
       lastMessage: lastMsg ? {
         text: lastMsg.type === 'LOCATION' ? '📍' : (lastMsg.text?.slice(0, 50) || ''),
-        isMe: lastMsg.senderId === session.userId,
+        isMe,
         createdAt: lastMsg.createdAt.toISOString(),
+        deliveredAt: isMe && lastMsg.deliveredAt ? lastMsg.deliveredAt.toISOString() : null,
+        readAt: readAtSafe,
       } : null,
     }
   })
