@@ -145,6 +145,15 @@ export async function GET(
     select: { createdAt: true },
   })
 
+  // Caller's own offer status — lets a driver's UI react in real time
+  // when the requester rejects (or withdraws) their offer, instead of
+  // requiring a manual refresh. null when the caller is the requester
+  // or hasn't offered.
+  const myOffer = await db.rideOffer.findUnique({
+    where: { rideRequestId_driverId: { rideRequestId: params.id, driverId: session.userId } },
+    select: { status: true },
+  })
+
   const isLate = !fresh.isImmediate && fresh.scheduledAt && new Date(fresh.scheduledAt) < now && fresh.status === 'RIDE_OPEN'
   const autoCloseAt = fresh.status === 'RIDE_PENDING_COMPLETION' && fresh.trip?.driverMarkedDoneAt
     ? new Date(new Date(fresh.trip.driverMarkedDoneAt).getTime() + 15 * 60 * 1000).toISOString()
@@ -158,5 +167,6 @@ export async function GET(
     autoCloseAt,
     trip: fresh.trip,
     lastMessageAt: lastMessage?.createdAt || null,
+    myOfferStatus: myOffer?.status ?? null,
   })
 }

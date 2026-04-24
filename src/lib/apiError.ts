@@ -269,6 +269,20 @@ export function translateApiError(body: any, lang: Lang): string {
           ? 'یہ پیشکش اب قابلِ ترمیم نہیں۔'
           : 'لم يعد بالإمكان تعديل هذا العرض.'
 
+    case 'OFFER_NOT_WITHDRAWABLE':
+      return lang === 'en'
+        ? 'This offer can no longer be withdrawn. Coordination already started.'
+        : lang === 'ur'
+          ? 'یہ پیشکش اب واپس نہیں لی جا سکتی۔ ہم آہنگی شروع ہو چکی ہے۔'
+          : 'لم يعد بالإمكان سحب هذا العرض — بدأ التنسيق.'
+
+    case 'OFFER_NOT_REJECTABLE':
+      return lang === 'en'
+        ? 'This offer can no longer be rejected. Coordination already started.'
+        : lang === 'ur'
+          ? 'یہ پیشکش اب مسترد نہیں کی جا سکتی۔ ہم آہنگی شروع ہو چکی ہے۔'
+          : 'لم يعد بالإمكان رفض هذا العرض — بدأ التنسيق.'
+
     case 'INVALID_TRANSITION':
       return lang === 'en'
         ? 'This trip is not complete yet.'

@@ -19,6 +19,7 @@ interface PollData {
     cancelledAt: string | null
   } | null
   lastMessageAt: string | null
+  myOfferStatus: 'OFFER_PENDING' | 'OFFER_ACCEPTED' | 'OFFER_PASSED' | 'OFFER_WITHDRAWN' | null
 }
 
 const TERMINAL_STATES = ['RIDE_COMPLETED', 'RIDE_CANCELLED', 'RIDE_EXPIRED']

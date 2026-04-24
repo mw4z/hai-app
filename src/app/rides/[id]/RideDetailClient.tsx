@@ -246,10 +246,50 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
   const isParticipant = isRequester || isDriver
   const isTerminal = ['RIDE_COMPLETED', 'RIDE_CANCELLED', 'RIDE_EXPIRED'].includes(status)
   const offers = ride?.offers || []
-  // Check if current user already submitted an offer
+  // Check if current user already submitted an offer. The driver's
+  // own offer status comes from two possible sources: the fetched
+  // ride's offer list (may be stale between polls) and the poll
+  // endpoint's `myOfferStatus` (refreshes every 3s). Poll wins.
   const existingOffer = offers.find((o: any) => o.driver?.id === currentUserId)
-  const hasMyOffer = !!existingOffer || !!myOffer
+  const rawOfferStatus = pollData?.myOfferStatus
+    || existingOffer?.status
+    || (myOffer ? 'OFFER_PENDING' : null)
+  // Only treat the offer as "mine" in the UI sense if it's still
+  // active (PENDING or ACCEPTED). Once it's been rejected by the
+  // requester (OFFER_PASSED) or the driver withdrew it
+  // (OFFER_WITHDRAWN), the driver should fall back to the submit
+  // form and be able to try again without a page reload.
+  const myOfferIsActive = rawOfferStatus === 'OFFER_PENDING' || rawOfferStatus === 'OFFER_ACCEPTED'
+  const hasMyOffer = myOfferIsActive && (!!existingOffer || !!myOffer || !!pollData?.myOfferStatus)
   const canOffer = !isRequester && status === 'RIDE_OPEN' && !hasMyOffer
+
+  // Detect the rejection transition so we can toast the driver
+  // exactly once when it happens (polling keeps sending the same
+  // value, don't spam). The previous value lives in a ref.
+  const lastOfferStatusRef = useRef<string | null>(null)
+  useEffect(() => {
+    const current = pollData?.myOfferStatus ?? null
+    const prev = lastOfferStatusRef.current
+    if (
+      prev === 'OFFER_PENDING' &&
+      current === 'OFFER_PASSED' &&
+      status === 'RIDE_OPEN'
+    ) {
+      // Requester dismissed this offer but the ride is still open, so
+      // the driver can submit a new one. Clear the optimistic
+      // myOffer state so the submit form re-appears immediately.
+      setMyOffer(null)
+      toast(
+        lang === 'en'
+          ? 'The requester declined your offer — you can submit a new one'
+          : lang === 'ur'
+            ? 'طالب نے آپ کی پیشکش مسترد کر دی — نئی پیشکش بھیج سکتے ہیں'
+            : 'صاحب الطلب رفض عرضك — يمكنك تقديم عرض جديد',
+        { duration: 5000, icon: '↩️' },
+      )
+    }
+    lastOfferStatusRef.current = current
+  }, [pollData?.myOfferStatus, status, lang])
 
   // ── Offer analysis ────────────────────────────────────────────────────────
 
