@@ -194,23 +194,34 @@ export default function AppSplash() {
         /* ── Root ──────────────────────────────────────────── */
         ._sp {
           position: fixed;
-          inset: 0;
+          /* Explicit viewport sizing instead of inset:0. iPad WKWebView
+             with html { overflow-x: hidden; padding: env(safe-area…) }
+             mis-resolved inset:0 to the padded box, so the splash shrank
+             and docked at one corner (the 'green tile in bottom-right'
+             glitch). 100dvh pins to the dynamic viewport height so it
+             follows rotation/keyboard. */
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100dvh;
           z-index: 9990;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
           opacity: 1;
-          transform: scale(1);
-          will-change: transform, opacity;
+          will-change: opacity;
         }
         ._sp-out {
-          animation: _spZoom ${FADE_MS}ms ease-out forwards;
+          /* Opacity-only fade. The previous scale(1.15) end state
+             distorted visibly when the splash partly overlapped the
+             next route's content during the handoff. */
+          animation: _spFade ${FADE_MS}ms ease-out forwards;
           pointer-events: none;
         }
-        @keyframes _spZoom {
-          0%   { opacity: 1; transform: scale(1); }
-          100% { opacity: 0; transform: scale(1.15); }
+        @keyframes _spFade {
+          0%   { opacity: 1; }
+          100% { opacity: 0; }
         }
 
         /* ── Background ───────────────────────────────────── */

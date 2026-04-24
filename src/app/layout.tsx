@@ -92,7 +92,9 @@ export default function RootLayout({
             AppSplash shows no color flash. No logo or text here; the
             animated AppSplash is the only visible intro. */}
         <div id="__hai_preload" style={{
-          position: 'fixed', inset: 0, zIndex: 99999,
+          position: 'fixed',
+          top: 0, left: 0, width: '100vw', height: '100dvh',
+          zIndex: 99999,
           background: 'radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #e0f7f2 40%, #fff 100%)',
         }} />
         <script dangerouslySetInnerHTML={{ __html: `
