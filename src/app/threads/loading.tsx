@@ -32,16 +32,7 @@ export default function ThreadsLoading() {
         ))}
       </div>
 
-      {/* Bottom nav */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-[var(--surface)] border-t border-gray-100 dark:border-gray-800 px-4 py-2" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <div className="flex items-end justify-around max-w-[480px] mx-auto">
-          <div className="flex flex-col items-center gap-1"><div className="w-5 h-5 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" /><div className="w-8 h-2 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" /></div>
-          <div className="flex flex-col items-center gap-1"><div className="w-5 h-5 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" /><div className="w-8 h-2 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" /></div>
-          <div className="w-[52px] h-[52px] bg-primary-100 dark:bg-primary-900/30 rounded-full animate-pulse -mt-3" />
-          <div className="flex flex-col items-center gap-1"><div className="w-5 h-5 bg-primary-100 dark:bg-primary-900/30 rounded animate-pulse" /><div className="w-8 h-2 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" /></div>
-          <div className="flex flex-col items-center gap-1"><div className="w-5 h-5 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" /><div className="w-8 h-2 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" /></div>
-        </div>
-      </div>
+      {/* BottomNav is mounted globally in layout.tsx. */}
     </div>
   )
 }

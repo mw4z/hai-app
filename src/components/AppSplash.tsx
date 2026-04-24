@@ -365,6 +365,14 @@ export default function AppSplash() {
         ._sp-ld {
           position: absolute;
           bottom: max(env(safe-area-inset-bottom, 20px), 44px);
+          /* Absolute children ignore the flex parent's
+             align-items/justify-content, so without an explicit
+             horizontal anchor this dot row defaulted to left:0 —
+             on iPad (and anywhere the viewport is wider than the
+             loader) that's the bottom-left glitch the user saw on
+             cold start. Center it on the x-axis explicitly. */
+          left: 50%;
+          transform: translateX(-50%);
           display: flex;
           gap: 5px;
           animation: _ldIn 0.3s ease-out 1.0s both;
