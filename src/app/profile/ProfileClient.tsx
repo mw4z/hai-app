@@ -182,6 +182,11 @@ export default function ProfileClient({ user, postCount }: Props) {
   function applyTheme(t: Theme) {
     setTheme(t)
     localStorage.setItem('hai_theme', t)
+    // Cookie is the primary source read by the inline head script on
+    // cold-start. localStorage on Android WebView sometimes hydrates
+    // AFTER the head script runs, losing the user's choice — the
+    // cookie arrives with the request itself, never racy.
+    document.cookie = `hai_theme=${t}; path=/; max-age=31536000; SameSite=Lax`
     const isDark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
     document.documentElement.classList.toggle('dark', isDark)
   }

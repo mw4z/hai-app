@@ -11,6 +11,8 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import androidx.webkit.WebSettingsCompat;
+import androidx.webkit.WebViewFeature;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -34,6 +36,14 @@ public class MainActivity extends BridgeActivity {
             ws.setRenderPriority(WebSettings.RenderPriority.HIGH);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 wv.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
+            }
+            // Make prefers-color-scheme reflect the OS setting. Many OEM
+            // WebViews (Samsung, Xiaomi, Huawei) default to "light" for
+            // the media query regardless of system dark mode — this flag
+            // opts the WebView into honoring the system value without
+            // auto-inverting page colors (our app has its own dark CSS).
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+                try { WebSettingsCompat.setAlgorithmicDarkeningAllowed(ws, true); } catch (Exception ignored) {}
             }
         } catch (Exception e) {}
     }

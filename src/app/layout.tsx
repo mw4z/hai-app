@@ -58,26 +58,57 @@ export default function RootLayout({
   const langCookie = cookieStore.get('hai_language')?.value
   const lang: Lang = langCookie === 'en' ? 'en' : langCookie === 'ur' ? 'ur' : 'ar'
 
+  // Theme cookie is the authoritative source for SSR — 'dark' or 'light'
+  // means the user picked manually; 'system' (or missing) means follow
+  // the OS. Applying the class here on the server avoids the Android
+  // WebView bug where localStorage hydrates after the head script runs
+  // and the wrong theme flashes in.
+  const themeCookie = cookieStore.get('hai_theme')?.value
+  const serverIsDark = themeCookie === 'dark'
+
   return (
-    <html lang={lang} dir={lang === 'en' ? 'ltr' : 'rtl'} suppressHydrationWarning>
+    <html
+      lang={lang}
+      dir={lang === 'en' ? 'ltr' : 'rtl'}
+      className={serverIsDark ? 'dark' : undefined}
+      suppressHydrationWarning
+    >
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="color-scheme" content="light dark" />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){
   try {
+    // Cookie is the primary source of truth — it survives WebView
+    // cold-restart earlier than localStorage on Android and is also
+    // set server-side. localStorage is a secondary fallback.
+    function readCookie(name) {
+      var m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+      return m ? decodeURIComponent(m[1]) : null;
+    }
     var mq = window.matchMedia('(prefers-color-scheme: dark)');
     function applyTheme() {
-      var th = localStorage.getItem('hai_theme') || 'system';
+      var th = readCookie('hai_theme');
+      if (!th) { try { th = localStorage.getItem('hai_theme'); } catch(_){} }
+      if (!th) th = 'system';
       var isDark = th === 'dark' || (th === 'system' && mq.matches);
       document.documentElement.classList.toggle('dark', isDark);
     }
     applyTheme();
-    mq.addEventListener('change', applyTheme);
-    var l = localStorage.getItem('hai_language') || 'ar';
+    // Only listen to OS changes when the user has NOT picked manually.
+    // If they picked dark/light, the OS shouldn't override their choice.
+    mq.addEventListener('change', function(){
+      var th = readCookie('hai_theme');
+      if (!th) { try { th = localStorage.getItem('hai_theme'); } catch(_){} }
+      if (!th || th === 'system') applyTheme();
+    });
+    var l = readCookie('hai_language');
+    if (!l) { try { l = localStorage.getItem('hai_language'); } catch(_){} }
+    if (!l) l = 'ar';
     document.documentElement.setAttribute('lang', l);
     document.documentElement.setAttribute('dir', l === 'en' ? 'ltr' : 'rtl');
     if (window.history) window.history.scrollRestoration = 'manual';
@@ -96,7 +127,9 @@ export default function RootLayout({
           top: 0, right: 0, bottom: 0, left: 0,
           minWidth: '100%', minHeight: '100%',
           zIndex: 99999,
-          background: 'radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #e0f7f2 40%, #fff 100%)',
+          background: serverIsDark
+            ? 'radial-gradient(ellipse at 50% 42%, #101619 0%, #070b0d 40%, #000000 100%)'
+            : 'radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #e0f7f2 40%, #fff 100%)',
         }} />
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){

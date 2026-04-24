@@ -27,12 +27,28 @@ export default function CapacitorBridge() {
 
     if (!window.Capacitor?.isNativePlatform()) return
 
+    // Read cookie first (matches inline head script), then localStorage.
+    function readThemeCookie(): string | null {
+      const m = document.cookie.match(/(?:^|; )hai_theme=([^;]*)/)
+      return m ? decodeURIComponent(m[1]) : null
+    }
+    let theme = readThemeCookie()
+    if (!theme) theme = localStorage.getItem('hai_theme')
+    if (!theme) theme = 'system'
+
+    // Back-fill cookie from legacy localStorage-only users so the next
+    // cold-start picks it up server-side without a flash.
+    if (!readThemeCookie() && theme !== 'system') {
+      document.cookie = `hai_theme=${theme}; path=/; max-age=31536000; SameSite=Lax`
+    }
+
     // Re-apply theme now that native bridge is ready — matchMedia may not
     // have worked correctly during the initial head script execution
-    const theme = localStorage.getItem('hai_theme') || 'system'
     if (theme === 'system') {
       const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
       document.documentElement.classList.toggle('dark', isDark)
+    } else {
+      document.documentElement.classList.toggle('dark', theme === 'dark')
     }
 
     async function init() {
