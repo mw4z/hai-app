@@ -431,17 +431,40 @@ export default function PostCard({
     setShowComments(v => !v)
   }
 
-  // Lock body scroll while comments modal is open + close on Escape
+  // Lock the feed behind the comments sheet + close on Escape.
+  // overflow:hidden alone doesn't stop iOS WKWebView / Android
+  // WebView from scrolling the page underneath — the touchmove
+  // events still pan the document. Using position:fixed + a saved
+  // scrollY + width:100% is the bulletproof cross-platform lock;
+  // we restore scrollY on close so the feed doesn't jump to the
+  // top when the sheet dismisses.
   useEffect(() => {
     if (!showComments) return
-    const prevOverflow = document.body.style.overflow
+    const scrollY = window.scrollY
+    const prev = {
+      position: document.body.style.position,
+      top: document.body.style.top,
+      width: document.body.style.width,
+      overflow: document.body.style.overflow,
+    }
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.width = '100%'
     document.body.style.overflow = 'hidden'
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setShowComments(false)
     }
     window.addEventListener('keydown', onKey)
+
     return () => {
-      document.body.style.overflow = prevOverflow
+      document.body.style.position = prev.position
+      document.body.style.top = prev.top
+      document.body.style.width = prev.width
+      document.body.style.overflow = prev.overflow
+      // iOS resets scroll to 0 when position:fixed is cleared — jump
+      // back to where the user was before the sheet opened.
+      window.scrollTo(0, scrollY)
       window.removeEventListener('keydown', onKey)
     }
   }, [showComments])
