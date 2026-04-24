@@ -3,6 +3,14 @@ import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import ChatClient from './ChatClient'
 
+// Never serve this page from the Router Cache. Without this, the
+// Android WebView was re-using a previous render of the thread when
+// the user navigated back-then-in, which dropped any message the
+// user sent between those navigations until the 3s poll caught up —
+// the 'message disappears then comes back' symptom.
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function ThreadPage({ params }: { params: { id: string } }) {
   const session = await getSession()
   if (!session) redirect('/login')

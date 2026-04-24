@@ -346,9 +346,41 @@ export default function ChatClient({
 
   useEffect(() => {
     if (closed) return
+
+    // Kick an immediate refresh as soon as the component mounts —
+    // before the 3-second polling loop would otherwise first fire.
+    // Covers the gap where a just-sent message wasn't in the
+    // server-rendered initialMessages (browser cache, navigation
+    // back/forward, native app resume) and would otherwise be
+    // invisible for up to 3 seconds.
+    const refreshOnce = async () => {
+      try {
+        const res = await fetch(`/api/threads/${threadId}/messages`, { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.status === 'CLOSED') {
+          setClosed(true)
+          setShowRating(true)
+          return
+        }
+        const serverMsgs: any[] = data.messages || data || []
+        const serverIds = new Set(serverMsgs.map((m: any) => m.id))
+        setMessages((prev: any[]) => {
+          const merged = serverMsgs.map((serverMsg: any) => {
+            const existing = prev.find((m: any) => m.id === serverMsg.id)
+            if (existing?.localPreview) return { ...serverMsg, localPreview: existing.localPreview }
+            return serverMsg
+          })
+          const localOnly = prev.filter((m: any) => !serverIds.has(m.id) && m.pending)
+          return [...merged, ...localOnly]
+        })
+      } catch { /* ignore — the poll below will catch up */ }
+    }
+    refreshOnce()
+
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/threads/${threadId}/messages`)
+        const res = await fetch(`/api/threads/${threadId}/messages`, { cache: 'no-store' })
         if (res.ok) {
           const data = await res.json()
           if (data.status === 'CLOSED') {
