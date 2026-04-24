@@ -294,36 +294,22 @@ input, textarea, [contenteditable="true"] {
   }
 }
 
-/* ── Page transition — iOS-style trailing-edge push ───────────────
-   Applied by src/app/template.tsx. Works safely now that the
-   BottomNav lives in src/app/layout.tsx (outside this wrapper), so
-   the transform no longer creates a containing block that
-   re-anchors fixed elements. Sticky per-page headers are unaffected
-   — position:sticky is scoped to the scroll container, not the
-   viewport, so it doesn't care about ancestor transforms. */
-@keyframes hai-page-push-ltr {
-  from { transform: translate3d(24%, 0, 0); opacity: 0.4; }
-  to   { transform: translate3d(0,   0, 0); opacity: 1;   }
-}
-@keyframes hai-page-push-rtl {
-  from { transform: translate3d(-24%, 0, 0); opacity: 0.4; }
-  to   { transform: translate3d(0,    0, 0); opacity: 1;   }
+/* ── Page transition — opacity-only crossfade ──────────────────────
+   Applied by src/app/template.tsx. Intentionally opacity-only:
+   any CSS transform / filter / will-change on the wrapper creates
+   a new containing block for position:fixed descendants for the
+   duration of the animation. The app has several full-screen
+   screens that rely on 'fixed inset-0' (post/new, sheets, chat
+   overlays) so a transform-based slide briefly mispositions them
+   on every navigation. Opacity is the only animatable property
+   that doesn't alter the containing block; it gives a "not
+   flashing" feel without breaking layouts. */
+@keyframes hai-page-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 .hai-page-enter {
-  animation: hai-page-push-ltr 280ms cubic-bezier(0.32, 0.72, 0.35, 1);
-  will-change: transform, opacity;
-}
-[dir="rtl"] .hai-page-enter {
-  animation: hai-page-push-rtl 280ms cubic-bezier(0.32, 0.72, 0.35, 1);
-}
-/* Clip the horizontal slide on <body>, not on the template wrapper —
-   putting overflow-x:hidden on the wrapper coerces overflow-y:auto
-   (per CSS spec), which turns the wrapper into a scroll container
-   and breaks every position:sticky header inside the page (they
-   anchor to the wrapper instead of the viewport, producing the gap
-   above the feed/thread headers). */
-body {
-  overflow-x: hidden;
+  animation: hai-page-fade 220ms cubic-bezier(0.32, 0.72, 0.35, 1);
 }
 @media (prefers-reduced-motion: reduce) {
   .hai-page-enter { animation: none; }
