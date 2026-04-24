@@ -448,8 +448,12 @@ export default function PostCard({
   // scrollY + width:100% is the bulletproof cross-platform lock;
   // we restore scrollY on close so the feed doesn't jump to the
   // top when the sheet dismisses.
+  //
+  // Same lock is applied to the user profile popup (showUserPopup)
+  // so swiping on the popup's backdrop or content doesn't scroll
+  // the feed underneath.
   useEffect(() => {
-    if (!showComments) return
+    if (!showComments && !showUserPopup) return
     const scrollY = window.scrollY
     const prev = {
       position: document.body.style.position,
@@ -463,7 +467,10 @@ export default function PostCard({
     document.body.style.overflow = 'hidden'
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setShowComments(false)
+      if (e.key === 'Escape') {
+        if (showUserPopup) setShowUserPopup(false)
+        else if (showComments) setShowComments(false)
+      }
     }
     window.addEventListener('keydown', onKey)
 
@@ -477,7 +484,7 @@ export default function PostCard({
       window.scrollTo(0, scrollY)
       window.removeEventListener('keydown', onKey)
     }
-  }, [showComments])
+  }, [showComments, showUserPopup])
 
   async function handleComment(e: React.FormEvent) {
     e.preventDefault()
