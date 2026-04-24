@@ -15,6 +15,16 @@ declare global {
 
 export default function CapacitorBridge() {
   useEffect(() => {
+    // Tag the root with the platform ASAP so CSS can opt features
+    // in/out per OS. Runs even on web so browsers get data-platform="web".
+    // The Android WebView mis-handles the template-level transform slide
+    // (glitches the page content mid-animation), so globals.css uses
+    // this hook to swap the slide for an opacity fade on Android.
+    try {
+      const p = window.Capacitor?.getPlatform?.() || 'web'
+      document.documentElement.dataset.platform = p
+    } catch {}
+
     if (!window.Capacitor?.isNativePlatform()) return
 
     // Re-apply theme now that native bridge is ready — matchMedia may not

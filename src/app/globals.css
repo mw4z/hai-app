@@ -329,6 +329,15 @@ body[data-full-screen="true"] .hai-page-enter {
   animation: hai-page-fade 220ms cubic-bezier(0.32, 0.72, 0.35, 1);
   will-change: opacity;
 }
+/* Android WebView opt-out — the translate animation visibly glitches
+   page content on Android (jumpy text, sticky header flicker). Force
+   the same opacity crossfade as the full-screen-page opt-out so
+   Android users get the "not flashing" feel without the glitch. iOS
+   + web keep the trailing-edge push. Tag comes from CapacitorBridge. */
+html[data-platform="android"] .hai-page-enter {
+  animation: hai-page-fade 220ms cubic-bezier(0.32, 0.72, 0.35, 1);
+  will-change: opacity;
+}
 /* Horizontal clip at body so the off-screen start never flashes a
    scrollbar. overflow-x:hidden here is safe because body is already
    the document scroll root — it doesn't create a new containing
