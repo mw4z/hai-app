@@ -8,19 +8,17 @@ export default async function ThreadsPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  // Fire-and-forget mark-as-read. Previously awaited, which added an
-  // extra DB round-trip to the time-to-first-paint of /threads. The
-  // bell counter on the next page load picks up the change either way.
-  db.notification.updateMany({
+  // Mark message notifications as read when user opens threads.
+  // Previously was fire-and-forget — reverted because un-awaited
+  // promises in a Vercel Function can produce orphaned writes that
+  // never land before the function recycles, leaving the bell
+  // counter stuck.
+  await db.notification.updateMany({
     where: { userId: session.userId, read: false, type: 'NEW_MESSAGE' },
     data: { read: true },
-  }).catch(() => {})
+  })
 
-  // Threads + a probe of postIds in parallel. The post-titles fetch
-  // can't actually start until we know which postIds to fetch, but we
-  // can still cut latency by reading from the threads cache + post
-  // cache concurrently when both are warm. When threads aren't cached,
-  // the postIds depend on threads so we await sequentially.
+  // Only show active threads
   const threads = await cached(`threads:${session.userId}`, 15_000, () =>
     db.thread.findMany({
       where: {
@@ -43,11 +41,10 @@ export default async function ThreadsPage() {
     })
   )
 
-  // Look up related post titles for context. Cached for 60s now —
-  // post titles rarely change after the thread is created.
+  // Look up related post titles for context
   const postIds = threads.map(t => t.postId).filter(Boolean) as string[]
   const posts = postIds.length > 0
-    ? await cached(`thread-posts:${session.userId}`, 60_000, () =>
+    ? await cached(`thread-posts:${session.userId}`, 30_000, () =>
         db.post.findMany({
           where: { id: { in: postIds } },
           select: { id: true, title: true, category: true, coordinationMode: true },

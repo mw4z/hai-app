@@ -78,11 +78,9 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
       } catch { /* ignore */ }
     }
 
-    // Don't refetch immediately on mount — the SSR data is already
-    // <15s old (cache TTL) and refetching here was the main cause of
-    // the visible "loading" feel: the SSR list rendered then
-    // instantly got replaced by a network round-trip. Visibility +
-    // realtime + 5s poll already keep the list fresh after mount.
+    // Immediate fetch on mount — the SSR data may be stale if the user
+    // just closed a thread and navigated back.
+    refresh()
 
     // Poll every 5s while the tab is visible. Tighter than before so
     // the check-mark states (sent → delivered → seen) catch up without

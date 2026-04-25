@@ -38,8 +38,8 @@ const NetworkContext = createContext<NetworkContextValue | null>(null)
 
 const PING_URL = '/api/ping'
 const PING_TIMEOUT_MS = 3500
-const PING_INTERVAL_MS = 25_000          // periodic background check
-const PING_AFTER_FOCUS_MS = 0            // immediate on visibility/focus
+const PING_INTERVAL_MS = 90_000          // periodic background check (was 25s — too aggressive)
+const PING_FOCUS_DEBOUNCE_MS = 30_000    // ignore focus/visibility probes when one already ran recently
 
 async function probe(): Promise<boolean> {
   if (typeof window === 'undefined') return true
@@ -69,6 +69,10 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
   const [lastReconnectAt, setLastReconnectAt] = useState<number | null>(null)
   const failuresRef = useRef(0)
   const lastWasOfflineRef = useRef(false)
+  // Last time we hit /api/ping. Used to debounce focus/visibilitychange
+  // events that can fire many times per minute on mobile and were
+  // hammering /api/ping enough to slow page navigation.
+  const lastProbeAtRef = useRef(0)
 
   const updateStatus = useCallback((next: NetStatus) => {
     setStatus((prev) => {
@@ -84,6 +88,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const runProbe = useCallback(async () => {
+    lastProbeAtRef.current = Date.now()
     const ok = await probe()
     if (ok) {
       failuresRef.current = 0
@@ -96,6 +101,11 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     return false
   }, [updateStatus])
 
+  const runProbeIfStale = useCallback(() => {
+    if (Date.now() - lastProbeAtRef.current < PING_FOCUS_DEBOUNCE_MS) return
+    void runProbe()
+  }, [runProbe])
+
   useEffect(() => {
     // Browser online/offline events are quick wins — trust them as
     // the initial signal, then verify with a probe.
@@ -107,16 +117,20 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     window.addEventListener('online', onOnline)
     window.addEventListener('offline', onOffline)
 
-    // Re-probe whenever the tab becomes visible — covers Capacitor
-    // resume from background and PWA tab-switch.
+    // Re-probe on focus/visibilitychange, but ONLY if we haven't
+    // probed recently. Without the debounce, every navigation +
+    // every WebView resume hit /api/ping, and on Vercel cold-start
+    // those probes piled up enough latency to slow real page
+    // navigation. 30s debounce window — plenty for real connectivity
+    // changes, cheap for normal use.
     const onVisibility = () => {
       if (document.visibilityState !== 'visible') return
-      setTimeout(() => { void runProbe() }, PING_AFTER_FOCUS_MS)
+      runProbeIfStale()
     }
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('focus', onVisibility)
 
-    // Initial check + slow background poll
+    // Initial check + slow background poll. Bumped from 25s → 90s.
     void runProbe()
     const id = setInterval(() => {
       if (document.visibilityState !== 'visible') return
@@ -130,7 +144,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('focus', onVisibility)
       clearInterval(id)
     }
-  }, [runProbe, updateStatus])
+  }, [runProbe, runProbeIfStale, updateStatus])
 
   const value = useMemo<NetworkContextValue>(() => ({
     status,
