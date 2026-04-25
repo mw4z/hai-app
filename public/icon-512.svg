@@ -1,7 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#15803d"/>
-  <circle cx="256" cy="282" r="45" fill="#ffffff"/>
-  <circle cx="256" cy="136" r="29" fill="#ffffff"/>
-  <circle cx="384" cy="357" r="29" fill="#ffffff"/>
-  <circle cx="128" cy="357" r="29" fill="#ffffff"/>
+  <!-- Hai brand icon: four-dot signature on brand teal gradient.
+       Matches hai-primary-500 (#00a884) → hai-primary-600 (#006d57)
+       in src/app/design-tokens.css. -->
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00a884"/>
+      <stop offset="100%" stop-color="#006d57"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="42%" r="65%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#brand)"/>
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+  <circle cx="256" cy="282" r="48" fill="#ffffff"/>
+  <circle cx="256" cy="138" r="30" fill="#ffffff" fill-opacity="0.92"/>
+  <circle cx="386" cy="358" r="30" fill="#ffffff" fill-opacity="0.92"/>
+  <circle cx="126" cy="358" r="30" fill="#ffffff" fill-opacity="0.92"/>
 </svg>

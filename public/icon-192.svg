@@ -1,7 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
-  <rect width="192" height="192" rx="42" fill="#15803d"/>
-  <circle cx="96"  cy="106" r="17" fill="#ffffff"/>
-  <circle cx="96"  cy="51"  r="11" fill="#ffffff"/>
-  <circle cx="144" cy="134" r="11" fill="#ffffff"/>
-  <circle cx="48"  cy="134" r="11" fill="#ffffff"/>
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00a884"/>
+      <stop offset="100%" stop-color="#006d57"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="42%" r="65%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="192" height="192" rx="42" fill="url(#brand)"/>
+  <rect width="192" height="192" rx="42" fill="url(#glow)"/>
+  <circle cx="96"  cy="106" r="18" fill="#ffffff"/>
+  <circle cx="96"  cy="51"  r="11" fill="#ffffff" fill-opacity="0.92"/>
+  <circle cx="145" cy="134" r="11" fill="#ffffff" fill-opacity="0.92"/>
+  <circle cx="47"  cy="134" r="11" fill="#ffffff" fill-opacity="0.92"/>
 </svg>
