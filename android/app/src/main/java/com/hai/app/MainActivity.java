@@ -1,14 +1,22 @@
 package com.hai.app;
 
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.webkit.WebSettingsCompat;
@@ -19,6 +27,13 @@ public class MainActivity extends BridgeActivity {
 
     private static final int DARK_COLOR = Color.parseColor("#0f172a");
     private static final int LIGHT_COLOR = Color.WHITE;
+    private static final String OFFLINE_URL = "file:///android_asset/public/offline.html";
+    private static final String REMOTE_URL = "https://app.hai-app.net";
+
+    // True while we've explicitly redirected the WebView to the bundled
+    // offline page. Prevents the WebViewClient from looping if the
+    // offline page itself somehow fails to load.
+    private boolean showingOfflineFallback = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,6 +60,81 @@ public class MainActivity extends BridgeActivity {
             if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
                 try { WebSettingsCompat.setAlgorithmicDarkeningAllowed(ws, true); } catch (Exception ignored) {}
             }
+
+            // Bulletproof offline fallback. Capacitor's server.errorPath
+            // sometimes doesn't fire on net::ERR_INTERNET_DISCONNECTED
+            // (cold-start with no radio). Wrap the existing WebViewClient
+            // so any main-frame load failure for the remote URL triggers
+            // an immediate load of the bundled offline page. White screens
+            // become a real, retry-able UI.
+            final WebViewClient existingClient = wv.getWebViewClient();
+            wv.setWebViewClient(new WebViewClient() {
+                @Override
+                public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                    // If a remote-origin URL starts loading, we're no
+                    // longer "stuck offline" — clear the flag so a new
+                    // failure can re-trigger the fallback.
+                    if (url != null && url.startsWith(REMOTE_URL)) {
+                        showingOfflineFallback = false;
+                    }
+                }
+
+                @Override
+                public void onReceivedError(WebView view, WebResourceRequest req, WebResourceError err) {
+                    // Only act on main-frame failures of the remote URL —
+                    // ignore subresource (image, script) failures and
+                    // failures of the offline page itself.
+                    if (req == null || !req.isForMainFrame()) return;
+                    String failed = req.getUrl() == null ? "" : req.getUrl().toString();
+                    if (showingOfflineFallback) return;
+                    if (!failed.startsWith(REMOTE_URL)) return;
+                    showingOfflineFallback = true;
+                    view.stopLoading();
+                    view.loadUrl(OFFLINE_URL);
+                }
+
+                @Override
+                public void onReceivedHttpError(WebView view, WebResourceRequest req,
+                                                android.webkit.WebResourceResponse resp) {
+                    // 5xx on the main document = remote app is down.
+                    // Same recovery path as a network error.
+                    if (req == null || !req.isForMainFrame()) return;
+                    if (showingOfflineFallback) return;
+                    if (resp == null || resp.getStatusCode() < 500) return;
+                    String failed = req.getUrl() == null ? "" : req.getUrl().toString();
+                    if (!failed.startsWith(REMOTE_URL)) return;
+                    showingOfflineFallback = true;
+                    view.stopLoading();
+                    view.loadUrl(OFFLINE_URL);
+                }
+            });
+
+            // Auto-recover: when connectivity comes back AND we're stuck
+            // on the offline page, navigate back to the live app on the
+            // UI thread. Saves the user a manual "Try again" tap when
+            // they reopen the radio after a tunnel / airplane mode.
+            try {
+                ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+                if (cm != null) {
+                    NetworkRequest request = new NetworkRequest.Builder()
+                        .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                        .build();
+                    cm.registerNetworkCallback(request, new ConnectivityManager.NetworkCallback() {
+                        @Override
+                        public void onAvailable(Network network) {
+                            runOnUiThread(() -> {
+                                if (showingOfflineFallback) {
+                                    showingOfflineFallback = false;
+                                    try {
+                                        WebView w = getBridge().getWebView();
+                                        if (w != null) w.loadUrl(REMOTE_URL);
+                                    } catch (Exception ignored) {}
+                                }
+                            });
+                        }
+                    });
+                }
+            } catch (Exception ignored) {}
         } catch (Exception e) {}
     }
 
