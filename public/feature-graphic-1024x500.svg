@@ -1,32 +1,34 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
-  <!-- Hai Play Store feature graphic — 1024x500 banner used at the
-       top of the listing. Brand-teal gradient with the same halo +
-       four-dot mark as the launcher icon, plus "حي / Hai" wordmark
-       and a one-line tagline. Edge-to-edge, no transparency
-       (Play Console rejects feature graphics with alpha). -->
+  <!-- Hai Play Store feature graphic — 1024x500. Typography-led
+       composition matching the previous design language: near-black
+       canvas, centered Arabic "حي" wordmark with a subtle brand-teal
+       glow underneath, subtitle + tagline, then a row of category
+       words separated by dots. Edge-to-edge, no transparency. -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%"   stop-color="#00b894"/>
-      <stop offset="60%"  stop-color="#007a62"/>
-      <stop offset="100%" stop-color="#004a3b"/>
+      <stop offset="0%"   stop-color="#0a1518"/>
+      <stop offset="55%"  stop-color="#0d2429"/>
+      <stop offset="100%" stop-color="#06181c"/>
     </linearGradient>
-    <radialGradient id="glow" cx="22%" cy="40%" r="60%">
-      <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.12"/>
-      <stop offset="80%" stop-color="#ffffff" stop-opacity="0"/>
+    <radialGradient id="centerGlow" cx="50%" cy="36%" r="42%">
+      <stop offset="0%"  stop-color="#00a884" stop-opacity="0.16"/>
+      <stop offset="60%" stop-color="#00a884" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#00a884" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="vignette" cx="92%" cy="92%" r="80%">
-      <stop offset="0%"  stop-color="#000000" stop-opacity="0.30"/>
-      <stop offset="80%" stop-color="#000000" stop-opacity="0"/>
-    </radialGradient>
+    <!-- Linear teal underline glow under the wordmark -->
+    <linearGradient id="underline" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#00a884" stop-opacity="0"/>
+      <stop offset="50%"  stop-color="#00a884" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#00a884" stop-opacity="0"/>
+    </linearGradient>
   </defs>
 
-  <!-- Background -->
+  <!-- Canvas -->
   <rect width="1024" height="500" fill="url(#bg)"/>
-  <rect width="1024" height="500" fill="url(#glow)"/>
-  <rect width="1024" height="500" fill="url(#vignette)"/>
+  <rect width="1024" height="500" fill="url(#centerGlow)"/>
 
-  <!-- Subtle dot grid for texture (very faint) -->
-  <g fill="#ffffff" fill-opacity="0.04">
+  <!-- Faint dot grid for texture -->
+  <g fill="#00a884" fill-opacity="0.05">
     <circle cx="80"  cy="80"  r="2"/>
     <circle cx="160" cy="120" r="2"/>
     <circle cx="60"  cy="200" r="2"/>
@@ -40,37 +42,60 @@
     <circle cx="900" cy="430" r="2"/>
   </g>
 
-  <!-- ── Left side: the icon (centered vertically) ─────────────── -->
-  <!-- Halo + dots, sized to fit a 360x360 area centered around (240, 250) -->
-  <g transform="translate(60, 70)">
-    <!-- Outer faint halo -->
-    <circle cx="180" cy="180" r="170"
-            fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="2.5"/>
-    <!-- Main halo (passes through satellite centers) -->
-    <circle cx="180" cy="180" r="135"
-            fill="none" stroke="#ffffff" stroke-opacity="0.30" stroke-width="3.5"/>
-    <!-- Center dot -->
-    <circle cx="180" cy="180" r="46" fill="#ffffff"/>
-    <!-- 3 satellite dots on the halo -->
-    <circle cx="180" cy="45"  r="26" fill="#ffffff"/>
-    <circle cx="297" cy="247" r="26" fill="#ffffff"/>
-    <circle cx="63"  cy="247" r="26" fill="#ffffff"/>
-  </g>
+  <!-- ── Main wordmark "حي" ─────────────────────────────────────── -->
+  <text x="512" y="220"
+        text-anchor="middle"
+        font-family="'IBM Plex Sans Arabic', 'Noto Sans Arabic', 'Tahoma', 'Arial', sans-serif"
+        font-size="180"
+        font-weight="700"
+        fill="#ffffff"
+        letter-spacing="-2">
+    حي
+  </text>
 
-  <!-- ── Right side: wordmark + tagline ────────────────────────── -->
-  <!-- "حي" big Arabic, followed by " | Hai" in Latin -->
-  <g fill="#ffffff" font-family="'IBM Plex Sans Arabic', 'Tahoma', 'Arial', sans-serif">
-    <text x="980" y="230" text-anchor="end" font-size="170" font-weight="700"
-          letter-spacing="-2">
-      حي
-    </text>
-    <text x="980" y="290" text-anchor="end" font-size="46" font-weight="500"
-          fill-opacity="0.78">
-      Hai · جيرانك أقرب
-    </text>
-    <text x="980" y="360" text-anchor="end" font-size="32" font-weight="400"
-          fill-opacity="0.65">
-      كل شيء في حيّك، في مكان واحد
-    </text>
+  <!-- Brand-teal underline glow beneath the wordmark -->
+  <rect x="380" y="240" width="264" height="4" fill="url(#underline)"/>
+
+  <!-- ── Subtitle ───────────────────────────────────────────────── -->
+  <text x="512" y="300"
+        text-anchor="middle"
+        font-family="'IBM Plex Sans Arabic', 'Noto Sans Arabic', 'Tahoma', 'Arial', sans-serif"
+        font-size="38"
+        font-weight="600"
+        fill="#ffffff"
+        fill-opacity="0.95">
+    منصة حيّك الذكية
+  </text>
+
+  <!-- ── Tagline ────────────────────────────────────────────────── -->
+  <text x="512" y="345"
+        text-anchor="middle"
+        font-family="'IBM Plex Sans Arabic', 'Noto Sans Arabic', 'Tahoma', 'Arial', sans-serif"
+        font-size="24"
+        font-weight="400"
+        fill="#ffffff"
+        fill-opacity="0.55">
+    جارك أقرب مما تتوقع
+  </text>
+
+  <!-- ── Category strip ─────────────────────────────────────────── -->
+  <text x="512" y="410"
+        text-anchor="middle"
+        font-family="'IBM Plex Sans Arabic', 'Noto Sans Arabic', 'Tahoma', 'Arial', sans-serif"
+        font-size="22"
+        font-weight="500"
+        fill="#00a884"
+        fill-opacity="0.95"
+        letter-spacing="1">
+    تنبيهات  ·  دردشة  ·  خدمات  ·  سوق
+  </text>
+
+  <!-- ── Page indicator dots ────────────────────────────────────── -->
+  <g fill="#ffffff" fill-opacity="0.40">
+    <circle cx="488" cy="450" r="3"/>
+    <circle cx="500" cy="450" r="3"/>
+    <circle cx="512" cy="450" r="3.5" fill-opacity="0.85"/>
+    <circle cx="524" cy="450" r="3"/>
+    <circle cx="536" cy="450" r="3"/>
   </g>
 </svg>
