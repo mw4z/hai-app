@@ -328,20 +328,9 @@ export default function FeedClient({
       {/* Guest mode banner — only for users with addressVerified=false */}
       <GuestBanner show={addressVerified === false} />
 
-      {/* Read-only banner */}
-      {isReadOnly && (
-        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between">
-          <span className="text-xs text-amber-700 font-medium">
-            🔒 {t('feed_readonly_banner')}
-          </span>
-          <button
-            onClick={() => router.push('/feed')}
-            className="text-xs text-amber-600 font-semibold underline"
-          >
-            {t('feed_return_home')}
-          </button>
-        </div>
-      )}
+      {/* Read-only banner is rendered INSIDE the header below so the
+          two elements pin together as one sticky unit when scrolling.
+          See the banner row directly under the header opening tag. */}
 
       {/* Mod recruitment banner (max 3 shows, dismissable) */}
       {!isReadOnly && !hasNeighborhoodMod && user.role === 'RESIDENT' && showModBanner && (
@@ -359,6 +348,23 @@ export default function FeedClient({
 
       {/* Header */}
       <header className="glass sticky top-0 z-10">
+        {/* Read-only banner — lives INSIDE the sticky header so it
+            pins together with the header as the user scrolls. Without
+            this nesting two separate sticky elements would overlap on
+            top:0 and the banner would visually cover the header. */}
+        {isReadOnly && (
+          <div className="bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800/60 px-4 py-2 flex items-center justify-between">
+            <span className="text-xs text-amber-700 dark:text-amber-200 font-medium">
+              🔒 {t('feed_readonly_banner')}
+            </span>
+            <button
+              onClick={() => router.push('/feed')}
+              className="text-xs text-amber-600 dark:text-amber-300 font-semibold underline"
+            >
+              {t('feed_return_home')}
+            </button>
+          </div>
+        )}
         <div className="hai-row-2 hai-justify-between hai-px-4 hai-header-top">
           <div className="hai-flex-1 hai-min-w-0">
             <div className="hai-row-1">
