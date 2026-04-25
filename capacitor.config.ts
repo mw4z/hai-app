@@ -7,6 +7,12 @@ const config: CapacitorConfig = {
   server: {
     url: 'https://app.hai-app.net',
     cleartext: true,
+    // Bundled offline fallback — when the remote app fails to load
+    // on cold-start (no internet, captive portal, server outage),
+    // Capacitor serves this local file from the webDir instead of
+    // showing a white screen. The page polls /api/ping and auto-
+    // reloads to the live app the moment connectivity returns.
+    errorPath: 'offline.html',
   },
   appendUserAgent: 'HaiNativeApp',
   android: {
