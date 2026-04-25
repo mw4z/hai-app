@@ -193,40 +193,45 @@ extension MainViewController: WKNavigationDelegate {
         capacitorDelegate?.webView?(webView, didFinish: navigation)
     }
 
+    // The decision-handler delegate methods need a guaranteed call to
+    // their handler — the WebView hangs forever otherwise. We forward
+    // to Capacitor's delegate via optional chaining; calling an
+    // optional protocol method on an instance that doesn't implement
+    // it returns nil, in which case we call decisionHandler ourselves
+    // with the safe default. (The previous #selector cast pattern
+    // broke under Xcode 26.2 / iOS 26 SDK because WKNavigationDelegate
+    // gained @MainActor + @Sendable annotations that made the cast
+    // ambiguous between the two overloaded webView selectors.)
+
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        if let cap = capacitorDelegate, cap.responds(to: #selector(WKNavigationDelegate.webView(_:decidePolicyFor:decisionHandler:) as (WKNavigationDelegate) -> (WKWebView, WKNavigationAction, @escaping (WKNavigationActionPolicy) -> Void) -> Void)) {
-            cap.webView?(webView, decidePolicyFor: navigationAction, decisionHandler: decisionHandler)
-        } else {
+        if capacitorDelegate?.webView?(webView, decidePolicyFor: navigationAction, decisionHandler: decisionHandler) == nil {
             decisionHandler(.allow)
         }
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
-        // 5xx on the main document → offline fallback. We still let
-        // Capacitor see the response in case it has its own handling.
+        // 5xx on the main document → offline fallback. We cancel the
+        // response and swap in the bundled offline page instead of
+        // letting Capacitor see it (we've already consumed the
+        // decisionHandler with .cancel).
         if navigationResponse.isForMainFrame,
            let httpResp = navigationResponse.response as? HTTPURLResponse,
            httpResp.statusCode >= 500,
            let url = httpResp.url,
            url.absoluteString.hasPrefix(MainViewController.remoteURLString),
            !showingOfflineFallback {
-            // Cancel the response, then load the offline page.
             decisionHandler(.cancel)
             loadBundledOfflinePage()
             return
         }
 
-        if let cap = capacitorDelegate, cap.responds(to: #selector(WKNavigationDelegate.webView(_:decidePolicyFor:decisionHandler:) as (WKNavigationDelegate) -> (WKWebView, WKNavigationResponse, @escaping (WKNavigationResponsePolicy) -> Void) -> Void)) {
-            cap.webView?(webView, decidePolicyFor: navigationResponse, decisionHandler: decisionHandler)
-        } else {
+        if capacitorDelegate?.webView?(webView, decidePolicyFor: navigationResponse, decisionHandler: decisionHandler) == nil {
             decisionHandler(.allow)
         }
     }
 
     func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-        if let cap = capacitorDelegate, cap.responds(to: #selector(WKNavigationDelegate.webView(_:didReceive:completionHandler:))) {
-            cap.webView?(webView, didReceive: challenge, completionHandler: completionHandler)
-        } else {
+        if capacitorDelegate?.webView?(webView, didReceive: challenge, completionHandler: completionHandler) == nil {
             completionHandler(.performDefaultHandling, nil)
         }
     }
