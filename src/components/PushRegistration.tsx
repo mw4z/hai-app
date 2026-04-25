@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import toast from 'react-hot-toast'
+import { showPushToast } from './PushToast'
 
 /**
  * Handles FCM/APNs registration on native platforms only.
@@ -94,34 +94,66 @@ export default function PushRegistration() {
         await PushNotifications.addListener(
           'pushNotificationReceived',
           (notification) => {
-            const type = notification?.data?.type
+            const data = (notification?.data || {}) as Record<string, string>
+            const type = data.type
             console.log('[PUSH] foreground received:', type)
-            try {
-              const title = notification?.title || (notification?.data as any)?.title
-              const body = notification?.body || (notification?.data as any)?.body
-              const text = [title, body].filter(Boolean).join(' — ')
-              if (text) toast(text, { duration: 5000, icon: '🔔' })
-            } catch (err) {
-              console.error('[PUSH] foreground toast failed:', err)
-            }
 
-            // Bridge push → DOM events so screens can react live
-            // without polling. Profile uses hai:mod-request-resolved
-            // to refetch /api/mod-request the instant the admin
-            // approves/rejects. Threads list uses hai:new-message so
-            // an incoming DM flips the row state + check marks right
-            // away instead of waiting for the next 5s poll.
+            // Bridge push → DOM events FIRST so chat / list screens
+            // refresh immediately even if the toast is suppressed.
             try {
               if (type === 'mod_request_resolved') {
                 window.dispatchEvent(new CustomEvent('hai:mod-request-resolved', {
-                  detail: notification?.data,
+                  detail: data,
                 }))
               } else if (type === 'new_message') {
                 window.dispatchEvent(new CustomEvent('hai:new-message', {
-                  detail: notification?.data,
+                  detail: data,
                 }))
               }
             } catch {}
+
+            // Suppress the toast when the user is already on the
+            // surface the notification points at — pointless to
+            // notify someone about a DM in a thread they're staring
+            // at. Same for post comment pushes when they're already
+            // reading that post.
+            try {
+              const path = window.location.pathname
+              const search = window.location.search
+              if (type === 'new_message' && data.threadId
+                  && path === `/threads/${data.threadId}`) {
+                return
+              }
+              if ((type === 'comment_on_post' || type === 'reply_to_comment'
+                   || type === 'follow_post_comment')
+                  && data.postId
+                  && path === '/feed' && search.includes(`post=${encodeURIComponent(data.postId)}`)) {
+                return
+              }
+            } catch {}
+
+            // Custom toast: replaces (not stacks) the previous one,
+            // swipe-to-dismiss, taps deeplink. See PushToast.tsx.
+            try {
+              const title = notification?.title || (data as any)?.title || null
+              const body = notification?.body || (data as any)?.body || null
+              const target = resolveDeeplink(data)
+              showPushToast({
+                title,
+                body,
+                icon: type === 'new_message' ? '💬'
+                  : type === 'emergency_alert' ? '🚨'
+                  : '🔔',
+                onTap: target ? () => {
+                  try {
+                    const cur = window.location.pathname + window.location.search
+                    if (cur !== target) window.location.href = target
+                  } catch {}
+                } : undefined,
+              })
+            } catch (err) {
+              console.error('[PUSH] foreground toast failed:', err)
+            }
           },
         )
       } catch (err) {

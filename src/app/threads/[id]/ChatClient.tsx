@@ -339,12 +339,12 @@ export default function ChatClient({
     return firstUnread?.id || null
   })
 
-  // Clear unread divider after 3 seconds of viewing
-  useEffect(() => {
-    if (!unreadDividerId) return
-    const timer = setTimeout(() => setUnreadDividerId(null), 3000)
-    return () => clearTimeout(timer)
-  }, [unreadDividerId])
+  // Unread divider persists until the user leaves the chat. Clearing
+  // it after 3s made the marker disappear before users had a chance
+  // to scroll up and see what was new — defeating the point. The
+  // marker now lives for the lifetime of this component instance:
+  // navigating to the threads list / another route unmounts the
+  // ChatClient and the next visit starts fresh.
 
   // Poll online status every 15s
   useEffect(() => {
@@ -431,6 +431,17 @@ export default function ChatClient({
     }
     refreshOnce()
 
+    // Realtime kick on push: PushRegistration dispatches
+    // 'hai:new-message' on every foreground DM push. If the push
+    // is for THIS thread, refetch immediately instead of waiting
+    // up to 3s for the next poll tick — that's the source of the
+    // "in-chat notifications are delayed" feel.
+    const onPushMessage = (e: Event) => {
+      const detail = (e as CustomEvent<{ threadId?: string }>).detail
+      if (!detail?.threadId || detail.threadId === threadId) refreshOnce()
+    }
+    window.addEventListener('hai:new-message', onPushMessage)
+
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/threads/${threadId}/messages`, { cache: 'no-store' })
@@ -464,8 +475,11 @@ export default function ChatClient({
         }
       } catch { /* ignore */ }
     }, 3000)
-    return () => clearInterval(interval)
-  }, [threadId])
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('hai:new-message', onPushMessage)
+    }
+  }, [threadId, closed])
 
   useEffect(() => {
     if (editingMsg && editInputRef.current) editInputRef.current.focus()
