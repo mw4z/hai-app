@@ -96,6 +96,23 @@ async function run() {
     path.join(ROOT, 'public/play-store-icon-512.png'),
     { flatten: true, flattenBg: '#00a884' })
 
+  // Play Store feature graphic — 1024x500 banner displayed at the
+  // top of the listing on the Play Store. Required by Google when
+  // promoting an app. Source SVG is hand-drawn at the right aspect
+  // ratio; flatten removes alpha (Play rejects transparency on
+  // promo graphics).
+  const featureSvgPath = path.join(ROOT, 'public/feature-graphic-1024x500.svg')
+  if (fs.existsSync(featureSvgPath)) {
+    const featureBuf = fs.readFileSync(featureSvgPath)
+    fs.mkdirSync(path.dirname(path.join(ROOT, 'public/feature-graphic-1024x500.png')), { recursive: true })
+    await sharp(featureBuf)
+      .resize(1024, 500)
+      .flatten({ background: '#00a884' })
+      .png({ compressionLevel: 9 })
+      .toFile(path.join(ROOT, 'public/feature-graphic-1024x500.png'))
+    console.log('wrote public/feature-graphic-1024x500.png 1024x500 (no-alpha)')
+  }
+
   console.log('Done.')
 }
 
