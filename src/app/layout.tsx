@@ -16,6 +16,8 @@ import { ConfirmProvider } from '@/components/ConfirmProvider'
 import ScrollReset from '@/components/ScrollReset'
 import PullToRefresh from '@/components/PullToRefresh'
 import { LangProvider } from '@/hooks/useLanguage'
+import { NetworkProvider } from '@/lib/network'
+import OfflineBanner from '@/components/OfflineBanner'
 import { checkEnvironment } from '@/lib/env-check'
 import type { Lang } from '@/lib/i18n'
 import './globals.css'
@@ -144,6 +146,7 @@ export default function RootLayout({
         <CapacitorBridge />
         <PushRegistration />
         <LangProvider initialLang={lang}>
+          <NetworkProvider>
           <ConfirmProvider>
           <Toaster
             position="top-center"
@@ -177,7 +180,11 @@ export default function RootLayout({
           <PullToRefresh />
           <ArrivalAlert />
           <RouteTransition />
+          {/* Offline banner — mounted last so its z-index sits above
+              the rest of the chrome but below sheets/modals. */}
+          <OfflineBanner />
           </ConfirmProvider>
+          </NetworkProvider>
         </LangProvider>
       </body>
     </html>

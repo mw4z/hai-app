@@ -6,6 +6,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { FiArrowRight, FiArrowLeft } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useNetworkStatus, isOfflineError } from '@/lib/network'
 import { translateApiError } from '@/lib/apiError'
 import RiyalIcon from '@/components/RiyalIcon'
 import { uploadFiles } from '@/lib/upload'
@@ -160,6 +161,7 @@ export default function NewPostPage() {
   const [images, setImages] = useState<{ file: File; preview: string; url?: string }[]>([])
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(false)
+  const { isOffline } = useNetworkStatus()
   const [location, setLocation] = useState<{ lat: number; lng: number; name: string } | null>(null)
   const [detectingLocation, setDetectingLocation] = useState(false)
 
@@ -320,6 +322,16 @@ export default function NewPostPage() {
     }
     if (!category) {
       toast.error(lang === 'en' ? 'Select a category' : 'اختر نوع المنشور')
+      return
+    }
+    if (isOffline) {
+      toast.error(
+        lang === 'en'
+          ? 'No internet connection. Try again when reconnected.'
+          : lang === 'ur'
+            ? 'انٹرنیٹ کنکشن نہیں — دوبارہ کنیکٹ ہونے پر کوشش کریں'
+            : 'لا يوجد اتصال — حاول مرة أخرى عند عودة الإنترنت',
+      )
       return
     }
 

@@ -9,6 +9,7 @@ import { playSend, playReaction, playDelete } from '@/lib/sound'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
 import EmojiPicker from './EmojiPickerWrapper'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useNetworkStatus, isOfflineError, OfflineError } from '@/lib/network'
 import { useConfirm } from './ConfirmProvider'
 import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useAttachContact } from '@/hooks/useAttachContact'
@@ -156,6 +157,19 @@ export default function PostCard({
   const router = useRouter()
   const confirmDialog = useConfirm()
   const attachContact = useAttachContact()
+  const { isOffline } = useNetworkStatus()
+
+  // Centralised guard so action handlers fail loudly + cleanly when the
+  // device is offline. Prevents dead taps and stuck spinners.
+  const offlineMessage = () => lang === 'en'
+    ? 'No internet connection. Try again when reconnected.'
+    : lang === 'ur'
+      ? 'انٹرنیٹ کنکشن نہیں — دوبارہ کنیکٹ ہونے پر کوشش کریں'
+      : 'لا يوجد اتصال — حاول مرة أخرى عند عودة الإنترنت'
+  const blockIfOffline = (): boolean => {
+    if (isOffline) { toast.error(offlineMessage()); return true }
+    return false
+  }
 
   // Safety guard — if post or author is missing, render nothing
   if (!post || !post.author) return null
@@ -509,6 +523,7 @@ export default function PostCard({
   async function handleComment(e: React.FormEvent) {
     e.preventDefault()
     if (!commentText.trim() && !commentImage) return
+    if (blockIfOffline()) return
     setSubmitting(true)
     try {
       let imageUrl: string | null = null
@@ -529,8 +544,8 @@ export default function PostCard({
       setCommentText('')
       setCommentImage(null)
       setCommentImagePreview(null)
-    } catch {
-      toast.error(t('common_error'))
+    } catch (err) {
+      toast.error(isOfflineError(err) || (err instanceof TypeError) ? offlineMessage() : t('common_error'))
     } finally {
       setSubmitting(false)
     }
@@ -539,6 +554,7 @@ export default function PostCard({
   async function handleReply(e: React.FormEvent) {
     e.preventDefault()
     if ((!replyText.trim() && !replyImage) || !replyingTo) return
+    if (blockIfOffline()) return
     setSubmittingReply(true)
     try {
       let imageUrl: string | null = null
@@ -566,8 +582,8 @@ export default function PostCard({
       setReplyImage(null)
       setReplyImagePreview(null)
       setReplyingTo(null)
-    } catch {
-      toast.error(t('common_error'))
+    } catch (err) {
+      toast.error(isOfflineError(err) || (err instanceof TypeError) ? offlineMessage() : t('common_error'))
     } finally {
       setSubmittingReply(false)
     }
@@ -636,6 +652,7 @@ export default function PostCard({
   }
 
   async function toggleBookmark() {
+    if (blockIfOffline()) return
     try {
       const res = await fetch(`/api/posts/${post.id}/bookmark`, { method: 'POST' })
       if (res.ok) {
@@ -651,6 +668,7 @@ export default function PostCard({
   // is discoverable without opening the overflow menu.
   async function toggleFollow() {
     if (post.author.id === currentUserId) return // author auto-follows
+    if (blockIfOffline()) return
     const next = !following
     setFollowing(next)
     try {

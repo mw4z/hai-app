@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useNetworkStatus, isOfflineError } from '@/lib/network'
 import { useConfirm } from '@/components/ConfirmProvider'
 import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, FiTrash2, FiCheck, FiCopy, FiFlag, FiImage, FiUser } from 'react-icons/fi'
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
@@ -133,6 +134,12 @@ export default function ChatClient({
   const confirmDialog = useConfirm()
   const attachContact = useAttachContact()
   const router = useRouter()
+  const { isOffline } = useNetworkStatus()
+  const offlineMsg = () => lang === 'en'
+    ? 'No internet connection. Try again when reconnected.'
+    : lang === 'ur'
+      ? 'انٹرنیٹ کنکشن نہیں — دوبارہ کنیکٹ ہونے پر کوشش کریں'
+      : 'لا يوجد اتصال — حاول مرة أخرى عند عودة الإنترنت'
   // Seed messages from a localStorage cache synchronously on first
   // render. If the cache has strictly MORE (newer) messages than the
   // server-rendered initialMessages — meaning the user just sent
@@ -490,6 +497,7 @@ export default function ChatClient({
     hapticLight()
     const body = text.trim()
     const replyId = replyingTo?.id || null
+    if (isOffline) { toast.error(offlineMsg()); return }
     setText('')
     setReplyingTo(null)
     setSending(true)
@@ -507,8 +515,10 @@ export default function ChatClient({
         await showApiError(res, lang as 'ar' | 'en' | 'ur')
         setText(body)
       }
-    } catch { toast.error(t('common_error')); setText(body) }
-    finally { setSending(false) }
+    } catch (err) {
+      toast.error(isOfflineError(err) || (err instanceof TypeError) ? offlineMsg() : t('common_error'))
+      setText(body)
+    } finally { setSending(false) }
   }
 
   async function sendLocation() {
