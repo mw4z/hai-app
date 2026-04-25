@@ -1,9 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <!-- Adaptive-icon foreground: the four-dot mark scaled into
-       Android's 66dp safe zone (~60% of canvas). The brand teal
-       background is supplied by @color/ic_launcher_background. -->
-  <circle cx="256" cy="282" r="36" fill="#ffffff"/>
-  <circle cx="256" cy="174" r="22" fill="#ffffff" fill-opacity="0.92"/>
-  <circle cx="354" cy="338" r="22" fill="#ffffff" fill-opacity="0.92"/>
-  <circle cx="158" cy="338" r="22" fill="#ffffff" fill-opacity="0.92"/>
+  <!-- Adaptive-icon foreground: 4-dot mark + halo ring centered on
+       the canvas, scaled into Android's 66dp safe zone (~60% of
+       canvas). Brand background supplied by
+       @color/ic_launcher_background. -->
+  <circle cx="256" cy="256" r="118" fill="none"
+          stroke="#ffffff" stroke-opacity="0.07" stroke-width="2"/>
+  <circle cx="256" cy="256" r="92" fill="none"
+          stroke="#ffffff" stroke-opacity="0.24" stroke-width="3"/>
+  <circle cx="256" cy="256" r="36" fill="#ffffff"/>
+  <circle cx="256" cy="164" r="22" fill="#ffffff"/>
+  <circle cx="336" cy="302" r="22" fill="#ffffff"/>
+  <circle cx="176" cy="302" r="22" fill="#ffffff"/>
 </svg>

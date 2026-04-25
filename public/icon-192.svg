@@ -1,18 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
   <defs>
     <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#00a884"/>
-      <stop offset="100%" stop-color="#006d57"/>
+      <stop offset="0%" stop-color="#00b894"/>
+      <stop offset="100%" stop-color="#005c48"/>
     </linearGradient>
-    <radialGradient id="topGlow" cx="50%" cy="40%" r="65%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18"/>
+    <radialGradient id="topGlow" cx="40%" cy="32%" r="58%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
       <stop offset="60%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="82%" cy="92%" r="70%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.22"/>
+      <stop offset="80%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="dotShade" cx="35%" cy="32%" r="80%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#eef9f4"/>
     </radialGradient>
   </defs>
   <rect width="192" height="192" rx="42" fill="url(#brand)"/>
   <rect width="192" height="192" rx="42" fill="url(#topGlow)"/>
-  <circle cx="96"  cy="106" r="18" fill="#ffffff"/>
-  <circle cx="96"  cy="51"  r="11" fill="#ffffff" fill-opacity="0.92"/>
-  <circle cx="145" cy="134" r="11" fill="#ffffff" fill-opacity="0.92"/>
-  <circle cx="47"  cy="134" r="11" fill="#ffffff" fill-opacity="0.92"/>
+  <rect width="192" height="192" rx="42" fill="url(#vignette)"/>
+  <circle cx="96" cy="96" r="73.5" fill="none"
+          stroke="#ffffff" stroke-opacity="0.07" stroke-width="0.8"/>
+  <circle cx="96" cy="96" r="57" fill="none"
+          stroke="#ffffff" stroke-opacity="0.24" stroke-width="1.4"/>
+  <circle cx="96" cy="96" r="19.5" fill="url(#dotShade)"/>
+  <circle cx="96"  cy="39"  r="11.25" fill="#ffffff"/>
+  <circle cx="145.5" cy="124.5" r="11.25" fill="#ffffff"/>
+  <circle cx="46.5"  cy="124.5" r="11.25" fill="#ffffff"/>
 </svg>

@@ -1,20 +1,57 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <!-- Hai brand icon: original four-dot mark on the brand teal
-       gradient (hai-primary-500 → 600). -->
+  <!-- Hai brand icon: four-dot mark with a halo ring connecting
+       the three "neighbor" satellites to the center home dot. The
+       ring passes geometrically through the satellite centers, so
+       each dot punctuates the ring rather than floats next to it.
+       Subtle outer halo + bottom-right vignette add depth without
+       going skeuomorphic. -->
   <defs>
     <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#00a884"/>
-      <stop offset="100%" stop-color="#006d57"/>
+      <stop offset="0%" stop-color="#00b894"/>
+      <stop offset="100%" stop-color="#005c48"/>
     </linearGradient>
-    <radialGradient id="topGlow" cx="50%" cy="40%" r="65%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18"/>
+    <radialGradient id="topGlow" cx="40%" cy="32%" r="58%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
       <stop offset="60%" stop-color="#ffffff" stop-opacity="0"/>
     </radialGradient>
+    <radialGradient id="vignette" cx="82%" cy="92%" r="70%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.22"/>
+      <stop offset="80%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Center-dot subtle inner highlight (top-left) so it reads
+         dimensional, not a flat blob, but still flat-design
+         friendly at small sizes. -->
+    <radialGradient id="dotShade" cx="35%" cy="32%" r="80%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#eef9f4"/>
+    </radialGradient>
   </defs>
+
+  <!-- Tile -->
   <rect width="512" height="512" rx="112" fill="url(#brand)"/>
   <rect width="512" height="512" rx="112" fill="url(#topGlow)"/>
-  <circle cx="256" cy="282" r="48" fill="#ffffff"/>
-  <circle cx="256" cy="138" r="30" fill="#ffffff" fill-opacity="0.92"/>
-  <circle cx="386" cy="358" r="30" fill="#ffffff" fill-opacity="0.92"/>
-  <circle cx="126" cy="358" r="30" fill="#ffffff" fill-opacity="0.92"/>
+  <rect width="512" height="512" rx="112" fill="url(#vignette)"/>
+
+  <!-- Composition is centered at the canvas center (256, 256) so
+       it doesn't look anchored to the bottom — the bottom-right
+       vignette already pulls visual weight that way, so balancing
+       the elements at true center keeps the icon feeling planted. -->
+
+  <!-- Outer halo: very faint wide ring for atmospheric depth -->
+  <circle cx="256" cy="256" r="196" fill="none"
+          stroke="#ffffff" stroke-opacity="0.07" stroke-width="2"/>
+
+  <!-- Main halo: passes EXACTLY through the satellite centers so
+       each dot sits on the ring like beads on a thread. -->
+  <circle cx="256" cy="256" r="152" fill="none"
+          stroke="#ffffff" stroke-opacity="0.24" stroke-width="3.5"/>
+
+  <!-- Center home dot -->
+  <circle cx="256" cy="256" r="52" fill="url(#dotShade)"/>
+
+  <!-- Three neighbor dots — sit perfectly on the halo ring
+       (radius 152 from center). -->
+  <circle cx="256" cy="104" r="30" fill="#ffffff"/>
+  <circle cx="388" cy="332" r="30" fill="#ffffff"/>
+  <circle cx="124" cy="332" r="30" fill="#ffffff"/>
 </svg>
