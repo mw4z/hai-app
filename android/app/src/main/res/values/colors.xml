@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Brand palette — unified WhatsApp-teal family (matches
-         --hai-primary-* in src/app/design-tokens.css). -->
+    <!-- Brand palette: unified WhatsApp-teal family (matches the
+         hai-primary tokens in src/app/design-tokens.css). -->
     <color name="colorPrimary">#00a884</color>
     <color name="colorPrimaryDark">#006d57</color>
     <color name="colorAccent">#00a884</color>
