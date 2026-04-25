@@ -11,14 +11,8 @@
   </defs>
   <rect width="192" height="192" rx="42" fill="url(#brand)"/>
   <rect width="192" height="192" rx="42" fill="url(#topGlow)"/>
-  <g fill="none" stroke="#ffffff" stroke-width="13"
-     stroke-linecap="round" stroke-linejoin="round">
-    <path d="
-      M 130.5 73.5
-      C 148.5 82.5 154.5 111 139.5 130.5
-      C 124.5 148.5 96 153 73.5 141
-      C 49.5 127.5 43.5 100.5 58.5 84
-    "/>
-    <path d="M 130.5 73.5 L 130.5 87 L 120.7 87" />
-  </g>
+  <circle cx="96"  cy="106" r="18" fill="#ffffff"/>
+  <circle cx="96"  cy="51"  r="11" fill="#ffffff" fill-opacity="0.92"/>
+  <circle cx="145" cy="134" r="11" fill="#ffffff" fill-opacity="0.92"/>
+  <circle cx="47"  cy="134" r="11" fill="#ffffff" fill-opacity="0.92"/>
 </svg>
