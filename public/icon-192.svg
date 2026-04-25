@@ -12,21 +12,23 @@
   <rect width="192" height="192" rx="42" fill="url(#brand)"/>
   <rect width="192" height="192" rx="42" fill="url(#topGlow)"/>
 
-  <g fill="#ffffff">
-    <path d="M 96 81 L 67 109 L 124 109 Z"/>
-    <path d="M 74 107
-             L 117 107
-             L 117 134
-             Q 117 138 113 138
-             L 78 138
-             Q 74 138 74 134 Z"/>
-  </g>
-  <path d="M 89 124
-           Q 89 118 96 118
-           Q 103 118 103 124
-           L 103 138
-           L 89 138 Z"
-        fill="url(#brand)"/>
+  <path d="
+    M 91.875 89.25
+    Q 96 84.75 100.125 89.25
+    L 117 107.25
+    L 117 125.25
+    Q 117 132.75 109.5 132.75
+    L 105 132.75
+    L 105 119.25
+    Q 105 115.5 101.25 115.5
+    L 90.75 115.5
+    Q 87 115.5 87 119.25
+    L 87 132.75
+    L 82.5 132.75
+    Q 75 132.75 75 125.25
+    L 75 107.25
+    Z
+  " fill="#ffffff"/>
 
   <circle cx="96"  cy="51"  r="11" fill="#ffffff" fill-opacity="0.92"/>
   <circle cx="145" cy="134" r="11" fill="#ffffff" fill-opacity="0.92"/>
