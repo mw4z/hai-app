@@ -1,7 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <!-- Hai brand icon: the original four-dot mark, recolored to the
-       app's actual primary teal gradient (hai-primary-500 → 600 in
-       src/app/design-tokens.css). -->
+  <!-- Hai brand icon: a white home silhouette at the center with the
+       three "neighbor" dots around it. The composition reads as
+       "your home + your neighbors = a حي". Roof slightly overhangs
+       the body for a real-architecture feel; the door is cut back to
+       the brand gradient so the home reads open / inviting instead
+       of a solid block. -->
   <defs>
     <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#00a884"/>
@@ -14,7 +17,29 @@
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#brand)"/>
   <rect width="512" height="512" rx="112" fill="url(#topGlow)"/>
-  <circle cx="256" cy="282" r="48" fill="#ffffff"/>
+
+  <!-- Home -->
+  <g fill="#ffffff">
+    <!-- Peaked roof, slightly wider than the body for an overhang -->
+    <path d="M 256 218 L 180 292 L 332 292 Z"/>
+    <!-- Body: rounded-bottom rectangle -->
+    <path d="M 198 286
+             L 314 286
+             L 314 356
+             Q 314 368 302 368
+             L 210 368
+             Q 198 368 198 356 Z"/>
+  </g>
+  <!-- Door cut: arched-top opening filled with the brand gradient
+       so it reads as a doorway, not a hole -->
+  <path d="M 238 330
+           Q 238 314 256 314
+           Q 274 314 274 330
+           L 274 368
+           L 238 368 Z"
+        fill="url(#brand)"/>
+
+  <!-- Three "neighbor" dots, unchanged positions -->
   <circle cx="256" cy="138" r="30" fill="#ffffff" fill-opacity="0.92"/>
   <circle cx="386" cy="358" r="30" fill="#ffffff" fill-opacity="0.92"/>
   <circle cx="126" cy="358" r="30" fill="#ffffff" fill-opacity="0.92"/>

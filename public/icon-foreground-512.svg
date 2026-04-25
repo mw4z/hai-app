@@ -1,11 +1,38 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <!-- Adaptive-icon foreground: TRANSPARENT background + only the
-       four-dot mark. Scaled to ~60% of the canvas so the dots stay
-       inside Android's 66dp safe zone (out of the 108dp adaptive
-       icon area), preventing them from being clipped by the
-       launcher mask. The brand-teal background is supplied by
-       @color/ic_launcher_background. -->
-  <circle cx="256" cy="282" r="36" fill="#ffffff"/>
+       home + 3 neighbor dots, scaled into Android's 66dp safe zone
+       (~60% of canvas). Brand-teal background is supplied by
+       @color/ic_launcher_background, so the door cutout is painted
+       with the same brand stop colors and visually disappears into
+       the tile background. -->
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00a884"/>
+      <stop offset="100%" stop-color="#006d57"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Home -->
+  <g fill="#ffffff">
+    <path d="M 256 248 L 200 304 L 312 304 Z"/>
+    <path d="M 212 300
+             L 300 300
+             L 300 348
+             Q 300 356 292 356
+             L 220 356
+             Q 212 356 212 348 Z"/>
+  </g>
+  <!-- Door cut, painted with the brand gradient — sits on top of the
+       launcher's brand-teal background so the door visually 'opens'
+       through to the tile color. -->
+  <path d="M 240 326
+           Q 240 314 256 314
+           Q 272 314 272 326
+           L 272 356
+           L 240 356 Z"
+        fill="url(#brand)"/>
+
+  <!-- Neighbor dots -->
   <circle cx="256" cy="174" r="22" fill="#ffffff" fill-opacity="0.92"/>
   <circle cx="354" cy="338" r="22" fill="#ffffff" fill-opacity="0.92"/>
   <circle cx="158" cy="338" r="22" fill="#ffffff" fill-opacity="0.92"/>
