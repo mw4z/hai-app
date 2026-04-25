@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- Adaptive-icon background tile (Android 8+). Brand teal so
+         the launcher tile reads as Hai. Matches hai-primary-500 in
+         src/app/design-tokens.css. -->
+    <color name="ic_launcher_background">#00a884</color>
 </resources>
