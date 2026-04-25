@@ -41,9 +41,39 @@ export default function PushRegistration() {
 
         await PushNotifications.addListener(
           'pushNotificationActionPerformed',
-          (action) => {
+          async (action) => {
             const data = (action?.notification?.data || {}) as Record<string, string>
             console.log('[PUSH] tap → resolving deeplink:', data?.type, data?.deeplink)
+
+            // Clear the tapped notification AND any siblings of the
+            // same type from the system tray. Without this, an
+            // already-read notification keeps sitting in the shade,
+            // confusing the user into thinking there's still
+            // something unseen. Works on both iOS (UNUserNotificationCenter)
+            // and Android (NotificationManager) via the same plugin.
+            try {
+              const tapped = action?.notification
+              const delivered = await PushNotifications.getDeliveredNotifications()
+              const sameType = data?.type
+              const toRemove = (delivered.notifications || []).filter((n) => {
+                if (tapped?.id && n.id === tapped.id) return true
+                // Also clear sibling pushes of the same type +
+                // resource id (e.g. multiple comment notifications
+                // for the same post / thread).
+                const nd = (n.data || {}) as Record<string, string>
+                if (!sameType || nd.type !== sameType) return false
+                if (sameType === 'new_message' && data.threadId && nd.threadId === data.threadId) return true
+                if ((sameType === 'comment_on_post' || sameType === 'reply_to_comment' || sameType === 'follow_post_comment') && data.postId && nd.postId === data.postId) return true
+                if (sameType === 'new_ride_request' && data.rideRequestId && nd.rideRequestId === data.rideRequestId) return true
+                return false
+              })
+              if (toRemove.length > 0) {
+                await PushNotifications.removeDeliveredNotifications({ notifications: toRemove })
+              }
+            } catch (err) {
+              console.error('[PUSH] clear-on-tap failed:', err)
+            }
+
             const target = resolveDeeplink(data)
             if (!target) return
             try {
