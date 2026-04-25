@@ -176,20 +176,36 @@ export default function BottomNav({
           )
         })}
 
-        {/* Center FAB — flat, token-driven. Sized to match the rhythm of
-            the side tabs (icon size matches, total button footprint sits
-            within the nav row, no floating/elevation). */}
-        <div className="flex-1 flex justify-center items-center">
+        {/* Center FAB — visually elevated so non-tech users (parents,
+            grandparents) can immediately see "this is the post button".
+            Raised above the bar with a shadow + soft brand glow ring,
+            bigger than side tabs, and a real "نشر / Post" label below
+            it for explicitness. The translate -top-3 lifts the button
+            so its top edge sits a bit above the nav row, the way most
+            mobile apps signal a primary action. */}
+        <div className="flex-1 flex flex-col justify-center items-center relative">
           <button
             onClick={handleNewPost}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"
+            data-tour="post-button"
+            className="relative w-14 h-14 -translate-y-3 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"
             style={{
               background: 'var(--hai-primary-500)',
+              boxShadow: '0 8px 20px -4px rgba(0, 109, 87, 0.45), 0 4px 8px -2px rgba(0, 0, 0, 0.15)',
             }}
             aria-label="new post"
           >
-            <FiPlus className="w-5 h-5" strokeWidth={2.5} />
+            {/* Soft outer glow ring — reuses the existing
+                animate-pulse-glow keyframe so non-tech users notice
+                the button right away. */}
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 rounded-full animate-pulse-glow"
+            />
+            <FiPlus className="w-7 h-7 relative" strokeWidth={3} />
           </button>
+          <span className="-mt-2 text-[9px] font-semibold text-primary-600 dark:text-primary-400 leading-none">
+            {lang === 'en' ? 'Post' : lang === 'ur' ? 'پوسٹ' : 'نشر'}
+          </span>
         </div>
 
         {/* Right two tabs: Chat, Profile */}
