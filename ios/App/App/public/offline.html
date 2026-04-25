@@ -206,7 +206,25 @@
         })
       }
 
-      if (btn) btn.addEventListener('click', function () { attemptRetry(false) })
+      // Manual button tap → ALWAYS navigate, no probe gate. Older
+      // builds got stuck here because the probe fetch was blocked by
+      // CORS (offline.html runs from file://, /api/ping wasn't
+      // returning ACAO). Trust the native WebView error handler
+      // (MainActivity / MainViewController) to re-show this page if
+      // the load still fails. If we're truly offline, the user lands
+      // back here within a second or two; if connectivity has
+      // returned, they get the live app.
+      function manualRetry() {
+        if (attempting) return
+        setBusy(true)
+        setStatus('جاري التحميل…')
+        try { window.location.href = REMOTE_URL } catch (_) {}
+        // Safety: re-enable the button after a few seconds in case
+        // the navigation was somehow no-op'd.
+        setTimeout(function () { setBusy(false) }, 4000)
+      }
+
+      if (btn) btn.addEventListener('click', manualRetry)
 
       // Auto-retry on the browser's online event AND on a slow poll —
       // navigator.onLine can lie behind captive portals. silent=true
