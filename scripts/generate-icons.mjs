@@ -28,10 +28,29 @@ if (!fs.existsSync(SVG_PATH)) {
 const svgBuf = fs.readFileSync(SVG_PATH)
 const fgBuf = fs.existsSync(FOREGROUND_SVG_PATH) ? fs.readFileSync(FOREGROUND_SVG_PATH) : null
 
-async function render(buf, size, out) {
+async function render(buf, size, out, opts = {}) {
   fs.mkdirSync(path.dirname(out), { recursive: true })
-  await sharp(buf).resize(size, size).png({ compressionLevel: 9 }).toFile(out)
-  console.log('wrote', path.relative(ROOT, out), `${size}x${size}`)
+  let pipe = sharp(buf).resize(size, size)
+  if (opts.flatten) {
+    // App Store rejects iOS 1024 icons that contain ANY alpha channel
+    // (Iris error -19241 / "Invalid large app icon … can't be
+    // transparent or contain an alpha channel"). flatten() composites
+    // any transparency over a solid background and strips the alpha
+    // channel from the PNG output entirely.
+    pipe = pipe.flatten({ background: opts.flattenBg || '#00a884' })
+  }
+  await pipe.png({ compressionLevel: 9 }).toFile(out)
+  console.log('wrote', path.relative(ROOT, out), `${size}x${size}`, opts.flatten ? '(no-alpha)' : '')
+}
+
+// iOS expects a SQUARE 1024 icon — the launcher applies the rounded
+// corners itself. Strip the rx="112" rounding from the SVG just for
+// the iOS render so the four corners are filled brand teal instead of
+// transparent. (We keep the rounded-corner SVG everywhere else.)
+function squareIosSvg(originalSvgBuf) {
+  return Buffer.from(
+    originalSvgBuf.toString('utf8').replace(/rx="112"/g, 'rx="0"'),
+  )
 }
 
 const ANDROID_SIZES = {
@@ -62,9 +81,12 @@ async function run() {
   }
 
   // iOS — single 1024 asset; Xcode generates the rest at build time
-  // using app-icon variants in the asset catalog.
-  await render(svgBuf, 1024,
-    path.join(ROOT, 'ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png'))
+  // using app-icon variants in the asset catalog. Render from the
+  // edge-to-edge SVG variant + flatten so the PNG has no alpha
+  // channel (Apple validation rejects transparent corners).
+  await render(squareIosSvg(svgBuf), 1024,
+    path.join(ROOT, 'ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png'),
+    { flatten: true, flattenBg: '#00a884' })
 
   console.log('Done.')
 }
