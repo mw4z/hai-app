@@ -1,9 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <!-- Hai brand icon: Material/Apple-style filled home silhouette
-       at the center + the three "neighbor" dots. Modeled on the
-       reference house-icon-sm.png — soft rounded peak, rounded
-       body corners, notched doorway with rounded top corners and
-       a flush bottom. -->
+  <!-- Hai brand icon: original four-dot mark on the brand teal
+       gradient (hai-primary-500 → 600). -->
   <defs>
     <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#00a884"/>
@@ -16,37 +13,7 @@
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#brand)"/>
   <rect width="512" height="512" rx="112" fill="url(#topGlow)"/>
-
-  <!-- House: single path, even-odd fill so the door notch punches
-       through to the brand tile. Rounded peak (Q at the apex),
-       softly rounded body bottom corners, door with rounded top
-       corners only (bottom is flush with the body so the silhouette
-       "stands" on the body). -->
-  <!-- Reference-matching home silhouette with pronounced rounding
-       at the apex, the body bottom corners, and the door arch.
-       Peak control point sits 22px above the slope-entry y so the
-       apex reads as a soft dome rather than a near-sharp point;
-       body bottom corners use a 20px round; door top corners use
-       a 10px round. -->
-  <path d="
-    M 245 238
-    Q 256 226 267 238
-    L 312 286
-    L 312 334
-    Q 312 354 292 354
-    L 280 354
-    L 280 318
-    Q 280 308 270 308
-    L 242 308
-    Q 232 308 232 318
-    L 232 354
-    L 220 354
-    Q 200 354 200 334
-    L 200 286
-    Z
-  " fill="#ffffff"/>
-
-  <!-- Three "neighbor" dots, unchanged positions -->
+  <circle cx="256" cy="282" r="48" fill="#ffffff"/>
   <circle cx="256" cy="138" r="30" fill="#ffffff" fill-opacity="0.92"/>
   <circle cx="386" cy="358" r="30" fill="#ffffff" fill-opacity="0.92"/>
   <circle cx="126" cy="358" r="30" fill="#ffffff" fill-opacity="0.92"/>

@@ -1,26 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <!-- Adaptive-icon foreground: house + 3 dots, scaled into the
-       66dp safe zone so Android's launcher mask never clips. The
-       brand-teal background is supplied by
-       @color/ic_launcher_background. -->
-  <path d="
-    M 245 238
-    Q 256 226 267 238
-    L 312 286
-    L 312 334
-    Q 312 354 292 354
-    L 280 354
-    L 280 318
-    Q 280 308 270 308
-    L 242 308
-    Q 232 308 232 318
-    L 232 354
-    L 220 354
-    Q 200 354 200 334
-    L 200 286
-    Z
-  " fill="#ffffff"/>
-
+  <!-- Adaptive-icon foreground: the four-dot mark scaled into
+       Android's 66dp safe zone (~60% of canvas). The brand teal
+       background is supplied by @color/ic_launcher_background. -->
+  <circle cx="256" cy="282" r="36" fill="#ffffff"/>
   <circle cx="256" cy="174" r="22" fill="#ffffff" fill-opacity="0.92"/>
   <circle cx="354" cy="338" r="22" fill="#ffffff" fill-opacity="0.92"/>
   <circle cx="158" cy="338" r="22" fill="#ffffff" fill-opacity="0.92"/>
