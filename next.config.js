@@ -52,14 +52,17 @@ const nextConfig = {
   // a brand refresh propagates within minutes instead of staying
   // edge-cached for the default static-asset year. Other static
   // assets keep their default long-lived cache.
+  // Note: Next.js header sources use path-to-regexp, not raw regex.
   async headers() {
+    const brandIconHeaders = [
+      { key: 'Cache-Control', value: 'public, max-age=300, s-maxage=300, must-revalidate' },
+    ]
     return [
-      {
-        source: '/:path(icon|favicon)[-\\w.]*\\.(png|svg|ico)',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=300, s-maxage=300, must-revalidate' },
-        ],
-      },
+      { source: '/icon-:size.png', headers: brandIconHeaders },
+      { source: '/icon-:size.svg', headers: brandIconHeaders },
+      { source: '/icon-foreground-:size.svg', headers: brandIconHeaders },
+      { source: '/favicon.ico', headers: brandIconHeaders },
+      { source: '/favicon.svg', headers: brandIconHeaders },
     ]
   },
 }
