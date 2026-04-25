@@ -162,23 +162,31 @@ async function sendFcmBatch(
         data: content.data,
         android: {
           priority: androidPriority,
-          // Only send channel_id when the caller explicitly wants the
-          // 'emergency' channel (which is also the only one registered
-          // on older installed builds). Omitting channel_id for
-          // everything else routes to FCM's auto-fallback channel —
-          // which exists on every installed Android app — so the push
-          // actually shows a banner instead of getting silently dropped
-          // by NotificationManager when the channel isn't registered.
-          // Once the Android rebuild with PushRegistration's
-          // 'hai_default' channel ships, switch this back to
-          // `content.androidChannel || 'hai_default'`.
-          notification: content.androidChannel
-            ? { channel_id: content.androidChannel, sound: 'default' }
-            : { sound: 'default' },
+          // Branded notification sound — 'hai_chime' resource name
+          // (extension stripped: Android looks up res/raw/hai_chime.wav).
+          // 'emergency' channel keeps the system default so it stays
+          // loud / distinct from regular activity. channel_id is only
+          // forwarded for emergency for now; everything else uses
+          // FCM's auto-fallback channel which exists on every
+          // installed app — once the Android rebuild ships with the
+          // 'hai_default' channel, restore the channel_id wiring.
+          notification: content.androidChannel === 'emergency'
+            ? { channel_id: 'emergency', sound: 'default' }
+            : { sound: 'hai_chime' },
         },
         apns: {
           headers: { 'apns-priority': apnsPriority },
-          payload: { aps: { sound: 'default', 'mutable-content': 1 } },
+          // iOS APS sound field takes the bundled file name WITH
+          // extension. The file is shipped under ios/App/App/sounds/
+          // and registered in the Xcode project as a Resource. The
+          // 'emergency' content channel keeps system default for max
+          // urgency.
+          payload: {
+            aps: {
+              sound: content.androidChannel === 'emergency' ? 'default' : 'hai_chime.wav',
+              'mutable-content': 1,
+            },
+          },
         },
       },
     }

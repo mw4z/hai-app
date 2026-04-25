@@ -175,7 +175,15 @@ export default function PushRegistration() {
               description: 'Neighborhood activity, messages, rides',
               importance: 4,         // HIGH — banner + sound by default
               visibility: 1,
-              sound: 'default',
+              // Custom Hai chime — file lives at
+              // android/app/src/main/res/raw/hai_chime.wav. Android's
+              // notification channel sound binds at channel-creation
+              // time and CANNOT be changed afterward; deleting and
+              // recreating the channel is the only way to swap. Old
+              // installs that already created hai_default with the
+              // default sound will keep the default until the user
+              // reinstalls (Android limitation, not ours).
+              sound: 'hai_chime',
               vibration: true,
               lights: true,
             })
