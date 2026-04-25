@@ -204,12 +204,6 @@ export default function BottomNav({
             />
             <FiPlus className="w-8 h-8 relative" strokeWidth={3} />
           </button>
-          <span
-            className="-mt-3 text-[11px] font-bold text-primary-600 dark:text-primary-400 leading-none whitespace-nowrap"
-            style={{ letterSpacing: '0.01em' }}
-          >
-            {lang === 'en' ? 'Post' : lang === 'ur' ? 'پوسٹ' : 'نشر'}
-          </span>
         </div>
 
         {/* Right two tabs: Chat, Profile */}

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
-import { FiArrowRight, FiArrowLeft } from 'react-icons/fi'
+import { FiArrowRight, FiArrowLeft, FiSend } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useNetworkStatus, isOfflineError } from '@/lib/network'
 import { translateApiError } from '@/lib/apiError'
@@ -416,9 +416,19 @@ export default function NewPostPage() {
           <button
             onClick={handleSubmit}
             disabled={loading || uploading}
-            className="text-primary-600 font-semibold text-sm disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary-600 text-white font-bold text-sm shadow-md active:scale-95 transition-transform disabled:opacity-50 disabled:active:scale-100"
+            style={{
+              boxShadow: '0 4px 12px -2px rgba(0, 109, 87, 0.45), 0 2px 4px -1px rgba(0, 0, 0, 0.12)',
+            }}
           >
-            {uploading ? 'رفع الصور...' : loading ? 'جاري النشر...' : 'نشر'}
+            {!loading && !uploading && <FiSend className="w-4 h-4" />}
+            <span>
+              {uploading
+                ? (lang === 'en' ? 'Uploading…' : lang === 'ur' ? 'اپ لوڈ…' : 'رفع الصور…')
+                : loading
+                  ? (lang === 'en' ? 'Publishing…' : lang === 'ur' ? 'شائع…' : 'جاري النشر…')
+                  : (lang === 'en' ? 'Publish' : lang === 'ur' ? 'شائع کریں' : 'نشر')}
+            </span>
           </button>
         )}
       </div>
