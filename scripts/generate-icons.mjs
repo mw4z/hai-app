@@ -88,6 +88,14 @@ async function run() {
     path.join(ROOT, 'ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png'),
     { flatten: true, flattenBg: '#00a884' })
 
+  // Google Play Console listing icon — 512x512, square, no alpha.
+  // Same rules as Apple: the store applies its own rounded mask, so
+  // a transparent corner shows through as background. Upload this
+  // file in Play Console → Main store listing → Graphics → App icon.
+  await render(squareIosSvg(svgBuf), 512,
+    path.join(ROOT, 'public/play-store-icon-512.png'),
+    { flatten: true, flattenBg: '#00a884' })
+
   console.log('Done.')
 }
 
