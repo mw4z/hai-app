@@ -10,9 +10,25 @@ const withPWA = require('next-pwa')({
       options: { cacheName: 'google-fonts', expiration: { maxEntries: 10, maxAgeSeconds: 365 * 24 * 60 * 60 } },
     },
     {
+      // Brand icons + favicons MUST always go to the network so the
+      // CDN-served file wins on the very first load after a brand
+      // refresh. Without this carve-out, the old runtimeCaching
+      // 'images' rule held the previous icon in the SW cache for
+      // 30 days even when the file on Vercel was already updated.
+      urlPattern: /\/(icon|favicon)[-\w.]*\.(?:png|svg|ico)(\?.*)?$/i,
+      handler: 'NetworkFirst',
+      options: { cacheName: 'brand-icons-v2', networkTimeoutSeconds: 4 },
+    },
+    {
+      // All other images: switched from CacheFirst → StaleWhileRevalidate
+      // and the cache name bumped to 'images-v2' so the OLD cache
+      // (still holding the previous icon under the bare /icon-192.png
+      // URL) is dropped on next SW activation. SWR shows the cached
+      // copy instantly AND fetches the fresh file in the background
+      // for next time — best of both for content images.
       urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
-      handler: 'CacheFirst',
-      options: { cacheName: 'images', expiration: { maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 } },
+      handler: 'StaleWhileRevalidate',
+      options: { cacheName: 'images-v2', expiration: { maxEntries: 60, maxAgeSeconds: 7 * 24 * 60 * 60 } },
     },
     {
       urlPattern: /\.(?:js|css)$/i,
@@ -31,6 +47,20 @@ const withPWA = require('next-pwa')({
 const nextConfig = {
   images: {
     domains: [],
+  },
+  // CDN cache hints: icon/favicon files get a 5-minute s-maxage so
+  // a brand refresh propagates within minutes instead of staying
+  // edge-cached for the default static-asset year. Other static
+  // assets keep their default long-lived cache.
+  async headers() {
+    return [
+      {
+        source: '/:path(icon|favicon)[-\\w.]*\\.(png|svg|ico)',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=300, s-maxage=300, must-revalidate' },
+        ],
+      },
+    ]
   },
 }
 
