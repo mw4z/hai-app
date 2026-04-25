@@ -176,34 +176,38 @@ export default function BottomNav({
           )
         })}
 
-        {/* Center FAB — visually elevated so non-tech users (parents,
-            grandparents) can immediately see "this is the post button".
-            Raised above the bar with a shadow + soft brand glow ring,
-            bigger than side tabs, and a real "نشر / Post" label below
-            it for explicitness. The translate -top-3 lifts the button
-            so its top edge sits a bit above the nav row, the way most
-            mobile apps signal a primary action. */}
-        <div className="flex-1 flex flex-col justify-center items-center relative">
+        {/* Center FAB — large, raised, glowing, with explicit label.
+            Triggered after a non-tech user couldn't find the publish
+            button. Sized 64px so it's visibly the dominant element on
+            the bar. White ring around it separates the button from
+            the dark/light bar background; brand drop-shadow says
+            "tap me". Label sits clearly below the button. */}
+        <div className="flex-1 flex flex-col items-center justify-end relative" style={{ paddingTop: 8 }}>
           <button
             onClick={handleNewPost}
             data-tour="post-button"
-            className="relative w-14 h-14 -translate-y-3 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"
+            className="relative w-16 h-16 -translate-y-5 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform"
             style={{
-              background: 'var(--hai-primary-500)',
-              boxShadow: '0 8px 20px -4px rgba(0, 109, 87, 0.45), 0 4px 8px -2px rgba(0, 0, 0, 0.15)',
+              background: 'linear-gradient(135deg, var(--hai-primary-500) 0%, var(--hai-primary-600) 100%)',
+              boxShadow:
+                '0 10px 24px -4px rgba(0, 109, 87, 0.55), ' +
+                '0 6px 10px -2px rgba(0, 0, 0, 0.20), ' +
+                '0 0 0 4px var(--hai-surface-1)', // white/dark-bg ring around the FAB
             }}
             aria-label="new post"
           >
-            {/* Soft outer glow ring — reuses the existing
-                animate-pulse-glow keyframe so non-tech users notice
-                the button right away. */}
+            {/* Pulsing brand glow ring — uses the existing
+                animate-pulse-glow keyframe (already in globals.css). */}
             <span
               aria-hidden="true"
-              className="absolute inset-0 rounded-full animate-pulse-glow"
+              className="absolute -inset-1 rounded-full animate-pulse-glow"
             />
-            <FiPlus className="w-7 h-7 relative" strokeWidth={3} />
+            <FiPlus className="w-8 h-8 relative" strokeWidth={3} />
           </button>
-          <span className="-mt-2 text-[9px] font-semibold text-primary-600 dark:text-primary-400 leading-none">
+          <span
+            className="-mt-3 text-[11px] font-bold text-primary-600 dark:text-primary-400 leading-none whitespace-nowrap"
+            style={{ letterSpacing: '0.01em' }}
+          >
             {lang === 'en' ? 'Post' : lang === 'ur' ? 'پوسٹ' : 'نشر'}
           </span>
         </div>
