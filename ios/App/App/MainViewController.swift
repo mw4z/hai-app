@@ -48,6 +48,16 @@ class MainViewController: CAPBridgeViewController {
         if let webView = self.webView {
             self.capacitorDelegate = webView.navigationDelegate
             webView.navigationDelegate = self
+
+            // Kill the iOS rubber-band / over-scroll bounce on screens
+            // whose content already fits the viewport. Real scrollable
+            // pages (feed, chat) keep working — these flags only stop
+            // the elastic pull-past-the-edge effect, they don't
+            // disable scrolling itself.
+            webView.scrollView.bounces = false
+            webView.scrollView.alwaysBounceVertical = false
+            webView.scrollView.alwaysBounceHorizontal = false
+            webView.scrollView.bouncesZoom = false
         }
 
         startPathMonitor()
