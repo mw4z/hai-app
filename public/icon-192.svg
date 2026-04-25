@@ -4,15 +4,28 @@
       <stop offset="0%" stop-color="#00a884"/>
       <stop offset="100%" stop-color="#006d57"/>
     </linearGradient>
-    <radialGradient id="glow" cx="50%" cy="42%" r="65%">
+    <radialGradient id="topGlow" cx="50%" cy="40%" r="65%">
       <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18"/>
       <stop offset="60%" stop-color="#ffffff" stop-opacity="0"/>
     </radialGradient>
   </defs>
   <rect width="192" height="192" rx="42" fill="url(#brand)"/>
-  <rect width="192" height="192" rx="42" fill="url(#glow)"/>
-  <circle cx="96"  cy="106" r="18" fill="#ffffff"/>
-  <circle cx="96"  cy="51"  r="11" fill="#ffffff" fill-opacity="0.92"/>
-  <circle cx="145" cy="134" r="11" fill="#ffffff" fill-opacity="0.92"/>
-  <circle cx="47"  cy="134" r="11" fill="#ffffff" fill-opacity="0.92"/>
+  <rect width="192" height="192" rx="42" fill="url(#topGlow)"/>
+  <circle cx="96" cy="102" r="67" fill="none"
+          stroke="#ffffff" stroke-opacity="0.16" stroke-width="1.6"/>
+  <circle cx="96"  cy="35"  r="8.5" fill="#ffffff" fill-opacity="0.92"/>
+  <circle cx="154" cy="136" r="8.5" fill="#ffffff" fill-opacity="0.92"/>
+  <circle cx="38"  cy="136" r="8.5" fill="#ffffff" fill-opacity="0.92"/>
+  <g fill="#ffffff">
+    <path d="M 59 107
+             L 96 70
+             L 133 107
+             L 133 147
+             Q 133 152 128 152
+             L 64 152
+             Q 59 152 59 147 Z"/>
+  </g>
+  <path d="M 87 124 L 87 152 L 105 152 L 105 124
+           Q 105 115 96 115 Q 87 115 87 124 Z"
+        fill="url(#brand)"/>
 </svg>
