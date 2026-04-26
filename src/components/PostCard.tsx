@@ -11,7 +11,8 @@ import EmojiPicker from './EmojiPickerWrapper'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useNetworkStatus, isOfflineError, OfflineError } from '@/lib/network'
 import { useConfirm } from './ConfirmProvider'
-import { pickImageOrFallback } from '@/lib/imagePicker'
+import { pickImageOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
+import ImageSourceSheet from '@/components/ImageSourceSheet'
 import { useAttachContact } from '@/hooks/useAttachContact'
 import ImageLightbox from './ImageLightbox'
 import SmartText from './SmartText'
@@ -258,6 +259,8 @@ export default function PostCard({
   const [editImages, setEditImages] = useState<string[]>(post.imageUrls || [])
   const [editImageUploading, setEditImageUploading] = useState(false)
   const editImageInputRef = useRef<HTMLInputElement>(null)
+  const editCameraInputRef = useRef<HTMLInputElement>(null)
+  const [showEditImageSheet, setShowEditImageSheet] = useState(false)
   const [editLoading, setEditLoading] = useState(false)
   const [postData, setPostData] = useState({ title: post.title, body: post.body, editedAt: post.editedAt, imageUrls: post.imageUrls || [] as string[] })
   // Auto-translation. Detected language comes from the raw title+body;
@@ -943,6 +946,27 @@ export default function PostCard({
                 }
               }}
             />
+            <input
+              ref={editCameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hai-hidden"
+              onChange={async (e) => {
+                const files = Array.from(e.target.files || [])
+                if (!files.length) return
+                setEditImageUploading(true)
+                try {
+                  const urls = await uploadFiles(files)
+                  setEditImages((prev) => [...prev, ...urls].slice(0, 5))
+                } catch {
+                  toast.error(lang === 'en' ? 'Upload failed' : lang === 'ur' ? 'اپ لوڈ ناکام' : 'فشل رفع الصورة')
+                } finally {
+                  setEditImageUploading(false)
+                  if (editCameraInputRef.current) editCameraInputRef.current.value = ''
+                }
+              }}
+            />
             <div className="hai-row-2" style={{ flexWrap: 'wrap', gap: 8 }}>
               {editImages.map((url, i) => (
                 <div key={url + i} style={{ position: 'relative' }}>
@@ -985,19 +1009,7 @@ export default function PostCard({
                 <button
                   type="button"
                   disabled={editImageUploading}
-                  onClick={async () => {
-                    const file = await pickImageOrFallback(lang as any, editImageInputRef)
-                    if (!file) return
-                    setEditImageUploading(true)
-                    try {
-                      const urls = await uploadFiles([file])
-                      setEditImages((prev) => [...prev, ...urls].slice(0, 5))
-                    } catch {
-                      toast.error(lang === 'en' ? 'Upload failed' : lang === 'ur' ? 'اپ لوڈ ناکام' : 'فشل رفع الصورة')
-                    } finally {
-                      setEditImageUploading(false)
-                    }
-                  }}
+                  onClick={() => setShowEditImageSheet(true)}
                   style={{
                     width: 64,
                     height: 64,
@@ -2010,6 +2022,47 @@ export default function PostCard({
               toast.success(lang === 'en' ? 'User blocked' : lang === 'ur' ? 'صارف بلاک ہو گیا' : 'تم حظر المستخدم')
             }
           } catch { /* ignore */ }
+        }}
+      />
+
+      <ImageSourceSheet
+        open={showEditImageSheet}
+        onClose={() => setShowEditImageSheet(false)}
+        onCamera={async () => {
+          const isNative = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
+          if (isNative) {
+            try {
+              const file = await pickImageFromCamera()
+              setEditImageUploading(true)
+              try {
+                const urls = await uploadFiles([file])
+                setEditImages((prev) => [...prev, ...urls].slice(0, 5))
+              } catch {
+                toast.error(lang === 'en' ? 'Upload failed' : lang === 'ur' ? 'اپ لوڈ ناکام' : 'فشل رفع الصورة')
+              } finally {
+                setEditImageUploading(false)
+              }
+            } catch (err: any) {
+              if (!err?.message?.toLowerCase?.().includes('cancel') && err?.message !== 'no_image') {
+                console.warn('[postEdit] camera failed', err)
+              }
+            }
+          } else {
+            editCameraInputRef.current?.click()
+          }
+        }}
+        onGallery={async () => {
+          const file = await pickImageOrFallback(lang as any, editImageInputRef)
+          if (!file) return
+          setEditImageUploading(true)
+          try {
+            const urls = await uploadFiles([file])
+            setEditImages((prev) => [...prev, ...urls].slice(0, 5))
+          } catch {
+            toast.error(lang === 'en' ? 'Upload failed' : lang === 'ur' ? 'اپ لوڈ ناکام' : 'فشل رفع الصورة')
+          } finally {
+            setEditImageUploading(false)
+          }
         }}
       />
     </div>

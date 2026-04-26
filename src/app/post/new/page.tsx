@@ -10,7 +10,8 @@ import { useNetworkStatus, isOfflineError } from '@/lib/network'
 import { translateApiError } from '@/lib/apiError'
 import RiyalIcon from '@/components/RiyalIcon'
 import { uploadFiles } from '@/lib/upload'
-import { pickImagesOrFallback } from '@/lib/imagePicker'
+import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
+import ImageSourceSheet from '@/components/ImageSourceSheet'
 import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { playSuccess, playError } from '@/lib/sound'
 import { FiX } from 'react-icons/fi'
@@ -250,6 +251,8 @@ export default function NewPostPage() {
   const showPrice = ['MARKETPLACE', 'REAL_ESTATE', 'FOOD_HOME'].includes(category)
 
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const [showImageSheet, setShowImageSheet] = useState(false)
 
   function applyPostImages(files: File[]) {
     const remaining = 5 - images.length
@@ -269,6 +272,30 @@ export default function NewPostPage() {
   }
 
   async function openPostImagePicker() {
+    const remaining = 5 - images.length
+    if (remaining <= 0) return
+    setShowImageSheet(true)
+  }
+
+  async function pickFromCamera() {
+    const remaining = 5 - images.length
+    if (remaining <= 0) return
+    const isNative = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
+    if (isNative) {
+      try {
+        const file = await pickImageFromCamera()
+        applyPostImages([file])
+      } catch (err: any) {
+        if (!err?.message?.toLowerCase?.().includes('cancel') && err?.message !== 'no_image') {
+          console.warn('[post/new] camera failed', err)
+        }
+      }
+    } else {
+      cameraInputRef.current?.click()
+    }
+  }
+
+  async function pickFromGallery() {
     const remaining = 5 - images.length
     if (remaining <= 0) return
     const files = await pickImagesOrFallback(remaining, imageInputRef)
@@ -590,6 +617,7 @@ export default function NewPostPage() {
                         <span>+ {lang === 'en' ? 'Choose photo' : lang === 'ur' ? 'تصویر منتخب کریں' : 'اختر صورة'}</span>
                       </button>
                       <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleImageSelect} className="hidden" />
+                      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
                     </>
                   )}
                 </div>
@@ -681,6 +709,7 @@ export default function NewPostPage() {
                         <span>+ {lang === 'en' ? 'Choose photo' : lang === 'ur' ? 'تصویر منتخب کریں' : 'اختر صورة'}</span>
                       </button>
                       <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleImageSelect} className="hidden" />
+                      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
                     </>
                   )}
                 </div>
@@ -790,6 +819,13 @@ export default function NewPostPage() {
           </div>
         </div>
       )}
+
+      <ImageSourceSheet
+        open={showImageSheet}
+        onClose={() => setShowImageSheet(false)}
+        onCamera={pickFromCamera}
+        onGallery={pickFromGallery}
+      />
     </main>
   )
 }
