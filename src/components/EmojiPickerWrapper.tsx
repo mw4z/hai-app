@@ -35,7 +35,13 @@ export default function EmojiPickerWrapper({ onSelect }: { onSelect: (emoji: str
           <button
             key={emoji}
             type="button"
-            onPointerDown={(e) => { e.stopPropagation(); onSelect(emoji) }}
+            // Was onPointerDown — closing the picker on pointerdown
+            // (which onSelect does) meant the synthesized click event
+            // fired on whatever was beneath the popover (the post
+            // image's lightbox handler), looking like a 'tap-through'
+            // bug. onClick only fires after the tap resolves on this
+            // exact button, so closing the picker afterward is safe.
+            onClick={(e) => { e.stopPropagation(); onSelect(emoji) }}
             className="text-2xl w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-125 transition-transform"
           >
             {emoji}
@@ -79,7 +85,7 @@ export default function EmojiPickerWrapper({ onSelect }: { onSelect: (emoji: str
               <button
                 key={emoji}
                 type="button"
-                onPointerDown={(e) => { e.stopPropagation(); onSelect(emoji) }}
+                onClick={(e) => { e.stopPropagation(); onSelect(emoji) }}
                 className="w-8 h-8 flex items-center justify-center text-xl rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-125 transition-transform"
               >
                 {emoji}
