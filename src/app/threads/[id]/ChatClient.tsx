@@ -1491,7 +1491,13 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
       <div
         ref={bubbleRef}
         style={{ willChange: 'transform' }}
-        className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} ${isLastInGroup ? 'mb-2' : 'mb-[3px]'} ${isFirstInGroup && !showDate ? 'mt-3' : ''}`}
+        // Force WhatsApp-style alignment: outgoing always on physical
+        // right, incoming always on physical left, regardless of page
+        // direction. In flex-col with dir=rtl, plain items-end flips to
+        // LEFT — that was leaving outgoing bubbles hugging the left edge
+        // with a wide empty wallpaper band on the right (the "black bar"
+        // Android tablet users were reporting).
+        className={`flex flex-col ${isMe ? 'ltr:items-end rtl:items-start' : 'ltr:items-start rtl:items-end'} ${isLastInGroup ? 'mb-2' : 'mb-[3px]'} ${isFirstInGroup && !showDate ? 'mt-3' : ''}`}
       >
         {msg.type === 'IMAGE' && (msg.imageUrl || (msg as any).localPreview) ? (
           <div className={`max-w-[85%]`} data-msg-id={msg.id} {...longPress}>
