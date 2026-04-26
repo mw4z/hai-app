@@ -36,8 +36,14 @@
         <item name="android:background">@drawable/splash</item>
         <!-- Android 12+ system splash API. Match @color/splash_bg so
              the launch screen matches Capacitor's JS splash color
-             (#e0f7f2 light, #000000 dark) and the handoff is seamless. -->
+             (#e0f7f2 light, #000000 dark) and the handoff is seamless.
+             windowSplashScreenAnimatedIcon must be supplied; without it
+             the system falls back to ic_launcher_foreground at full
+             size, which read as a giant pre-splash icon on most
+             Android 12+ devices. -->
         <item name="windowSplashScreenBackground">@color/splash_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_splash</item>
+        <item name="windowSplashScreenIconBackgroundColor">#00a884</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
         <item name="android:statusBarColor">@color/splash_bg</item>
         <item name="android:navigationBarColor">@color/splash_bg</item>

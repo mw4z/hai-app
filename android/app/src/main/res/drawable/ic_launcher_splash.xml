@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 12+ splash-screen icon. The system clips this to a 240dp
+    circle and scales the visible content to ~108dp inside it, so the
+    drawable's logo MUST live within the inner ~45% of the viewport —
+    if it fills more, the system shows it cropped or oversized.
+    @drawable/ic_launcher_foreground (the launcher tile) fills 60%+ of
+    its canvas, which is why most Android 12+ phones were showing the
+    Hai mark as a giant pre-splash icon.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer halo ring -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#ffffff"
+        android:strokeAlpha="0.32"
+        android:strokeWidth="0.9"
+        android:pathData="M54,54 m -22,0 a 22,22 0 1,0 44,0 a 22,22 0 1,0 -44,0" />
+    <!-- Center dot -->
+    <path
+        android:fillColor="#ffffff"
+        android:pathData="M54,54 m -7,0 a 7,7 0 1,0 14,0 a 7,7 0 1,0 -14,0" />
+    <!-- Top satellite -->
+    <path
+        android:fillColor="#ffffff"
+        android:pathData="M54,32 m -4.5,0 a 4.5,4.5 0 1,0 9,0 a 4.5,4.5 0 1,0 -9,0" />
+    <!-- Bottom-right satellite -->
+    <path
+        android:fillColor="#ffffff"
+        android:pathData="M73,67.5 m -4.5,0 a 4.5,4.5 0 1,0 9,0 a 4.5,4.5 0 1,0 -9,0" />
+    <!-- Bottom-left satellite -->
+    <path
+        android:fillColor="#ffffff"
+        android:pathData="M35,67.5 m -4.5,0 a 4.5,4.5 0 1,0 9,0 a 4.5,4.5 0 1,0 -9,0" />
+</vector>
