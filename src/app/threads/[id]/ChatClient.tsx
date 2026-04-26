@@ -183,6 +183,17 @@ export default function ChatClient({
   }, [messages, threadId])
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  // Synchronous send-locks. The send button has BOTH a form `submit`
+  // AND an onTouchEnd that calls requestSubmit() — needed so the iOS
+  // keyboard doesn't dismiss between the touch and the click. On
+  // Android that fires sendText/sendLocation/sendImages TWICE in the
+  // same tick, and React state setters (`setSending(true)`) don't
+  // flush synchronously, so both invocations pass the `if (sending)`
+  // guard and each posts its own copy of the message. A useRef flag
+  // updates synchronously and the second call returns immediately.
+  const sendLockRef = useRef(false)
+  const sendLocationLockRef = useRef(false)
+  const sendImagesLockRef = useRef(false)
   const [replyingTo, setReplyingTo] = useState<Msg | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const composerRef = useRef<HTMLDivElement>(null)
@@ -504,14 +515,15 @@ export default function ChatClient({
 
   async function sendText(e: React.FormEvent) {
     e.preventDefault()
-    if (!text.trim() || sending) return
+    if (!text.trim() || sendLockRef.current) return
+    sendLockRef.current = true
     // Keep focus on the input BEFORE any async work — prevents iOS
     // from dismissing the keyboard when the form submits.
     textInputRef.current?.focus()
     hapticLight()
     const body = text.trim()
     const replyId = replyingTo?.id || null
-    if (isOffline) { toast.error(offlineMsg()); return }
+    if (isOffline) { sendLockRef.current = false; toast.error(offlineMsg()); return }
     setText('')
     setReplyingTo(null)
     setSending(true)
@@ -532,11 +544,12 @@ export default function ChatClient({
     } catch (err) {
       toast.error(isOfflineError(err) || (err instanceof TypeError) ? offlineMsg() : t('common_error'))
       setText(body)
-    } finally { setSending(false) }
+    } finally { setSending(false); sendLockRef.current = false }
   }
 
   async function sendLocation() {
-    if (sendingLocation) return
+    if (sendLocationLockRef.current) return
+    sendLocationLockRef.current = true
     setSendingLocation(true)
     setShowLocationConfirm(false)
     try {
@@ -556,6 +569,7 @@ export default function ChatClient({
       toast.error(t('thread_location_fail'))
     } finally {
       setSendingLocation(false)
+      sendLocationLockRef.current = false
     }
   }
 
@@ -585,7 +599,8 @@ export default function ChatClient({
   // expect one imageUrl per message). The reply target, if any, is
   // attached only to the first image — subsequent ones are plain.
   async function sendImages(files: File[]) {
-    if (sendingImage || files.length === 0) return
+    if (sendImagesLockRef.current || files.length === 0) return
+    sendImagesLockRef.current = true
     const valid = files.filter((f) => {
       if (!f.type.startsWith('image/')) return false
       if (f.size > 5 * 1024 * 1024) return false
@@ -676,7 +691,11 @@ export default function ChatClient({
       pendingPlaceholders.forEach(p => p.localPreview && URL.revokeObjectURL(p.localPreview))
       toast.error(t('common_error'))
     }
-    finally { setSendingImage(false); if (imgInputRef.current) imgInputRef.current.value = '' }
+    finally {
+      setSendingImage(false)
+      sendImagesLockRef.current = false
+      if (imgInputRef.current) imgInputRef.current.value = ''
+    }
   }
 
   async function deleteMessage(msgId: string) {
