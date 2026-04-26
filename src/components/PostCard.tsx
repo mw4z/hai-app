@@ -311,6 +311,7 @@ export default function PostCard({
   const displayTitle = showTranslated && translated ? translated.title : postData.title
   const displayBody  = showTranslated && translated ? translated.body  : postData.body
   const pickerRef = useRef<HTMLDivElement>(null)
+  const reactionTriggerRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!showReactionPicker) return
@@ -1204,14 +1205,30 @@ export default function PostCard({
 
           {/* Emoji picker — portaled to <body> so it escapes any
               transformed/will-change ancestor (.glass, .glass-bottom,
-              .hai-page-enter route-transition wrapper). Without the
-              portal, position:fixed was being containing-blocked to
-              the post card and the picker landed off-center against
-              the screen edge. */}
+              .hai-page-enter route-transition wrapper). Position is
+              computed from the trigger's getBoundingClientRect() so
+              the picker sits right above the post's reaction button,
+              with horizontal clamp so it never escapes the viewport. */}
           {showReactionPicker && typeof document !== 'undefined' && createPortal(
             <div
               ref={pickerRef}
               className="hai-reaction-popover reaction-picker-enter"
+              style={(() => {
+                const rect = reactionTriggerRef.current?.getBoundingClientRect()
+                if (!rect) return undefined
+                const pickerW = 320 // matches EmojiPickerWrapper w-72 + a little slack
+                const margin = 12
+                const vw = window.innerWidth
+                const triggerCenter = rect.left + rect.width / 2
+                let left = triggerCenter - pickerW / 2
+                if (left < margin) left = margin
+                if (left + pickerW > vw - margin) left = vw - pickerW - margin
+                return {
+                  left: `${left}px`,
+                  top: `${rect.top - 8}px`,
+                  transform: 'translateY(-100%)',
+                }
+              })()}
             >
               <EmojiPicker onSelect={(emoji) => { handleReact(emoji); setShowReactionPicker(false) }} />
             </div>,
@@ -1220,6 +1237,7 @@ export default function PostCard({
 
           {/* Trigger button — tap own reaction to remove, long-press to change */}
           <button
+            ref={reactionTriggerRef}
             onClick={() => myReaction ? handleReact(myReaction) : setShowReactionPicker(v => !v)}
             className="hai-reaction-item"
             data-selected={myReaction ? 'true' : 'false'}
