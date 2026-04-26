@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiBell, FiBellOff, FiImage, FiUser } from 'react-icons/fi'
@@ -1201,14 +1202,20 @@ export default function PostCard({
         {/* Reactions — full emoji picker */}
         <div className="hai-menu-anchor hai-row-2">
 
-          {/* Emoji-mart picker */}
-          {showReactionPicker && (
+          {/* Emoji picker — portaled to <body> so it escapes any
+              transformed/will-change ancestor (.glass, .glass-bottom,
+              .hai-page-enter route-transition wrapper). Without the
+              portal, position:fixed was being containing-blocked to
+              the post card and the picker landed off-center against
+              the screen edge. */}
+          {showReactionPicker && typeof document !== 'undefined' && createPortal(
             <div
               ref={pickerRef}
               className="hai-reaction-popover reaction-picker-enter"
             >
               <EmojiPicker onSelect={(emoji) => { handleReact(emoji); setShowReactionPicker(false) }} />
-            </div>
+            </div>,
+            document.body,
           )}
 
           {/* Trigger button — tap own reaction to remove, long-press to change */}
