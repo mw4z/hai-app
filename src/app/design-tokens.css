@@ -2574,10 +2574,26 @@ textarea.hai-input {
   display: flex;
   align-items: center;
   justify-content: space-around;
+  /* Allow rows of action buttons to wrap on narrower cards. Without
+     this, when reactions accumulate (emoji + change-reaction + count
+     summary), the reaction-side flex child grows wider than the
+     remaining space, and `justify-content: space-between` (used by
+     the .hai-justify-between modifier) pushes both children PAST the
+     card edges. row-gap kicks in only after a wrap. */
+  flex-wrap: wrap;
+  row-gap: var(--hai-space-2);
   gap: var(--hai-space-1);
   margin-top: var(--hai-space-3);
   padding-top: var(--hai-space-2);
   border-top: 1px solid var(--hai-border-soft);
+}
+/* Direct children of the action bar must allow themselves to shrink
+   below their content's intrinsic min-width — same flex-1 / min-w-0
+   trick used to keep the chat composer send button on screen. */
+.hai-action-bar > .hai-row-1,
+.hai-action-bar > .hai-row-2,
+.hai-action-bar > .hai-menu-anchor {
+  min-width: 0;
 }
 .hai-action-bar--flush {
   margin-top: 0;
