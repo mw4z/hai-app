@@ -2643,20 +2643,26 @@ textarea.hai-input {
    picker extends INWARD across the card body instead of off-screen
    (the trigger is a small left-edge item in the action bar).
    max-width keeps it inside the viewport on narrow phones. */
+/* The popover is rendered into <body> via createPortal. It's a
+   full-width strip pinned to the bottom of the viewport, containing
+   one centered child (the EmojiPicker). No transforms, no inset-
+   inline-start anchored to a small trigger — there's no containing
+   block confusion to fight, and the centering is bulletproof on RTL
+   and LTR alike. */
 .hai-reaction-popover {
-  /* Pin to viewport, not to the small reaction trigger. With
-     position:absolute + inset-inline-start:0 anchored to the trigger,
-     the popover spilled past the card / screen edge in RTL whenever
-     it was wider than the space to the trigger's start side. Fixed
-     positioning + 50%-centered translate means the picker can never
-     leave the viewport, regardless of where the triggering post sits
-     on screen. */
   position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
-  max-width: calc(100vw - var(--hai-space-6));
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  padding: 0 var(--hai-space-3);
   z-index: var(--hai-z-sheet);
+}
+.hai-reaction-popover > * {
+  pointer-events: auto;
+  max-width: 100%;
   border-radius: var(--hai-radius-lg);
   overflow: hidden;
   box-shadow: var(--hai-shadow-lg);
