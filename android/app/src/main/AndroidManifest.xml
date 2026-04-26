@@ -54,4 +54,43 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+
+    <!-- Android 11+ package visibility. Without these <queries>
+         declarations, Intent.resolveActivity() returns null for the
+         contact picker / image picker / share sheet on devices targeting
+         SDK 30+, even when the system app exists — so the @capacitor-
+         community/contacts plugin's pickContact() silently failed and
+         the chat composer fell through to the manual name+phone prompt
+         instead of opening the OS Contacts UI. -->
+    <queries>
+        <!-- Contact picker (ACTION_PICK on contacts content URI) -->
+        <intent>
+            <action android:name="android.intent.action.PICK" />
+            <data android:mimeType="vnd.android.cursor.dir/contact" />
+        </intent>
+        <!-- Generic image picker / file chooser -->
+        <intent>
+            <action android:name="android.intent.action.GET_CONTENT" />
+            <data android:mimeType="image/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.PICK" />
+            <data android:mimeType="image/*" />
+        </intent>
+        <!-- Camera capture (used for photo attachments) -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <!-- Share sheet (used by post share button + system share) -->
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="*/*" />
+        </intent>
+        <!-- External browser launch (Browser.open used by social links) -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
 </manifest>
