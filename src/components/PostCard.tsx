@@ -377,10 +377,6 @@ export default function PostCard({
   const [following, setFollowing] = useState(initialFollowing)
   const [replyText, setReplyText] = useState('')
   const [submittingReply, setSubmittingReply] = useState(false)
-  const [supportsContacts] = useState(
-    () => typeof window !== 'undefined' && 'contacts' in navigator && 'ContactsManager' in window
-  )
-
   const style = CATEGORY_STYLES[post.category] || CATEGORY_STYLES.GENERAL
   const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + b, 0)
   const serverCommentCount = post._count?.comments || 0
@@ -1667,29 +1663,6 @@ export default function PostCard({
             {/* Pinned footer — contact picker + input, safe-area aware */}
             <div className="hai-sheet__footer">
               {/* Pick contact from phone — only for LOOKING_FOR on supported devices */}
-              {isLookingFor && supportsContacts && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      // @ts-ignore — Contact Picker API not yet in TS lib
-                      const results = await navigator.contacts.select(['name', 'tel'], { multiple: false })
-                      if (results.length > 0) {
-                        const name = results[0].name?.[0] || ''
-                        const tel  = results[0].tel?.[0]  || ''
-                        setCommentText(name && tel ? `${name}: ${tel}` : tel || name)
-                      }
-                    } catch {
-                      // user cancelled — do nothing
-                    }
-                  }}
-                  className="hai-callout hai-callout--info hai-row-2 hai-justify-center hai-mb-2 hai-cursor-pointer"
-                >
-                  <span>📱</span>
-                  <span>{t('post_share_contacts')}</span>
-                </button>
-              )}
-
               {commentImagePreview && (
                 <div className="hai-comment-input__attach">
                   <img src={commentImagePreview} alt="" />
