@@ -1292,8 +1292,17 @@ export default function ChatClient({
                 className="flex-1 min-w-0 bg-white/10 dark:bg-white/10 rounded-full px-4 py-2.5 text-[15px] text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-400/40 focus:border-primary-400/30 transition-shadow"
                 maxLength={1000} />
               <button type="submit" disabled={sending || !text.trim()}
-                onTouchEnd={(e) => { e.preventDefault(); textInputRef.current?.focus(); (e.target as HTMLElement).closest('form')?.requestSubmit() }}
                 className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white disabled:opacity-30 flex-shrink-0 active:scale-90 transition-all shadow-sm hover:bg-primary-700 glow-primary">
+                {/* No more onTouchEnd → requestSubmit. The previous handler
+                    fired the form's onSubmit AND the synthesized click
+                    fired it again — duplicated messages on every Android
+                    tap, and the synchronous send-lock only caught it
+                    when both events landed in the same tick (it didn't,
+                    consistently). The form's natural submit path now
+                    runs exactly once per tap. sendText already calls
+                    textInputRef.current?.focus() at the top so the iOS
+                    keyboard refocus this previously guarded against
+                    still works. */}
                 <FiSend className="w-4.5 h-4.5" style={lang !== 'en' ? { transform: 'scaleX(-1)' } : undefined} />
               </button>
             </form>
