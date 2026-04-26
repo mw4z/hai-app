@@ -9,8 +9,8 @@
              Opaque white bars caused some Android OEM skins (Samsung,
              OnePlus) to render a gray strip where the status or
              navigation bar sat on top of the app content. -->
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">@color/hai_surface</item>
+        <item name="android:navigationBarColor">@color/hai_surface</item>
         <item name="android:windowTranslucentStatus">false</item>
         <item name="android:windowTranslucentNavigation">false</item>
     </style>
@@ -24,8 +24,8 @@
              in CapacitorBridge) paints the right icon contrast on top.
              enforceContrast=false stops Android 10+ from auto-applying
              its own scrim under the bars. -->
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">@color/hai_surface</item>
+        <item name="android:navigationBarColor">@color/hai_surface</item>
         <item name="android:enforceNavigationBarContrast">false</item>
         <item name="android:enforceStatusBarContrast">false</item>
         <item name="android:windowLightStatusBar">true</item>

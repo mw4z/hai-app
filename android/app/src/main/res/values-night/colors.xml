@@ -7,4 +7,6 @@
     <color name="colorPrimaryDark">#000000</color>
     <color name="colorAccent">#00a884</color>
     <color name="splash_bg">#000000</color>
+    <!-- Dark surface for system bars (pre-API 29 scrim avoidance). -->
+    <color name="hai_surface">#101619</color>
 </resources>

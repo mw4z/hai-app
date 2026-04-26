@@ -6,4 +6,9 @@
     <color name="colorPrimaryDark">#006d57</color>
     <color name="colorAccent">#00a884</color>
     <color name="splash_bg">#e0f7f2</color>
+    <!-- Surface colors for system bars. Pre-API 29 Android applies a
+         gray contrast scrim to translucent bars; setting an opaque
+         brand-matching color avoids the scrim. Matches the JS-side
+         StatusBar.setBackgroundColor in CapacitorBridge. -->
+    <color name="hai_surface">#ffffff</color>
 </resources>

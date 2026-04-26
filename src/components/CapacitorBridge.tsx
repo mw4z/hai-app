@@ -57,7 +57,14 @@ export default function CapacitorBridge() {
         const isDark = document.documentElement.classList.contains('dark')
         await StatusBar.setOverlaysWebView({ overlay: true })
         await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light })
-        await StatusBar.setBackgroundColor({ color: '#00000000' })
+        // Was '#00000000' (transparent). On Android < 10 the OS auto-
+        // applies a gray contrast SCRIM to translucent system bars
+        // (enforceStatusBarContrast doesn't exist pre-API 29), and that
+        // scrim was reading as the gray bar at top/bottom that some
+        // older Android phones report. Setting an opaque brand-tinted
+        // color removes the transparency the OS scrims against. iOS
+        // ignores this call.
+        await StatusBar.setBackgroundColor({ color: isDark ? '#101619' : '#ffffff' })
       } catch {}
 
       // Keyboard resize mode, per-platform:
@@ -88,6 +95,7 @@ export default function CapacitorBridge() {
         const { StatusBar, Style } = await import('@capacitor/status-bar')
         const isDark = document.documentElement.classList.contains('dark')
         await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light })
+        await StatusBar.setBackgroundColor({ color: isDark ? '#101619' : '#ffffff' })
       } catch {}
     })
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
