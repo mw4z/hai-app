@@ -642,7 +642,7 @@ export default function NewPostPage() {
                         placeholder="0"
                         value={price}
                         onChange={(e) => setPrice(e.target.value)}
-                        className="flex-1 px-3 py-3 bg-transparent focus:outline-none text-start text-gray-900 dark:text-white"
+                        className="flex-1 min-w-0 px-3 py-3 bg-transparent focus:outline-none text-start text-gray-900 dark:text-white"
                         dir="ltr"
                       />
                     </div>

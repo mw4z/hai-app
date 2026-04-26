@@ -374,7 +374,7 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
                   <input ref={inputRef} type="text" value={searchQuery}
                     onChange={e => handleSearchInput(e.target.value)}
                     placeholder={lang === 'en' ? 'Search place, restaurant, store...' : lang === 'ur' ? 'جگہ، ریستوران، دکان تلاش کریں...' : 'ابحث عن مكان، مطعم، محل...'}
-                    className="flex-1 py-3.5 text-sm bg-transparent text-gray-900 dark:text-white focus:outline-none" />
+                    className="flex-1 min-w-0 py-3.5 text-sm bg-transparent text-gray-900 dark:text-white focus:outline-none" />
                   {searching && <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mx-3" />}
                 </div>
 

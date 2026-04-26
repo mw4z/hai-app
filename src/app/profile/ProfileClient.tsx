@@ -891,7 +891,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                     { key: 'snapchat',  label: 'Snapchat',       ph: 'yourhandle' },
                     { key: 'whatsapp',  label: 'WhatsApp',       ph: '05xxxxxxxx' },
                   ] as const).map(({ key, label, ph }) => (
-                    <div key={key} className="flex items-center gap-2">
+                    <div key={key} className="flex items-center gap-2 min-w-0">
                       <span className="w-20 flex-shrink-0 text-[11px] text-gray-500 dark:text-gray-400">{label}</span>
                       <input
                         type="text"
@@ -899,7 +899,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                         value={tempSocial[key] || ''}
                         onChange={(e) => setTempSocial({ ...tempSocial, [key]: e.target.value })}
                         placeholder={ph}
-                        className="input-field text-sm flex-1"
+                        className="input-field text-sm flex-1 min-w-0"
                         maxLength={80}
                         dir="ltr"
                       />

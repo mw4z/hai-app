@@ -202,10 +202,10 @@ export default function PollCard({ poll, currentUserId, onDelete }: Props) {
             ))}
             {comments.length === 0 && <p className="text-xs text-gray-400 text-center py-2">{lang === 'en' ? 'No comments' : lang === 'ur' ? 'کوئی تبصرہ نہیں' : 'لا توجد تعليقات'}</p>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <input value={newComment} onChange={e => setNewComment(e.target.value)} onKeyDown={e => e.key === 'Enter' && addComment()}
               placeholder={lang === 'en' ? 'Add comment...' : lang === 'ur' ? 'تبصرہ شامل کریں...' : 'أضف تعليق...'}
-              className="flex-1 bg-gray-50 dark:bg-gray-700 rounded-full px-3 py-2 text-xs focus:outline-none text-gray-900 dark:text-white" />
+              className="flex-1 min-w-0 bg-gray-50 dark:bg-gray-700 rounded-full px-3 py-2 text-xs focus:outline-none text-gray-900 dark:text-white" />
             <button onClick={addComment} className="text-primary-600 p-1.5"><FiSend className="w-3.5 h-3.5" /></button>
           </div>
         </div>

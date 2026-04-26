@@ -209,7 +209,7 @@ export default function NeighborhoodSheet({
               placeholder={t('feed_search_area')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 bg-transparent text-base focus:outline-none text-gray-800 dark:text-gray-100 placeholder:text-gray-400"
+              className="flex-1 min-w-0 bg-transparent text-base focus:outline-none text-gray-800 dark:text-gray-100 placeholder:text-gray-400"
             />
             {query && (
               <button
