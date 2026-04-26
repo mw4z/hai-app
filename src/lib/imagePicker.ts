@@ -32,6 +32,14 @@ function isNative(): boolean {
   )
 }
 
+function getPlatform(): 'ios' | 'android' | 'web' {
+  if (typeof window === 'undefined') return 'web'
+  return ((window as any).Capacitor?.getPlatform?.() ?? 'web') as
+    | 'ios'
+    | 'android'
+    | 'web'
+}
+
 function arabicLabels(): ImagePickerLabels {
   return {
     header: 'اختر صورة',
@@ -298,15 +306,22 @@ export async function pickImageFilesMulti(
 /**
  * Multi-image variant of pickImageOrFallback.
  *
- * On native: opens the photo library directly via Camera.pickImages()
- *            (no English intermediate sheet).
- * On web:    triggers the hidden multi-capable <input type="file"> ref.
+ * On iOS:     uses Camera.pickImages() — the native PHPicker is reliable.
+ * On Android: uses the web <input type="file" multiple> directly, which
+ *             delegates to the OS picker via the WebView. Android's
+ *             native Camera.pickImages is flaky with the Android 13+
+ *             scoped media permissions ("Selected photos" mode silently
+ *             returns no photos with no error), and the new-post screen
+ *             was hitting that — users reported they had to publish the
+ *             post first, then edit it to attach images. The WebView
+ *             intent picker honors Selected-photos correctly.
+ * On web:     triggers the hidden multi-capable <input type="file"> ref.
  */
 export async function pickImagesOrFallback(
   limit: number,
   webInputRef: { current: HTMLInputElement | null },
 ): Promise<File[]> {
-  if (isNative()) {
+  if (isNative() && getPlatform() === 'ios') {
     try {
       return await pickImageFilesMulti(limit)
     } catch (err: any) {
@@ -317,7 +332,7 @@ export async function pickImagesOrFallback(
         return []
       }
       console.warn(
-        '[imagePicker] native multi failed, falling back to web input:',
+        '[imagePicker] iOS native multi failed, falling back to web input:',
         err,
       )
     }
