@@ -6,6 +6,7 @@ import { moderateContent } from '@/lib/moderation'
 import { requireVerified } from '@/lib/requireVerified'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { kickNotifCron } from '@/lib/kickNotifCron'
+import { sendDmPushNow } from '@/app/api/cron/process-notifs/route'
 
 // GET /api/threads/[id]/messages
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -232,32 +233,46 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       },
     })
 
-    // Phone push — single-user target, priority high so the banner
-    // fires immediately instead of being batched by Doze mode.
-    // IMPORTANT: await the insert before kickNotifCron(). Fire-and-
-    // forget here created a race where the cron read the queue
-    // before this row had committed, the job wasn't found, and the
-    // push then waited up to ~60s for the next scheduled cron tick.
-    try {
-      await db.notifJob.create({
-        data: {
-          type: 'new_message',
-          priority: 'high',
-          targetType: 'user',
-          targetRef: recipientId,
-          payload: {
-            threadId: params.id,
-            senderId: session.userId,
-            senderName,
-            snippet,
-            messageType: type || 'TEXT',
+    // Phone push — DMs are the highest-priority push class in the app,
+    // so we send DIRECTLY to FCM/APNs in this request instead of
+    // routing through the NotifJob queue → cron processor (which added
+    // 1.5s coalescing + an HTTP roundtrip + cron read latency, putting
+    // total perceived delivery in the 2-5s range). Inline send lands
+    // the banner on the recipient's phone within the same second the
+    // message hits the server.
+    //
+    // If the inline send fails for any reason (FCM token, transient
+    // network), we fall back to the queue + cron path so the push
+    // still gets delivered eventually.
+    const inlineSent = await sendDmPushNow({
+      recipientId,
+      threadId: params.id,
+      senderName,
+      snippet,
+      messageType: type || 'TEXT',
+    })
+    if (!inlineSent) {
+      try {
+        await db.notifJob.create({
+          data: {
+            type: 'new_message',
+            priority: 'high',
+            targetType: 'user',
+            targetRef: recipientId,
+            payload: {
+              threadId: params.id,
+              senderId: session.userId,
+              senderName,
+              snippet,
+              messageType: type || 'TEXT',
+            },
           },
-        },
-      })
-    } catch (err) {
-      console.error('[NOTIF_JOB] enqueue new_message failed:', err)
+        })
+      } catch (err) {
+        console.error('[NOTIF_JOB] enqueue new_message failed:', err)
+      }
+      kickNotifCron()
     }
-    kickNotifCron()
 
     return NextResponse.json(message)
   } catch (error) {

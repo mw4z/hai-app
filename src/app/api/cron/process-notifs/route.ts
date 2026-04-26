@@ -1389,6 +1389,63 @@ async function processNewMessage(job: JobRow): Promise<JobOutcome> {
   return 'done'
 }
 
+/**
+ * Inline DM-push helper — same delivery as processNewMessage but for
+ * the realtime-call path. The messages route awaits this so the
+ * recipient's phone gets the banner in the same request that wrote
+ * the message, instead of waiting for the cron processor (which adds
+ * 1.5s coalescing + an HTTP roundtrip + cron read latency).
+ *
+ * Returns true on successful FCM/APNs delivery, false otherwise. The
+ * messages route falls back to enqueuing a NotifJob if this returns
+ * false, so a transient FCM blip doesn't lose the push.
+ */
+export async function sendDmPushNow(args: {
+  recipientId: string
+  threadId: string
+  senderName: string | null | undefined
+  snippet: string
+  messageType: string | null | undefined
+}): Promise<boolean> {
+  try {
+    const { recipientId, threadId, senderName, snippet, messageType } = args
+
+    const { tokens, userExists } = await resolveUserTokens(
+      recipientId,
+      'directMessage',
+    )
+    if (!userExists || tokens.length === 0) return false
+
+    const who = senderName?.trim() || 'جار'
+    const pushTitle = `💬 ${who}`
+    const body = messageType === 'IMAGE'
+      ? '📷 صورة'
+      : messageType === 'LOCATION'
+        ? '📍 موقع'
+        : (snippet || '').trim().slice(0, 180) || 'رسالة جديدة'
+
+    const result = await sendPushBatch(tokens, {
+      title: pushTitle,
+      body,
+      priority: 'high',
+      data: {
+        type: 'new_message',
+        threadId,
+        deeplink: `hai://threads/${threadId}`,
+      },
+    })
+
+    // Best-effort token cleanup; don't await for delivery latency.
+    void cleanupInvalidTokens(result.invalidTokens, '__inline__', 'new_message')
+      .catch(() => { /* ignore */ })
+
+    return result.success > 0
+  } catch (err) {
+    console.warn('[NOTIF_INLINE] sendDmPushNow failed:', (err as Error)?.message)
+    return false
+  }
+}
+
 // ── Main handler ─────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   return handle(req)
