@@ -1261,10 +1261,15 @@ export default function ChatClient({
                 <FiMapPin className={`w-5 h-5 ${sendingLocation ? 'animate-pulse' : ''}`} />
               </button>
             </div>
-            <form onSubmit={sendText} className="flex-1 flex items-center gap-2">
+            <form onSubmit={sendText} className="flex-1 min-w-0 flex items-center gap-2">
+              {/* min-w-0 on the input AND its parent form is required for the
+                  flex-1 input to actually shrink below its content's min
+                  intrinsic width. Without this, long placeholder/value would
+                  push the send button off the visible edge of the screen on
+                  some Android devices (Samsung curved screens reported it). */}
               <input ref={textInputRef} type="text" value={text} onChange={e => setText(e.target.value)}
                 placeholder={t('thread_placeholder')}
-                className="flex-1 bg-white/10 dark:bg-white/10 rounded-full px-4 py-2.5 text-[15px] text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-400/40 focus:border-primary-400/30 transition-shadow"
+                className="flex-1 min-w-0 bg-white/10 dark:bg-white/10 rounded-full px-4 py-2.5 text-[15px] text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-400/40 focus:border-primary-400/30 transition-shadow"
                 maxLength={1000} />
               <button type="submit" disabled={sending || !text.trim()}
                 onTouchEnd={(e) => { e.preventDefault(); textInputRef.current?.focus(); (e.target as HTMLElement).closest('form')?.requestSubmit() }}
