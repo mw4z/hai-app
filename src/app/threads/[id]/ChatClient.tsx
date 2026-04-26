@@ -858,9 +858,13 @@ export default function ChatClient({
         )}
       </header>
 
-      {/* Messages */}
-      <div ref={messagesRef} className="px-4 py-3 flex-1 min-h-0 overflow-y-auto" data-tour="chat-messages"
+      {/* Messages — wallpaper bg spans full width, message column is
+         constrained to max-w-[480px] (same as composer) so on tablets
+         and wide-aspect Android devices the chat doesn't spread into
+         a half-empty band of wallpaper next to tiny RTL-aligned bubbles. */}
+      <div ref={messagesRef} className="flex-1 min-h-0 overflow-y-auto" data-tour="chat-messages"
         style={{ background: isDark ? wallpaper.dark : wallpaper.light }}>
+       <div className="px-4 py-3 w-full max-w-[480px] mx-auto">
         {messages.length === 0 && (
           <div className="text-center py-12">
             <div className="w-16 h-16 rounded-full bg-white dark:bg-gray-800 shadow-sm mx-auto mb-3 flex items-center justify-center">
@@ -918,6 +922,7 @@ export default function ChatClient({
           )
         })}
         <div ref={bottomRef} />
+       </div>
       </div>
 
       {/* Message action overlay — WhatsApp style */}
