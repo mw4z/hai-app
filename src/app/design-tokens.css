@@ -2644,11 +2644,19 @@ textarea.hai-input {
    (the trigger is a small left-edge item in the action bar).
    max-width keeps it inside the viewport on narrow phones. */
 .hai-reaction-popover {
-  position: absolute;
-  bottom: calc(100% + var(--hai-space-2));
-  inset-inline-start: 0;
+  /* Pin to viewport, not to the small reaction trigger. With
+     position:absolute + inset-inline-start:0 anchored to the trigger,
+     the popover spilled past the card / screen edge in RTL whenever
+     it was wider than the space to the trigger's start side. Fixed
+     positioning + 50%-centered translate means the picker can never
+     leave the viewport, regardless of where the triggering post sits
+     on screen. */
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
   max-width: calc(100vw - var(--hai-space-6));
-  z-index: var(--hai-z-menu);
+  z-index: var(--hai-z-sheet);
   border-radius: var(--hai-radius-lg);
   overflow: hidden;
   box-shadow: var(--hai-shadow-lg);
