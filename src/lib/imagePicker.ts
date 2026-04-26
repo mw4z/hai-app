@@ -147,7 +147,11 @@ export async function pickImageOrFallback(
   lang: 'ar' | 'en' | 'ur',
   webInputRef: { current: HTMLInputElement | null },
 ): Promise<File | null> {
-  if (isNative()) {
+  // Same routing as pickImagesOrFallback — Android goes through the
+  // WebView <input type="file"> because Camera.getPhoto's library option
+  // hits the same Android 13+ "Selected photos" silent-empty bug. iOS
+  // keeps the native prompt (PHPicker / camera UI with localized labels).
+  if (isNative() && getPlatform() === 'ios') {
     try {
       return await pickImageFile(lang)
     } catch (err: any) {
@@ -158,7 +162,7 @@ export async function pickImageOrFallback(
       ) {
         return null
       }
-      console.warn('[imagePicker] native failed, falling back to web input:', err)
+      console.warn('[imagePicker] iOS native failed, falling back to web input:', err)
     }
   }
   webInputRef.current?.click()
