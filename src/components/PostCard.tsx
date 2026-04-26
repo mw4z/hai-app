@@ -456,6 +456,27 @@ export default function PostCard({
       const data = await res.json()
       setComments(data)
       setCommentsLoaded(true)
+      // Pre-warm image cache the instant the comment list arrives. The
+      // browser starts decoding/downloading each URL into its image
+      // cache RIGHT NOW (before React paints the comment row), so by
+      // the time the <img> tags mount with these src URLs, the bytes
+      // are already in memory and the comment images appear with no
+      // pop-in delay. Without this, users saw the comments sheet open
+      // instantly but the inline images load one-by-one over a second.
+      try {
+        const urls: string[] = []
+        for (const c of data as any[]) {
+          if (c?.imageUrl) urls.push(c.imageUrl)
+          for (const r of (c?.replies || []) as any[]) {
+            if (r?.imageUrl) urls.push(r.imageUrl)
+          }
+        }
+        for (const u of urls) {
+          const img = new Image()
+          img.decoding = 'async'
+          img.src = u
+        }
+      } catch { /* preload is best-effort */ }
     } catch {
       toast.error(t('common_error'))
     }
@@ -468,10 +489,17 @@ export default function PostCard({
 
   async function toggleComments() {
     if (!showComments) {
-      // Always refetch when opening to get fresh data
-      await fetchComments()
+      // Open the sheet RIGHT AWAY, then fetch in the background.
+      // Previously we awaited fetchComments() before opening the sheet,
+      // so the user saw a 200-400ms freeze on tap before the sheet
+      // animated in. Now: tap → sheet opens with whatever's already
+      // in `comments` state (preview comments seeded from SSR), and
+      // the full thread + images stream in beneath it.
+      setShowComments(true)
+      void fetchComments()
+      return
     }
-    setShowComments(v => !v)
+    setShowComments(false)
   }
 
   // Lock the feed behind the comments sheet + close on Escape.
