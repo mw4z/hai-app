@@ -33,9 +33,9 @@ export async function GET(req: NextRequest) {
       [...rides.map(r => r.trip?.driverId), ...rides.map(r => r.requesterId)].filter(Boolean)
     )) as string[]
     const users = userIds.length > 0
-      ? await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } })
+      ? await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, lastName: true } })
       : []
-    const nameMap = Object.fromEntries(users.map(u => [u.id, u.name]))
+    const nameMap = Object.fromEntries(users.map(u => [u.id, [u.name?.trim(), u.lastName?.trim()].filter(Boolean).join(' ') || u.name]))
 
     return NextResponse.json(rides.map(r => ({
       id: r.id,

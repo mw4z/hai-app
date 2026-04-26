@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
         select: {
           id: true,
           name: true,
+          lastName: true,
           status: true,
           signupDeviceId: true,
         },
@@ -129,6 +130,6 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     status: 'PENDING',
-    inviterName: codeRow.user.name,
+    inviterName: [codeRow.user.name?.trim(), codeRow.user.lastName?.trim()].filter(Boolean).join(' ') || codeRow.user.name,
   })
 }

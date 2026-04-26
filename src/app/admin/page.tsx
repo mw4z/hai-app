@@ -11,10 +11,11 @@ export default async function AdminPage() {
 
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { role: true, name: true },
+    select: { role: true, name: true, lastName: true },
   })
 
   if (!user || !ADMIN_ROLES.includes(user.role)) redirect('/feed')
 
-  return <AdminClient role={user.role} adminName={user.name || 'Admin'} />
+  const adminFullName = [user.name?.trim(), user.lastName?.trim()].filter(Boolean).join(' ') || user.name || 'Admin'
+  return <AdminClient role={user.role} adminName={adminFullName} />
 }

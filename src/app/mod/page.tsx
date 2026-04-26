@@ -9,7 +9,7 @@ export default async function ModPage() {
 
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { role: true, neighborhoodId: true, name: true, neighborhood: { select: { name: true, nameEn: true } } },
+    select: { role: true, neighborhoodId: true, name: true, lastName: true, neighborhood: { select: { name: true, nameEn: true } } },
   })
   if (!user || user.role === 'RESIDENT') redirect('/feed')
   if (!user.neighborhoodId) redirect('/feed')
@@ -32,7 +32,7 @@ export default async function ModPage() {
       where: { neighborhoodId: nbId, reportCount: { gt: 0 }, status: { in: ['ACTIVE', 'IN_PROGRESS'] } },
       select: {
         id: true, title: true, body: true, category: true, reportCount: true, createdAt: true,
-        author: { select: { id: true, name: true, phone: true, reputation: true } },
+        author: { select: { id: true, name: true, lastName: true, phone: true, reputation: true } },
       },
       orderBy: { reportCount: 'desc' },
       take: 20,
@@ -43,7 +43,7 @@ export default async function ModPage() {
       where: { neighborhoodId: nbId, status: 'HIDDEN' },
       select: {
         id: true, title: true, category: true, createdAt: true,
-        author: { select: { name: true } },
+        author: { select: { name: true, lastName: true } },
       },
       orderBy: { updatedAt: 'desc' },
       take: 20,
@@ -52,7 +52,7 @@ export default async function ModPage() {
     // Banned users in neighborhood
     db.user.findMany({
       where: { neighborhoodId: nbId, status: { in: ['BANNED_TEMP', 'BANNED_PERM'] } },
-      select: { id: true, name: true, phone: true, status: true, reputation: true },
+      select: { id: true, name: true, lastName: true, phone: true, status: true, reputation: true },
     }),
 
     // Recent mod logs by this user
@@ -78,10 +78,10 @@ export default async function ModPage() {
         listingId: true,
         createdAt: true,
         reportedUser: {
-          select: { id: true, name: true, reputation: true, avatarUrl: true, neighborhood: { select: { name: true, nameEn: true } } },
+          select: { id: true, name: true, lastName: true, reputation: true, avatarUrl: true, neighborhood: { select: { name: true, nameEn: true } } },
         },
         reporter: {
-          select: { id: true, name: true, reputation: true },
+          select: { id: true, name: true, lastName: true, reputation: true },
         },
       },
     }),
@@ -98,7 +98,7 @@ export default async function ModPage() {
   return (
     <ModDashboard
       data={JSON.parse(JSON.stringify({
-        user: { name: user.name, role: user.role, neighborhood: user.neighborhood?.name, neighborhoodEn: user.neighborhood?.nameEn },
+        user: { name: user.name, lastName: user.lastName, role: user.role, neighborhood: user.neighborhood?.name, neighborhoodEn: user.neighborhood?.nameEn },
         reportedPosts,
         hiddenPosts,
         bannedUsers,

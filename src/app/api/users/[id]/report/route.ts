@@ -84,7 +84,7 @@ export async function POST(
   // flagged as a moderator-target report.
   const target = await db.user.findUnique({
     where: { id: targetUserId },
-    select: { id: true, name: true, neighborhoodId: true, role: true, modStatus: true },
+    select: { id: true, name: true, lastName: true, neighborhoodId: true, role: true, modStatus: true },
   })
   if (!target) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
@@ -107,7 +107,7 @@ export async function POST(
   // flip a moderator into review.
   const reporter = await db.user.findUnique({
     where: { id: session.userId },
-    select: { role: true, status: true, name: true, neighborhoodId: true, reputation: true },
+    select: { role: true, status: true, name: true, lastName: true, neighborhoodId: true, reputation: true },
   })
   const bypass = isSuperAdminRole(reporter?.role)
 
@@ -220,9 +220,9 @@ export async function POST(
     // receive per-report pushes; they can still view everything via
     // the mod dashboard. Mods for any other neighborhood never get
     // pinged.
-    const reporterName = reporter?.name || null
+    const reporterName = [reporter?.name?.trim(), reporter?.lastName?.trim()].filter(Boolean).join(' ') || reporter?.name || null
     const reporterNeighborhoodId = reporter?.neighborhoodId || null
-    const targetName = target.name || null
+    const targetName = [target.name?.trim(), target.lastName?.trim()].filter(Boolean).join(' ') || target.name || null
     const reasonLabel = REASON_LABELS[reason as UserReportReason] || reason
 
     const [superAdmins, nbhdMods] = await Promise.all([

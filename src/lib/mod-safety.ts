@@ -210,7 +210,8 @@ export async function escalateToAdmin(modId: string, targetId: string, reason: s
     return { ok: false, error: 'تجاوزت الحد الأقصى للتصعيدات في الساعة / Hourly escalation limit reached' }
   }
 
-  const modUser = await db.user.findUnique({ where: { id: modId }, select: { name: true } })
+  const modUser = await db.user.findUnique({ where: { id: modId }, select: { name: true, lastName: true } })
+  const modUserFullName = [modUser?.name?.trim(), modUser?.lastName?.trim()].filter(Boolean).join(' ') || modUser?.name
 
   const admins = await db.user.findMany({
     where: { role: { in: ['SUPER_ADMIN', 'PLATFORM_MOD'] } },
@@ -222,7 +223,7 @@ export async function escalateToAdmin(modId: string, targetId: string, reason: s
       data: {
         userId: admin.id,
         actorId: modId,
-        actorName: modUser?.name,
+        actorName: modUserFullName,
         type: 'SYSTEM',
         title: 'تصعيد من مشرف حي',
         titleEn: 'Escalation from Neighborhood Mod',
@@ -236,7 +237,7 @@ export async function escalateToAdmin(modId: string, targetId: string, reason: s
   await db.moderationLog.create({
     data: {
       adminId: modId,
-      adminName: modUser?.name,
+      adminName: modUserFullName,
       action: 'ESCALATE',
       targetType: 'post',
       targetId,

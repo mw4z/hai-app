@@ -33,7 +33,7 @@ export async function PATCH(
 
   const admin = await db.user.findUnique({
     where: { id: session.userId },
-    select: { id: true, role: true, neighborhoodId: true, name: true, status: true },
+    select: { id: true, role: true, neighborhoodId: true, name: true, lastName: true, status: true },
   })
   if (!admin || !ADMIN_ROLES.includes(admin.role)) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
@@ -90,7 +90,7 @@ export async function PATCH(
     await db.moderationLog.create({
       data: {
         adminId: admin.id,
-        adminName: admin.name,
+        adminName: [admin.name?.trim(), admin.lastName?.trim()].filter(Boolean).join(' ') || admin.name,
         action: `user_report_${statusRaw.toLowerCase()}`,
         targetType: 'user_report',
         targetId: report.id,

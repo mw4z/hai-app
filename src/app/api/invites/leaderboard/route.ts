@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
     select: {
       id: true,
       name: true,
+      lastName: true,
       invitesQualified: true,
       inviteBadgeTier: true,
     },
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
     scope,
     leaders: leaders.map((u) => ({
       userId: u.id,
-      name: u.name,
+      name: [u.name?.trim(), u.lastName?.trim()].filter(Boolean).join(' ') || u.name,
       qualifiedCount: u.invitesQualified,
       badgeTier: u.inviteBadgeTier,
     })),

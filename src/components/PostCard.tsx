@@ -28,6 +28,7 @@ import { getRepLevel } from '@/lib/reputation-levels'
 import RiyalIcon from './RiyalIcon'
 import UserBadgeDisplay, { TierLabel } from './UserBadge'
 import { StatePill } from '@/lib/state-render'
+import { fullName } from '@/lib/displayName'
 
 /**
  * Category → semantic label + icon.
@@ -60,7 +61,7 @@ interface Reply {
   body: string
   imageUrl?: string | null
   createdAt: string
-  author: { id: string; name: string | null; reputation: number; accountType?: string; providerStatus?: string | null }
+  author: { id: string; name: string | null; lastName?: string | null; reputation: number; accountType?: string; providerStatus?: string | null }
   likeCount?: number
   isLiked?: boolean
 }
@@ -70,7 +71,7 @@ interface Comment {
   body: string
   imageUrl?: string | null
   createdAt: string
-  author: { id: string; name: string | null; reputation: number; accountType?: string; providerStatus?: string | null }
+  author: { id: string; name: string | null; lastName?: string | null; reputation: number; accountType?: string; providerStatus?: string | null }
   likeCount?: number
   isLiked?: boolean
   replies: Reply[]
@@ -94,6 +95,7 @@ interface Post {
   author: {
     id: string
     name: string | null
+    lastName?: string | null
     reputation: number
     accountType?: string
     providerStatus?: string | null
@@ -812,7 +814,7 @@ export default function PostCard({
           </div>
           <div>
             <div className="hai-row-1">
-              <span className="hai-body-strong">{post.author.name || t('post_neighbor')}</span>
+              <span className="hai-body-strong">{fullName(post.author) || t('post_neighbor')}</span>
               <UserBadgeDisplay accountType={post.author.accountType} providerStatus={post.author.providerStatus} reputation={post.author.reputation} role={post.author.role} />
             </div>
             <div className="hai-row-1">
@@ -1364,7 +1366,7 @@ export default function PostCard({
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">{top.author.name}</span>
+                    <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">{fullName(top.author) || top.author.name}</span>
                     <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-snug line-clamp-2">{top.body}</p>
                   </div>
                   {(top.likeCount || 0) > 0 && (
@@ -1442,7 +1444,7 @@ export default function PostCard({
                       )}
                       <div className="hai-comment__body">
                         <div className="hai-comment__meta">
-                          <span className="hai-comment__author">{c.author.name || t('post_neighbor')}</span>
+                          <span className="hai-comment__author">{fullName(c.author) || t('post_neighbor')}</span>
                           <UserBadgeDisplay accountType={c.author.accountType} providerStatus={c.author.providerStatus} reputation={c.author.reputation} />
                           <span className="hai-comment__time">
                             {(() => {
@@ -1501,7 +1503,7 @@ export default function PostCard({
                             {(c.likeCount || 0) > 0 && <span>{c.likeCount}</span>}
                           </button>
                           <button
-                            onClick={() => setReplyingTo(replyingTo?.id === c.id ? null : { id: c.id, name: c.author.name || t('post_neighbor') })}
+                            onClick={() => setReplyingTo(replyingTo?.id === c.id ? null : { id: c.id, name: fullName(c.author) || t('post_neighbor') })}
                             className="hai-comment__action"
                           >
                             {t('post_reply')}
@@ -1542,7 +1544,7 @@ export default function PostCard({
                           {/* Report — only on other people's comments. */}
                           {c.author.id !== currentUserId && (
                             <button
-                              onClick={() => setCommentReportTarget({ id: c.author.id, name: c.author.name, commentId: c.id })}
+                              onClick={() => setCommentReportTarget({ id: c.author.id, name: fullName(c.author) || c.author.name, commentId: c.id })}
                               className="hai-comment__action is-danger"
                             >
                               {lang === 'en' ? 'Report' : lang === 'ur' ? 'رپورٹ' : 'إبلاغ'}
@@ -1566,7 +1568,7 @@ export default function PostCard({
                             )}
                             <div className="hai-comment__body">
                               <div className="hai-comment__meta">
-                                <span className="hai-comment__author">{reply.author.name || t('post_neighbor')}</span>
+                                <span className="hai-comment__author">{fullName(reply.author) || t('post_neighbor')}</span>
                                 <UserBadgeDisplay accountType={reply.author.accountType} providerStatus={reply.author.providerStatus} reputation={reply.author.reputation} />
                               </div>
                               {reply.body && (() => {
@@ -1619,7 +1621,7 @@ export default function PostCard({
                                 )}
                                 {reply.author.id !== currentUserId && (
                                   <button
-                                    onClick={() => setCommentReportTarget({ id: reply.author.id, name: reply.author.name, commentId: reply.id })}
+                                    onClick={() => setCommentReportTarget({ id: reply.author.id, name: fullName(reply.author) || reply.author.name, commentId: reply.id })}
                                     className="hai-comment__action is-danger"
                                   >
                                     {lang === 'en' ? 'Report' : lang === 'ur' ? 'رپورٹ' : 'إبلاغ'}
@@ -1795,7 +1797,7 @@ export default function PostCard({
                 </div>
 
                 {/* Name */}
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">{post.author.name || t('post_neighbor')}</h3>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">{fullName(post.author) || t('post_neighbor')}</h3>
 
                 {/* Identity badges (verification, role) */}
                 <div className="flex items-center gap-1.5 mt-1">
@@ -1980,7 +1982,7 @@ export default function PostCard({
         open={reportingUser}
         onClose={() => setReportingUser(false)}
         targetUserId={post.author.id}
-        targetName={post.author.name}
+        targetName={fullName(post.author) || post.author.name}
         targetRole={post.author.role}
         source="POST"
         postId={post.id}

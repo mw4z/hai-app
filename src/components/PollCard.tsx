@@ -6,6 +6,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import { useConfirm } from './ConfirmProvider'
 import { hapticLight, hapticMedium, hapticSuccess } from '@/lib/haptic'
 import { FiMessageCircle, FiSend, FiTrash2 } from 'react-icons/fi'
+import { fullName } from '@/lib/displayName'
 
 interface Props {
   poll: {
@@ -16,7 +17,7 @@ interface Props {
     expiresAt: string | null
     createdAt: string
     authorId: string
-    author: { id: string; name: string; avatarUrl: string | null; role: string }
+    author: { id: string; name: string; lastName?: string | null; avatarUrl: string | null; role: string }
     votes: { userId: string; optionIndex: number }[]
     reactions: { userId: string; emoji: string }[]
     _count: { votes: number; comments: number }
@@ -114,7 +115,7 @@ export default function PollCard({ poll, currentUserId, onDelete }: Props) {
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium text-gray-800 dark:text-white">{poll.author.name}</span>
+            <span className="text-sm font-medium text-gray-800 dark:text-white">{fullName(poll.author) || poll.author.name}</span>
             {roleLabel && <span className="text-[9px] bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded-full font-bold">{roleLabel}</span>}
           </div>
           <p className="text-[10px] text-gray-400">{timeAgo(poll.createdAt)}</p>

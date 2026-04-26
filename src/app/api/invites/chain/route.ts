@@ -23,7 +23,7 @@ export async function GET() {
     me.invitedById
       ? db.user.findUnique({
           where: { id: me.invitedById },
-          select: { id: true, name: true, inviteBadgeTier: true },
+          select: { id: true, name: true, lastName: true, inviteBadgeTier: true },
         })
       : Promise.resolve(null),
     db.inviteRedemption.findMany({
@@ -35,7 +35,7 @@ export async function GET() {
         status: true,
         createdAt: true,
         rewardedAt: true,
-        invitee: { select: { id: true, name: true } },
+        invitee: { select: { id: true, name: true, lastName: true } },
       },
     }),
     db.inviteRedemption.groupBy({
@@ -53,11 +53,19 @@ export async function GET() {
     else if (c.status === 'REJECTED') byStatus.rejected = c._count
   }
 
+  const invitedByOut = invitedBy
+    ? {
+        id: invitedBy.id,
+        name: [invitedBy.name?.trim(), invitedBy.lastName?.trim()].filter(Boolean).join(' ') || invitedBy.name,
+        inviteBadgeTier: invitedBy.inviteBadgeTier,
+      }
+    : null
+
   return NextResponse.json({
-    invitedBy,
+    invitedBy: invitedByOut,
     invited: invited.map((r) => ({
       id: r.invitee.id,
-      name: r.invitee.name,
+      name: [r.invitee.name?.trim(), r.invitee.lastName?.trim()].filter(Boolean).join(' ') || r.invitee.name,
       status: r.status,
       createdAt: r.createdAt.toISOString(),
       rewardedAt: r.rewardedAt?.toISOString() ?? null,

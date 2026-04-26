@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { addReputation, REP_POINTS } from '@/lib/reputation'
 import { createNotification } from '@/lib/notifications'
+import { fullName } from '@/lib/displayName'
 
 // POST /api/threads/[id]/rate — rate the other participant after closing
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // Apply reputation based on rating — weighted by rater's trust level
   const rater = await db.user.findUnique({
     where: { id: session.userId },
-    select: { name: true, reputation: true, createdAt: true },
+    select: { name: true, lastName: true, reputation: true, createdAt: true },
   })
 
   // Calculate weighted points based on rater's reputation
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       type: 'REACTION_ON_POST',
       userId: otherId,
       actorId: session.userId,
-      actorName: rater?.name || undefined,
+      actorName: fullName(rater) || rater?.name || undefined,
       postTitle: 'حصلت على تقييم ممتاز! ⭐',
     })
   } else if (rating === 'negative') {

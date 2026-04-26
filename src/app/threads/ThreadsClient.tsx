@@ -5,10 +5,11 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/hooks/useLanguage'
 import { FiMessageSquare } from 'react-icons/fi'
+import { fullName } from '@/lib/displayName'
 
 interface Thread {
   id: string
-  other: { id: string; name: string | null; avatarUrl: string | null }
+  other: { id: string; name: string | null; lastName?: string | null; avatarUrl: string | null }
   postTitle: string | null
   postCategory: string | null
   isExclusive: boolean
@@ -153,7 +154,7 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-0.5">
                   <p className="text-[15px] font-semibold text-gray-900 dark:text-white truncate">
-                    {thread.other.name || (lang === 'en' ? 'Neighbor' : 'جار')}
+                    {fullName(thread.other) || (lang === 'en' ? 'Neighbor' : 'جار')}
                   </p>
                   {thread.lastMessage && (
                     <span className="text-[11px] text-gray-400 dark:text-gray-500 flex-shrink-0 mr-1">

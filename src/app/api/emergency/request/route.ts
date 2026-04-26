@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { id: true, name: true, status: true, neighborhoodId: true, role: true },
+    select: { id: true, name: true, lastName: true, status: true, neighborhoodId: true, role: true },
   })
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const bypass = isSuperAdminRole(user.role)
@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
         if (admins.length === 0) return
 
         const severityEmoji = severity === 'critical' ? '🚨' : severity === 'warning' ? '⚠️' : 'ℹ️'
-        const requesterName = user.name || 'جار'
+        const requesterName = [user.name?.trim(), user.lastName?.trim()].filter(Boolean).join(' ') || user.name || 'جار'
         const bellTitle = `${severityEmoji} طلب تنبيه طوارئ — ${requesterName}`
         const bellTitleEn = `${severityEmoji} Emergency request — ${requesterName}`
         const bodySnippet = title.slice(0, 140)

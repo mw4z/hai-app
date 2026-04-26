@@ -48,7 +48,7 @@ export async function POST(
     // Account age check
     const user = await db.user.findUnique({
       where: { id: session.userId },
-      select: { name: true, createdAt: true, role: true },
+      select: { name: true, lastName: true, createdAt: true, role: true },
     })
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
     const bypass = isSuperAdminRole(user.role)
@@ -223,7 +223,7 @@ export async function PATCH(
 
     // Notify requester only if price decreased (beneficial)
     if (updates.price && (updates.price as number) < existing.price) {
-      const user = await db.user.findUnique({ where: { id: session.userId }, select: { name: true } })
+      const user = await db.user.findUnique({ where: { id: session.userId }, select: { name: true, lastName: true } })
       await db.notification.create({
         data: {
           userId: ride.requesterId,
@@ -231,8 +231,8 @@ export async function PATCH(
           actorId: session.userId,
           title: 'تم تعديل عرض',
           titleEn: 'Offer updated',
-          body: `${user?.name || 'سائق'} خفّض السعر إلى ${updates.price} ريال`,
-          bodyEn: `${user?.name || 'Driver'} lowered price to ${updates.price} SAR`,
+          body: `${[user?.name?.trim(), user?.lastName?.trim()].filter(Boolean).join(' ') || 'سائق'} خفّض السعر إلى ${updates.price} ريال`,
+          bodyEn: `${[user?.name?.trim(), user?.lastName?.trim()].filter(Boolean).join(' ') || 'Driver'} lowered price to ${updates.price} SAR`,
           rideRequestId: ride.id,
         },
       })
@@ -343,7 +343,7 @@ export async function DELETE(
     try {
       const driver = await db.user.findUnique({
         where: { id: session.userId },
-        select: { name: true },
+        select: { name: true, lastName: true },
       })
       const { notifyRide } = await import('@/lib/rides/notify')
       await notifyRide({
@@ -351,8 +351,8 @@ export async function DELETE(
         type: 'RIDE_OFFER',
         titleAr: '🔄 تم سحب عرض',
         titleEn: '🔄 Offer withdrawn',
-        bodyAr: `${driver?.name || 'سائق'} سحب عرضه — تصفّح العروض الأخرى`,
-        bodyEn: `${driver?.name || 'A driver'} withdrew their offer — check other offers`,
+        bodyAr: `${[driver?.name?.trim(), driver?.lastName?.trim()].filter(Boolean).join(' ') || 'سائق'} سحب عرضه — تصفّح العروض الأخرى`,
+        bodyEn: `${[driver?.name?.trim(), driver?.lastName?.trim()].filter(Boolean).join(' ') || 'A driver'} withdrew their offer — check other offers`,
         actorId: session.userId,
         rideRequestId: ride.id,
       })

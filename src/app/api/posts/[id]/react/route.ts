@@ -6,6 +6,7 @@ import { addReputation, REP_POINTS } from '@/lib/reputation'
 import { requireVerified } from '@/lib/requireVerified'
 import { kickNotifCron } from '@/lib/kickNotifCron'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
+import { fullName } from '@/lib/displayName'
 
 function isValidEmoji(str: string) {
   return typeof str === 'string' && str.trim().length > 0 && str.length <= 8
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // Neighborhood isolation: verify post belongs to user's neighborhood
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { neighborhoodId: true, name: true, status: true, role: true },
+    select: { neighborhoodId: true, name: true, lastName: true, status: true, role: true },
   })
   const bypass = isSuperAdminRole(user?.role)
   if (!bypass && (user?.status === 'BANNED_TEMP' || user?.status === 'BANNED_PERM')) {
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       type: 'REACTION_ON_POST',
       userId: post.authorId,
       actorId: session.userId,
-      actorName: user?.name || undefined,
+      actorName: fullName(user) || user?.name || undefined,
       postId: params.id,
       postTitle: post.title.slice(0, 80),
     })
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (post && post.authorId !== session.userId) {
     const recipientId = post.authorId
     const dedupKey = `reaction:${params.id}:${recipientId}`
-    const actorNameForPush = user?.name || null
+    const actorNameForPush = fullName(user) || user?.name || null
     const actorIdForPush = session.userId
     const postIdForPush = params.id
 

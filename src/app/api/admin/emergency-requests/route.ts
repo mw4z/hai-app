@@ -60,8 +60,8 @@ export async function GET() {
       reviewedAt: true,
       neighborhoodId: true,
       neighborhood: { select: { name: true, nameEn: true } },
-      requester: { select: { id: true, name: true, phone: true, reputation: true } },
-      reviewedBy: { select: { id: true, name: true } },
+      requester: { select: { id: true, name: true, lastName: true, phone: true, reputation: true } },
+      reviewedBy: { select: { id: true, name: true, lastName: true } },
     },
   })
 

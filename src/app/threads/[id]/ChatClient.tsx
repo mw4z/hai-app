@@ -20,6 +20,7 @@ import SmartText from '@/components/SmartText'
 import ImageLightbox from '@/components/ImageLightbox'
 import ReportUserSheet from '@/components/ReportUserSheet'
 import { showApiError } from '@/lib/apiError'
+import { fullName } from '@/lib/displayName'
 
 interface ReplyTo {
   id: string
@@ -125,7 +126,7 @@ export default function ChatClient({
 }: {
   threadId: string
   currentUserId: string
-  other: { id: string; name: string | null; avatarUrl: string | null; role?: string | null }
+  other: { id: string; name: string | null; lastName?: string | null; avatarUrl: string | null; role?: string | null }
   initialMessages: Msg[]
   isClosed?: boolean
   canRate?: boolean
@@ -839,7 +840,7 @@ export default function ChatClient({
           )}
           <div className="min-w-0 text-start">
             <h1 className="text-[15px] font-semibold text-gray-900 dark:text-white truncate">
-              {other.name || (lang === 'en' ? 'Neighbor' : 'جار')}
+              {fullName(other) || (lang === 'en' ? 'Neighbor' : 'جار')}
             </h1>
             {!closed && statusLoaded && !statusHidden && (
               <p className={`text-[11px] font-medium ${otherOnline ? 'text-green-500' : 'text-gray-400'}`}>
@@ -931,7 +932,7 @@ export default function ChatClient({
               showUnreadDivider={msg.id === unreadDividerId}
               t={t}
               currentUserId={currentUserId}
-              otherName={other.name || (lang === 'en' ? 'Neighbor' : 'جار')}
+              otherName={fullName(other) || (lang === 'en' ? 'Neighbor' : 'جار')}
               onPendingImageLoad={() => bottomRef.current?.scrollIntoView({ block: 'end' })}
             />
           )
@@ -1236,7 +1237,7 @@ export default function ChatClient({
                 <p className="text-[10px] font-bold text-primary-600 dark:text-primary-400">
                   {replyingTo.senderId === currentUserId
                     ? (lang === 'en' ? 'You' : lang === 'ur' ? 'آپ' : 'أنت')
-                    : (other.name || (lang === 'en' ? 'Neighbor' : 'جار'))}
+                    : (fullName(other) || (lang === 'en' ? 'Neighbor' : 'جار'))}
                 </p>
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
                   {replyingTo.type === 'IMAGE' ? '📷' : replyingTo.type === 'LOCATION' ? '📍' : (replyingTo.text || '').slice(0, 80)}
@@ -1374,7 +1375,7 @@ export default function ChatClient({
         open={reportingUser}
         onClose={() => setReportingUser(false)}
         targetUserId={other.id}
-        targetName={other.name}
+        targetName={fullName(other) || other.name}
         targetRole={other.role ?? null}
         source="CHAT"
         conversationId={threadId}

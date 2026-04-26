@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { addReputation, REP_POINTS } from '@/lib/reputation'
 import { createNotification } from '@/lib/notifications'
+import { fullName } from '@/lib/displayName'
 
 // POST /api/threads/[id]/close — close a thread
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -28,13 +29,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // Notify the other person that the thread was closed
   const otherId = thread.user1Id === session.userId ? thread.user2Id : thread.user1Id
-  const closer = await db.user.findUnique({ where: { id: session.userId }, select: { name: true } })
+  const closer = await db.user.findUnique({ where: { id: session.userId }, select: { name: true, lastName: true } })
   await db.notification.create({
     data: {
       type: 'NEW_MESSAGE',
       userId: otherId,
       actorId: session.userId,
-      actorName: closer?.name || undefined,
+      actorName: fullName(closer) || closer?.name || undefined,
       postTitle: 'تم إنهاء المحادثة',
       threadId: params.id,
     },

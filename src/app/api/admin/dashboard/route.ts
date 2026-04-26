@@ -78,7 +78,7 @@ export async function GET() {
     db.moderationLog.findMany({ orderBy: { createdAt: 'desc' }, take: 20 }),
     isSuper ? db.user.findMany({
       where: { role: { not: 'RESIDENT' } },
-      select: { id: true, name: true, phone: true, role: true },
+      select: { id: true, name: true, lastName: true, phone: true, role: true },
       orderBy: { role: 'asc' },
     }) : [],
     db.city.findMany({
@@ -107,6 +107,7 @@ export async function GET() {
       select: {
         id: true,
         name: true,
+        lastName: true,
         avatarUrl: true,
         neighborhoodId: true,
         modStatus: true,

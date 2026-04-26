@@ -47,7 +47,7 @@ export default async function MarketPage({
         category: { in: categoryMap[tab] || ALL_MARKET_CATEGORIES },
       },
       include: {
-        author: { select: { id: true, name: true, reputation: true, accountType: true, providerStatus: true } },
+        author: { select: { id: true, name: true, lastName: true, reputation: true, accountType: true, providerStatus: true } },
         reactions: { select: { emoji: true, userId: true } },
       },
       orderBy: [{ isFeatured: 'desc' }, { createdAt: 'desc' }],

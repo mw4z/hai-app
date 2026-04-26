@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
     const user = await db.user.findUnique({
       where: { id: session.userId },
-      select: { role: true, name: true },
+      select: { role: true, name: true, lastName: true },
     })
     if (!user || !['NEIGHBORHOOD_MOD', 'PLATFORM_MOD', 'SUPER_ADMIN'].includes(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 })
 
     const escalationReason = reason?.trim()
-      ? `${user.name || 'Mod'}: ${reason.trim()}`
-      : `${user.name || 'Mod'} escalated post "${post.title?.slice(0, 40)}"`
+      ? `${[user.name?.trim(), user.lastName?.trim()].filter(Boolean).join(' ') || 'Mod'}: ${reason.trim()}`
+      : `${[user.name?.trim(), user.lastName?.trim()].filter(Boolean).join(' ') || 'Mod'} escalated post "${post.title?.slice(0, 40)}"`
 
     const result = await escalateToAdmin(session.userId, postId, escalationReason)
     if (!result.ok) {

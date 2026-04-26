@@ -44,12 +44,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       points: REP_POINTS.comment_engaged,
     })
 
-    const sender = await db.user.findUnique({ where: { id: session.userId }, select: { name: true } })
+    const sender = await db.user.findUnique({ where: { id: session.userId }, select: { name: true, lastName: true } })
     createNotification({
       type: 'REACTION_ON_POST',
       userId: comment.authorId,
       actorId: session.userId,
-      actorName: sender?.name || undefined,
+      actorName: [sender?.name?.trim(), sender?.lastName?.trim()].filter(Boolean).join(' ') || sender?.name || undefined,
       postId: comment.postId,
       postTitle: comment.body?.slice(0, 50) || undefined,
     })

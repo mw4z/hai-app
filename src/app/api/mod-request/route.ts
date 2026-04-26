@@ -121,9 +121,9 @@ export async function POST(req: NextRequest) {
     try {
       const requesterRow = await db.user.findUnique({
         where: { id: session.userId },
-        select: { name: true },
+        select: { name: true, lastName: true },
       })
-      const requesterName = requesterRow?.name || null
+      const requesterName = [requesterRow?.name?.trim(), requesterRow?.lastName?.trim()].filter(Boolean).join(' ') || requesterRow?.name || null
 
       const platformAdmins = await db.user.findMany({
         where: {

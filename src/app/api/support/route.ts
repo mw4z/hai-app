@@ -43,7 +43,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'لديك تذاكر مفتوحة كثيرة — انتظر حتى يتم الرد عليها' }, { status: 429 })
     }
 
-    const user = await db.user.findUnique({ where: { id: session.userId }, select: { name: true } })
+    const user = await db.user.findUnique({ where: { id: session.userId }, select: { name: true, lastName: true } })
+    const userFullName = [user?.name?.trim(), user?.lastName?.trim()].filter(Boolean).join(' ') || user?.name || null
 
     const ticket = await db.supportTicket.create({
       data: {
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
           userId: admin.id,
           type: 'SYSTEM',
           actorId: session.userId,
-          actorName: user?.name || null,
+          actorName: userFullName,
           title: `${typeLabel} تذكرة دعم جديدة`,
           titleEn: `${typeLabel} New support ticket`,
           body: subject.trim(),
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
     sendEmail({
       to: 'support@hai-app.net',
       subject: `${typeLabel} تذكرة دعم جديدة: ${subject.trim()}`,
-      text: `تذكرة دعم جديدة\n\nالمستخدم: ${user?.name || 'غير معروف'}\nالنوع: ${typeNameAr}\nالموضوع: ${subject.trim()}\n\n${ticketBody.trim()}\n\n---\nرقم التذكرة: ${ticket.id}`,
+      text: `تذكرة دعم جديدة\n\nالمستخدم: ${userFullName || 'غير معروف'}\nالنوع: ${typeNameAr}\nالموضوع: ${subject.trim()}\n\n${ticketBody.trim()}\n\n---\nرقم التذكرة: ${ticket.id}`,
       html: `
         <div dir="rtl" style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: #006d57; color: white; padding: 16px 24px; border-radius: 12px 12px 0 0; text-align: center;">
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
           </div>
           <div style="background: #f9fafb; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
             <table style="width: 100%; font-size: 14px; color: #374151; margin-bottom: 16px;">
-              <tr><td style="padding: 4px 0; font-weight: bold;">المستخدم:</td><td>${user?.name || 'غير معروف'}</td></tr>
+              <tr><td style="padding: 4px 0; font-weight: bold;">المستخدم:</td><td>${userFullName || 'غير معروف'}</td></tr>
               <tr><td style="padding: 4px 0; font-weight: bold;">النوع:</td><td>${typeNameAr}</td></tr>
               <tr><td style="padding: 4px 0; font-weight: bold;">الموضوع:</td><td>${subject.trim()}</td></tr>
             </table>

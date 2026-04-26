@@ -22,14 +22,14 @@ export async function GET() {
       role: 'NEIGHBORHOOD_MOD',
       status: 'ACTIVE',
     },
-    select: { id: true, name: true, avatarUrl: true, role: true },
+    select: { id: true, name: true, lastName: true, avatarUrl: true, role: true },
   })
 
   // Fallback to any super admin
   if (!mod) {
     const superAdmin = await db.user.findFirst({
       where: { role: 'SUPER_ADMIN', status: 'ACTIVE' },
-      select: { id: true, name: true, avatarUrl: true, role: true },
+      select: { id: true, name: true, lastName: true, avatarUrl: true, role: true },
     })
     return NextResponse.json({ admin: superAdmin, type: 'super_admin' })
   }

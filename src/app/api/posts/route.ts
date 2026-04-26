@@ -11,6 +11,7 @@ import { moderateContent } from '@/lib/moderation'
 import { kickNotifCron } from '@/lib/kickNotifCron'
 import { requireVerified } from '@/lib/requireVerified'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
+import { fullName } from '@/lib/displayName'
 
 const DEFAULT_POST_LIMIT = 5
 const POST_COOLDOWN_SECONDS = 60
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     const user = await db.user.findUnique({
       where: { id: session.userId },
-      select: { id: true, name: true, neighborhoodId: true, status: true, gender: true, reputation: true, role: true, plan: true, providerStatus: true },
+      select: { id: true, name: true, lastName: true, neighborhoodId: true, status: true, gender: true, reputation: true, role: true, plan: true, providerStatus: true },
     })
 
     if (!user?.neighborhoodId) {
@@ -191,7 +192,7 @@ export async function POST(req: NextRequest) {
           type: 'REPORT',
           userId: user.id,
           actorId: user.id,
-          actorName: `[AUTO-MOD] ${user.name || 'User'}`,
+          actorName: `[AUTO-MOD] ${fullName(user) || user.name || 'User'}`,
           postTitle: `${titleMod.action}/${bodyMod.action}: ${title.trim().slice(0, 80)}`,
         },
       }).catch(() => {})
@@ -244,7 +245,7 @@ export async function POST(req: NextRequest) {
           payload: {
             postId: post.id,
             authorId: user.id,
-            authorName: user.name || null,
+            authorName: fullName(user) || user.name || null,
             title: finalTitle.slice(0, 140),
             category,
           },
@@ -260,7 +261,7 @@ export async function POST(req: NextRequest) {
       notifyNeighborhood({
         type: 'LOOKING_FOR_POST',
         actorId: user.id,
-        actorName: user.name || undefined,
+        actorName: fullName(user) || user.name || undefined,
         neighborhoodId: targetNeighborhoodId,
         postId: post.id,
         postTitle: title.trim().slice(0, 80),

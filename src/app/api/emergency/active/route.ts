@@ -30,7 +30,7 @@ export async function GET() {
       body: true,
       severity: true,
       expiresAt: true,
-      author: { select: { name: true } },
+      author: { select: { name: true, lastName: true } },
     },
   })
 
@@ -41,7 +41,7 @@ export async function GET() {
       body: a.body,
       severity: a.severity,
       expiresAt: a.expiresAt.toISOString(),
-      authorName: a.author?.name || null,
+      authorName: [a.author?.name?.trim(), a.author?.lastName?.trim()].filter(Boolean).join(' ') || a.author?.name || null,
     })),
   )
 }

@@ -26,8 +26,8 @@ export default async function ThreadsPage() {
         OR: [{ user1Id: session.userId }, { user2Id: session.userId }],
       },
       include: {
-        user1: { select: { id: true, name: true, avatarUrl: true, showReadReceipts: true } },
-        user2: { select: { id: true, name: true, avatarUrl: true, showReadReceipts: true } },
+        user1: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true } },
+        user2: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true } },
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -63,7 +63,7 @@ export default async function ThreadsPage() {
       : null
     return {
       id: t.id,
-      other: { id: other.id, name: other.name, avatarUrl: other.avatarUrl },
+      other: { id: other.id, name: other.name, lastName: other.lastName, avatarUrl: other.avatarUrl },
       postTitle: post?.title?.slice(0, 40) || null,
       postCategory: post?.category || null,
       isExclusive: post?.coordinationMode === 'EXCLUSIVE',

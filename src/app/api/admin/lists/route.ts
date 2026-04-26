@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
       const posts = await db.post.findMany({
         where: { reportCount: { gt: 0 }, status: { in: ['ACTIVE', 'HIDDEN', 'IN_PROGRESS'] }, ...nbhdFilter, ...womenOnlyFilter },
         include: {
-          author: { select: { id: true, name: true, phone: true } },
+          author: { select: { id: true, name: true, lastName: true, phone: true } },
           neighborhood: { select: { name: true } },
         },
         orderBy: { reportCount: 'desc' },
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
           ...(statusFilter ? { status: statusFilter as any } : {}),
         },
         include: {
-          author: { select: { id: true, name: true, phone: true } },
+          author: { select: { id: true, name: true, lastName: true, phone: true } },
           neighborhood: { select: { name: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -68,11 +68,11 @@ export async function GET(req: NextRequest) {
       })
       const enriched = await Promise.all(requests.map(async r => {
         const [user, from, to] = await Promise.all([
-          db.user.findUnique({ where: { id: r.userId }, select: { name: true, phone: true } }),
+          db.user.findUnique({ where: { id: r.userId }, select: { name: true, lastName: true, phone: true } }),
           db.neighborhood.findUnique({ where: { id: r.currentNeighborhoodId }, select: { name: true } }),
           db.neighborhood.findUnique({ where: { id: r.requestedNeighborhoodId }, select: { name: true } }),
         ])
-        return { ...r, userName: user?.name, userPhone: user?.phone, fromName: from?.name, toName: to?.name }
+        return { ...r, userName: [user?.name?.trim(), user?.lastName?.trim()].filter(Boolean).join(' ') || user?.name, userPhone: user?.phone, fromName: from?.name, toName: to?.name }
       }))
       return NextResponse.json(enriched)
     }
@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
           ...userNbhdFilter,
           ...(q ? { OR: [{ name: { contains: q } }, { phone: { contains: q } }, { email: { contains: q } }] } : {}),
         },
-        select: { id: true, name: true, phone: true, email: true, role: true, status: true, neighborhoodId: true, reputation: true, accountType: true, providerStatus: true },
+        select: { id: true, name: true, lastName: true, phone: true, email: true, role: true, status: true, neighborhoodId: true, reputation: true, accountType: true, providerStatus: true },
         orderBy: { createdAt: 'desc' },
         take: 50,
       })
@@ -97,8 +97,8 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'asc' },
       })
       const enriched = await Promise.all(vrs.map(async v => {
-        const user = await db.user.findUnique({ where: { id: v.userId }, select: { name: true, phone: true } })
-        return { ...v, userName: user?.name, userPhone: user?.phone }
+        const user = await db.user.findUnique({ where: { id: v.userId }, select: { name: true, lastName: true, phone: true } })
+        return { ...v, userName: [user?.name?.trim(), user?.lastName?.trim()].filter(Boolean).join(' ') || user?.name, userPhone: user?.phone }
       }))
       return NextResponse.json(enriched)
     }
@@ -110,11 +110,11 @@ export async function GET(req: NextRequest) {
       })
       const enriched = await Promise.all(mrs.map(async m => {
         const [user, nbhd] = await Promise.all([
-          db.user.findUnique({ where: { id: m.userId }, select: { name: true, phone: true, reputation: true, createdAt: true } }),
+          db.user.findUnique({ where: { id: m.userId }, select: { name: true, lastName: true, phone: true, reputation: true, createdAt: true } }),
           db.neighborhood.findUnique({ where: { id: m.neighborhoodId }, select: { name: true, nameEn: true } }),
         ])
         const ageDays = user ? Math.floor((Date.now() - new Date(user.createdAt).getTime()) / 86400000) : 0
-        return { ...m, userName: user?.name, userPhone: user?.phone, reputation: user?.reputation, ageDays, neighborhoodName: nbhd?.name, neighborhoodNameEn: nbhd?.nameEn }
+        return { ...m, userName: [user?.name?.trim(), user?.lastName?.trim()].filter(Boolean).join(' ') || user?.name, userPhone: user?.phone, reputation: user?.reputation, ageDays, neighborhoodName: nbhd?.name, neighborhoodNameEn: nbhd?.nameEn }
       }))
       return NextResponse.json(enriched)
     }
@@ -124,8 +124,8 @@ export async function GET(req: NextRequest) {
       if (isNbhdMod && admin.neighborhoodId) nrWhere.neighborhoodId = admin.neighborhoodId
       const reports = await db.neighborhoodReport.findMany({ where: nrWhere, orderBy: { createdAt: 'desc' }, take: 50 })
       const enriched = await Promise.all(reports.map(async r => {
-        const u = await db.user.findUnique({ where: { id: r.userId }, select: { name: true, phone: true, avatarUrl: true } })
-        return { ...r, userName: u?.name, userPhone: u?.phone }
+        const u = await db.user.findUnique({ where: { id: r.userId }, select: { name: true, lastName: true, phone: true, avatarUrl: true } })
+        return { ...r, userName: [u?.name?.trim(), u?.lastName?.trim()].filter(Boolean).join(' ') || u?.name, userPhone: u?.phone }
       }))
       return NextResponse.json(enriched)
     }
@@ -138,8 +138,8 @@ export async function GET(req: NextRequest) {
         take: 50,
       })
       const enriched = await Promise.all(tickets.map(async t => {
-        const user = await db.user.findUnique({ where: { id: t.userId }, select: { name: true, phone: true, avatarUrl: true } })
-        return { ...t, userName: user?.name, userPhone: user?.phone, userAvatar: user?.avatarUrl }
+        const user = await db.user.findUnique({ where: { id: t.userId }, select: { name: true, lastName: true, phone: true, avatarUrl: true } })
+        return { ...t, userName: [user?.name?.trim(), user?.lastName?.trim()].filter(Boolean).join(' ') || user?.name, userPhone: user?.phone, userAvatar: user?.avatarUrl }
       }))
       return NextResponse.json(enriched)
     }

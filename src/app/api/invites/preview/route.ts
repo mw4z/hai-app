@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
       user: {
         select: {
           name: true,
+          lastName: true,
           status: true,
           neighborhood: { select: { name: true, nameEn: true } },
         },
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     valid: true,
-    inviterName: row.user.name ?? null,
+    inviterName: [row.user.name?.trim(), row.user.lastName?.trim()].filter(Boolean).join(' ') || row.user.name || null,
     neighborhoodName: row.user.neighborhood?.name ?? null,
     neighborhoodNameEn: row.user.neighborhood?.nameEn ?? null,
   })

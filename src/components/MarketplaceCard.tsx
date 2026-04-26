@@ -20,10 +20,12 @@ import {
   type UrgencyState,
 } from '@/lib/display-policy'
 import { StatePill, StateDot } from '@/lib/state-render'
+import { fullName } from '@/lib/displayName'
 
 export interface MarketplaceSeller {
   id: string
   name: string | null
+  lastName?: string | null
   avatarUrl?: string | null
   accountType?: string
   providerStatus?: string | null
@@ -178,7 +180,7 @@ export default function MarketplaceCard({
             </div>
             <div className="hai-flex-1 hai-min-w-0">
               <div className="hai-row-1">
-                <span className="hai-body-strong hai-truncate">{seller.name || '—'}</span>
+                <span className="hai-body-strong hai-truncate">{fullName(seller) || seller.name || '—'}</span>
                 <UserBadgeDisplay
                   accountType={seller.accountType}
                   providerStatus={seller.providerStatus}

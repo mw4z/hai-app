@@ -7,6 +7,7 @@ import { moderateContent } from '@/lib/moderation'
 import { requireVerified } from '@/lib/requireVerified'
 import { kickNotifCron } from '@/lib/kickNotifCron'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
+import { fullName } from '@/lib/displayName'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
@@ -15,12 +16,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const comments = await db.comment.findMany({
     where: { postId: params.id, parentId: null },
     include: {
-      author: { select: { id: true, name: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true } },
+      author: { select: { id: true, name: true, lastName: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true } },
       likes: { select: { userId: true } },
       _count: { select: { likes: true } },
       replies: {
         include: {
-          author: { select: { id: true, name: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true } },
+          author: { select: { id: true, name: true, lastName: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true } },
           likes: { select: { userId: true } },
           _count: { select: { likes: true } },
         },
@@ -146,8 +147,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       parentId: parentId || null,
     },
     include: {
-      author: { select: { id: true, name: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true } },
-      replies: { include: { author: { select: { id: true, name: true, reputation: true } } } },
+      author: { select: { id: true, name: true, lastName: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true } },
+      replies: { include: { author: { select: { id: true, name: true, lastName: true, reputation: true } } } },
     },
   })
 
@@ -157,7 +158,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       type: 'REPLY_TO_COMMENT',
       userId: parentComment.authorId,
       actorId: session.userId,
-      actorName: comment.author.name || undefined,
+      actorName: fullName(comment.author) || comment.author.name || undefined,
       postId: params.id,
       postTitle: post.title.slice(0, 80),
       commentId: comment.id,
@@ -167,7 +168,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       type: 'COMMENT_ON_POST',
       userId: post.authorId,
       actorId: session.userId,
-      actorName: comment.author.name || undefined,
+      actorName: fullName(comment.author) || comment.author.name || undefined,
       postId: params.id,
       postTitle: post.title.slice(0, 80),
       commentId: comment.id,
@@ -176,7 +177,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // ── Push notification enqueue (fire-and-forget) ────────────────────
   // Reply path is exclusive: never enqueue comment_on_post for a reply.
-  const actorNameForPush = comment.author?.name || null
+  const actorNameForPush = fullName(comment.author) || comment.author?.name || null
   const pushSnippet = (censoredBody || '').slice(0, 120)
 
   if (parentId && parentComment) {

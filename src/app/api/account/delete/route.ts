@@ -28,7 +28,7 @@ export async function DELETE(req: NextRequest) {
 
     const user = await db.user.findUnique({
       where: { id: session.userId },
-      select: { id: true, phone: true, name: true, deletedAt: true },
+      select: { id: true, phone: true, name: true, lastName: true, deletedAt: true },
     })
     if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (user.deletedAt) return NextResponse.json({ error: 'Account already deleted' }, { status: 400 })

@@ -13,8 +13,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   })
 
   const enriched = await Promise.all(comments.map(async c => {
-    const user = await db.user.findUnique({ where: { id: c.authorId }, select: { name: true, avatarUrl: true } })
-    return { ...c, authorName: user?.name, authorAvatar: user?.avatarUrl }
+    const user = await db.user.findUnique({ where: { id: c.authorId }, select: { name: true, lastName: true, avatarUrl: true } })
+    return { ...c, authorName: [user?.name?.trim(), user?.lastName?.trim()].filter(Boolean).join(' ') || user?.name, authorAvatar: user?.avatarUrl }
   }))
 
   return NextResponse.json(enriched)
@@ -33,6 +33,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     data: { pollId: params.id, authorId: session.userId, body: body.trim() },
   })
 
-  const user = await db.user.findUnique({ where: { id: session.userId }, select: { name: true, avatarUrl: true } })
-  return NextResponse.json({ ...comment, authorName: user?.name, authorAvatar: user?.avatarUrl }, { status: 201 })
+  const user = await db.user.findUnique({ where: { id: session.userId }, select: { name: true, lastName: true, avatarUrl: true } })
+  return NextResponse.json({ ...comment, authorName: [user?.name?.trim(), user?.lastName?.trim()].filter(Boolean).join(' ') || user?.name, authorAvatar: user?.avatarUrl }, { status: 201 })
 }

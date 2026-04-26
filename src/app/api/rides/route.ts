@@ -233,7 +233,7 @@ export async function GET(req: NextRequest) {
         status: true,
         createdAt: true,
         requester: {
-          select: { id: true, name: true, avatarUrl: true, reputation: true },
+          select: { id: true, name: true, lastName: true, avatarUrl: true, reputation: true },
         },
         _count: { select: { offers: true } },
       },

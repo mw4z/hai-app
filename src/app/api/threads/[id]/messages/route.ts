@@ -7,6 +7,7 @@ import { requireVerified } from '@/lib/requireVerified'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { kickNotifCron } from '@/lib/kickNotifCron'
 import { sendDmPushNow } from '@/app/api/cron/process-notifs/route'
+import { fullName } from '@/lib/displayName'
 
 // GET /api/threads/[id]/messages
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -153,7 +154,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     const recipientId = thread.user1Id === session.userId ? thread.user2Id : thread.user1Id
-    const sender = await db.user.findUnique({ where: { id: session.userId }, select: { name: true, role: true } })
+    const sender = await db.user.findUnique({ where: { id: session.userId }, select: { name: true, lastName: true, role: true } })
     const bypass = isSuperAdminRole(sender?.role)
 
     let body: any
@@ -215,7 +216,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Notify the recipient — bell (in-app) AND push (phone). Previously
     // only the bell row was written, so the recipient got no phone
     // banner when the app was closed. Now both fire together.
-    const senderName = sender?.name || null
+    const senderName = fullName(sender) || sender?.name || null
     const snippet = type === 'LOCATION'
       ? '📍'
       : type === 'IMAGE'

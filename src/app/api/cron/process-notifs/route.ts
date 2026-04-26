@@ -1270,7 +1270,7 @@ async function processNewRideRequest(job: JobRow): Promise<JobOutcome> {
       id: true,
       status: true,
       neighborhoodId: true,
-      requester: { select: { id: true, name: true, status: true } },
+      requester: { select: { id: true, name: true, lastName: true, status: true } },
     },
   })
   if (!ride) return 'dropped'
@@ -1292,7 +1292,7 @@ async function processNewRideRequest(job: JobRow): Promise<JobOutcome> {
     return 'dropped'
   }
 
-  const author = ride.requester.name?.trim() || 'جار'
+  const author = [ride.requester.name?.trim(), ride.requester.lastName?.trim()].filter(Boolean).join(' ') || 'جار'
   const pushTitle = `🚗 طلب توصيل · ${author}`
   const pushBody = pickupArea && dropoffArea
     ? `${pickupArea} → ${dropoffArea}`

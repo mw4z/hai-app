@@ -75,13 +75,13 @@ export async function GET() {
     // Get blocked user names
     const userIds = blocks.map(b => b.blockedId)
     const users = userIds.length > 0
-      ? await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, avatarUrl: true } })
+      ? await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, lastName: true, avatarUrl: true } })
       : []
     const userMap = Object.fromEntries(users.map(u => [u.id, u]))
 
     return NextResponse.json(blocks.map(b => ({
       userId: b.blockedId,
-      name: userMap[b.blockedId]?.name || null,
+      name: [userMap[b.blockedId]?.name?.trim(), userMap[b.blockedId]?.lastName?.trim()].filter(Boolean).join(' ') || userMap[b.blockedId]?.name || null,
       avatarUrl: userMap[b.blockedId]?.avatarUrl || null,
       blockedAt: b.createdAt,
     })))

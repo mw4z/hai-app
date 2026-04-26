@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
 
   const admin = await db.user.findUnique({
     where: { id: session.userId },
-    select: { role: true, name: true, neighborhoodId: true, modApprovedAt: true },
+    select: { role: true, name: true, lastName: true, neighborhoodId: true, modApprovedAt: true },
   })
   if (!admin || !ADMIN_ROLES.includes(admin.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
     case 'delete_user': {
       if (!isSuper) return NextResponse.json({ error: 'حذف المستخدم متاح فقط للمدير العام' }, { status: 403 })
       if (targetId === session.userId) return NextResponse.json({ error: 'لا يمكنك حذف نفسك' }, { status: 403 })
-      const target3 = await db.user.findUnique({ where: { id: targetId }, select: { role: true, name: true, phone: true } })
+      const target3 = await db.user.findUnique({ where: { id: targetId }, select: { role: true, name: true, lastName: true, phone: true } })
       if (target3?.role === 'SUPER_ADMIN') return NextResponse.json({ error: 'لا يمكن حذف مدير عام' }, { status: 403 })
       // Delete all user data in order
       await db.notification.deleteMany({ where: { userId: targetId } })
@@ -443,7 +443,7 @@ export async function POST(req: NextRequest) {
       if (!isSuper) return NextResponse.json({ error: 'متاح فقط للمدير العام' }, { status: 403 })
       const targetUser = await db.user.findUnique({
         where: { id: targetId },
-        select: { email: true, emailVerified: true, name: true },
+        select: { email: true, emailVerified: true, name: true, lastName: true },
       })
       if (!targetUser?.email) return NextResponse.json({ error: 'المستخدم ليس لديه بريد إلكتروني' }, { status: 400 })
       const emailSubject = body.emailSubject

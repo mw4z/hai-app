@@ -18,8 +18,8 @@ export default async function ThreadPage({ params }: { params: { id: string } })
   const thread = await db.thread.findUnique({
     where: { id: params.id },
     include: {
-      user1: { select: { id: true, name: true, avatarUrl: true, role: true } },
-      user2: { select: { id: true, name: true, avatarUrl: true, role: true } },
+      user1: { select: { id: true, name: true, lastName: true, avatarUrl: true, role: true } },
+      user2: { select: { id: true, name: true, lastName: true, avatarUrl: true, role: true } },
     },
   })
 

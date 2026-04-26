@@ -17,6 +17,7 @@ import GuestBanner from '@/components/GuestBanner'
 import { FiBell, FiPlus, FiMapPin, FiX, FiSearch, FiFilter, FiCheck, FiChevronDown } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import type { TranslationKey } from '@/lib/i18n'
+import { fullName } from '@/lib/displayName'
 
 const CATEGORIES: { key: string; tKey: TranslationKey; icon: string }[] = [
   { key: 'ALL',                tKey: 'feed_all',              icon: '🏘️' },
@@ -46,7 +47,7 @@ interface Post {
   price: number | null
   imageUrls: string[]
   createdAt: string
-  author: { id: string; name: string | null; reputation: number }
+  author: { id: string; name: string | null; lastName?: string | null; reputation: number }
 }
 
 interface NeighborhoodItem {
@@ -63,6 +64,7 @@ interface Props {
   user: {
     id: string
     name: string | null
+    lastName?: string | null
     gender: string
     phone: string
     neighborhood: string
@@ -549,7 +551,7 @@ export default function FeedClient({
                     <div className="w-5 h-5 rounded-full bg-primary-100 overflow-hidden flex-shrink-0">
                       {r.requester?.avatarUrl ? <img src={r.requester.avatarUrl} alt="" className="w-full h-full object-cover" /> : null}
                     </div>
-                    <span className="text-[11px] text-gray-500 dark:text-gray-400">{r.requester?.name || '—'}</span>
+                    <span className="text-[11px] text-gray-500 dark:text-gray-400">{fullName(r.requester) || r.requester?.name || '—'}</span>
                   </div>
                 </div>
               </Link>

@@ -20,8 +20,8 @@ export async function GET() {
         OR: [{ user1Id: session.userId }, { user2Id: session.userId }],
       },
       include: {
-        user1: { select: { id: true, name: true, avatarUrl: true, showReadReceipts: true } },
-        user2: { select: { id: true, name: true, avatarUrl: true, showReadReceipts: true } },
+        user1: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true } },
+        user2: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true } },
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -70,7 +70,7 @@ export async function GET() {
         : null
       return {
         id: t.id,
-        other: { id: other.id, name: other.name, avatarUrl: other.avatarUrl },
+        other: { id: other.id, name: other.name, lastName: other.lastName, avatarUrl: other.avatarUrl },
         postTitle: post?.title || null,
         postCategory: post?.category || null,
         isExclusive: post?.coordinationMode === 'EXCLUSIVE',

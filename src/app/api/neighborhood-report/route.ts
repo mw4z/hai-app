@@ -14,7 +14,8 @@ export async function POST(req: NextRequest) {
 
     log.api('POST', '/api/neighborhood-report', session.userId)
 
-    const user = await db.user.findUnique({ where: { id: session.userId }, select: { name: true, neighborhoodId: true, role: true } })
+    const user = await db.user.findUnique({ where: { id: session.userId }, select: { name: true, lastName: true, neighborhoodId: true, role: true } })
+    const userFullName = [user?.name?.trim(), user?.lastName?.trim()].filter(Boolean).join(' ') || user?.name || null
     if (!user?.neighborhoodId) return NextResponse.json({ error: 'يجب أن تكون مسجلاً في حي' }, { status: 400 })
     const bypass = isSuperAdminRole(user.role)
 
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
     for (const admin of admins) {
       await db.notification.create({
         data: {
-          userId: admin.id, type: 'SYSTEM', actorId: session.userId, actorName: user.name,
+          userId: admin.id, type: 'SYSTEM', actorId: session.userId, actorName: userFullName,
           title: `${typeEmoji} بلاغ حي جديد`, titleEn: `${typeEmoji} New neighborhood report`,
           body: subject.trim(), bodyEn: subject.trim(),
         },

@@ -14,12 +14,12 @@ export async function GET(
   const ride = await db.rideRequest.findUnique({
     where: { id: params.id },
     include: {
-      requester: { select: { id: true, name: true, avatarUrl: true, reputation: true } },
+      requester: { select: { id: true, name: true, lastName: true, avatarUrl: true, reputation: true } },
       offers: {
         include: {
           driver: {
             select: {
-              id: true, name: true, avatarUrl: true,
+              id: true, name: true, lastName: true, avatarUrl: true,
               driverRatingAvg: true, driverTripsCount: true, driverCancelCount: true,
               reputation: true, accountType: true, providerStatus: true,
             },
@@ -58,6 +58,7 @@ export async function GET(
       driver: {
         id: o.driver.id,
         name: o.driver.name,
+        lastName: o.driver.lastName,
         avatarUrl: o.driver.avatarUrl,
         driverRatingAvg: o.driver.driverRatingAvg,
         driverTripsCount: o.driver.driverTripsCount,

@@ -36,7 +36,7 @@ export async function PATCH(
 
   const admin = await db.user.findUnique({
     where: { id: session.userId },
-    select: { id: true, role: true, name: true, neighborhoodId: true, status: true },
+    select: { id: true, role: true, name: true, lastName: true, neighborhoodId: true, status: true },
   })
   if (!admin) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   if (admin.role !== 'PLATFORM_MOD' && admin.role !== 'SUPER_ADMIN') {
@@ -58,7 +58,7 @@ export async function PATCH(
 
   const target = await db.user.findUnique({
     where: { id: params.id },
-    select: { id: true, name: true, role: true, modStatus: true, neighborhoodId: true },
+    select: { id: true, name: true, lastName: true, role: true, modStatus: true, neighborhoodId: true },
   })
   if (!target) return NextResponse.json({ error: 'not_found' }, { status: 404 })
   if (target.role !== 'NEIGHBORHOOD_MOD' && action !== 'clear_review') {

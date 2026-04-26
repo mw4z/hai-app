@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
       status: 'active',
     },
     include: {
-      author: { select: { id: true, name: true, avatarUrl: true, role: true } },
+      author: { select: { id: true, name: true, lastName: true, avatarUrl: true, role: true } },
       votes: { select: { userId: true, optionIndex: true } },
       reactions: { select: { userId: true, emoji: true } },
       _count: { select: { votes: true, comments: true } },

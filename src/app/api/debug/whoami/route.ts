@@ -25,6 +25,7 @@ export async function GET() {
     select: {
       id: true,
       name: true,
+      lastName: true,
       role: true,
       status: true,
       neighborhoodId: true,
@@ -45,6 +46,7 @@ export async function GET() {
       select: {
         id: true,
         name: true,
+        lastName: true,
         role: true,
         neighborhoodId: true,
         neighborhood: { select: { name: true, nameEn: true } },
