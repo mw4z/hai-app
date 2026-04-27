@@ -537,7 +537,12 @@ export default function ChatClient({
       if (res.ok) {
         const msg = await res.json()
         playSend()
-        setMessages(prev => [...prev, msg])
+        // Dedupe by id: the 3s poll can fetch this message from the
+        // server BEFORE this POST resolves, in which case the merged
+        // state already contains it. Without this guard, the poll-
+        // inserted copy + this insert produce two visible bubbles
+        // until the next poll consolidates by id.
+        setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
       } else {
         await showApiError(res, lang as 'ar' | 'en' | 'ur')
         setText(body)
@@ -564,7 +569,10 @@ export default function ChatClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'LOCATION', lat: pos.coords.latitude, lng: pos.coords.longitude }),
       })
-      if (res.ok) { const msg = await res.json(); setMessages(prev => [...prev, msg]) }
+      if (res.ok) {
+        const msg = await res.json()
+        setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
+      }
       else { await showApiError(res, lang as 'ar' | 'en' | 'ur') }
     } catch {
       toast.error(t('thread_location_fail'))
@@ -674,9 +682,20 @@ export default function ChatClient({
           // visible <img> stays on the already-decoded local preview so
           // the bubble never flashes to blank. Blob URLs are cleaned up
           // on unmount (see the effect at the top of this component).
-          setMessages((prev: any[]) => prev.map((m) => (
-            m.id === tempId ? { ...msg, localPreview } : m
-          )))
+          // Same poll-race possibility as sendText: the 3s poll might
+          // already have inserted the real msg by id while we were
+          // awaiting the POST. Replace the pending placeholder with
+          // the server msg, AND drop any duplicate that the poll
+          // inserted (matched by the real id).
+          setMessages((prev: any[]) => {
+            const polledExists = prev.some((m) => m.id === msg.id)
+            return prev
+              .map((m) => (m.id === tempId ? { ...msg, localPreview } : m))
+              .filter((m, idx, arr) =>
+                // keep only the first occurrence of msg.id
+                m.id !== msg.id || arr.findIndex((x) => x.id === msg.id) === idx,
+              )
+          })
         } else {
           // Drop pending placeholders for this and the rest of the batch
           setMessages((prev: any[]) => prev.filter((m) => !pendingPlaceholders.slice(i).some(p => p.id === m.id)))
