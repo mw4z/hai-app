@@ -14,3 +14,7 @@ public/sw.js
 public/workbox-*.js
 public/sw.js.map
 public/workbox-*.js.map
+
+# Phase 3 migration: prod DB dump used for staging restore — never commit
+prod_snapshot.dump
+*.dump

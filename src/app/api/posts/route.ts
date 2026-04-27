@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { classifyPost } from '@/lib/posts/classifyPost'
 import { getSession } from '@/lib/auth'
 import { notifyNeighborhood } from '@/lib/notifications'
 import { validateContent, normalizeForComparison, isSimilar, apiError } from '@/lib/validation'
@@ -211,11 +212,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Dual-write through classifyPost — populates legacy `category`
+    // AND v2 (newCategory / intent / priority / audience) in one shot.
+    // Single source of truth for the mapping; never duplicate it
+    // anywhere else in the codebase.
+    const c = classifyPost({ kind: 'legacy', legacyCategory: category as any })
     const post = await db.post.create({
       data: {
         title: finalTitle,
         body: finalBody,
-        category,
+        category:    c.legacyCategory,
+        newCategory: c.newCategory,
+        intent:      c.intent,
+        priority:    c.priority,
+        audience:    c.audience,
         coordinationMode,
         price: price || null,
         imageUrls: validatedImages,

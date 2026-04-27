@@ -79,6 +79,7 @@ model User {
   postSubscriptions PostSubscription[]
   comments         Comment[]
   notifications    Notification[]
+  notificationPreferences NotificationPreference[]
   threads1         Thread[]      @relation("threadUser1")
   threads2         Thread[]      @relation("threadUser2")
   messages         Message[]
@@ -267,7 +268,17 @@ model Post {
   id             String        @id @default(cuid())
   title          String
   body           String
+  // Old (legacy) category — kept during the staged migration. Phase 1
+  // adds newCategory + intent + priority + audience as nullable fields.
+  // Phase 2 backfills them. Phase 3 switches reads to newCategory.
+  // Phase 4 drops `category` and renames `newCategory` → `category`.
   category       PostCategory
+  // ── Staged-migration columns (drop in Phase 4) ─────────────────────
+  newCategory    PostCategoryV2?
+  intent         PostIntent?      @default(NORMAL)
+  priority       PostPriority?    @default(NORMAL)
+  audience       PostAudience?    @default(ALL)
+  // ───────────────────────────────────────────────────────────────────
   status         PostStatus    @default(PENDING_AI)
   isPaid         Boolean       @default(false)
   isPinned       Boolean       @default(false)
@@ -297,9 +308,12 @@ model Post {
   updatedAt      DateTime      @updatedAt
 
   @@index([neighborhoodId, category, status])
+  @@index([neighborhoodId, newCategory, status])
   @@index([authorId])
 }
 
+// LEGACY enum — frozen. Do not add or remove members during the
+// staged migration; Phase 4 will drop it entirely.
 enum PostCategory {
   ALERT              // تنبيهات
   LOST_FOUND         // مفقودات ومصطبات
@@ -315,6 +329,41 @@ enum PostCategory {
   WOMEN_ONLY         // للنساء فقط
   EID_RAMADAN        // فعاليات ومناسبات
   CONTESTS           // مسابقات وجوائز
+}
+
+// NEW canonical category enum. Suffixed with V2 during the staged
+// migration; Phase 4 renames PostCategoryV2 → PostCategory and the
+// new field newCategory → category.
+enum PostCategoryV2 {
+  HOME_BUSINESSES       // الأسر المنتجة (was FOOD_HOME)
+  MARKETPLACE           // سوق الحي
+  SERVICES              // خدمات
+  RIDES                 // مشاوير (was RIDE_REQUEST + intent=REQUEST)
+  REAL_ESTATE           // عقارات
+  LOST_FOUND            // مفقودات
+  NEIGHBORHOOD_REPORTS  // بلاغات الحي (was NEIGHBORHOOD_ISSUE / ALERT)
+  EVENTS                // فعاليات ومناسبات (was MOSQUE / EID_RAMADAN)
+  COMPETITIONS          // مسابقات وجوائز (was CONTESTS)
+  GENERAL               // hidden admin-only fallback
+}
+
+enum PostIntent {
+  OFFER     // user is offering something
+  REQUEST   // user is asking / looking for something (was LOOKING_FOR / RIDE_REQUEST)
+  NORMAL    // informational / no transactional intent
+}
+
+enum PostPriority {
+  LOW
+  NORMAL
+  HIGH        // LOST_FOUND, NEIGHBORHOOD_REPORTS, ALERT
+  CRITICAL    // emergency-class — bypasses category filters
+}
+
+enum PostAudience {
+  ALL
+  WOMEN       // was WOMEN_ONLY category
+  MEN
 }
 
 enum CoordinationMode {
@@ -1327,4 +1376,23 @@ model InviteFraudSignal {
 
   @@index([userId])
   @@index([kind, createdAt])
+}
+
+// ─── Notification preferences ────────────────────────────────────────
+// One row per (user, category). Missing rows = use category defaults
+// (ALL ON for new users; CRITICAL alerts always enabled). Reads go
+// through src/lib/notifications/canSendNotification.ts.
+model NotificationPreference {
+  id           String         @id @default(cuid())
+  userId       String
+  category     PostCategoryV2
+  pushEnabled  Boolean        @default(true)
+  inAppEnabled Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category])
+  @@index([userId])
 }
