@@ -125,6 +125,28 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning>
+        {/* Safe-area top cover — paints the iOS notch / status-bar
+            zone with the header surface colour. position:fixed at
+            top:0 means it stays put while the body scrolls (without
+            this, the body's padding-top zone scrolls off-screen and
+            the feed becomes visible behind the iOS status bar).
+            z-index 1 keeps it BELOW popup backdrops (z-40+) so a
+            backdrop dims it uniformly with the page below. Concrete
+            hex fallback for WKWebView's stylesheet-load race. */}
+        <div
+          id="__hai_safe_top"
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 'env(safe-area-inset-top, 0px)',
+            zIndex: 1,
+            pointerEvents: 'none',
+            background: serverIsDark ? '#101619' : '#ffffff',
+          }}
+        />
         {/* Blank cover — matches AppSplash's background gradient exactly
             so the handoff from native launch storyboard → preload → JS
             AppSplash shows no color flash. No logo or text here; the
