@@ -10,6 +10,7 @@ export const translations = {
   // ── Feed ────────────────────────────────────────────────────────────────────
   feed_title:          { ar: 'حي',               en: 'Hai',              ur: 'حی'              },
   feed_all:            { ar: 'الكل',             en: 'All',              ur: 'سب'              },
+  feed_requests:       { ar: 'طلبات',            en: 'Requests',         ur: 'درخواستیں'       },
   feed_new_post:       { ar: 'منشور جديد',       en: 'New Post',         ur: 'نئی پوسٹ'        },
   feed_quick_ask:      { ar: 'تبحث عن شيء؟',    en: 'Looking for something?' , ur: 'کچھ ڈھونڈ رہے ہیں؟' },
   feed_quick_ask_btn:  { ar: 'اسأل',             en: 'Ask'               , ur: 'پوچھیں' },

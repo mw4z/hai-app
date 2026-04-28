@@ -20,27 +20,28 @@ import type { TranslationKey } from '@/lib/i18n'
 import { fullName } from '@/lib/displayName'
 import { readCategory } from '@/lib/posts/readCategory'
 
-// v2 filter chips — mirror the 9 PostCategoryV2 buckets the composer
-// uses, in the SAME UX-driven order as the composer grid (NOT
-// alphabetical, NOT enum order). Source of truth for ordering is
-// src/app/post/new/page.tsx CATEGORIES — keep these two lists aligned.
-// GENERAL is admin-only fallback so it stays out of the picker. The
-// `key` is the v2 enum and is translated to the legacy column when
-// the request hits /api/feed (the API itself still keys on legacy
-// during the Phase 3 read switch).
+// v2 filter chips — REQUESTS is a special intent-based chip (not a
+// PostCategoryV2 value) elevated to position 2 to surface request
+// posts that were getting buried inside category-based browsing.
+// MARKETPLACE remains in the strip because Market has its own bottom
+// tab AND deserves a top chip, but with intent=OFFER scoping so
+// "ابحث عن شقة" no longer pollutes it. Other category chips are
+// unchanged (all intents) — narrow them later if needed.
 const CATEGORIES: { key: string; tKey: TranslationKey; icon: string }[] = [
   { key: 'ALL',                  tKey: 'feed_all',                    icon: '🏘️' },
-  // Row 1 — core
+  // Promoted to position 2 — visibility boost for request content.
+  { key: 'REQUESTS',             tKey: 'feed_requests',               icon: '🔎' },
+  // Core categories
   { key: 'MARKETPLACE',          tKey: 'post_v2_MARKETPLACE',         icon: '🛒' },
   { key: 'SERVICES',             tKey: 'post_v2_SERVICES',            icon: '🔧' },
   { key: 'HOME_BUSINESSES',      tKey: 'post_v2_HOME_BUSINESSES',     icon: '🍱' },
-  // Row 2 — daily needs
+  // Daily needs
   { key: 'RIDES',                tKey: 'post_v2_RIDES',               icon: '🚗' },
   { key: 'REAL_ESTATE',          tKey: 'post_v2_REAL_ESTATE',         icon: '🏠' },
-  // Row 3 — important / urgent
+  // Important / urgent
   { key: 'NEIGHBORHOOD_REPORTS', tKey: 'post_v2_NEIGHBORHOOD_REPORTS',icon: '⚠️' },
   { key: 'LOST_FOUND',           tKey: 'post_v2_LOST_FOUND',          icon: '🔍' },
-  // Row 4 — social / optional
+  // Social / optional
   { key: 'EVENTS',               tKey: 'post_v2_EVENTS',              icon: '🎉' },
   { key: 'COMPETITIONS',         tKey: 'post_v2_COMPETITIONS',        icon: '🏆' },
 ]

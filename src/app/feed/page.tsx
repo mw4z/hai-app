@@ -42,10 +42,16 @@ export default async function FeedPage({
   // else gets WOMEN-targeted posts filtered out via the audience field.
   // v2 chips route through the v2 column directly. Anything else (a
   // legacy chip slipping through somehow) falls through with no
-  // category filter — defensive.
+  // category filter — defensive. REQUESTS is intent-only (no category
+  // restriction); MARKETPLACE pins intent=OFFER so request posts don't
+  // pollute the marketplace chip; other v2 chips filter by category.
   let categoryFilter: object
   if (category === 'ALL') {
     categoryFilter = isFemale ? {} : { audience: { not: 'WOMEN' } }
+  } else if (category === 'REQUESTS') {
+    categoryFilter = { intent: 'REQUEST' }
+  } else if (category === 'MARKETPLACE') {
+    categoryFilter = { newCategory: 'MARKETPLACE' as PostCategoryV2, intent: 'OFFER' }
   } else if (V2_FILTER_VALUES.includes(category)) {
     categoryFilter = { newCategory: category as PostCategoryV2 }
   } else {

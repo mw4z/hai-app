@@ -109,12 +109,18 @@ export async function GET(req: NextRequest) {
 
   const isFemale = gender === 'FEMALE'
   // Audience-based ALL: female viewers see every audience; everyone
-  // else gets WOMEN-targeted posts filtered out. v2 chips route through
-  // the v2 column directly. Anything else (a legacy chip slipping
-  // through somehow) falls through with no category filter — defensive.
+  // else gets WOMEN-targeted posts filtered out. v2 chips route
+  // through the v2 column directly. REQUESTS is a special intent-only
+  // chip — no category filter, just intent='REQUEST'. MARKETPLACE
+  // additionally pins intent='OFFER' so request posts don't pollute
+  // the marketplace browsing experience.
   let categoryFilter: object
   if (category === 'ALL') {
     categoryFilter = isFemale ? {} : { audience: { not: 'WOMEN' } }
+  } else if (category === 'REQUESTS') {
+    categoryFilter = { intent: 'REQUEST' }
+  } else if (category === 'MARKETPLACE') {
+    categoryFilter = { newCategory: 'MARKETPLACE' as PostCategoryV2, intent: 'OFFER' }
   } else if (V2_FILTER_VALUES.includes(category)) {
     categoryFilter = { newCategory: category as PostCategoryV2 }
   } else {
