@@ -466,41 +466,33 @@ html {
 body {
   padding-top: env(safe-area-inset-top, 0px);
 }
-body::before {
+/* MUST be html::before, NOT body::before. Why:
+   useBodyScrollLock applies position:fixed to <body> when a sheet
+   opens. position:fixed on body makes body a containing block for
+   any fixed-positioned descendant — so body::before's `position:
+   fixed; top: 0` would re-anchor to the BODY's top, which is at
+   viewport y = -scrollY (offscreen) during lock. The safe-area
+   cover would disappear the moment any sheet opened, exposing the
+   page content behind it as the visible "gap above the header".
+   Putting the cover on <html> keeps it anchored to the viewport
+   regardless of body's positioning. */
+html::before {
   content: '';
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   height: env(safe-area-inset-top, 0px);
-  /* z-index 1 keeps the safe-area paint LAYER below every popup
-     backdrop (z-40+) so a backdrop dims it uniformly with the page
-     content beneath. With z-50, the QuickAskSheet backdrop (z-40)
-     would render under the cover, leaving the safe-area visibly
-     bright while the page below was dimmed — the seam read as a
-     "gap" above the header on iOS. Below all popup z-indexes, but
-     above the auto-stacked page content so the cover still wins in
+  /* z-index 1 keeps the cover BELOW every popup backdrop (z-40+) so
+     a backdrop dims it uniformly with the page content beneath.
+     Above the auto-stacked page content so the cover still wins in
      the no-popup steady state. */
   z-index: 1;
   pointer-events: none;
-  /* Safe-area cover tracks the APP HEADER colour, not the page
-     background — so the notch / status-bar region always reads as
-     part of the header on iOS AND Android. Screens with a sticky
-     `.glass` header inherit the same surface-1; header-less screens
-     (auth / onboarding) still get a tidy top chrome band in the
-     same material family.
-
-     --hai-safe-top-bg is the single override point: a screen that
-     needs a different safe-area colour can set it locally
-     (e.g. inline on <main> or via a data-attr rule) and everything
-     else will track automatically.
-
-     Concrete hex first for WKWebView's stylesheet-load race; var()
-     second so theme / per-screen overrides still win once resolved. */
   background: #ffffff;
   background: var(--hai-safe-top-bg, var(--hai-surface-1, #ffffff));
 }
-html.dark body::before {
+html.dark::before {
   background: #101619;
   background: var(--hai-safe-top-bg, var(--hai-surface-1, #101619));
 }
