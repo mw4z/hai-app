@@ -18,6 +18,7 @@ import PullToRefresh from '@/components/PullToRefresh'
 import { LangProvider } from '@/hooks/useLanguage'
 import { NetworkProvider } from '@/lib/network'
 import OfflineBanner from '@/components/OfflineBanner'
+import SafeAreaDebug from '@/components/SafeAreaDebug'
 import { checkEnvironment } from '@/lib/env-check'
 import type { Lang } from '@/lib/i18n'
 import './globals.css'
@@ -188,6 +189,7 @@ export default function RootLayout({
           {/* Offline banner — mounted last so its z-index sits above
               the rest of the chrome but below sheets/modals. */}
           <OfflineBanner />
+          <SafeAreaDebug />
           </ConfirmProvider>
           </NetworkProvider>
         </LangProvider>
