@@ -391,18 +391,8 @@ body {
   position: relative;
 }
 .dark body {
-  /* Match the header `.glass` surface (#101619) — NOT the page bg
-     token. Why: body's padding-top zone (env(safe-area-inset-top))
-     paints the body bg in the iOS notch/status-bar area. If body bg
-     is #000 and the header below is #101619, popup backdrops dim
-     them to two different shades and the seam reads as a visible
-     "gap" above the header on iOS. Painting body the same colour as
-     the header means the safe-area + header sit on a continuous
-     surface, dimmed identically by any backdrop. Pages that need a
-     different page-area bg (feed gradient, etc.) still override on
-     their own root element. */
-  background-color: #101619;
-  background-color: var(--hai-surface-1, #101619);
+  background-color: #000000;
+  background-color: var(--bg, #000000);
   color: #e9edef;
   color: var(--text, #e9edef);
 }
@@ -467,32 +457,47 @@ html {
   background-color: #ffffff;
 }
 .dark html, html.dark {
-  /* Match the header surface colour. Why: the safe-area-inset-top
-     band is painted by body::before at low z, so popup backdrops
-     dim it alongside the rest of the screen. But on backdrops with
-     `backdrop-filter: blur` (BottomNav) or low opacity (QuickAskSheet
-     bg-black/40), the seam between solid #101619 in the safe-area
-     and the busy page content below was still visible as a band /
-     "gap" above the header. Setting html bg to the same surface
-     colour means even when body::before is dimmed/blurred away, the
-     base layer underneath still matches what the page paints below
-     — so the safe-area zone reads continuously with the header. */
-  background-color: #101619;
-  background-color: var(--hai-surface-1, #101619);
+  background-color: #000000;              /* concrete fallback — true-black page */
+  background-color: var(--hai-bg, #000000);
 }
 
 /* ── iOS safe area — universal approach ──────────────────────── */
-/* env() = 0 on web (no-op), ~47px on iOS native.
-   No body::before / overlay element — html background is set to the
-   header surface colour above so the safe-area zone naturally paints
-   the right colour straight from the html layer. Any popup backdrop
-   (fixed inset-0 ...) covers safe-area + page uniformly because they
-   share the same underlying paint. Avoiding the pseudo-element layer
-   removes the seam that backdrop-blur / low-opacity backdrops were
-   exposing between body::before and the page content below it. */
+/* env() = 0 on web (no-op), ~47px on iOS native                 */
 body {
   padding-top: env(safe-area-inset-top, 0px);
 }
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 50;
+  pointer-events: none;
+  /* Safe-area cover tracks the APP HEADER colour, not the page
+     background — so the notch / status-bar region always reads as
+     part of the header on iOS AND Android. Screens with a sticky
+     `.glass` header inherit the same surface-1; header-less screens
+     (auth / onboarding) still get a tidy top chrome band in the
+     same material family.
+
+     --hai-safe-top-bg is the single override point: a screen that
+     needs a different safe-area colour can set it locally
+     (e.g. inline on <main> or via a data-attr rule) and everything
+     else will track automatically.
+
+     Concrete hex first for WKWebView's stylesheet-load race; var()
+     second so theme / per-screen overrides still win once resolved. */
+  background: #ffffff;
+  background: var(--hai-safe-top-bg, var(--hai-surface-1, #ffffff));
+}
+html.dark body::before {
+  background: #101619;
+  background: var(--hai-safe-top-bg, var(--hai-surface-1, #101619));
+}
+/* Safe-area cover is now rendered as #__hai_safe_top in layout.tsx —
+   a real DOM node paints reliably across WKWebView versions. */
 .sticky.top-0 {
   top: env(safe-area-inset-top, 0px) !important;
 }
