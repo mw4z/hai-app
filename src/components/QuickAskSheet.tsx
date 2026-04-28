@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiX, FiSend } from 'react-icons/fi'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
+import { inferAskCategory, type V2Category } from '@/lib/classify/inferAskCategory'
 
 const SUGGESTIONS = [
   { label: 'سباك',         icon: '🔧' },
@@ -17,11 +18,41 @@ const SUGGESTIONS = [
   { label: 'مطعم / أكل',   icon: '🍽️' },
 ]
 
+// Same v2 buckets as the /ask page picker. COMPETITIONS omitted —
+// requests don't fit a contest format.
+const ASK_CATEGORIES: { key: V2Category; label: string; icon: string }[] = [
+  { key: 'MARKETPLACE',          label: 'السوق',          icon: '🛒' },
+  { key: 'SERVICES',             label: 'خدمات',          icon: '🔧' },
+  { key: 'HOME_BUSINESSES',      label: 'الأسر المنتجة', icon: '🍱' },
+  { key: 'RIDES',                label: 'مشاوير',         icon: '🚗' },
+  { key: 'REAL_ESTATE',          label: 'عقارات',         icon: '🏠' },
+  { key: 'NEIGHBORHOOD_REPORTS', label: 'بلاغات الحي',    icon: '⚠️' },
+  { key: 'LOST_FOUND',           label: 'مفقودات',        icon: '🔍' },
+  { key: 'EVENTS',               label: 'فعاليات',        icon: '🎉' },
+]
+const DEFAULT_CATEGORY: V2Category = 'SERVICES'
+
 export default function QuickAskSheet({ onClose }: { onClose: () => void }) {
   const drag = useDragToDismiss<HTMLDivElement, HTMLDivElement>({ open: true, onDismiss: onClose })
   const router = useRouter()
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
+  const [category, setCategory] = useState<V2Category>(DEFAULT_CATEGORY)
+  // Once the user manually picks a category, we stop overwriting their
+  // choice on every keystroke — same pattern as the /ask page.
+  const [userOverrode, setUserOverrode] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  // v1 rule-based suggestion — sub-millisecond, sync. Re-runs on every
+  // keystroke unless the user has explicitly picked a category.
+  useEffect(() => {
+    if (userOverrode) return
+    const suggested = inferAskCategory(text)
+    setCategory((prev) => (prev === suggested ? prev : suggested))
+  }, [text, userOverrode])
+
+  const selected = ASK_CATEGORIES.find((c) => c.key === category)
+  const isSuggested = !userOverrode && category !== DEFAULT_CATEGORY
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -31,7 +62,7 @@ export default function QuickAskSheet({ onClose }: { onClose: () => void }) {
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: text.trim(), body: text.trim(), category: 'SERVICES', intent: 'REQUEST' }),
+        body: JSON.stringify({ title: text.trim(), body: text.trim(), category, intent: 'REQUEST' }),
       })
       const data = await res.json()
       if (!res.ok) { toast.error(typeof data.error === 'string' ? data.error : data.error?.message || 'فشل النشر'); return }
@@ -81,6 +112,57 @@ export default function QuickAskSheet({ onClose }: { onClose: () => void }) {
                 <span>{s.label}</span>
               </button>
             ))}
+          </div>
+
+          {/* Suggested category — auto-inferred via inferAskCategory.
+              Tap to expand and override. The label flips between
+              "القسم (افتراضي)" and "القسم المقترح" so the user knows
+              when the rule actually fired versus the SERVICES fallback. */}
+          <div className="mb-3">
+            <button
+              type="button"
+              onClick={() => setPickerOpen((v) => !v)}
+              className="flex items-center justify-between w-full px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 active:scale-[0.99] transition-transform"
+            >
+              <span className="text-[11px] font-medium text-gray-500">
+                {userOverrode
+                  ? 'القسم'
+                  : isSuggested
+                    ? 'القسم المقترح'
+                    : 'القسم (افتراضي)'}
+              </span>
+              <span className="flex items-center gap-1.5 text-sm font-medium text-gray-800">
+                {selected && (
+                  <>
+                    <span>{selected.icon}</span>
+                    <span>{selected.label}</span>
+                  </>
+                )}
+              </span>
+            </button>
+            {pickerOpen && (
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {ASK_CATEGORIES.map((c) => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    onClick={() => {
+                      setCategory(c.key)
+                      setUserOverrode(true)
+                      setPickerOpen(false)
+                    }}
+                    className={`flex flex-col items-center justify-center gap-1 aspect-square p-2 rounded-xl border active:scale-[0.97] transition-transform ${
+                      category === c.key
+                        ? 'border-sky-400 bg-sky-50'
+                        : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <span className="text-xl">{c.icon}</span>
+                    <span className="text-[10px] font-medium text-gray-700">{c.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Input + send */}
