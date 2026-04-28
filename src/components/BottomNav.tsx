@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus, FiEdit3, FiSearch } from 'react-icons/fi'
@@ -90,6 +91,36 @@ export default function BottomNav({
   // came out of the Phase 3.5 cutover — Ask is its own entry point, not
   // a sub-toggle inside the post composer's category picker.
   const [showEntrySheet, setShowEntrySheet] = useState(false)
+
+  // Swipe-down-to-dismiss for the entry sheet — same hook used by
+  // QuickAskSheet, ImageSourceSheet, etc. The drag handle sits at the
+  // top of the sheet; vertical drag past the threshold calls onDismiss.
+  const entryDrag = useDragToDismiss<HTMLDivElement, HTMLDivElement>({
+    open: showEntrySheet,
+    onDismiss: () => setShowEntrySheet(false),
+  })
+
+  // Lock feed scroll while the sheet is open — overflow:hidden +
+  // touch-action:none on html/body. Same pattern as QuickAskSheet:
+  // no body reposition, no page jump, just an instant freeze.
+  useEffect(() => {
+    if (!showEntrySheet) return
+    const html = document.documentElement
+    const body = document.body
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      bodyTouchAction: body.style.touchAction,
+    }
+    html.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+    body.style.touchAction = 'none'
+    return () => {
+      html.style.overflow = prev.htmlOverflow
+      body.style.overflow = prev.bodyOverflow
+      body.style.touchAction = prev.bodyTouchAction
+    }
+  }, [showEntrySheet])
 
   async function handleNewPost() {
     hapticMedium()
@@ -248,14 +279,28 @@ export default function BottomNav({
       {showEntrySheet && (
         <div
           className="fixed inset-0 z-[1000] bg-black/50 backdrop-blur-sm flex items-end justify-center"
-          onClick={() => setShowEntrySheet(false)}
+          // Tap anywhere outside the sheet → dismiss. onPointerDown
+          // catches both touch and mouse synchronously (onClick on a
+          // backdrop sometimes loses to a child's pointer-up on
+          // Android WebView).
+          onPointerDown={(e) => {
+            if (e.target === e.currentTarget) setShowEntrySheet(false)
+          }}
         >
           <div
+            ref={entryDrag.sheetRef}
             className="w-full max-w-[480px] bg-white dark:bg-gray-900 rounded-t-3xl p-5 animate-slide-up"
-            onClick={(e) => e.stopPropagation()}
+            // Stop pointer events on the sheet itself from bubbling up
+            // to the backdrop's dismiss handler.
+            onPointerDown={(e) => e.stopPropagation()}
             style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.25rem)' }}
           >
-            <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4" />
+            {/* Drag handle area — touchmove on this element drives
+                the swipe-down dismiss. Made tall enough (touch-none on
+                a generous hit area) for thumb reach. */}
+            <div ref={entryDrag.handleRef} className="touch-none -mx-5 px-5 -mt-5 pt-5 pb-1 cursor-grab">
+              <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4" />
+            </div>
 
             <div className="text-center mb-5">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">
