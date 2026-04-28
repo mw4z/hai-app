@@ -197,6 +197,11 @@ export default function NewPostPage() {
   // SUPER_ADMIN can post into any neighborhood and any category.
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [isAdminLike, setIsAdminLike] = useState(false)
+  // Tracks whether the /api/profile fetch has resolved. While false,
+  // we never hide cells — the grid renders all 9 categories from the
+  // first paint so it doesn't shift under the user when the profile
+  // gate finally loads. Validation moves to onClick instead.
+  const [profileLoaded, setProfileLoaded] = useState(false)
   const [ownNeighborhoodId, setOwnNeighborhoodId] = useState<string | null>(null)
   const [allNeighborhoods, setAllNeighborhoods] = useState<{ id: string; name: string; nameEn?: string; cityName?: string }[]>([])
   const [targetNeighborhoodId, setTargetNeighborhoodId] = useState<string>('')
@@ -216,7 +221,9 @@ export default function NewPostPage() {
       if (['SUPER_ADMIN', 'PLATFORM_MOD', 'NEIGHBORHOOD_MOD'].includes(d.role)) {
         setIsAdminLike(true)
       }
-    }).catch(() => {})
+    })
+      .catch(() => {})
+      .finally(() => setProfileLoaded(true))
   }, [])
 
   // Super-admins: lazy-load the full neighborhood list once.
@@ -308,14 +315,19 @@ export default function NewPostPage() {
     router.push('/feed')
   }
 
-  // Visible categories — provider gate hides SERVICES from non-providers,
-  // admin gate hides COMPETITIONS from non-admins. The order mirrors the
-  // spec list so the grid reads top-down as the user expects.
-  const visibleCategories = CATEGORIES.filter(c => {
-    if (c.key === 'SERVICES' && !canPostServices && !isAdminLike) return false
-    if (ADMIN_ONLY_CATEGORIES.has(c.key) && !isAdminLike) return false
-    return true
-  })
+  // Always render all 9 cells so the grid layout is stable from the
+  // first paint. Validation now happens on click (see onCategoryTap
+  // below), gated by `profileLoaded` — a user tapping a restricted
+  // cell after the profile loads gets a toast; before profile loads
+  // the tap proceeds and the server-side check is the safety net.
+  const visibleCategories = CATEGORIES
+
+  const isCategoryRestricted = (key: string): boolean => {
+    if (!profileLoaded) return false
+    if (key === 'SERVICES' && !canPostServices && !isAdminLike) return true
+    if (ADMIN_ONLY_CATEGORIES.has(key) && !isAdminLike) return true
+    return false
+  }
 
   const selected = CATEGORIES.find(i => i.key === category)
   const showPrice = PRICE_CATEGORIES.has(category)
@@ -569,23 +581,50 @@ export default function NewPostPage() {
               {lang === 'en' ? 'Choose a category' : lang === 'ur' ? 'زمرہ منتخب کریں' : 'اختر نوع المنشور'}
             </p>
             <div className="grid grid-cols-3 gap-2.5">
-              {visibleCategories.map((cat) => (
-                <button
-                  key={cat.key}
-                  onClick={() => {
-                    // RIDES routes to the structured ride form — same
-                    // behavior as the legacy RIDE_REQUEST entry.
-                    if (cat.key === 'RIDES') { router.push('/rides/new'); return }
-                    setCategory(cat.key); setStep('content')
-                  }}
-                  className="flex flex-col items-center justify-center gap-1.5 aspect-square p-3 rounded-xl border border-gray-200 dark:border-gray-700 active:scale-[0.97] transition-transform bg-white dark:bg-gray-800 hover:border-primary-300"
-                >
-                  <span className="text-2xl">{cat.icon}</span>
-                  <span className="text-[11px] font-medium text-gray-800 dark:text-white text-center leading-tight">
-                    {labelOf(cat)}
-                  </span>
-                </button>
-              ))}
+              {visibleCategories.map((cat) => {
+                const restricted = isCategoryRestricted(cat.key)
+                return (
+                  <button
+                    key={cat.key}
+                    onClick={() => {
+                      if (restricted) {
+                        // Tell the user why they can't pick this. The
+                        // server-side check is the canonical guard;
+                        // this is just UX feedback.
+                        if (cat.key === 'SERVICES') {
+                          toast.error(lang === 'en'
+                            ? 'Services posts are for verified providers only'
+                            : lang === 'ur'
+                              ? 'خدمات کی پوسٹس صرف تصدیق شدہ خدمات فراہم کرنے والوں کیلئے'
+                              : 'هذا القسم متاح فقط لمقدمي الخدمات')
+                        } else {
+                          toast.error(lang === 'en'
+                            ? 'Admin-only category'
+                            : lang === 'ur'
+                              ? 'صرف منتظمین کیلئے'
+                              : 'هذا القسم متاح فقط للمشرفين')
+                        }
+                        return
+                      }
+                      // RIDES routes to the structured ride form — same
+                      // behavior as the legacy RIDE_REQUEST entry.
+                      if (cat.key === 'RIDES') { router.push('/rides/new'); return }
+                      setCategory(cat.key); setStep('content')
+                    }}
+                    className={`flex flex-col items-center justify-center gap-1.5 aspect-square p-3 rounded-xl border active:scale-[0.97] transition-transform ${
+                      restricted
+                        ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 opacity-50'
+                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-primary-300'
+                    }`}
+                    aria-disabled={restricted}
+                  >
+                    <span className="text-2xl">{cat.icon}</span>
+                    <span className="text-[11px] font-medium text-gray-800 dark:text-white text-center leading-tight">
+                      {labelOf(cat)}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         )}
