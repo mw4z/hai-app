@@ -473,7 +473,15 @@ body::before {
   left: 0;
   right: 0;
   height: env(safe-area-inset-top, 0px);
-  z-index: 50;
+  /* z-index must sit above every popup backdrop so the safe-area
+     cover always paints the header colour at the top of the screen.
+     Backdrops in this app: BottomNav entry sheet (z-[1000]),
+     QuickAskSheet (z-40), ImageSourceSheet (z-[60]), lightbox
+     (z-[80]). Picking 1500 is comfortably above those and well below
+     the preload splash (z-99999). Without this, opening a popup with
+     a backdrop ≥ z-50 visibly punches through the safe-area, showing
+     a dark/black gap between the iOS status bar and the page header. */
+  z-index: 1500;
   pointer-events: none;
   /* Safe-area cover tracks the APP HEADER colour, not the page
      background — so the notch / status-bar region always reads as
@@ -496,8 +504,6 @@ html.dark body::before {
   background: #101619;
   background: var(--hai-safe-top-bg, var(--hai-surface-1, #101619));
 }
-/* Safe-area cover is now rendered as #__hai_safe_top in layout.tsx —
-   a real DOM node paints reliably across WKWebView versions. */
 .sticky.top-0 {
   top: env(safe-area-inset-top, 0px) !important;
 }
