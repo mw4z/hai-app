@@ -505,30 +505,24 @@ export default function FeedClient({
       {/* Quick Ask bar — only in own neighborhood */}
       {!isReadOnly && (
         <div className="px-4 pt-4">
-          {/* Real <input> instead of a <button>. Native focus on tap
-              starts the keyboard animation IMMEDIATELY (before the
-              click event even fires). Synchronous setShowAsk(true)
-              opens the pre-mounted sheet in the same frame; the
-              sheet's useLayoutEffect refocuses its own textarea
-              synchronously so the keyboard never dips between the
-              two inputs (browsers keep the IME open across
-              same-frame focus swaps between text inputs). */}
-          <label
+          {/* Plain button — NOT a real input. The previous <input
+              readOnly> trigger caused the browser to auto-scroll the
+              feed when the keyboard pushed the input out of the
+              viewport. With a button there's no native focus, no
+              scroll-into-view, no keyboard rise on the trigger
+              itself — the sheet's textarea is what raises the
+              keyboard, and it does so as soon as the sheet flips
+              display: block (see useLayoutEffect in QuickAskSheet). */}
+          <button
             data-tour="new-post"
-            className="glow-ask w-full flex items-center gap-3 bg-white border border-sky-100 rounded-2xl px-4 py-3 transition-shadow cursor-text"
+            type="button"
+            onClick={() => setShowAsk(true)}
+            className="glow-ask w-full flex items-center gap-3 bg-white border border-sky-100 rounded-2xl px-4 py-3 transition-shadow"
           >
             <span className="text-lg">🔎</span>
-            <input
-              type="text"
-              readOnly
-              value=""
-              placeholder={t('feed_ask_placeholder')}
-              onFocus={() => setShowAsk(true)}
-              className="flex-1 bg-transparent border-none outline-none text-sm text-gray-400 placeholder:text-gray-400 min-w-0 cursor-text"
-              aria-label={t('feed_ask_placeholder')}
-            />
+            <span className="flex-1 text-start text-sm text-gray-400">{t('feed_ask_placeholder')}</span>
             <span className="text-xs bg-sky-600 text-white px-3 py-1 rounded-full font-medium flex-shrink-0">{t('feed_quick_ask_btn')}</span>
-          </label>
+          </button>
         </div>
       )}
 

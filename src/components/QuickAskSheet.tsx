@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiX, FiSend, FiImage } from 'react-icons/fi'
@@ -191,7 +192,17 @@ export default function QuickAskSheet({ open, onClose }: { open: boolean; onClos
     }
   }
 
-  return (
+  // Portal to <body> so the sheet's render is decoupled from
+  // FeedClient's render tree. Without the portal, every state change
+  // in FeedClient (and there are many — auto-refresh, polls,
+  // bookmarks, etc.) would cascade into the sheet's parent chain and
+  // delay the open-toggle by however long FeedClient takes to
+  // reconcile (~300ms-1s on Android with a full feed). The portal
+  // makes the sheet a sibling of <body> — its render is its own
+  // isolated subtree.
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <>
       {/* Backdrop — pre-mounted, hidden via display when closed so it
           contributes zero to layout/paint. No transition: tap should
@@ -362,6 +373,7 @@ export default function QuickAskSheet({ open, onClose }: { open: boolean; onClos
         onCamera={pickFromCamera}
         onGallery={pickFromGallery}
       />
-    </>
+    </>,
+    document.body,
   )
 }
