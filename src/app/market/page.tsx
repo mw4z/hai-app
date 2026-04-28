@@ -7,19 +7,49 @@ import PostCard from '@/components/PostCard'
 import Link from 'next/link'
 import MarketTab from './MarketTab'
 
-// v2 categories that belong on the market surface. The legacy
-// LOOKING_FOR / RIDE_REQUEST request-style buckets are intentionally
-// excluded — request flows now go through intent: 'REQUEST' filtering,
-// driven from the dedicated Ask tab.
-const ALL_MARKET_CATEGORIES: PostCategoryV2[] = [
+// ─────────────────────────────────────────────────────────────────────
+// Market tab filtering — v2 only (intent + newCategory).
+//
+// REQUEST posts ("ابحث عن شقة") are NEVER mixed into the OFFER tabs —
+// they live exclusively in the REQUESTS tab. The market is perceived
+// as a place for selling/offering, not asking, so OFFER vs REQUEST
+// gets a hard split:
+//
+//   ALL       intent=OFFER   in MARKETPLACE / HOME_BUSINESSES /
+//                             REAL_ESTATE / SERVICES
+//   SELLING   intent=OFFER   in MARKETPLACE / HOME_BUSINESSES /
+//                             REAL_ESTATE  (no services)
+//   REQUESTS  intent=REQUEST in MARKETPLACE / HOME_BUSINESSES /
+//                             REAL_ESTATE / SERVICES / RIDES
+//   SERVICES  intent=OFFER   in SERVICES
+// ─────────────────────────────────────────────────────────────────────
+
+// Categories that show on the market's offer-side tabs.
+const OFFER_CATEGORIES_ALL: PostCategoryV2[] = [
   'MARKETPLACE',
   'HOME_BUSINESSES',
   'REAL_ESTATE',
   'SERVICES',
 ]
 
-const SELLING_CATEGORIES: PostCategoryV2[] = ['MARKETPLACE', 'HOME_BUSINESSES', 'REAL_ESTATE']
-const SERVICES_CATEGORIES: PostCategoryV2[] = ['SERVICES']
+// Just goods/property — no services.
+const OFFER_CATEGORIES_SELLING: PostCategoryV2[] = [
+  'MARKETPLACE',
+  'HOME_BUSINESSES',
+  'REAL_ESTATE',
+]
+
+const OFFER_CATEGORIES_SERVICES: PostCategoryV2[] = ['SERVICES']
+
+// Request-side: includes RIDES (asking for a ride is the canonical
+// request-only bucket) on top of the goods/property/services list.
+const REQUEST_CATEGORIES: PostCategoryV2[] = [
+  'MARKETPLACE',
+  'HOME_BUSINESSES',
+  'REAL_ESTATE',
+  'SERVICES',
+  'RIDES',
+]
 
 export default async function MarketPage({
   searchParams,
@@ -37,24 +67,24 @@ export default async function MarketPage({
 
   const tab = searchParams.tab || 'ALL'
 
-  // Build the per-tab where filter against the v2 column directly. The
-  // REQUESTS tab is no longer a category list — it's an intent filter
-  // that crosses every v2 commercial bucket (any post asking for
-  // something, regardless of category).
+  // Per-tab where clause. Every offer-side tab pins intent: 'OFFER'
+  // so request posts can never bleed in. The REQUESTS tab pins
+  // intent: 'REQUEST' and a curated category set (drops EVENTS,
+  // NEIGHBORHOOD_REPORTS, etc. that aren't market content).
   let tabFilter: object
   switch (tab) {
     case 'SELLING':
-      tabFilter = { newCategory: { in: SELLING_CATEGORIES } }
+      tabFilter = { intent: 'OFFER', newCategory: { in: OFFER_CATEGORIES_SELLING } }
       break
     case 'REQUESTS':
-      tabFilter = { intent: 'REQUEST', newCategory: { in: ALL_MARKET_CATEGORIES } }
+      tabFilter = { intent: 'REQUEST', newCategory: { in: REQUEST_CATEGORIES } }
       break
     case 'SERVICES':
-      tabFilter = { newCategory: { in: SERVICES_CATEGORIES } }
+      tabFilter = { intent: 'OFFER', newCategory: { in: OFFER_CATEGORIES_SERVICES } }
       break
     case 'ALL':
     default:
-      tabFilter = { newCategory: { in: ALL_MARKET_CATEGORIES } }
+      tabFilter = { intent: 'OFFER', newCategory: { in: OFFER_CATEGORIES_ALL } }
       break
   }
 
