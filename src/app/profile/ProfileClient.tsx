@@ -9,6 +9,7 @@ import SocialChips from '@/components/SocialChips'
 import EmergencyRequestSheet from '@/components/EmergencyRequestSheet'
 import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useLanguage, LANGUAGE_CHANGE_EVENT } from '@/hooks/useLanguage'
+import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
 import { useConfirm } from '@/components/ConfirmProvider'
 import {
   FiMapPin, FiStar, FiFileText, FiLogOut, FiCamera,
@@ -312,6 +313,14 @@ export default function ProfileClient({ user, postCount }: Props) {
   }
 
   const [showCoverPicker, setShowCoverPicker] = useState(false)
+
+  // Shared iOS-safe scroll lock for every modal/sheet on this screen.
+  // One hook call per modal so each lock is its own stack entry —
+  // useBodyScrollLock's module-level ref count handles concurrent
+  // locks (e.g. delete-account confirm opened on top of avatar picker).
+  useBodyScrollLock(showCoverPicker)
+  useBodyScrollLock(showAvatarPicker)
+  useBodyScrollLock(deleteStage !== null)
 
   function handleCoverClick() {
     setShowCoverPicker(true)
@@ -1598,7 +1607,15 @@ export default function ProfileClient({ user, postCount }: Props) {
       {/* Cover Picker Modal */}
       {showCoverPicker && (
         <>
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={() => setShowCoverPicker(false)} />
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+            onPointerDown={(e) => {
+              if (e.target !== e.currentTarget) return
+              e.preventDefault()
+              consumeNextClick()
+              setShowCoverPicker(false)
+            }}
+          />
           <div className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl" style={{ maxHeight: '65vh' }}>
             <div className="px-5 pt-3 pb-6">
               <div className="w-10 h-1 bg-gray-200 dark:bg-gray-600 rounded-full mx-auto mb-4" />
@@ -1655,7 +1672,15 @@ export default function ProfileClient({ user, postCount }: Props) {
       {/* Avatar Picker Modal */}
       {showAvatarPicker && (
         <>
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={() => setShowAvatarPicker(false)} />
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+            onPointerDown={(e) => {
+              if (e.target !== e.currentTarget) return
+              e.preventDefault()
+              consumeNextClick()
+              setShowAvatarPicker(false)
+            }}
+          />
           <div className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl" style={{ maxHeight: '75vh' }}>
             <div className="px-5 pt-3 pb-6">
               <div className="w-10 h-1 bg-gray-200 dark:bg-gray-600 rounded-full mx-auto mb-4" />
@@ -1725,12 +1750,18 @@ export default function ProfileClient({ user, postCount }: Props) {
       {/* Delete Account Modal — in-app RTL-aware, replaces native confirm/prompt */}
       {deleteStage && (
         <div
-          className="fixed inset-0 z-[60] bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4"
-          onClick={() => { if (!deleting) setDeleteStage(null) }}
+          className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onPointerDown={(e) => {
+            if (e.target !== e.currentTarget) return
+            if (deleting) return
+            e.preventDefault()
+            consumeNextClick()
+            setDeleteStage(null)
+          }}
         >
           <div
             className="bg-white dark:bg-gray-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5"
-            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
             style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
           >
             <div className="flex items-center gap-3 mb-3">
@@ -1848,6 +1879,7 @@ function BookmarkedPosts({ lang, currentUserId }: { lang: string; currentUserId:
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<'newest' | 'popular'>('newest')
   const [showAll, setShowAll] = useState(false)
+  useBodyScrollLock(showAll)
   const router = useRouter()
 
   useEffect(() => {
@@ -1948,7 +1980,15 @@ function BookmarkedPosts({ lang, currentUserId }: { lang: string; currentUserId:
       {/* Full-screen sheet */}
       {showAll && (
         <>
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={() => setShowAll(false)} />
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+            onPointerDown={(e) => {
+              if (e.target !== e.currentTarget) return
+              e.preventDefault()
+              consumeNextClick()
+              setShowAll(false)
+            }}
+          />
           <div className="fixed inset-0 z-50 bg-white dark:bg-gray-900 flex flex-col max-w-[480px] mx-auto">
             {/* Header */}
             <div className="glass px-4 py-3 flex items-center justify-between">

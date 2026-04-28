@@ -1791,7 +1791,7 @@ export default function PostCard({
 
         return (
           <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
             onPointerDown={(e) => {
               // Only close when the press lands on THIS element itself
               // (the backdrop), never from bubbling. Android WebViews
