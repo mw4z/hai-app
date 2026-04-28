@@ -36,7 +36,25 @@ const ASK_CATEGORIES: { key: V2Category; label: string; icon: string }[] = [
 ]
 const DEFAULT_CATEGORY: V2Category = 'SERVICES'
 
-export default function QuickAskSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function QuickAskSheet({
+  open,
+  onClose,
+  externalTextareaRef,
+}: {
+  open: boolean
+  onClose: () => void
+  /**
+   * Optional ref forwarded by the trigger (the search bar in
+   * FeedClient). Letting the trigger hold a direct ref to the
+   * textarea is the ONLY way to focus it synchronously inside the
+   * tap's onClick handler — iOS WKWebView refuses to raise the
+   * keyboard for a programmatic .focus() that happens after the
+   * user-gesture context is gone (i.e. inside React's
+   * useLayoutEffect after a render). Android Chrome WebView is
+   * lenient about this; iOS is strict.
+   */
+  externalTextareaRef?: React.RefObject<HTMLTextAreaElement>
+}) {
   // Hooks must run unconditionally even when closed — that's the
   // entire point of the pre-mount pattern (avoid React mount cost on
   // every tap). Heavy effects (scroll lock, focus) gate their work on
@@ -204,27 +222,35 @@ export default function QuickAskSheet({ open, onClose }: { open: boolean; onClos
 
   return createPortal(
     <>
-      {/* Backdrop — pre-mounted, hidden via display when closed so it
-          contributes zero to layout/paint. No transition: tap should
-          flip backdrop ON instantly, not fade. */}
+      {/* Backdrop — visibility via opacity + pointer-events so the
+          DOM stays mounted at all times. iOS WKWebView won't raise
+          the keyboard for a focus() on a `display: none` textarea
+          even if we make it visible in the same tick — the element
+          must be attached to a visible render tree at the moment
+          .focus() is called. opacity:0 + pointer-events:none keeps
+          the DOM but no visual cost. */}
       <div
         className="fixed inset-0 bg-black/40 z-40"
-        style={{ display: open ? 'block' : 'none' }}
+        style={{
+          opacity: open ? 1 : 0,
+          pointerEvents: open ? 'auto' : 'none',
+        }}
         onClick={onClose}
       />
 
-      {/* Sheet — same pattern. display:none when closed kills paint
-          cost AND disables the textarea (so keyboard doesn't rise
-          spuriously while closed). When open flips true the sheet
-          appears the same frame; useLayoutEffect[open] focuses the
-          textarea synchronously, keyboard rises immediately. NO slide
-          animation by user request — pure on/off. */}
+      {/* Sheet — translateY off-screen when closed so the textarea is
+          always in the render tree and synchronously focusable from
+          the trigger's onClick. iOS WKWebView refuses to raise the
+          keyboard for a programmatic focus on a display:none element
+          OR for one that fires after the user-gesture context has
+          ended; pre-mounted + always-rendered solves both. */}
       <div
         ref={drag.sheetRef}
         className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white rounded-t-3xl shadow-2xl"
         style={{
           paddingBottom: 'env(safe-area-inset-bottom)',
-          display: open ? 'block' : 'none',
+          transform: open ? 'translateY(0)' : 'translateY(110%)',
+          pointerEvents: open ? 'auto' : 'none',
         }}
         aria-hidden={!open}
       >
@@ -334,7 +360,15 @@ export default function QuickAskSheet({ open, onClose }: { open: boolean; onClos
           {/* Input + image + send */}
           <form onSubmit={handleSubmit} className="flex gap-2 items-end min-w-0">
             <textarea
-              ref={textareaRef}
+              ref={(node) => {
+                // Bind both the internal ref and the external one
+                // forwarded by the trigger, so FeedClient can call
+                // .focus() synchronously on tap.
+                ;(textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = node
+                if (externalTextareaRef) {
+                  ;(externalTextareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = node
+                }
+              }}
               value={text}
               onChange={e => setText(e.target.value)}
               placeholder="مثال: أبحث عن سباك موثوق في الحي..."

@@ -120,6 +120,12 @@ export default function FeedClient({
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(initialPosts.length >= 20)
   const [showAsk, setShowAsk] = useState(false)
+  // Direct ref to QuickAskSheet's textarea. Used to focus the
+  // textarea SYNCHRONOUSLY in the search-bar's onClick — preserves
+  // the user-gesture context that iOS WKWebView requires before it
+  // will raise the keyboard. Android Chrome WebView is lenient about
+  // this; iOS isn't.
+  const askTextareaRef = useRef<HTMLTextAreaElement>(null)
   const [openRides, setOpenRides] = useState<any[]>([])
   const [polls, setPolls] = useState<any[]>([])
   const [showFilter, setShowFilter] = useState(false)
@@ -516,7 +522,21 @@ export default function FeedClient({
           <button
             data-tour="new-post"
             type="button"
-            onClick={() => setShowAsk(true)}
+            onClick={() => {
+              // Order matters on iOS:
+              //   1) focus the textarea SYNCHRONOUSLY inside the
+              //      tap's gesture chain — that's what raises the
+              //      WKWebView keyboard. The textarea is always in
+              //      the DOM thanks to QuickAskSheet's pre-mount
+              //      + translateY hide pattern.
+              //   2) THEN set showAsk so React can flip the sheet's
+              //      transform: translateY(110%) → translateY(0) in
+              //      the next frame. The sheet appearing is purely
+              //      visual at this point — the keyboard is already
+              //      rising.
+              askTextareaRef.current?.focus()
+              setShowAsk(true)
+            }}
             className="glow-ask w-full flex items-center gap-3 bg-white border border-sky-100 rounded-2xl px-4 py-3 transition-shadow"
           >
             <span className="text-lg">🔎</span>
@@ -728,7 +748,11 @@ export default function FeedClient({
           the user taps the search bar — see commit notes. The sheet
           is always in the DOM, just translated off-screen until
           open=true. */}
-      <QuickAskSheet open={showAsk} onClose={() => setShowAsk(false)} />
+      <QuickAskSheet
+        open={showAsk}
+        onClose={() => setShowAsk(false)}
+        externalTextareaRef={askTextareaRef}
+      />
 
       {/* Neighborhood picker — polished bottom sheet */}
       <NeighborhoodSheet
