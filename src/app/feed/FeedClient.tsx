@@ -98,11 +98,16 @@ interface Props {
   unreadNotifCount: number
   hasNeighborhoodMod?: boolean
   addressVerified?: boolean
-  /** Count of REQUEST posts created in the last 24h. Rendered as a
-   *  small dot badge on the REQUESTS chip when > 0. Computed
-   *  server-side from the same activePosts array used for ranking,
-   *  so no extra API call. Suppressed by NEXT_PUBLIC_REQUEST_BOOST=0. */
-  requestsBadge24h?: number
+  /** Master kill switch for the REQUEST visibility experiment. When
+   *  false, the inline Ask CTA, the chip dot, the post-submit success
+   *  state, and the auto-select-on-mount behaviour all turn off. The
+   *  ranking + soft-insert side already gate themselves server-side
+   *  on the same env var. */
+  requestBoostOn?: boolean
+  /** True when at least one REQUEST was created in the last 6 hours.
+   *  Renders a small presence dot on the REQUESTS chip — deliberately
+   *  not a count, to avoid reading as a "new / unread" notification. */
+  requestsRecentDot?: boolean
 }
 
 export default function FeedClient({
@@ -117,7 +122,8 @@ export default function FeedClient({
   unreadNotifCount,
   hasNeighborhoodMod,
   addressVerified,
-  requestsBadge24h = 0,
+  requestBoostOn = true,
+  requestsRecentDot = false,
 }: Props) {
   const router = useRouter()
   const { t, lang } = useLanguage()
@@ -132,13 +138,15 @@ export default function FeedClient({
   // on success; FeedClient consumes it once on mount, so the next
   // feed view lands on the REQUESTS filter without a per-request
   // round-trip. Cleared after read so it fires only the first time.
+  // Skipped when the experiment is off, but the flag is still
+  // cleared so a flag flip doesn't trigger stale jumps later.
   useEffect(() => {
     if (selectedCategory === 'REQUESTS') return
     if (typeof window === 'undefined') return
     try {
       if (sessionStorage.getItem('hai_pending_request_view') === '1') {
         sessionStorage.removeItem('hai_pending_request_view')
-        router.replace('/feed?category=REQUESTS')
+        if (requestBoostOn) router.replace('/feed?category=REQUESTS')
       }
     } catch { /* sessionStorage can be blocked in some WebViews */ }
     // Run once on mount only — guarding on selectedCategory above so
@@ -461,7 +469,10 @@ export default function FeedClient({
           {/* Category tabs */}
           <div className="hai-row-2 hai-overflow-x-auto hai-flex-1 hai-pe-4 hai-tabs-mask">
             {categories.map((cat) => {
-              const showBadge = cat.key === 'REQUESTS' && requestsBadge24h > 0
+              // Presence dot — NOT a count. Reads as "there's recent
+              // activity in this filter" rather than "X unread", so
+              // we don't promise an unread inbox we can't deliver.
+              const showDot = cat.key === 'REQUESTS' && requestBoostOn && requestsRecentDot
               return (
                 <button
                   key={cat.key}
@@ -471,13 +482,11 @@ export default function FeedClient({
                 >
                   <span>{cat.icon}</span>
                   <span>{t(cat.tKey)}</span>
-                  {showBadge && (
+                  {showDot && (
                     <span
-                      className="absolute -top-1 -end-1 min-w-[16px] h-4 px-1 rounded-full bg-sky-500 text-white text-[9px] font-bold flex items-center justify-center"
-                      aria-label={`${requestsBadge24h} new in last 24h`}
-                    >
-                      {requestsBadge24h > 9 ? '9+' : requestsBadge24h}
-                    </span>
+                      className="absolute top-0.5 end-1 w-2 h-2 rounded-full bg-sky-500 ring-2 ring-white dark:ring-gray-900"
+                      aria-label="recent activity"
+                    />
                   )}
                 </button>
               )
@@ -772,8 +781,10 @@ export default function FeedClient({
                     post (idx === 3) on the ALL chip only — REQUESTS /
                     other filters already centre the request flow.
                     Same trigger as the top search bar so iOS keyboard
-                    rises synchronously on tap. */}
-                {idx === 3 && selectedCategory === 'ALL' && !isReadOnly && (
+                    rises synchronously on tap. Gated on the boost
+                    flag so the CTA disappears alongside ranking +
+                    badge when the experiment is off. */}
+                {idx === 3 && selectedCategory === 'ALL' && !isReadOnly && requestBoostOn && (
                   <button
                     type="button"
                     onClick={() => {
@@ -812,6 +823,7 @@ export default function FeedClient({
         open={showAsk}
         onClose={() => setShowAsk(false)}
         externalTextareaRef={askTextareaRef}
+        requestBoostOn={requestBoostOn}
       />
 
       {/* Neighborhood picker — polished bottom sheet */}

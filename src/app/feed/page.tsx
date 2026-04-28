@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import FeedClient from './FeedClient'
@@ -205,30 +206,55 @@ export default async function FeedPage({
   // Soft guarantee: if the first 5 posts don't include a REQUEST,
   // splice the highest-scored REQUEST in at position 4 (0-indexed: 3).
   // Doesn't touch ranking — just a single visibility nudge for the
-  // first screen. No-op when no REQUEST exists or one is already up
-  // top, or when the boost flag is off.
+  // first screen. No-op when no REQUEST exists, when one is already
+  // up top, or when the boost flag is off.
+  //
+  // Session-scope dedupe: track which REQUEST IDs we've already
+  // soft-inserted into THIS user's first screen via a cookie, so a
+  // refresh-loop on a slow-traffic neighborhood doesn't keep showing
+  // the same low-ranked REQUEST in the boosted slot. The cookie
+  // holds up to 10 IDs, expires after 6h (covers a typical browse
+  // session without persisting across days). When a candidate is
+  // picked, its ID is appended.
+  const insertedCookie = cookies().get('hai_req_seen')?.value || ''
+  const seenIds = new Set(insertedCookie.split(',').filter(Boolean))
+  let pickedIdForCookie: string | null = null
   if (REQUEST_BOOST_ON && balanced.length >= 5) {
     const firstFive = balanced.slice(0, 5)
     const hasRequestUp = firstFive.some(p => p.intent === 'REQUEST')
     if (!hasRequestUp) {
-      const idx = balanced.findIndex(p => p.intent === 'REQUEST')
+      const idx = balanced.findIndex(
+        p => p.intent === 'REQUEST' && !seenIds.has(p.id),
+      )
       if (idx >= 5) {
         const [pick] = balanced.splice(idx, 1)
         balanced.splice(3, 0, pick)
+        pickedIdForCookie = pick.id
       }
     }
   }
+  if (pickedIdForCookie) {
+    const next = [pickedIdForCookie, ...Array.from(seenIds)].slice(0, 10).join(',')
+    cookies().set('hai_req_seen', next, {
+      maxAge: 6 * 3600,
+      sameSite: 'lax',
+      httpOnly: false,
+      path: '/',
+    })
+  }
 
-  // Badge: count of REQUEST posts created in the last 24h. Cheap
-  // (already have the array in memory). Passed to FeedClient so the
-  // chip can render a small new-count badge.
-  const twentyFourHoursAgo = Date.now() - 24 * 3600_000
-  const requestsBadge24h = REQUEST_BOOST_ON
-    ? activePosts.filter(p =>
-        p.intent === 'REQUEST'
-        && new Date(p.createdAt).getTime() >= twentyFourHoursAgo,
-      ).length
-    : 0
+  // Chip indicator: presence-only dot scoped to the last 6 hours.
+  // Why not a count: a number badge reads as "unread / new for me",
+  // but the value is just neighborhood-wide volume — a refresher
+  // who already saw the posts would see the same number and feel
+  // it's a stale notification. A dot signals "there's recent
+  // activity here" without overpromising. 6h scope keeps the
+  // signal meaningfully recent.
+  const sixHoursAgo = Date.now() - 6 * 3600_000
+  const requestsRecentDot = REQUEST_BOOST_ON && activePosts.some(p =>
+    p.intent === 'REQUEST'
+    && new Date(p.createdAt).getTime() >= sixHoursAgo,
+  )
 
   return (
     <FeedClient
@@ -291,7 +317,8 @@ export default async function FeedPage({
       unreadNotifCount={unreadNotifCount}
       hasNeighborhoodMod={true}
       addressVerified={!!user.addressVerified}
-      requestsBadge24h={requestsBadge24h}
+      requestBoostOn={REQUEST_BOOST_ON}
+      requestsRecentDot={requestsRecentDot}
     />
   )
 }

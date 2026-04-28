@@ -42,6 +42,7 @@ export default function QuickAskSheet({
   open,
   onClose,
   externalTextareaRef,
+  requestBoostOn = true,
 }: {
   open: boolean
   onClose: () => void
@@ -56,6 +57,10 @@ export default function QuickAskSheet({
    * lenient about this; iOS is strict.
    */
   externalTextareaRef?: React.RefObject<HTMLTextAreaElement>
+  /** Master kill switch (NEXT_PUBLIC_REQUEST_BOOST). When false the
+   *  post-submit success state is skipped — sheet closes immediately
+   *  with a toast like the original behaviour. */
+  requestBoostOn?: boolean
 }) {
   // Hooks must run unconditionally even when closed — that's the
   // entire point of the pre-mount pattern (avoid React mount cost on
@@ -195,18 +200,22 @@ export default function QuickAskSheet({
       })
       const data = await res.json()
       if (!res.ok) { toast.error(typeof data.error === 'string' ? data.error : data.error?.message || 'فشل النشر'); return }
-      // Refresh in the background so the new request lands in feed
-      // SSR data; show inline success state instead of closing.
       router.refresh()
-      setSubmitted(true)
-      // Reset draft so reopening the sheet starts fresh.
-      setText('')
-      if (image) {
-        try { URL.revokeObjectURL(image.preview) } catch { /* ignore */ }
-        setImage(null)
+      if (requestBoostOn) {
+        // Show inline success state with "see requests" CTA.
+        setSubmitted(true)
+        setText('')
+        if (image) {
+          try { URL.revokeObjectURL(image.preview) } catch { /* ignore */ }
+          setImage(null)
+        }
+        setUserOverrode(false)
+        setCategory(DEFAULT_CATEGORY)
+      } else {
+        // Original behaviour — toast + immediate close.
+        toast.success('وصل طلبك للجيران! 🔎')
+        onClose()
       }
-      setUserOverrode(false)
-      setCategory(DEFAULT_CATEGORY)
     } catch {
       toast.error('تعذر الاتصال')
     } finally {
