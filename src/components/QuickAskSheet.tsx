@@ -193,34 +193,27 @@ export default function QuickAskSheet({ open, onClose }: { open: boolean; onClos
 
   return (
     <>
-      {/* Backdrop — visibility toggled via opacity so the DOM stays
-          mounted (pre-mount pattern). pointer-events:none when closed
-          so the feed underneath stays tappable. */}
+      {/* Backdrop — pre-mounted, hidden via display when closed so it
+          contributes zero to layout/paint. No transition: tap should
+          flip backdrop ON instantly, not fade. */}
       <div
-        className="fixed inset-0 bg-black/40 z-40 transition-opacity duration-150"
-        style={{
-          opacity: open ? 1 : 0,
-          pointerEvents: open ? 'auto' : 'none',
-        }}
+        className="fixed inset-0 bg-black/40 z-40"
+        style={{ display: open ? 'block' : 'none' }}
         onClick={onClose}
       />
 
-      {/* Sheet — visually hidden via translateY when closed; sliding
-          back in is GPU-accelerated and instantaneous. The DOM is
-          persistent so focus + keyboard come up the same frame the
-          user taps. */}
-      {/* visibility:hidden would make the textarea non-focusable, so
-          we use translateY only. The sheet sits 110% below the
-          viewport when closed — invisible but the DOM (and the
-          textarea) is alive and ready for synchronous focus. */}
+      {/* Sheet — same pattern. display:none when closed kills paint
+          cost AND disables the textarea (so keyboard doesn't rise
+          spuriously while closed). When open flips true the sheet
+          appears the same frame; useLayoutEffect[open] focuses the
+          textarea synchronously, keyboard rises immediately. NO slide
+          animation by user request — pure on/off. */}
       <div
         ref={drag.sheetRef}
         className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white rounded-t-3xl shadow-2xl"
         style={{
           paddingBottom: 'env(safe-area-inset-bottom)',
-          transform: open ? 'translateY(0)' : 'translateY(110%)',
-          transition: 'transform 180ms ease-out',
-          pointerEvents: open ? 'auto' : 'none',
+          display: open ? 'block' : 'none',
         }}
         aria-hidden={!open}
       >
