@@ -77,12 +77,14 @@ export default function QuickAskSheet({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Eager focus before paint, fired ON the open→true transition.
-  // The sheet is pre-mounted (see FeedClient: always-rendered with
-  // open prop) so this useLayoutEffect runs in the same frame the
-  // user's tap lands, BEFORE the browser paints. The keyboard rises
-  // immediately — no remount cost, no commit-phase deferral.
+  // preventScroll:true stops iOS WKWebView from scrolling the
+  // document to show the (until-now) offscreen textarea — without
+  // it the feed visibly scrolls down. The synchronous focus call
+  // in FeedClient's onClick is the iOS keyboard-raising path; this
+  // useLayoutEffect is mostly a safety net for cases where open
+  // flips true without going through the search-bar tap.
   useLayoutEffect(() => {
-    if (open) textareaRef.current?.focus()
+    if (open) textareaRef.current?.focus({ preventScroll: true })
   }, [open])
 
   // Lock feed scroll while open WITHOUT repositioning the body. The

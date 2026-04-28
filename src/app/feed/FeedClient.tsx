@@ -529,12 +529,15 @@ export default function FeedClient({
               //      WKWebView keyboard. The textarea is always in
               //      the DOM thanks to QuickAskSheet's pre-mount
               //      + translateY hide pattern.
-              //   2) THEN set showAsk so React can flip the sheet's
+              //   2) preventScroll:true is REQUIRED on iOS — without
+              //      it, iOS WKWebView scrolls the document down to
+              //      try to show the offscreen translateY(110%)
+              //      textarea, which is what produced the 'feed
+              //      scrolls down' bug.
+              //   3) THEN set showAsk so React can flip the sheet's
               //      transform: translateY(110%) → translateY(0) in
-              //      the next frame. The sheet appearing is purely
-              //      visual at this point — the keyboard is already
-              //      rising.
-              askTextareaRef.current?.focus()
+              //      the next frame.
+              askTextareaRef.current?.focus({ preventScroll: true })
               setShowAsk(true)
             }}
             className="glow-ask w-full flex items-center gap-3 bg-white border border-sky-100 rounded-2xl px-4 py-3 transition-shadow"
