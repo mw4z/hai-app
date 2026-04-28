@@ -18,3 +18,21 @@ public/workbox-*.js.map
 # Phase 3 migration: prod DB dump used for staging restore — never commit
 prod_snapshot.dump
 *.dump
+
+# Android signing keys — NEVER commit. Audited 2026-04-28: never been
+# in git history. Specific path + glob defense-in-depth.
+android/app/hai-release.keystore
+*.keystore
+*.jks
+
+# Store-listing screenshots — regeneratable outputs of the styling
+# scripts under scripts/. Living in public/ would also serve them at
+# https://app.hai-app.net/screenshots/... which we don't want.
+# Sources of truth: the raw/* originals and the *.mjs scripts.
+public/screenshots/
+public/screenshots-raw/
+public/screenshots-ipad-raw/
+public/screenshots-store/
+public/screenshots-store-android/
+public/screenshots-store-iphone/
+public/screenshots-store-ipad/
