@@ -28,8 +28,6 @@ import { useEffect } from 'react'
 let lockCount = 0
 let prev: {
   htmlOverflow: string
-  htmlOverflowY: string
-  bodyOverflow: string
   bodyTouchAction: string
 } | null = null
 
@@ -38,30 +36,32 @@ function applyLock() {
   const body = document.body
   prev = {
     htmlOverflow: html.style.overflow,
-    htmlOverflowY: html.style.overflowY,
-    bodyOverflow: body.style.overflow,
     bodyTouchAction: body.style.touchAction,
   }
   // Lock at the <html> level. iOS WKWebView's document scroll lives
   // on <html>, so this is the one place where overflow:hidden
-  // actually stops the page from panning under the sheet. Setting
-  // it on <body> alone is a no-op on iOS — that was the bug behind
-  // multiple earlier "still scrolls under the sheet" reports.
+  // actually stops the page from panning. Setting it on <body>
+  // alone is a no-op on iOS — that was the bug behind multiple
+  // earlier "still scrolls under the sheet" reports.
   html.style.overflow = 'hidden'
-  html.style.overflowY = 'hidden'
-  // touch-action:none on body kills the rubber-band overscroll that
-  // would otherwise pan the page even when document scroll is
+  // touch-action:none on body kills the rubber-band overscroll
+  // that would otherwise pan the page even when document scroll is
   // disabled.
-  body.style.overflow = 'hidden'
   body.style.touchAction = 'none'
-  // CRITICAL: do NOT use `position: fixed; top: -scrollY` on body.
-  // It works for scroll lock but turns body into a non-scrolling
-  // container — every sticky header in the page (`.glass sticky
-  // top-0`) reverts to its in-flow position, dropping below the
-  // safe-area cover by exactly env(safe-area-inset-top) (because
-  // body still has `padding-top: env(...)` and the sticky no
-  // longer pins to viewport top). That is the visible "header
-  // pushed down + black gap above it" symptom on iOS.
+  // CRITICAL: do NOT also set `body.style.overflow = 'hidden'`.
+  // That makes <body> a scroll container in WebKit's eyes, and
+  // every `position: sticky` descendant inside body switches its
+  // scrolling-ancestor reference from <html> to <body>. body
+  // doesn't scroll (its content already fits), so sticky reverts
+  // to its natural in-flow position — header drops below the
+  // safe-area cover by exactly env(safe-area-inset-top) and a
+  // gap appears above the header the moment a sheet opens. Lock
+  // ONLY html.overflow + body.touchAction. Verified manually on
+  // iOS: this is the combination that keeps the sticky header
+  // pinned at top: env(safe-area-inset-top) during sheet open.
+  //
+  // Likewise, do NOT use `position: fixed; top: -scrollY` on body.
+  // Same containing-block-and-sticky-breaks failure mode.
 }
 
 function releaseLock() {
@@ -69,13 +69,8 @@ function releaseLock() {
   const html = document.documentElement
   const body = document.body
   html.style.overflow = prev.htmlOverflow
-  html.style.overflowY = prev.htmlOverflowY
-  body.style.overflow = prev.bodyOverflow
   body.style.touchAction = prev.bodyTouchAction
   prev = null
-  // No scroll restore needed: html overflow:hidden preserves the
-  // existing scroll position; releasing it leaves the user where
-  // they were.
 }
 
 export function useBodyScrollLock(active: boolean) {
