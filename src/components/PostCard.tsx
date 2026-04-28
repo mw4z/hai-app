@@ -1432,12 +1432,16 @@ export default function PostCard({
         <div
           data-overlay="true"
           className="hai-sheet-overlay"
-          onClick={() => setShowComments(false)}
+          onPointerDown={(e) => {
+            if (e.target !== e.currentTarget) return
+            e.preventDefault()
+            setShowComments(false)
+          }}
         >
           <div
             ref={commentsSheetRef}
             className="hai-sheet animate-slide-up"
-            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
           >
             {/* Drag handle — grab bar + header, everything the finger
                 needs to catch to drag-dismiss the sheet. Touches that
@@ -1787,16 +1791,19 @@ export default function PostCard({
         return (
           <div
             className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
-            onClick={(e) => {
-              // Only close when the click lands on THIS element itself
+            onPointerDown={(e) => {
+              // Only close when the press lands on THIS element itself
               // (the backdrop), never from bubbling. Android WebViews
               // occasionally dispatch a late touchend/click whose target
               // is a parent after an <a target="_blank"> tap — that
               // stray event was closing the popup right after social
               // chips were pressed. Comparing target vs currentTarget
-              // is the one pattern that always gets it right regardless
-              // of event type or event.stopPropagation timing.
-              if (e.target === e.currentTarget) setShowUserPopup(false)
+              // is the one pattern that always gets it right.
+              if (e.target !== e.currentTarget) return
+              // Suppress the iOS ghost-click on whatever sits at these
+              // coordinates after the popup unmounts.
+              e.preventDefault()
+              setShowUserPopup(false)
             }}
           >
             <div

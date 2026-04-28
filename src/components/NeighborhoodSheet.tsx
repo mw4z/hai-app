@@ -149,7 +149,11 @@ export default function NeighborhoodSheet({
     <>
       <div
         data-overlay="true"
-        onClick={onClose}
+        onPointerDown={(e) => {
+          if (e.target !== e.currentTarget) return
+          e.preventDefault()
+          onClose()
+        }}
         className={`fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
           entered ? 'opacity-100' : 'opacity-0'
         }`}

@@ -266,7 +266,11 @@ export default function BottomNav({
           // backdrop sometimes loses to a child's pointer-up on
           // Android WebView).
           onPointerDown={(e) => {
-            if (e.target === e.currentTarget) setShowEntrySheet(false)
+            if (e.target !== e.currentTarget) return
+            // Prevent iOS ghost-click on the element under the tap
+            // (a feed post, a tab icon, etc.) once the sheet closes.
+            e.preventDefault()
+            setShowEntrySheet(false)
           }}
         >
           <div

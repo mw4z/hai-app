@@ -133,12 +133,17 @@ export default function EmergencyRequestSheet({ open, onClose }: Props) {
   return (
     <div
       className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4"
-      onClick={() => !submitting && onClose()}
+      onPointerDown={(e) => {
+        if (e.target !== e.currentTarget) return
+        if (submitting) return
+        e.preventDefault()
+        onClose()
+      }}
     >
       <div
         ref={drag.sheetRef}
         className="bg-white dark:bg-gray-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
         style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
       >
         <div ref={drag.handleRef} className="px-5 pt-3 touch-none">

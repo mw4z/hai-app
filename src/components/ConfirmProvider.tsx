@@ -138,11 +138,15 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {pending && (
         <div
           className="fixed inset-0 z-[70] bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4"
-          onClick={() => close(false)}
+          onPointerDown={(e) => {
+            if (e.target !== e.currentTarget) return
+            e.preventDefault()
+            close(false)
+          }}
         >
           <div
             className="bg-white dark:bg-gray-900 w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
             style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
           >
             {pending.opts.title && (

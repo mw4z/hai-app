@@ -218,7 +218,14 @@ export default function QuickAskSheet({
           opacity: open ? 1 : 0,
           pointerEvents: open ? 'auto' : 'none',
         }}
-        onClick={onClose}
+        onPointerDown={(e) => {
+          if (e.target !== e.currentTarget) return
+          // Prevent iOS ghost-click on the underlying element after
+          // the sheet closes — the same tap would otherwise trigger
+          // whatever button sits at those coordinates in the post-close DOM.
+          e.preventDefault()
+          onClose()
+        }}
       />
 
       {/* Sheet — translateY off-screen when closed so the textarea is
