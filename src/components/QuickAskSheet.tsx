@@ -213,7 +213,7 @@ export default function QuickAskSheet({
           .focus() is called. opacity:0 + pointer-events:none keeps
           the DOM but no visual cost. */}
       <div
-        className="fixed inset-0 bg-black/40 z-40"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000]"
         style={{
           opacity: open ? 1 : 0,
           pointerEvents: open ? 'auto' : 'none',
@@ -229,7 +229,7 @@ export default function QuickAskSheet({
           ended; pre-mounted + always-rendered solves both. */}
       <div
         ref={drag.sheetRef}
-        className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white rounded-t-3xl shadow-2xl"
+        className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-[1001] bg-white rounded-t-3xl shadow-2xl"
         style={{
           paddingBottom: 'env(safe-area-inset-bottom)',
           transform: open ? 'translateY(0)' : 'translateY(110%)',
