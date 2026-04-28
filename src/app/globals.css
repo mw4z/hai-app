@@ -457,8 +457,18 @@ html {
   background-color: #ffffff;
 }
 .dark html, html.dark {
-  background-color: #000000;              /* concrete fallback — true-black page */
-  background-color: var(--hai-bg, #000000);
+  /* Match the header surface colour. Why: the safe-area-inset-top
+     band is painted by body::before at low z, so popup backdrops
+     dim it alongside the rest of the screen. But on backdrops with
+     `backdrop-filter: blur` (BottomNav) or low opacity (QuickAskSheet
+     bg-black/40), the seam between solid #101619 in the safe-area
+     and the busy page content below was still visible as a band /
+     "gap" above the header. Setting html bg to the same surface
+     colour means even when body::before is dimmed/blurred away, the
+     base layer underneath still matches what the page paints below
+     — so the safe-area zone reads continuously with the header. */
+  background-color: #101619;
+  background-color: var(--hai-surface-1, #101619);
 }
 
 /* ── iOS safe area — universal approach ──────────────────────── */
