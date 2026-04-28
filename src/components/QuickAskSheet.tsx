@@ -87,27 +87,23 @@ export default function QuickAskSheet({
     if (open) textareaRef.current?.focus({ preventScroll: true })
   }, [open])
 
-  // Lock feed scroll while open WITHOUT repositioning the body. The
-  // older "position:fixed + top:-scrollY" pattern caused the visible
-  // page to jump UP by the saved scrollY each time the sheet opened —
-  // looked like the page sliding up before the popup arrived.
-  // overflow:hidden on html+body + touch-action:none keeps the feed
-  // from panning on iOS WKWebView and Android WebView without any
-  // visible re-layout.
+  // Lock feed scroll while open. Only locks BODY (not html). Locking
+  // html caused iOS WKWebView to expose the html-level background at
+  // the safe-area-inset-top zone above the header — visible as a
+  // black gap between the iOS status bar and the page's header glass.
+  // Body-only overflow:hidden + touch-action:none is enough to block
+  // the feed pan on iOS and Android, and doesn't disturb the WebView's
+  // safe-area layout.
   useEffect(() => {
     if (!open) return
-    const html = document.documentElement
     const body = document.body
     const prev = {
-      htmlOverflow: html.style.overflow,
       bodyOverflow: body.style.overflow,
       bodyTouchAction: body.style.touchAction,
     }
-    html.style.overflow = 'hidden'
     body.style.overflow = 'hidden'
     body.style.touchAction = 'none'
     return () => {
-      html.style.overflow = prev.htmlOverflow
       body.style.overflow = prev.bodyOverflow
       body.style.touchAction = prev.bodyTouchAction
     }

@@ -100,23 +100,21 @@ export default function BottomNav({
     onDismiss: () => setShowEntrySheet(false),
   })
 
-  // Lock feed scroll while the sheet is open — overflow:hidden +
-  // touch-action:none on html/body. Same pattern as QuickAskSheet:
-  // no body reposition, no page jump, just an instant freeze.
+  // Lock feed scroll while the sheet is open. Body-only — locking
+  // html caused iOS WKWebView to expose the html background at the
+  // safe-area-inset-top zone (visible black gap above the header).
+  // Body overflow:hidden + touch-action:none is enough to block the
+  // feed pan and doesn't disturb the WebView's safe-area layout.
   useEffect(() => {
     if (!showEntrySheet) return
-    const html = document.documentElement
     const body = document.body
     const prev = {
-      htmlOverflow: html.style.overflow,
       bodyOverflow: body.style.overflow,
       bodyTouchAction: body.style.touchAction,
     }
-    html.style.overflow = 'hidden'
     body.style.overflow = 'hidden'
     body.style.touchAction = 'none'
     return () => {
-      html.style.overflow = prev.htmlOverflow
       body.style.overflow = prev.bodyOverflow
       body.style.touchAction = prev.bodyTouchAction
     }
