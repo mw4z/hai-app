@@ -156,6 +156,15 @@ export default async function FeedPage({
   }
   const COMMERCIAL = new Set<PostCategoryV2>(['MARKETPLACE', 'HOME_BUSINESSES', 'REAL_ESTATE', 'SERVICES'])
 
+  // Feature flag: increase REQUEST visibility. Set NEXT_PUBLIC_REQUEST_BOOST
+  // to '0' to disable the bump + soft guarantee + first-screen
+  // insertion below. Defaults on. Cheap kill switch if a side effect
+  // appears in production without needing a redeploy.
+  const REQUEST_BOOST_ON = process.env.NEXT_PUBLIC_REQUEST_BOOST !== '0'
+  // +10 on a base of 50 ≈ 20% bump. Capped by anti-domination /
+  // commercial-balance rules below so REQUESTs can't crowd out the rest.
+  const REQUEST_INTENT_BOOST = REQUEST_BOOST_ON ? 10 : 3
+
   // Score with time decay
   const scored = activePosts.map(p => {
     if (p.isPinned) return { ...p, _score: 999999 }
@@ -163,7 +172,7 @@ export default async function FeedPage({
     const hoursAgo = (Date.now() - new Date(p.createdAt).getTime()) / 3600_000
     const engagement = Math.min(p._count.comments * 3 + p._count.reactions, 30)
     const boost = (p.newCategory && TYPE_BOOST[p.newCategory]) || 0
-    const intentBoost = p.intent === 'REQUEST' ? 3 : 0
+    const intentBoost = p.intent === 'REQUEST' ? REQUEST_INTENT_BOOST : 0
     const repBoost = getFeedBoost(p.author.reputation)
     return { ...p, _score: (50 + engagement + boost + intentBoost + repBoost) / (hoursAgo + 2) }
   }).sort((a, b) => b._score - a._score)
@@ -192,6 +201,34 @@ export default async function FeedPage({
     }
     balanced.push(post)
   }
+
+  // Soft guarantee: if the first 5 posts don't include a REQUEST,
+  // splice the highest-scored REQUEST in at position 4 (0-indexed: 3).
+  // Doesn't touch ranking — just a single visibility nudge for the
+  // first screen. No-op when no REQUEST exists or one is already up
+  // top, or when the boost flag is off.
+  if (REQUEST_BOOST_ON && balanced.length >= 5) {
+    const firstFive = balanced.slice(0, 5)
+    const hasRequestUp = firstFive.some(p => p.intent === 'REQUEST')
+    if (!hasRequestUp) {
+      const idx = balanced.findIndex(p => p.intent === 'REQUEST')
+      if (idx >= 5) {
+        const [pick] = balanced.splice(idx, 1)
+        balanced.splice(3, 0, pick)
+      }
+    }
+  }
+
+  // Badge: count of REQUEST posts created in the last 24h. Cheap
+  // (already have the array in memory). Passed to FeedClient so the
+  // chip can render a small new-count badge.
+  const twentyFourHoursAgo = Date.now() - 24 * 3600_000
+  const requestsBadge24h = REQUEST_BOOST_ON
+    ? activePosts.filter(p =>
+        p.intent === 'REQUEST'
+        && new Date(p.createdAt).getTime() >= twentyFourHoursAgo,
+      ).length
+    : 0
 
   return (
     <FeedClient
@@ -254,6 +291,7 @@ export default async function FeedPage({
       unreadNotifCount={unreadNotifCount}
       hasNeighborhoodMod={true}
       addressVerified={!!user.addressVerified}
+      requestsBadge24h={requestsBadge24h}
     />
   )
 }

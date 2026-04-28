@@ -3,6 +3,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
+import { useLanguage } from '@/hooks/useLanguage'
 import toast from 'react-hot-toast'
 import { FiX, FiSend, FiImage } from 'react-icons/fi'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
@@ -60,10 +61,21 @@ export default function QuickAskSheet({
   // entire point of the pre-mount pattern (avoid React mount cost on
   // every tap). Heavy effects (scroll lock, focus) gate their work on
   // `open` themselves below.
-  const drag = useDragToDismiss<HTMLDivElement, HTMLDivElement>({ open, onDismiss: onClose })
+  // Wrap onClose so closing always clears the success state — next
+  // open should land on the empty composer, not on the success card.
+  const closeAndReset = () => {
+    setSubmitted(false)
+    onClose()
+  }
+  const drag = useDragToDismiss<HTMLDivElement, HTMLDivElement>({ open, onDismiss: closeAndReset })
   const router = useRouter()
+  const { t } = useLanguage()
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
+  // Brief success state shown after a successful POST — replaces the
+  // immediate sheet close with a "تم نشر طلبك" + "شاهد الطلبات" CTA
+  // so the user has a one-tap path to their request feed.
+  const [submitted, setSubmitted] = useState(false)
   const [category, setCategory] = useState<V2Category>(DEFAULT_CATEGORY)
   // Once the user manually picks a category, we stop overwriting their
   // choice on every keystroke — same pattern as the /ask page.
@@ -183,9 +195,18 @@ export default function QuickAskSheet({
       })
       const data = await res.json()
       if (!res.ok) { toast.error(typeof data.error === 'string' ? data.error : data.error?.message || 'فشل النشر'); return }
-      toast.success('وصل طلبك للجيران! 🔎')
-      onClose()
+      // Refresh in the background so the new request lands in feed
+      // SSR data; show inline success state instead of closing.
       router.refresh()
+      setSubmitted(true)
+      // Reset draft so reopening the sheet starts fresh.
+      setText('')
+      if (image) {
+        try { URL.revokeObjectURL(image.preview) } catch { /* ignore */ }
+        setImage(null)
+      }
+      setUserOverrode(false)
+      setCategory(DEFAULT_CATEGORY)
     } catch {
       toast.error('تعذر الاتصال')
     } finally {
@@ -224,7 +245,7 @@ export default function QuickAskSheet({
           // the sheet closes — the same tap would otherwise trigger
           // whatever button sits at those coordinates in the post-close DOM.
           e.preventDefault()
-          onClose()
+          closeAndReset()
         }}
       />
 
@@ -250,11 +271,39 @@ export default function QuickAskSheet({
 
           <div className="flex items-center justify-between">
             <h2 className="font-bold text-gray-900 text-base">🔎 اسأل جيرانك</h2>
-            <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-100">
+            <button onClick={closeAndReset} className="p-1 rounded-full hover:bg-gray-100">
               <FiX className="w-5 h-5 text-gray-400" />
             </button>
           </div>
         </div>
+        {submitted ? (
+          /* Success state — replaces the composer after a successful
+             POST. Single-tap CTA to /feed?category=REQUESTS via a
+             session flag the FeedClient consumes on mount. */
+          <div className="px-4 pt-4 pb-8 text-center">
+            <div className="mx-auto w-14 h-14 rounded-full bg-sky-100 flex items-center justify-center mb-3 text-2xl">🔎</div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">{t('ask_submitted_title')}</h3>
+            <p className="text-xs text-gray-500 mb-5">{t('ask_submitted_sub')}</p>
+            <button
+              type="button"
+              onClick={() => {
+                try { sessionStorage.setItem('hai_pending_request_view', '1') } catch { /* ignore */ }
+                closeAndReset()
+                router.push('/feed?category=REQUESTS')
+              }}
+              className="w-full bg-sky-600 text-white text-sm font-bold py-3 rounded-2xl active:scale-[0.98] transition-transform"
+            >
+              {t('ask_view_requests')}
+            </button>
+            <button
+              type="button"
+              onClick={closeAndReset}
+              className="w-full mt-2 py-2.5 text-xs font-medium text-gray-500 active:scale-[0.98] transition-transform"
+            >
+              {t('post_or_ask_cancel')}
+            </button>
+          </div>
+        ) : (
         <div className="px-4 pt-2 pb-8">
 
           {/* Suggestion chips */}
@@ -389,6 +438,7 @@ export default function QuickAskSheet({
           <input ref={cameraInputRef}  type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
           <p className="text-xs text-gray-400 mt-2 text-center">سيصل طلبك لجميع جيرانك في الحي فوراً</p>
         </div>
+        )}
       </div>
 
       <ImageSourceSheet

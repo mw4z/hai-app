@@ -98,6 +98,11 @@ interface Props {
   unreadNotifCount: number
   hasNeighborhoodMod?: boolean
   addressVerified?: boolean
+  /** Count of REQUEST posts created in the last 24h. Rendered as a
+   *  small dot badge on the REQUESTS chip when > 0. Computed
+   *  server-side from the same activePosts array used for ranking,
+   *  so no extra API call. Suppressed by NEXT_PUBLIC_REQUEST_BOOST=0. */
+  requestsBadge24h?: number
 }
 
 export default function FeedClient({
@@ -112,6 +117,7 @@ export default function FeedClient({
   unreadNotifCount,
   hasNeighborhoodMod,
   addressVerified,
+  requestsBadge24h = 0,
 }: Props) {
   const router = useRouter()
   const { t, lang } = useLanguage()
@@ -120,6 +126,25 @@ export default function FeedClient({
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(initialPosts.length >= 20)
   const [showAsk, setShowAsk] = useState(false)
+
+  // Auto-select REQUESTS chip after a successful Ask submit. The
+  // QuickAskSheet sets sessionStorage.hai_pending_request_view = '1'
+  // on success; FeedClient consumes it once on mount, so the next
+  // feed view lands on the REQUESTS filter without a per-request
+  // round-trip. Cleared after read so it fires only the first time.
+  useEffect(() => {
+    if (selectedCategory === 'REQUESTS') return
+    if (typeof window === 'undefined') return
+    try {
+      if (sessionStorage.getItem('hai_pending_request_view') === '1') {
+        sessionStorage.removeItem('hai_pending_request_view')
+        router.replace('/feed?category=REQUESTS')
+      }
+    } catch { /* sessionStorage can be blocked in some WebViews */ }
+    // Run once on mount only — guarding on selectedCategory above so
+    // it doesn't fire when the user manually navigates back.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // Direct ref to QuickAskSheet's textarea. Used to focus the
   // textarea SYNCHRONOUSLY in the search-bar's onClick — preserves
   // the user-gesture context that iOS WKWebView requires before it
@@ -435,17 +460,28 @@ export default function FeedClient({
           </button>
           {/* Category tabs */}
           <div className="hai-row-2 hai-overflow-x-auto hai-flex-1 hai-pe-4 hai-tabs-mask">
-            {categories.map((cat) => (
-              <button
-                key={cat.key}
-                onClick={() => handleCategoryChange(cat.key)}
-                data-active={selectedCategory === cat.key ? 'true' : 'false'}
-                className="hai-chip hai-shrink-0"
-              >
-                <span>{cat.icon}</span>
-                <span>{t(cat.tKey)}</span>
-              </button>
-            ))}
+            {categories.map((cat) => {
+              const showBadge = cat.key === 'REQUESTS' && requestsBadge24h > 0
+              return (
+                <button
+                  key={cat.key}
+                  onClick={() => handleCategoryChange(cat.key)}
+                  data-active={selectedCategory === cat.key ? 'true' : 'false'}
+                  className="hai-chip hai-shrink-0 relative"
+                >
+                  <span>{cat.icon}</span>
+                  <span>{t(cat.tKey)}</span>
+                  {showBadge && (
+                    <span
+                      className="absolute -top-1 -end-1 min-w-[16px] h-4 px-1 rounded-full bg-sky-500 text-white text-[9px] font-bold flex items-center justify-center"
+                      aria-label={`${requestsBadge24h} new in last 24h`}
+                    >
+                      {requestsBadge24h > 9 ? '9+' : requestsBadge24h}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
           </div>
         </div>
         {/* Filter panel (expands below tabs) */}
@@ -728,8 +764,29 @@ export default function FeedClient({
         ) : (
           <>
             {displayPosts.map((post, idx) => (
-              <div key={post.id} data-tour={idx === 0 ? 'first-post' : undefined} style={{ animationDelay: `${Math.min(idx * 50, 300)}ms`, animationFillMode: 'backwards' }} className="animate-fade-in-up">
-                <PostCard post={post} currentUserId={user.id} currentUserPhone={user.phone} currentUserRole={user.role} isBookmarked={bookmarkedIds.includes(post.id)} isFollowing={followedIds.includes(post.id)} onDelete={(id) => setPosts(prev => prev.filter(p => p.id !== id))} />
+              <div key={post.id}>
+                <div data-tour={idx === 0 ? 'first-post' : undefined} style={{ animationDelay: `${Math.min(idx * 50, 300)}ms`, animationFillMode: 'backwards' }} className="animate-fade-in-up">
+                  <PostCard post={post} currentUserId={user.id} currentUserPhone={user.phone} currentUserRole={user.role} isBookmarked={bookmarkedIds.includes(post.id)} isFollowing={followedIds.includes(post.id)} onDelete={(id) => setPosts(prev => prev.filter(p => p.id !== id))} />
+                </div>
+                {/* Secondary inline Ask CTA. Renders after the 4th
+                    post (idx === 3) on the ALL chip only — REQUESTS /
+                    other filters already centre the request flow.
+                    Same trigger as the top search bar so iOS keyboard
+                    rises synchronously on tap. */}
+                {idx === 3 && selectedCategory === 'ALL' && !isReadOnly && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      askTextareaRef.current?.focus({ preventScroll: true })
+                      setShowAsk(true)
+                    }}
+                    className="w-full mt-2 mb-1 flex items-center gap-3 px-4 py-3 rounded-2xl bg-sky-50 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/40 text-start active:scale-[0.99] transition-transform"
+                  >
+                    <span className="w-9 h-9 rounded-full bg-sky-500 text-white flex items-center justify-center text-base flex-shrink-0">🔎</span>
+                    <span className="flex-1 text-sm font-medium text-sky-900 dark:text-sky-100">{t('feed_inline_ask_cta')}</span>
+                    <span className="text-sky-600 dark:text-sky-400 text-xs font-semibold flex-shrink-0">{t('feed_quick_ask_btn')} ←</span>
+                  </button>
+                )}
               </div>
             ))}
             {hasMore && (
