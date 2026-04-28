@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import { FiX, FiSend, FiImage } from 'react-icons/fi'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import { inferAskCategory, type V2Category } from '@/lib/classify/inferAskCategory'
-import { pickImageOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
+import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
 import { uploadFiles } from '@/lib/upload'
 
@@ -145,8 +145,14 @@ export default function QuickAskSheet({ open, onClose }: { open: boolean; onClos
   }
 
   async function pickFromGallery() {
-    const file = await pickImageOrFallback('ar' as any, galleryInputRef)
-    if (file) applyImage(file)
+    // Use the multi-picker capped at 1 — pickImagesOrFallback goes
+    // STRAIGHT to the iOS PHPicker (no intermediate "Take Photo /
+    // Photo Library" Apple action sheet) and on Android routes
+    // through the WebView <input type=file>. The single-pick
+    // pickImageOrFallback uses CameraSource.Prompt which double-
+    // stacks our custom ImageSourceSheet against Apple's own.
+    const files = await pickImagesOrFallback(1, galleryInputRef)
+    if (files[0]) applyImage(files[0])
   }
 
   const selected = ASK_CATEGORIES.find((c) => c.key === category)

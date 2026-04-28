@@ -23,7 +23,7 @@ import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { playSuccess, playError } from '@/lib/sound'
 import { t as translate } from '@/lib/i18n'
 import { inferAskCategory } from '@/lib/classify/inferAskCategory'
-import { pickImageOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
+import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
 import { uploadFiles } from '@/lib/upload'
 
@@ -189,8 +189,11 @@ export default function AskNeighborsPage() {
   }
 
   async function pickFromGallery() {
-    const file = await pickImageOrFallback(lang as any, galleryInputRef)
-    if (file) applyImage(file)
+    // pickImagesOrFallback (multi capped at 1) goes straight to
+    // PHPicker on iOS — no extra Apple "Take Photo / Photo Library"
+    // sheet stacking on top of our ImageSourceSheet.
+    const files = await pickImagesOrFallback(1, galleryInputRef)
+    if (files[0]) applyImage(files[0])
   }
 
   const selectedCategory = ASK_CATEGORIES.find(c => c.key === category)
