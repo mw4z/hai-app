@@ -8,19 +8,18 @@ import Link from 'next/link'
 import MarketTab from './MarketTab'
 
 // ─────────────────────────────────────────────────────────────────────
-// Market tab filtering — v2 only (intent + newCategory).
+// Market = OFFER ONLY. There is no REQUESTS tab here. REQUEST posts
+// live in the main feed's REQUESTS chip; the Market surface is a
+// pure selling/offering experience.
 //
-// REQUEST posts ("ابحث عن شقة") are NEVER mixed into the OFFER tabs —
-// they live exclusively in the REQUESTS tab. The market is perceived
-// as a place for selling/offering, not asking, so OFFER vs REQUEST
-// gets a hard split:
+// Every tab below pins intent: 'OFFER' at the Prisma where clause —
+// REQUEST posts can never enter Market regardless of which tab the
+// user lands on.
 //
 //   ALL       intent=OFFER   in MARKETPLACE / HOME_BUSINESSES /
 //                             REAL_ESTATE / SERVICES
 //   SELLING   intent=OFFER   in MARKETPLACE / HOME_BUSINESSES /
 //                             REAL_ESTATE  (no services)
-//   REQUESTS  intent=REQUEST in MARKETPLACE / HOME_BUSINESSES /
-//                             REAL_ESTATE / SERVICES / RIDES
 //   SERVICES  intent=OFFER   in SERVICES
 // ─────────────────────────────────────────────────────────────────────
 
@@ -41,15 +40,13 @@ const OFFER_CATEGORIES_SELLING: PostCategoryV2[] = [
 
 const OFFER_CATEGORIES_SERVICES: PostCategoryV2[] = ['SERVICES']
 
-// Request-side: includes RIDES (asking for a ride is the canonical
-// request-only bucket) on top of the goods/property/services list.
-const REQUEST_CATEGORIES: PostCategoryV2[] = [
-  'MARKETPLACE',
-  'HOME_BUSINESSES',
-  'REAL_ESTATE',
-  'SERVICES',
-  'RIDES',
-]
+// Whitelist of valid Market tabs. Any unknown / legacy value (e.g. a
+// shared link to ?tab=REQUESTS from before this refactor) falls
+// through to ALL — the resolved tab is what drives the Prisma where
+// clause AND the cache key, so a request URL physically can't reach
+// the request-side query path.
+type MarketTabKey = 'ALL' | 'SELLING' | 'SERVICES'
+const VALID_MARKET_TABS = new Set<MarketTabKey>(['ALL', 'SELLING', 'SERVICES'])
 
 export default async function MarketPage({
   searchParams,
@@ -65,19 +62,18 @@ export default async function MarketPage({
   })
   if (!user?.neighborhoodId) redirect('/onboarding')
 
-  const tab = searchParams.tab || 'ALL'
+  // Resolve the requested tab against the whitelist. Anything not in
+  // VALID_MARKET_TABS (including the legacy 'REQUESTS' value) collapses
+  // to 'ALL' — the request-side query path no longer exists in Market.
+  const requested = (searchParams.tab || 'ALL') as MarketTabKey
+  const tab: MarketTabKey = VALID_MARKET_TABS.has(requested) ? requested : 'ALL'
 
-  // Per-tab where clause. Every offer-side tab pins intent: 'OFFER'
-  // so request posts can never bleed in. The REQUESTS tab pins
-  // intent: 'REQUEST' and a curated category set (drops EVENTS,
-  // NEIGHBORHOOD_REPORTS, etc. that aren't market content).
+  // Per-tab where clause. EVERY tab pins intent: 'OFFER' — REQUEST
+  // posts cannot reach Market through this code path.
   let tabFilter: object
   switch (tab) {
     case 'SELLING':
       tabFilter = { intent: 'OFFER', newCategory: { in: OFFER_CATEGORIES_SELLING } }
-      break
-    case 'REQUESTS':
-      tabFilter = { intent: 'REQUEST', newCategory: { in: REQUEST_CATEGORIES } }
       break
     case 'SERVICES':
       tabFilter = { intent: 'OFFER', newCategory: { in: OFFER_CATEGORIES_SERVICES } }
@@ -104,17 +100,17 @@ export default async function MarketPage({
     })
   )
 
+  // No REQUESTS tab — Market is offer-only. Users browsing requests
+  // do so through the main feed's REQUESTS chip.
   const tabs = [
-    { key: 'ALL',      label: 'الكل',    labelEn: 'All',      icon: '🛍️' },
-    { key: 'SELLING',  label: 'بيع',     labelEn: 'Selling',  icon: '🛒' },
-    { key: 'REQUESTS', label: 'طلبات',   labelEn: 'Requests', icon: '🔎' },
-    { key: 'SERVICES', label: 'خدمات',   labelEn: 'Services', icon: '🔧' },
+    { key: 'ALL',      label: 'الكل',  labelEn: 'All',      icon: '🛍️' },
+    { key: 'SELLING',  label: 'بيع',   labelEn: 'Selling',  icon: '🛒' },
+    { key: 'SERVICES', label: 'خدمات', labelEn: 'Services', icon: '🔧' },
   ]
 
   const emptyStates: Record<string, { emoji: string; title: string; sub: string }> = {
     ALL:      { emoji: '🛍️', title: 'لا توجد إعلانات بعد',       sub: 'كن أول من يضيف في حيّك!' },
     SELLING:  { emoji: '🛒', title: 'لا توجد منتجات للبيع',      sub: 'أضف منتجك الآن!' },
-    REQUESTS: { emoji: '🔎', title: 'لا توجد طلبات بعد',         sub: 'اطلب ما تحتاجه من جيرانك' },
     SERVICES: { emoji: '🔧', title: 'لا توجد خدمات مسجّلة بعد',  sub: 'هل تقدم خدمة في الحي؟ أضفها!' },
   }
 
