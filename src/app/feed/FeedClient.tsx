@@ -714,7 +714,11 @@ export default function FeedClient({
 
       {/* BottomNav is mounted globally in src/app/layout.tsx */}
 
-      {showAsk && <QuickAskSheet onClose={() => setShowAsk(false)} />}
+      {/* Pre-mount QuickAskSheet so the keyboard rises the same frame
+          the user taps the search bar — see commit notes. The sheet
+          is always in the DOM, just translated off-screen until
+          open=true. */}
+      <QuickAskSheet open={showAsk} onClose={() => setShowAsk(false)} />
 
       {/* Neighborhood picker — polished bottom sheet */}
       <NeighborhoodSheet

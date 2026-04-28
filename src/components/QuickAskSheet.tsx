@@ -35,8 +35,12 @@ const ASK_CATEGORIES: { key: V2Category; label: string; icon: string }[] = [
 ]
 const DEFAULT_CATEGORY: V2Category = 'SERVICES'
 
-export default function QuickAskSheet({ onClose }: { onClose: () => void }) {
-  const drag = useDragToDismiss<HTMLDivElement, HTMLDivElement>({ open: true, onDismiss: onClose })
+export default function QuickAskSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  // Hooks must run unconditionally even when closed — that's the
+  // entire point of the pre-mount pattern (avoid React mount cost on
+  // every tap). Heavy effects (scroll lock, focus) gate their work on
+  // `open` themselves below.
+  const drag = useDragToDismiss<HTMLDivElement, HTMLDivElement>({ open, onDismiss: onClose })
   const router = useRouter()
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
@@ -53,20 +57,20 @@ export default function QuickAskSheet({ onClose }: { onClose: () => void }) {
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Eager focus before paint — `autoFocus` defers focus to React's
-  // commit phase which on Android WebView landed AFTER the browser
-  // had painted the sheet. Synchronous focus in useLayoutEffect makes
-  // the keyboard rise the same frame the sheet appears.
+  // Eager focus before paint, fired ON the open→true transition.
+  // The sheet is pre-mounted (see FeedClient: always-rendered with
+  // open prop) so this useLayoutEffect runs in the same frame the
+  // user's tap lands, BEFORE the browser paints. The keyboard rises
+  // immediately — no remount cost, no commit-phase deferral.
   useLayoutEffect(() => {
-    textareaRef.current?.focus()
-  }, [])
+    if (open) textareaRef.current?.focus()
+  }, [open])
 
-  // Lock the feed scroll while this sheet is open. overflow:hidden on
-  // body alone doesn't stop iOS WKWebView / Android WebView touchmove
-  // from panning the document underneath; position:fixed + saved
-  // scrollY + width:100% is the bulletproof cross-platform lock. We
-  // restore scrollY on close so the feed doesn't jump to the top.
+  // Lock the feed scroll only WHILE open. The pre-mount means this
+  // component is alive at all times; we must NOT freeze the page just
+  // because the sheet exists. Effect re-runs when `open` flips.
   useEffect(() => {
+    if (!open) return
     const scrollY = window.scrollY
     const prev = {
       position: document.body.style.position,
@@ -85,7 +89,7 @@ export default function QuickAskSheet({ onClose }: { onClose: () => void }) {
       document.body.style.overflow = prev.overflow
       window.scrollTo(0, scrollY)
     }
-  }, [])
+  }, [open])
 
   // v1 rule-based suggestion — sub-millisecond, sync. Re-runs on every
   // keystroke unless the user has explicitly picked a category.
@@ -182,9 +186,37 @@ export default function QuickAskSheet({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+      {/* Backdrop — visibility toggled via opacity so the DOM stays
+          mounted (pre-mount pattern). pointer-events:none when closed
+          so the feed underneath stays tappable. */}
+      <div
+        className="fixed inset-0 bg-black/40 z-40 transition-opacity duration-150"
+        style={{
+          opacity: open ? 1 : 0,
+          pointerEvents: open ? 'auto' : 'none',
+        }}
+        onClick={onClose}
+      />
 
-      <div ref={drag.sheetRef} className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white rounded-t-3xl shadow-2xl" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      {/* Sheet — visually hidden via translateY when closed; sliding
+          back in is GPU-accelerated and instantaneous. The DOM is
+          persistent so focus + keyboard come up the same frame the
+          user taps. */}
+      {/* visibility:hidden would make the textarea non-focusable, so
+          we use translateY only. The sheet sits 110% below the
+          viewport when closed — invisible but the DOM (and the
+          textarea) is alive and ready for synchronous focus. */}
+      <div
+        ref={drag.sheetRef}
+        className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white rounded-t-3xl shadow-2xl"
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          transform: open ? 'translateY(0)' : 'translateY(110%)',
+          transition: 'transform 180ms ease-out',
+          pointerEvents: open ? 'auto' : 'none',
+        }}
+        aria-hidden={!open}
+      >
         <div ref={drag.handleRef} className="px-4 pt-3 touch-none">
           {/* Handle */}
           <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
