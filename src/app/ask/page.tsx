@@ -27,14 +27,21 @@ import { t as translate } from '@/lib/i18n'
 // nothing to ask there) and GENERAL (admin-only fallback). Order
 // mirrors the post composer for muscle memory.
 interface AskCategory { key: string; label: string; labelEn: string; labelUr: string; icon: string }
+// Same UX-driven order as the composer + feed chips. COMPETITIONS is
+// intentionally omitted because requests don't make sense for an
+// admin-curated competitions bucket.
 const ASK_CATEGORIES: AskCategory[] = [
-  { key: 'HOME_BUSINESSES',      label: 'الأسر المنتجة',     labelEn: 'Home Businesses',      labelUr: 'گھریلو کاروبار', icon: '🍱' },
+  // Row 1 — core
   { key: 'MARKETPLACE',          label: 'السوق',                labelEn: 'Marketplace',          labelUr: 'مارکیٹ',         icon: '🛒' },
   { key: 'SERVICES',             label: 'خدمات',                labelEn: 'Services',             labelUr: 'خدمات',          icon: '🔧' },
+  { key: 'HOME_BUSINESSES',      label: 'الأسر المنتجة',     labelEn: 'Home Businesses',      labelUr: 'گھریلو کاروبار', icon: '🍱' },
+  // Row 2 — daily needs
   { key: 'RIDES',                label: 'مشاوير',               labelEn: 'Rides',                labelUr: 'سواری',          icon: '🚗' },
   { key: 'REAL_ESTATE',          label: 'عقارات',               labelEn: 'Real Estate',          labelUr: 'جائیداد',        icon: '🏠' },
-  { key: 'LOST_FOUND',           label: 'مفقودات',              labelEn: 'Lost & Found',         labelUr: 'گمشدہ اشیاء',   icon: '🔍' },
+  // Row 3 — important / urgent
   { key: 'NEIGHBORHOOD_REPORTS', label: 'بلاغات الحي',          labelEn: 'Neighborhood Reports', labelUr: 'محلے کی رپورٹس', icon: '⚠️' },
+  { key: 'LOST_FOUND',           label: 'مفقودات',              labelEn: 'Lost & Found',         labelUr: 'گمشدہ اشیاء',   icon: '🔍' },
+  // Row 4 — social / optional
   { key: 'EVENTS',               label: 'فعاليات',              labelEn: 'Events',               labelUr: 'تقریبات',        icon: '🎉' },
 ]
 

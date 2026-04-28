@@ -21,19 +21,26 @@ import { fullName } from '@/lib/displayName'
 import { readCategory } from '@/lib/posts/readCategory'
 
 // v2 filter chips — mirror the 9 PostCategoryV2 buckets the composer
-// uses. GENERAL is admin-only fallback so it stays out of the picker.
-// The `key` is the v2 enum and is translated to the legacy column when
+// uses, in the SAME UX-driven order as the composer grid (NOT
+// alphabetical, NOT enum order). Source of truth for ordering is
+// src/app/post/new/page.tsx CATEGORIES — keep these two lists aligned.
+// GENERAL is admin-only fallback so it stays out of the picker. The
+// `key` is the v2 enum and is translated to the legacy column when
 // the request hits /api/feed (the API itself still keys on legacy
 // during the Phase 3 read switch).
 const CATEGORIES: { key: string; tKey: TranslationKey; icon: string }[] = [
   { key: 'ALL',                  tKey: 'feed_all',                    icon: '🏘️' },
-  { key: 'HOME_BUSINESSES',      tKey: 'post_v2_HOME_BUSINESSES',     icon: '🍱' },
+  // Row 1 — core
   { key: 'MARKETPLACE',          tKey: 'post_v2_MARKETPLACE',         icon: '🛒' },
   { key: 'SERVICES',             tKey: 'post_v2_SERVICES',            icon: '🔧' },
+  { key: 'HOME_BUSINESSES',      tKey: 'post_v2_HOME_BUSINESSES',     icon: '🍱' },
+  // Row 2 — daily needs
   { key: 'RIDES',                tKey: 'post_v2_RIDES',               icon: '🚗' },
   { key: 'REAL_ESTATE',          tKey: 'post_v2_REAL_ESTATE',         icon: '🏠' },
-  { key: 'LOST_FOUND',           tKey: 'post_v2_LOST_FOUND',          icon: '🔍' },
+  // Row 3 — important / urgent
   { key: 'NEIGHBORHOOD_REPORTS', tKey: 'post_v2_NEIGHBORHOOD_REPORTS',icon: '⚠️' },
+  { key: 'LOST_FOUND',           tKey: 'post_v2_LOST_FOUND',          icon: '🔍' },
+  // Row 4 — social / optional
   { key: 'EVENTS',               tKey: 'post_v2_EVENTS',              icon: '🎉' },
   { key: 'COMPETITIONS',         tKey: 'post_v2_COMPETITIONS',        icon: '🏆' },
 ]

@@ -70,17 +70,18 @@ interface CategoryItem {
   placeholderUr: string
 }
 
+// Order is UX-driven (real frequency of use), NOT alphabetical and NOT
+// enum order. Layout reads as a 3-column grid:
+//
+//   Row 1 — core / highest frequency:        MARKETPLACE   SERVICES        HOME_BUSINESSES
+//   Row 2 — daily needs:                     RIDES         REAL_ESTATE
+//   Row 3 — important / urgent:              NEIGHBORHOOD_REPORTS  LOST_FOUND
+//   Row 4 — social / optional:               EVENTS        COMPETITIONS
+//
+// Rows 2-4 will appear with 2 cells side-by-side — the grid auto-flows
+// inside `.hai-option-grid-3` so the visual rhythm is preserved.
 const CATEGORIES: CategoryItem[] = [
-  {
-    key: 'HOME_BUSINESSES',
-    label: 'الأسر المنتجة',
-    labelEn: 'Home Businesses',
-    labelUr: 'گھریلو کاروبار',
-    icon: '🍱',
-    placeholder: 'مثال: متوفر اليوم كبسة دجاج وسمبوسة — الطلب على الخاص',
-    placeholderEn: 'Example: Today: chicken kabsa and samosa — order via DM',
-    placeholderUr: 'مثال: آج چکن کبسہ اور سموسے دستیاب — آرڈر ڈی ایم پر',
-  },
+  // Row 1
   {
     key: 'MARKETPLACE',
     label: 'السوق',
@@ -102,6 +103,17 @@ const CATEGORIES: CategoryItem[] = [
     placeholderUr: 'مثال: اے سی ٹیکنیشن — 10 سال تجربہ — محلے میں خدمت',
   },
   {
+    key: 'HOME_BUSINESSES',
+    label: 'الأسر المنتجة',
+    labelEn: 'Home Businesses',
+    labelUr: 'گھریلو کاروبار',
+    icon: '🍱',
+    placeholder: 'مثال: متوفر اليوم كبسة دجاج وسمبوسة — الطلب على الخاص',
+    placeholderEn: 'Example: Today: chicken kabsa and samosa — order via DM',
+    placeholderUr: 'مثال: آج چکن کبسہ اور سموسے دستیاب — آرڈر ڈی ایم پر',
+  },
+  // Row 2
+  {
     key: 'RIDES',
     label: 'مشاوير',
     labelEn: 'Rides',
@@ -121,16 +133,7 @@ const CATEGORIES: CategoryItem[] = [
     placeholderEn: 'Example: Apartment for rent — 3 bedrooms — DM to contact',
     placeholderUr: 'مثال: کرائے کیلئے فلیٹ — 3 کمرے — رابطہ ڈی ایم پر',
   },
-  {
-    key: 'LOST_FOUND',
-    label: 'مفقودات',
-    labelEn: 'Lost & Found',
-    labelUr: 'گمشدہ اشیاء',
-    icon: '🔍',
-    placeholder: 'مثال: وجدت مفاتيح عند المسجد',
-    placeholderEn: 'Example: Found keys near the mosque',
-    placeholderUr: 'مثال: مسجد کے پاس چابیاں ملی ہیں',
-  },
+  // Row 3
   {
     key: 'NEIGHBORHOOD_REPORTS',
     label: 'بلاغات الحي',
@@ -141,6 +144,17 @@ const CATEGORIES: CategoryItem[] = [
     placeholderEn: 'Example: Water outage on main street',
     placeholderUr: 'مثال: مین سٹریٹ پر پانی کی بندش',
   },
+  {
+    key: 'LOST_FOUND',
+    label: 'مفقودات',
+    labelEn: 'Lost & Found',
+    labelUr: 'گمشدہ اشیاء',
+    icon: '🔍',
+    placeholder: 'مثال: وجدت مفاتيح عند المسجد',
+    placeholderEn: 'Example: Found keys near the mosque',
+    placeholderUr: 'مثال: مسجد کے پاس چابیاں ملی ہیں',
+  },
+  // Row 4
   {
     key: 'EVENTS',
     label: 'فعاليات ومناسبات',
