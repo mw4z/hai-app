@@ -38,12 +38,13 @@ const COLOURS = {
 
 function isDebugOn(): boolean {
   if (typeof window === 'undefined') return false
-  if ((window as any).__haiDebugSafe === true) return true
-  try {
-    const sp = new URLSearchParams(window.location.search)
-    if (sp.get('debug-safe') === '1') return true
-  } catch { /* ignore */ }
-  return false
+  // FORCE-ON for the safe-area gap investigation — middleware blocks
+  // the ?debug-safe=1 query and the user can't reach Safari devtools
+  // to toggle window.__haiDebugSafe from the iPhone. Set to false to
+  // disable once the diagnosis is captured. Explicit window.__haiDebugSafe
+  // = false in console disables it without a redeploy.
+  if ((window as any).__haiDebugSafe === false) return false
+  return true
 }
 
 function snapshot() {
