@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
-import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
 import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus, FiEdit3, FiSearch } from 'react-icons/fi'
@@ -270,6 +270,7 @@ export default function BottomNav({
             // Prevent iOS ghost-click on the element under the tap
             // (a feed post, a tab icon, etc.) once the sheet closes.
             e.preventDefault()
+            consumeNextClick()
             setShowEntrySheet(false)
           }}
         >

@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useLanguage } from '@/hooks/useLanguage'
-import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
 
 /**
  * In-app RTL-aware replacement for window.confirm().
@@ -141,6 +141,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           onPointerDown={(e) => {
             if (e.target !== e.currentTarget) return
             e.preventDefault()
+            consumeNextClick()
             close(false)
           }}
         >

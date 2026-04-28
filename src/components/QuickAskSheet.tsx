@@ -7,7 +7,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import toast from 'react-hot-toast'
 import { FiX, FiSend, FiImage } from 'react-icons/fi'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
-import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
 import { inferAskCategory, type V2Category } from '@/lib/classify/inferAskCategory'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
@@ -251,9 +251,11 @@ export default function QuickAskSheet({
         onPointerDown={(e) => {
           if (e.target !== e.currentTarget) return
           // Prevent iOS ghost-click on the underlying element after
-          // the sheet closes — the same tap would otherwise trigger
-          // whatever button sits at those coordinates in the post-close DOM.
+          // the sheet closes. preventDefault on pointerdown alone is
+          // unreliable in iOS WKWebView; consumeNextClick installs a
+          // capture-phase click swallower for one tick.
           e.preventDefault()
+          consumeNextClick()
           closeAndReset()
         }}
       />

@@ -83,6 +83,44 @@ export function isBodyScrollLocked(): boolean {
   return lockCount > 0
 }
 
+/**
+ * Swallow the very next click event on the window in capture phase.
+ * Call this RIGHT BEFORE you close a sheet via a backdrop press, so
+ * the click event iOS WKWebView synthesises after touchend can't
+ * reach whatever underlying element is now at those coordinates
+ * (post-close DOM).
+ *
+ * Why we need this even with onPointerDown + preventDefault: on iOS
+ * WKWebView, preventDefault on pointerdown does NOT reliably
+ * suppress the compatibility mouse/click events. The clicks are
+ * dispatched asynchronously after pointerup, and by then the sheet
+ * is gone — so React's pointerdown handlers can't suppress them.
+ * A capture-phase click listener on window catches the click before
+ * any element-bound onClick can fire and cancels it.
+ *
+ * Safety net: a 600ms timeout removes the listener if no click
+ * arrives — covers cases where the user starts a press on the
+ * backdrop and then drags/cancels, so the listener doesn't linger
+ * and swallow a legitimate later click.
+ */
+export function consumeNextClick(): void {
+  if (typeof window === 'undefined') return
+  let cleared = false
+  const swallow = (e: Event) => {
+    if (cleared) return
+    cleared = true
+    e.stopPropagation()
+    e.preventDefault()
+    window.removeEventListener('click', swallow, true)
+  }
+  window.addEventListener('click', swallow, true)
+  setTimeout(() => {
+    if (cleared) return
+    cleared = true
+    window.removeEventListener('click', swallow, true)
+  }, 600)
+}
+
 export function useBodyScrollLock(active: boolean) {
   useEffect(() => {
     if (!active) return

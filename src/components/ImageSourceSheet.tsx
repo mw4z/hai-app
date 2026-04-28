@@ -11,7 +11,7 @@
 
 import { FiCamera, FiImage } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
-import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
 import { t as translate } from '@/lib/i18n'
 
 interface Props {
@@ -34,6 +34,7 @@ export default function ImageSourceSheet({ open, onClose, onCamera, onGallery }:
       onPointerDown={(e) => {
         if (e.target !== e.currentTarget) return
         e.preventDefault()
+        consumeNextClick()
         onClose()
       }}
     >

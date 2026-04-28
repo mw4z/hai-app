@@ -12,7 +12,7 @@ import {
 } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
-import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
 
 /**
  * User-facing emergency alert request sheet.
@@ -137,6 +137,7 @@ export default function EmergencyRequestSheet({ open, onClose }: Props) {
         if (e.target !== e.currentTarget) return
         if (submitting) return
         e.preventDefault()
+        consumeNextClick()
         onClose()
       }}
     >

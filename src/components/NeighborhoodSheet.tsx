@@ -5,7 +5,7 @@ import { FiMapPin, FiSearch, FiX, FiNavigation, FiCornerUpLeft } from 'react-ico
 import { useLanguage } from '@/hooks/useLanguage'
 import { hapticLight } from '@/lib/haptic'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
-import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
 
 type NeighborhoodItem = {
   id: string
@@ -152,6 +152,7 @@ export default function NeighborhoodSheet({
         onPointerDown={(e) => {
           if (e.target !== e.currentTarget) return
           e.preventDefault()
+          consumeNextClick()
           onClose()
         }}
         className={`fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${

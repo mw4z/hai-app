@@ -23,7 +23,7 @@ import { showApiError } from '@/lib/apiError'
 import { detectLang } from '@/lib/detectLang'
 import { HaiSpinner } from './HaiLoader'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
-import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
 import type { TranslationKey } from '@/lib/i18n'
 import { canStartPrivateThread } from '@/lib/thread-rules'
 import { getRepLevel } from '@/lib/reputation-levels'
@@ -1435,6 +1435,7 @@ export default function PostCard({
           onPointerDown={(e) => {
             if (e.target !== e.currentTarget) return
             e.preventDefault()
+            consumeNextClick()
             setShowComments(false)
           }}
         >
@@ -1803,6 +1804,7 @@ export default function PostCard({
               // Suppress the iOS ghost-click on whatever sits at these
               // coordinates after the popup unmounts.
               e.preventDefault()
+              consumeNextClick()
               setShowUserPopup(false)
             }}
           >
