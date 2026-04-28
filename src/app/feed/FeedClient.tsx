@@ -504,15 +504,30 @@ export default function FeedClient({
       {/* Quick Ask bar — only in own neighborhood */}
       {!isReadOnly && (
         <div className="px-4 pt-4">
-          <button
+          {/* Real <input> instead of a <button>. Native focus on tap
+              starts the keyboard animation IMMEDIATELY (before the
+              click event even fires). Synchronous setShowAsk(true)
+              opens the pre-mounted sheet in the same frame; the
+              sheet's useLayoutEffect refocuses its own textarea
+              synchronously so the keyboard never dips between the
+              two inputs (browsers keep the IME open across
+              same-frame focus swaps between text inputs). */}
+          <label
             data-tour="new-post"
-            onClick={() => setShowAsk(true)}
-            className="glow-ask w-full flex items-center gap-3 bg-white border border-sky-100 rounded-2xl px-4 py-3 transition-shadow"
+            className="glow-ask w-full flex items-center gap-3 bg-white border border-sky-100 rounded-2xl px-4 py-3 transition-shadow cursor-text"
           >
             <span className="text-lg">🔎</span>
-            <span className="flex-1 text-start text-sm text-gray-400">{t('feed_ask_placeholder')}</span>
+            <input
+              type="text"
+              readOnly
+              value=""
+              placeholder={t('feed_ask_placeholder')}
+              onFocus={() => setShowAsk(true)}
+              className="flex-1 bg-transparent border-none outline-none text-sm text-gray-400 placeholder:text-gray-400 min-w-0 cursor-text"
+              aria-label={t('feed_ask_placeholder')}
+            />
             <span className="text-xs bg-sky-600 text-white px-3 py-1 rounded-full font-medium flex-shrink-0">{t('feed_quick_ask_btn')}</span>
-          </button>
+          </label>
         </div>
       )}
 
