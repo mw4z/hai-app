@@ -22,6 +22,7 @@ import { translateApiError } from '@/lib/apiError'
 import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { playSuccess, playError } from '@/lib/sound'
 import { t as translate } from '@/lib/i18n'
+import { inferAskCategory } from '@/lib/classify/inferAskCategory'
 
 // Optional category strip — Ask flow excludes COMPETITIONS (admin-only,
 // nothing to ask there) and GENERAL (admin-only fallback). Order
@@ -79,7 +80,20 @@ export default function AskNeighborsPage() {
 
   const [text, setText] = useState('')
   const [category, setCategory] = useState<string>(DEFAULT_CATEGORY)
+  // Track whether the user has explicitly overridden the suggested
+  // category. Once they pick anything from the strip, we stop nudging
+  // it on every keystroke — their choice is sacred.
+  const [userOverrode, setUserOverrode] = useState(false)
   const [showCategoryPicker, setShowCategoryPicker] = useState(false)
+
+  // v1 rule-based suggestion. Runs synchronously on every text change
+  // (sub-millisecond). If the user has manually picked a category, we
+  // do NOT overwrite their choice — only the auto-default is updated.
+  useEffect(() => {
+    if (userOverrode) return
+    const suggested = inferAskCategory(text)
+    setCategory((prev) => (prev === suggested ? prev : suggested))
+  }, [text, userOverrode])
   const [location, setLocation] = useState<{ lat: number; lng: number; name: string } | null>(null)
   const [detectingLocation, setDetectingLocation] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -233,8 +247,12 @@ export default function AskNeighborsPage() {
         />
 
         {/* Optional category picker — collapsed by default; tapping
-            "category" reveals the strip. Default badge shows the SERVICES
-            chip so the user knows what'll be sent if they don't pick. */}
+            "category" reveals the strip. While the user types, the v1
+            rule-based inferAskCategory() updates the chip. The hint
+            text changes from "Category (optional)" to "Suggested
+            category" once a non-default suggestion has matched, so
+            the user knows it was inferred — and can still tap to
+            override (sets userOverrode). */}
         <div>
           <button
             type="button"
@@ -242,7 +260,11 @@ export default function AskNeighborsPage() {
             className="flex items-center justify-between w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 active:scale-[0.99] transition-transform"
           >
             <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-              {lang === 'en' ? 'Category (optional)' : lang === 'ur' ? 'زمرہ (اختیاری)' : 'القسم (اختياري)'}
+              {userOverrode
+                ? (lang === 'en' ? 'Category' : lang === 'ur' ? 'زمرہ' : 'القسم')
+                : category !== DEFAULT_CATEGORY
+                  ? (lang === 'en' ? 'Suggested category' : lang === 'ur' ? 'تجویز کردہ زمرہ' : 'القسم المقترح')
+                  : (lang === 'en' ? 'Category (optional)' : lang === 'ur' ? 'زمرہ (اختیاری)' : 'القسم (اختياري)')}
             </span>
             <span className="flex items-center gap-1.5 text-sm font-medium text-gray-800 dark:text-gray-100">
               {selectedCategory && (
@@ -258,7 +280,11 @@ export default function AskNeighborsPage() {
               {ASK_CATEGORIES.map((c) => (
                 <button
                   key={c.key}
-                  onClick={() => { setCategory(c.key); setShowCategoryPicker(false) }}
+                  onClick={() => {
+                    setCategory(c.key)
+                    setUserOverrode(true)
+                    setShowCategoryPicker(false)
+                  }}
                   className={`flex flex-col items-center justify-center gap-1 aspect-square p-2 rounded-xl border active:scale-[0.97] transition-transform ${
                     category === c.key
                       ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/20'
