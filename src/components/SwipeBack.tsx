@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
+import { isBodyScrollLocked } from '@/hooks/useBodyScrollLock'
 
 /**
  * Edge swipe-to-go-back gesture. Invisible — no visual indicator.
@@ -51,7 +52,9 @@ export default function SwipeBack() {
 
     function isInOverlay(): boolean {
       if (document.querySelector('[data-overlay="true"]')) return true
-      if (document.body.style.overflow === 'hidden') return true
+      // useBodyScrollLock no longer sets body.style.overflow; check
+      // its module-level ref count via the helper instead.
+      if (isBodyScrollLocked()) return true
       const tag = (document.activeElement?.tagName || '').toLowerCase()
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return true
       return false

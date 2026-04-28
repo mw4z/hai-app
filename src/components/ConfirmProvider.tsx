@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
 /**
  * In-app RTL-aware replacement for window.confirm().
@@ -109,6 +110,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     },
     [pending, inputValue],
   )
+
+  useBodyScrollLock(pending !== null)
 
   // ESC cancels
   useEffect(() => {

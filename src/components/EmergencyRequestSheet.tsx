@@ -12,6 +12,7 @@ import {
 } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
 /**
  * User-facing emergency alert request sheet.
@@ -46,6 +47,8 @@ export default function EmergencyRequestSheet({ open, onClose }: Props) {
   const { lang } = useLanguage()
   const dn = (ar: string, en: string) => (lang === 'en' ? en : ar)
   const drag = useDragToDismiss<HTMLDivElement, HTMLDivElement>({ open, onDismiss: onClose })
+
+  useBodyScrollLock(open)
 
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')

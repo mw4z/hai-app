@@ -73,6 +73,16 @@ function releaseLock() {
   prev = null
 }
 
+/**
+ * Read-only check: is any sheet/modal currently locking scroll?
+ * Used by SwipeBack and PullToRefresh to suppress their gesture
+ * handlers while a sheet is open. Module-level ref count is the
+ * source of truth — no DOM-style sniffing.
+ */
+export function isBodyScrollLocked(): boolean {
+  return lockCount > 0
+}
+
 export function useBodyScrollLock(active: boolean) {
   useEffect(() => {
     if (!active) return

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { hapticMedium, hapticLight } from '@/lib/haptic'
+import { isBodyScrollLocked } from '@/hooks/useBodyScrollLock'
 
 const THRESHOLD = 80
 const MAX_PULL = 120
@@ -39,7 +40,9 @@ export default function PullToRefresh() {
       if (document.querySelector('[data-overlay="true"]')) return
       // Any modal that locks body scroll is immune too — comments sheet,
       // confirm dialogs, prompt dialogs, delete-account, emergency sheets.
-      if (document.body.style.overflow === 'hidden') return
+      // useBodyScrollLock no longer sets body.style.overflow; check its
+      // module-level ref count via the helper instead.
+      if (isBodyScrollLocked()) return
       // Only active on feed, market, and threads list
       const path = window.location.pathname
       if (path !== '/feed' && path !== '/market' && path !== '/threads') return
