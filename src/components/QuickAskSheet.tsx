@@ -66,28 +66,29 @@ export default function QuickAskSheet({ open, onClose }: { open: boolean; onClos
     if (open) textareaRef.current?.focus()
   }, [open])
 
-  // Lock the feed scroll only WHILE open. The pre-mount means this
-  // component is alive at all times; we must NOT freeze the page just
-  // because the sheet exists. Effect re-runs when `open` flips.
+  // Lock feed scroll while open WITHOUT repositioning the body. The
+  // older "position:fixed + top:-scrollY" pattern caused the visible
+  // page to jump UP by the saved scrollY each time the sheet opened —
+  // looked like the page sliding up before the popup arrived.
+  // overflow:hidden on html+body + touch-action:none keeps the feed
+  // from panning on iOS WKWebView and Android WebView without any
+  // visible re-layout.
   useEffect(() => {
     if (!open) return
-    const scrollY = window.scrollY
+    const html = document.documentElement
+    const body = document.body
     const prev = {
-      position: document.body.style.position,
-      top: document.body.style.top,
-      width: document.body.style.width,
-      overflow: document.body.style.overflow,
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      bodyTouchAction: body.style.touchAction,
     }
-    document.body.style.position = 'fixed'
-    document.body.style.top = `-${scrollY}px`
-    document.body.style.width = '100%'
-    document.body.style.overflow = 'hidden'
+    html.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+    body.style.touchAction = 'none'
     return () => {
-      document.body.style.position = prev.position
-      document.body.style.top = prev.top
-      document.body.style.width = prev.width
-      document.body.style.overflow = prev.overflow
-      window.scrollTo(0, scrollY)
+      html.style.overflow = prev.htmlOverflow
+      body.style.overflow = prev.bodyOverflow
+      body.style.touchAction = prev.bodyTouchAction
     }
   }, [open])
 
