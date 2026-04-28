@@ -18,7 +18,6 @@ import PullToRefresh from '@/components/PullToRefresh'
 import { LangProvider } from '@/hooks/useLanguage'
 import { NetworkProvider } from '@/lib/network'
 import OfflineBanner from '@/components/OfflineBanner'
-import SafeAreaDebug from '@/components/SafeAreaDebug'
 import { checkEnvironment } from '@/lib/env-check'
 import type { Lang } from '@/lib/i18n'
 import './globals.css'
@@ -126,28 +125,6 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning>
-        {/* DIAGNOSTIC: real DOM safe-area cover painted CYAN. If
-            html::before renders magenta/lime but this paints cyan
-            *over* it, that proves a real DOM element works while
-            html::before doesn't on iOS WKWebView. If body becomes
-            position:fixed during scroll lock, this cover also gets
-            re-anchored to body's top (off-screen) — that proves
-            ANY child of body can't host the cover during lock. */}
-        <div
-          id="__hai_safe_top_diag"
-          aria-hidden="true"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 'env(safe-area-inset-top, 0px)',
-            background: 'cyan',
-            opacity: 0.6,
-            zIndex: 2,
-            pointerEvents: 'none',
-          }}
-        />
         {/* Blank cover — matches AppSplash's background gradient exactly
             so the handoff from native launch storyboard → preload → JS
             AppSplash shows no color flash. No logo or text here; the
@@ -211,7 +188,6 @@ export default function RootLayout({
           {/* Offline banner — mounted last so its z-index sits above
               the rest of the chrome but below sheets/modals. */}
           <OfflineBanner />
-          <SafeAreaDebug />
           </ConfirmProvider>
           </NetworkProvider>
         </LangProvider>

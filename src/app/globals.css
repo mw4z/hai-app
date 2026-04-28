@@ -443,8 +443,24 @@ html, body {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Reduce paint on scroll — promote fixed/sticky elements to own layer */
-.glass, .glass-bottom, .fixed, [class*="sticky"] {
+/* Reduce paint on scroll — promote fixed/sticky elements to own
+   layer.
+
+   IMPORTANT: do NOT include `.fixed` or any wrapper that contains
+   position:fixed descendants. `will-change: transform` (and an
+   active transform / filter / perspective) makes the element a
+   *containing block* for its position:fixed descendants — so a
+   sheet backdrop rendered inside a `.fixed` parent (e.g. the
+   BottomNav <nav>) gets re-anchored to that parent's box instead
+   of the viewport. The visible symptom on iOS: the backdrop covers
+   only the bottom of the screen, the safe-area + page-top show
+   undimmed, reading as a "gap above the header" once a sheet opens.
+
+   Limit promotion to elements that are themselves the layer (the
+   header glass and explicit sticky elements). The dropped
+   selectors gain nothing perf-wise since position:fixed already
+   forms its own stacking context. */
+.glass, .glass-bottom {
   will-change: transform;
   backface-visibility: hidden;
 }
@@ -476,10 +492,14 @@ body {
    page content behind it as the visible "gap above the header".
    Putting the cover on <html> keeps it anchored to the viewport
    regardless of body's positioning. */
-/* TEMP DIAGNOSTIC: bright magenta. If you see magenta in the
-   safe-area zone, html::before is rendering. If you see black,
-   iOS WKWebView is dropping html::before and we need a different
-   element to paint the safe-area cover. */
+/* Safe-area cover painted by html::before (NOT body::before). Why:
+   useBodyScrollLock applies position:fixed to <body>. While that
+   alone doesn't make body a containing block for fixed descendants
+   (only transform/filter/perspective/will-change does), keeping the
+   cover on <html> guarantees the cover never re-anchors regardless
+   of what we add to body in the future. z-index:1 keeps the cover
+   below popup backdrops (z-40+) so they dim it uniformly with the
+   page below. */
 html::before {
   content: '';
   position: fixed;
@@ -489,10 +509,12 @@ html::before {
   height: env(safe-area-inset-top, 0px);
   z-index: 1;
   pointer-events: none;
-  background: magenta !important;
+  background: #ffffff;
+  background: var(--hai-safe-top-bg, var(--hai-surface-1, #ffffff));
 }
 html.dark::before {
-  background: lime !important;
+  background: #101619;
+  background: var(--hai-safe-top-bg, var(--hai-surface-1, #101619));
 }
 /* Safe-area cover is now rendered as #__hai_safe_top in layout.tsx —
    a real DOM node paints reliably across WKWebView versions. */
