@@ -24,7 +24,7 @@ async function runArchive() {
       where: { status: 'ACTIVE' },
       select: {
         id: true,
-        category: true,
+        newCategory: true,
         createdAt: true,
         activeThreadId: true,
         isPinned: true,

@@ -2,16 +2,13 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import FeedClient from './FeedClient'
-import { PostCategory, PostCategoryV2 } from '@prisma/client'
+import { PostCategoryV2 } from '@prisma/client'
 import { getFeedBoost } from '@/lib/reputation-levels'
 import { cached } from '@/lib/cache'
 import { shouldArchivePost } from '@/lib/postExpiry'
-import { legacyOf } from '@/lib/postCategory'
-import { FLAGS } from '@/lib/flags'
 
-// v2 chip values posted by the new feed UI. Phase 3 read switch maps
-// these to the v2 column when USE_NEW_CATEGORY is on, otherwise falls
-// back to legacyOf() so the legacy column still works.
+// v2 chip values posted by the feed UI — internal reads/writes go
+// through the v2 column directly during Phase 3 read-flag-on era.
 const V2_FILTER_VALUES: readonly string[] = [
   'HOME_BUSINESSES','MARKETPLACE','SERVICES','RIDES','REAL_ESTATE',
   'LOST_FOUND','NEIGHBORHOOD_REPORTS','EVENTS','COMPETITIONS','GENERAL',
@@ -41,23 +38,18 @@ export default async function FeedPage({
 
   const isFemale = user.gender === 'FEMALE'
 
-  // Filter mapping — accept either v2 chip values from the new feed UI
-  // or legacy enum values that older clients may still send. ALL +
-  // WOMEN_ONLY keep their existing semantics; v2 keys route through
-  // newCategory when the read flag is on, else through the legacy
-  // column via legacyOf().
+  // Audience-based ALL: female viewers see every audience; everyone
+  // else gets WOMEN-targeted posts filtered out via the audience field.
+  // v2 chips route through the v2 column directly. Anything else (a
+  // legacy chip slipping through somehow) falls through with no
+  // category filter — defensive.
   let categoryFilter: object
   if (category === 'ALL') {
-    categoryFilter = isFemale ? {} : { category: { not: PostCategory.WOMEN_ONLY } }
-  } else if (category === 'WOMEN_ONLY') {
-    categoryFilter = isFemale ? { category: PostCategory.WOMEN_ONLY } : { id: '' }
+    categoryFilter = isFemale ? {} : { audience: { not: 'WOMEN' } }
   } else if (V2_FILTER_VALUES.includes(category)) {
-    const v2 = category as PostCategoryV2
-    categoryFilter = FLAGS.USE_NEW_CATEGORY
-      ? { newCategory: v2 }
-      : { category: legacyOf(v2) }
+    categoryFilter = { newCategory: category as PostCategoryV2 }
   } else {
-    categoryFilter = { category: category as PostCategory }
+    categoryFilter = {}
   }
 
   // Run all DB queries in parallel
@@ -149,10 +141,14 @@ export default async function FeedPage({
     }).catch(() => {})
   }
 
-  const TYPE_BOOST: Record<string, number> = {
-    ALERT: 5, NEIGHBORHOOD_ISSUE: 4, LOOKING_FOR: 3, LOST_FOUND: 2, MOSQUE: 2,
+  // v2 boost map. NEIGHBORHOOD_REPORTS absorbs legacy ALERT +
+  // NEIGHBORHOOD_ISSUE; EVENTS keeps the small MOSQUE bump. Request
+  // posts are boosted via intent === 'REQUEST' below, replacing the
+  // legacy LOOKING_FOR boost.
+  const TYPE_BOOST: Partial<Record<PostCategoryV2, number>> = {
+    NEIGHBORHOOD_REPORTS: 5, LOST_FOUND: 2, EVENTS: 2,
   }
-  const COMMERCIAL = new Set(['MARKETPLACE', 'FOOD_HOME', 'REAL_ESTATE', 'SERVICES'])
+  const COMMERCIAL = new Set<PostCategoryV2>(['MARKETPLACE', 'HOME_BUSINESSES', 'REAL_ESTATE', 'SERVICES'])
 
   // Score with time decay
   const scored = activePosts.map(p => {
@@ -160,9 +156,10 @@ export default async function FeedPage({
     if (p.isFeatured) return { ...p, _score: 999998 }
     const hoursAgo = (Date.now() - new Date(p.createdAt).getTime()) / 3600_000
     const engagement = Math.min(p._count.comments * 3 + p._count.reactions, 30)
-    const boost = TYPE_BOOST[p.category] || 0
+    const boost = (p.newCategory && TYPE_BOOST[p.newCategory]) || 0
+    const intentBoost = p.intent === 'REQUEST' ? 3 : 0
     const repBoost = getFeedBoost(p.author.reputation)
-    return { ...p, _score: (50 + engagement + boost + repBoost) / (hoursAgo + 2) }
+    return { ...p, _score: (50 + engagement + boost + intentBoost + repBoost) / (hoursAgo + 2) }
   }).sort((a, b) => b._score - a._score)
 
   // Anti-domination: max 2 consecutive posts per same author
@@ -181,7 +178,7 @@ export default async function FeedPage({
   const balanced: typeof deduped = []
   let commercialStreak = 0
   for (const post of [...deduped, ...deferred]) {
-    if (COMMERCIAL.has(post.category)) {
+    if (post.newCategory && COMMERCIAL.has(post.newCategory)) {
       commercialStreak++
       if (commercialStreak >= 3) { balanced.push(post); continue }
     } else {

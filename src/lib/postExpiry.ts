@@ -5,22 +5,20 @@
  * Posts with active threads or high engagement get extended.
  */
 
-// Free durations in hours per category
+// Free durations in hours per v2 category. Callers pass the post's v2
+// category (post.newCategory or readCategory(post)) so legacy values
+// never reach this map.
 const EXPIRY_HOURS: Record<string, number> = {
-  ALERT: 24,
-  LOOKING_FOR: 48,
-  RIDE_REQUEST: 12,
-  LOST_FOUND: 168,        // 7 days
-  MARKETPLACE: 72,        // 3 days
-  FOOD_HOME: 24,
-  SERVICES: 24,           // paid extension later
-  REAL_ESTATE: 24,        // paid extension later
-  NEIGHBORHOOD_ISSUE: 168, // 7 days
-  GENERAL: 72,            // 3 days
-  CONTESTS: 168,          // 7 days
-  MOSQUE: 168,            // 7 days
-  EID_RAMADAN: 168,       // 7 days
-  WOMEN_ONLY: 72,         // 3 days
+  LOST_FOUND:           168,   // 7 days
+  MARKETPLACE:          72,    // 3 days
+  HOME_BUSINESSES:      24,
+  SERVICES:             24,    // paid extension later
+  REAL_ESTATE:          24,    // paid extension later
+  NEIGHBORHOOD_REPORTS: 168,   // 7 days
+  EVENTS:               168,   // 7 days
+  COMPETITIONS:         168,   // 7 days
+  RIDES:                12,
+  GENERAL:              72,    // 3 days
 }
 
 const DEFAULT_HOURS = 72 // 3 days fallback
@@ -29,19 +27,24 @@ const DEFAULT_HOURS = 72 // 3 days fallback
 const HIGH_ENGAGEMENT_COMMENTS = 5
 
 /**
- * Get expiry date for a post based on its category and creation time.
+ * Get expiry date for a post based on its v2 category and creation time.
+ * Pass post.newCategory (the v2 column) — legacy values are not
+ * supported here and will fall through to DEFAULT_HOURS.
  */
-export function getPostExpiryDate(category: string, createdAt: Date): Date {
-  const hours = EXPIRY_HOURS[category] || DEFAULT_HOURS
+export function getPostExpiryDate(category: string | null | undefined, createdAt: Date): Date {
+  const hours = (category && EXPIRY_HOURS[category]) || DEFAULT_HOURS
   return new Date(createdAt.getTime() + hours * 60 * 60 * 1000)
 }
 
 /**
  * Check if a post should be archived.
  * Returns true if expired and no active threads or high engagement.
+ *
+ * Reads post.newCategory (the v2 column) for the bucket lookup; falls
+ * back to DEFAULT_HOURS for any row whose newCategory is null.
  */
 export function shouldArchivePost(post: {
-  category: string
+  newCategory?: string | null
   createdAt: Date
   activeThreadId?: string | null
   isPinned?: boolean
@@ -53,7 +56,7 @@ export function shouldArchivePost(post: {
   // Posts with active coordination threads stay visible
   if (post.activeThreadId) return false
 
-  const hours = EXPIRY_HOURS[post.category] || DEFAULT_HOURS
+  const hours = (post.newCategory && EXPIRY_HOURS[post.newCategory]) || DEFAULT_HOURS
 
   // High engagement posts get 2x duration
   const commentCount = post._count?.comments || 0
@@ -67,13 +70,14 @@ export function shouldArchivePost(post: {
 
 /**
  * Get remaining time for a post in human-readable format.
+ * Accepts the v2 category string (post.newCategory).
  */
-export function getTimeRemaining(category: string, createdAt: Date, commentCount = 0): {
+export function getTimeRemaining(category: string | null | undefined, createdAt: Date, commentCount = 0): {
   expired: boolean
   hoursLeft: number
   label: { ar: string; en: string }
 } {
-  const hours = EXPIRY_HOURS[category] || DEFAULT_HOURS
+  const hours = (category && EXPIRY_HOURS[category]) || DEFAULT_HOURS
   const multiplier = commentCount >= HIGH_ENGAGEMENT_COMMENTS ? 2 : 1
   const expiryMs = hours * multiplier * 60 * 60 * 1000
   const expiryDate = new Date(createdAt.getTime() + expiryMs)

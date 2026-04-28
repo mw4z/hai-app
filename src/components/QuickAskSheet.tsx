@@ -31,7 +31,7 @@ export default function QuickAskSheet({ onClose }: { onClose: () => void }) {
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: text.trim(), body: text.trim(), category: 'LOOKING_FOR' }),
+        body: JSON.stringify({ title: text.trim(), body: text.trim(), category: 'SERVICES', intent: 'REQUEST' }),
       })
       const data = await res.json()
       if (!res.ok) { toast.error(typeof data.error === 'string' ? data.error : data.error?.message || 'فشل النشر'); return }

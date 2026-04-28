@@ -243,10 +243,12 @@ interface ResolvedTokens {
 async function resolveNewPostTokens(
   neighborhoodId: string,
   authorId: string,
-  category: string,
+  audience: string | null | undefined,
 ): Promise<ResolvedTokens> {
+  // Audience targeting now lives on Post.audience — the legacy
+  // WOMEN_ONLY category is no longer how this is expressed.
   const genderFilter =
-    category === 'WOMEN_ONLY' ? ({ gender: 'FEMALE' } as const) : {}
+    audience === 'WOMEN' ? ({ gender: 'FEMALE' } as const) : {}
 
   const users = await db.user.findMany({
     where: {
@@ -384,21 +386,21 @@ interface JobRow {
   maxAttempts: number
 }
 
+// v2 PostCategoryV2 keys. Push titles use the post's effective v2
+// category from the job payload. Request-flow posts (ask) get the
+// neutral category label — the "🙋 أبحث عن" affordance is now signaled
+// via intent, not a separate category.
 const CATEGORY_LABEL_AR: Record<string, string> = {
-  ALERT: '🔔 تنبيه',
-  NEIGHBORHOOD_ISSUE: '⚠️ مشكلة بالحي',
-  LOST_FOUND: '🔍 مفقودات',
-  MARKETPLACE: '🛒 سوق',
-  FOOD_HOME: '🍱 طبخ منزلي',
-  REAL_ESTATE: '🏠 عقار',
-  SERVICES: '🔧 خدمة',
-  LOOKING_FOR: '🙋 أبحث عن',
-  MOSQUE: '🕌 مسجد',
-  EID_RAMADAN: '🎉 مناسبات',
-  CONTESTS: '🏆 مسابقة',
-  RIDE_REQUEST: '🚗 توصيل',
-  WOMEN_ONLY: '👩 للنساء',
-  GENERAL: '💬 عام',
+  NEIGHBORHOOD_REPORTS: '⚠️ بلاغ في الحي',
+  LOST_FOUND:           '🔍 مفقودات',
+  MARKETPLACE:          '🛒 سوق',
+  HOME_BUSINESSES:      '🍱 أسر منتجة',
+  REAL_ESTATE:          '🏠 عقار',
+  SERVICES:             '🔧 خدمة',
+  EVENTS:               '🎉 فعاليات',
+  COMPETITIONS:         '🏆 مسابقة',
+  RIDES:                '🚗 توصيل',
+  GENERAL:              '💬 عام',
 }
 
 async function processNewPost(job: JobRow): Promise<JobOutcome> {
@@ -422,6 +424,8 @@ async function processNewPost(job: JobRow): Promise<JobOutcome> {
       id: true,
       status: true,
       neighborhoodId: true,
+      audience: true,
+      newCategory: true,
       author: { select: { id: true, status: true } },
     },
   })
@@ -432,10 +436,13 @@ async function processNewPost(job: JobRow): Promise<JobOutcome> {
   }
   if (post.neighborhoodId !== job.targetRef) return 'dropped'
 
+  // Audience targeting (e.g. WOMEN-only) is now sourced from the post's
+  // audience column rather than inferred from the legacy WOMEN_ONLY
+  // category. The push title still uses the v2 category for display.
   const { tokens, recipientUserCount } = await resolveNewPostTokens(
     job.targetRef,
     authorId,
-    category,
+    post.audience,
   )
   if (tokens.length === 0) {
     console.log('[NOTIF_CRON] drop: no recipients (new_post)', { jobId: job.id })
@@ -443,7 +450,11 @@ async function processNewPost(job: JobRow): Promise<JobOutcome> {
   }
 
   const author = authorName?.trim() || 'جار'
-  const catLabel = CATEGORY_LABEL_AR[category] || ''
+  // Prefer the post's stored v2 category for the label; fall back to
+  // whatever the payload had (older enqueues may carry a legacy value
+  // from a build still in the field).
+  const labelKey = post.newCategory || category
+  const catLabel = (labelKey && CATEGORY_LABEL_AR[labelKey]) || ''
   const pushTitle = catLabel ? `${author} · ${catLabel}` : author
   const pushBody = title.slice(0, 180)
 
@@ -456,7 +467,7 @@ async function processNewPost(job: JobRow): Promise<JobOutcome> {
     data: {
       type: 'new_post',
       postId,
-      category,
+      category: labelKey || '',
       deeplink: `hai://feed?post=${postId}`,
     },
   })
@@ -1280,12 +1291,13 @@ async function processNewRideRequest(job: JobRow): Promise<JobOutcome> {
   if (ride.requester.status === 'BANNED_TEMP' || ride.requester.status === 'BANNED_PERM') return 'dropped'
 
   // Reuse the existing new-post fan-out: same prefs, quiet hours,
-  // gender filtering, token collection. Category RIDE_REQUEST
-  // slots into the standard feed-preference pipeline.
+  // token collection. Rides are not WOMEN-targeted, so we pass
+  // audience=ALL — the underlying resolver only filters when audience
+  // is 'WOMEN'.
   const { tokens, recipientUserCount } = await resolveNewPostTokens(
     ride.neighborhoodId,
     requesterId,
-    'RIDE_REQUEST',
+    'ALL',
   )
   if (tokens.length === 0) {
     console.log('[NOTIF_CRON] drop: no recipients (new_ride_request)', { jobId: job.id })

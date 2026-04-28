@@ -811,8 +811,9 @@ export default function PostCard({
   }
 
   // Visual styling for "looking for" cards is now driven by intent —
-  // covers both legacy LOOKING_FOR posts and the new Ask flow.
-  const isLookingFor = post.category === 'LOOKING_FOR' || isRequest
+  // covers both legacy LOOKING_FOR posts (mapped to intent=REQUEST in
+  // Phase 2) and the new Ask flow.
+  const isLookingFor = isRequest
 
   return (
     <div className={`hai-card relative animate-fade-in-up glow-card ${post.isPinned ? 'hai-post--pinned' : ''} ${isLookingFor ? 'hai-post--looking-for' : ''}`}>
@@ -844,7 +845,7 @@ export default function PostCard({
           </div>
         </div>
         <div className="hai-row-2">
-          <span className="hai-category-badge" data-category={post.category}>{style.icon} {t(style.tKey)}</span>
+          <span className="hai-category-badge" data-category={v2Category}>{style.icon} {t(style.tKey)}</span>
           {isRequest && (
             <span
               className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
@@ -1294,7 +1295,7 @@ export default function PostCard({
 
         <div className="hai-row-1">
           {/* Contact / DM button */}
-          {post.author.id !== currentUserId && canStartPrivateThread(post.category) && (
+          {post.author.id !== currentUserId && canStartPrivateThread(v2Category) && (
             post.coordinationMode === 'EXCLUSIVE' && post.activeThreadId ? (
               <span className="hai-action-btn is-warning hai-action-btn--static">
                 <FiMail className="hai-icon-md hai-action-btn__icon" />

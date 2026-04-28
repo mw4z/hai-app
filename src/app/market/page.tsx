@@ -2,19 +2,24 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { cached } from '@/lib/cache'
-import { PostCategory } from '@prisma/client'
+import { PostCategoryV2 } from '@prisma/client'
 import PostCard from '@/components/PostCard'
 import Link from 'next/link'
 import MarketTab from './MarketTab'
 
-const ALL_MARKET_CATEGORIES = [
-  PostCategory.MARKETPLACE,
-  PostCategory.FOOD_HOME,
-  PostCategory.REAL_ESTATE,
-  PostCategory.SERVICES,
-  PostCategory.LOOKING_FOR,
-  PostCategory.RIDE_REQUEST,
+// v2 categories that belong on the market surface. The legacy
+// LOOKING_FOR / RIDE_REQUEST request-style buckets are intentionally
+// excluded — request flows now go through intent: 'REQUEST' filtering,
+// driven from the dedicated Ask tab.
+const ALL_MARKET_CATEGORIES: PostCategoryV2[] = [
+  'MARKETPLACE',
+  'HOME_BUSINESSES',
+  'REAL_ESTATE',
+  'SERVICES',
 ]
+
+const SELLING_CATEGORIES: PostCategoryV2[] = ['MARKETPLACE', 'HOME_BUSINESSES', 'REAL_ESTATE']
+const SERVICES_CATEGORIES: PostCategoryV2[] = ['SERVICES']
 
 export default async function MarketPage({
   searchParams,
@@ -32,11 +37,25 @@ export default async function MarketPage({
 
   const tab = searchParams.tab || 'ALL'
 
-  const categoryMap: Record<string, PostCategory[]> = {
-    ALL:       ALL_MARKET_CATEGORIES,
-    SELLING:   [PostCategory.MARKETPLACE, PostCategory.FOOD_HOME, PostCategory.REAL_ESTATE],
-    REQUESTS:  [PostCategory.LOOKING_FOR, PostCategory.RIDE_REQUEST],
-    SERVICES:  [PostCategory.SERVICES],
+  // Build the per-tab where filter against the v2 column directly. The
+  // REQUESTS tab is no longer a category list — it's an intent filter
+  // that crosses every v2 commercial bucket (any post asking for
+  // something, regardless of category).
+  let tabFilter: object
+  switch (tab) {
+    case 'SELLING':
+      tabFilter = { newCategory: { in: SELLING_CATEGORIES } }
+      break
+    case 'REQUESTS':
+      tabFilter = { intent: 'REQUEST', newCategory: { in: ALL_MARKET_CATEGORIES } }
+      break
+    case 'SERVICES':
+      tabFilter = { newCategory: { in: SERVICES_CATEGORIES } }
+      break
+    case 'ALL':
+    default:
+      tabFilter = { newCategory: { in: ALL_MARKET_CATEGORIES } }
+      break
   }
 
   const posts = await cached(`market:${user.neighborhoodId}:${tab}`, 30_000, () =>
@@ -44,7 +63,7 @@ export default async function MarketPage({
       where: {
         neighborhoodId: user.neighborhoodId!,
         status: { in: ['ACTIVE', 'IN_PROGRESS'] },
-        category: { in: categoryMap[tab] || ALL_MARKET_CATEGORIES },
+        ...tabFilter,
       },
       include: {
         author: { select: { id: true, name: true, lastName: true, reputation: true, accountType: true, providerStatus: true } },

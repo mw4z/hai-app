@@ -5,10 +5,10 @@ import Link from 'next/link'
 import RiyalIcon from '@/components/RiyalIcon'
 
 const PRICING: Record<string, { label: string; price: number }[]> = {
-  MARKETPLACE:  [{ label: 'إعلان عادي', price: 10 }, { label: 'إعلان بارز', price: 30 }],
-  FOOD_HOME:    [{ label: 'نشر يومي', price: 10 }, { label: 'نشر أسبوعي', price: 25 }],
-  REAL_ESTATE:  [{ label: 'إعلان عادي', price: 20 }, { label: 'إعلان بارز', price: 50 }],
-  SERVICES:     [{ label: 'إدراج شهري', price: 50 }, { label: 'إدراج بارز', price: 150 }],
+  MARKETPLACE:     [{ label: 'إعلان عادي', price: 10 }, { label: 'إعلان بارز', price: 30 }],
+  HOME_BUSINESSES: [{ label: 'نشر يومي', price: 10 }, { label: 'نشر أسبوعي', price: 25 }],
+  REAL_ESTATE:     [{ label: 'إعلان عادي', price: 20 }, { label: 'إعلان بارز', price: 50 }],
+  SERVICES:        [{ label: 'إدراج شهري', price: 50 }, { label: 'إدراج بارز', price: 150 }],
 }
 
 export default async function PayPage({ params }: { params: { id: string } }) {
@@ -21,7 +21,9 @@ export default async function PayPage({ params }: { params: { id: string } }) {
 
   if (!post) redirect('/feed')
 
-  const plans = PRICING[post.category] || [{ label: 'نشر', price: 10 }]
+  // Phase 3 read-flag-on era: read v2 column directly. Falls through
+  // to the default plan if newCategory is null (pre-Phase-2 row).
+  const plans = (post.newCategory && PRICING[post.newCategory]) || [{ label: 'نشر', price: 10 }]
 
   return (
     <main className="min-h-screen bg-white dark:bg-gray-900 flex flex-col px-4 pt-10">

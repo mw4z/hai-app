@@ -124,11 +124,12 @@ export async function POST(req: NextRequest) {
     if (postId) {
       const post = await db.post.findUnique({
         where: { id: postId },
-        select: { category: true, coordinationMode: true, activeThreadId: true, authorId: true, status: true },
+        select: { newCategory: true, coordinationMode: true, activeThreadId: true, authorId: true, status: true },
       })
 
-      // Block threads on categories that don't allow private contact
-      if (post && !canStartPrivateThread(post.category)) {
+      // Block threads on v2 categories that don't allow private contact.
+      // Falls through to allowed if newCategory is null (pre-Phase-2 row).
+      if (post && post.newCategory && !canStartPrivateThread(post.newCategory)) {
         return NextResponse.json({ error: 'هذا النوع من المنشورات لا يدعم المحادثات الخاصة' }, { status: 403 })
       }
 

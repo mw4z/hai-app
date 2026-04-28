@@ -655,7 +655,7 @@ export default function FeedClient({
       {/* Posts */}
       <div className="px-4 py-4 space-y-3">
         {displayPosts.length === 0 ? (
-          selectedCategory === 'CONTESTS' ? (
+          selectedCategory === 'COMPETITIONS' ? (
             <div className="text-center py-16">
               <div className="text-6xl mb-4">🏆</div>
               <p className="text-gray-500 dark:text-gray-300 font-bold text-xl mb-2">{t('contests_coming_soon')}</p>

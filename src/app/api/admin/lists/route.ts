@@ -23,8 +23,10 @@ export async function GET(req: NextRequest) {
   const isNbhdMod = admin.role === 'NEIGHBORHOOD_MOD'
   const nbhdFilter = isNbhdMod && admin.neighborhoodId ? { neighborhoodId: admin.neighborhoodId } : {}
   const userNbhdFilter = isNbhdMod && admin.neighborhoodId ? { neighborhoodId: admin.neighborhoodId } : {}
-  // Male mods cannot see or manage WOMEN_ONLY posts
-  const womenOnlyFilter = admin.gender !== 'FEMALE' ? { category: { not: 'WOMEN_ONLY' as any } } : {}
+  // Male mods cannot see or manage WOMEN-targeted posts. Audience
+  // targeting now lives in Post.audience — the legacy WOMEN_ONLY
+  // category is no longer how this is expressed.
+  const womenOnlyFilter = admin.gender !== 'FEMALE' ? { audience: { not: 'WOMEN' as any } } : {}
 
   switch (list) {
     case 'reported_posts': {

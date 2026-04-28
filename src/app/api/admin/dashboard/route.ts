@@ -23,8 +23,10 @@ export async function GET() {
 
   // Scoping: neighborhood mods only see their neighborhood
   const nbhdFilter = isPlatform ? {} : { neighborhoodId: admin.neighborhoodId! }
-  // Male mods don't see WOMEN_ONLY posts in counts
-  const womenOnlyFilter = admin.gender !== 'FEMALE' ? { category: { not: 'WOMEN_ONLY' as any } } : {}
+  // Male mods don't see WOMEN-targeted posts in counts. Audience
+  // targeting now lives in Post.audience — the legacy WOMEN_ONLY
+  // category is no longer how this is expressed.
+  const womenOnlyFilter = admin.gender !== 'FEMALE' ? { audience: { not: 'WOMEN' as any } } : {}
 
   // Active users = real humans who completed the full onboarding flow
   // (OTP + neighborhood verification). This is tighter than just
@@ -68,7 +70,7 @@ export async function GET() {
       where: { ...nbhdFilter, status: { in: ['ACTIVE', 'IN_PROGRESS'] }, author: { isSeed: false, isVerified: true, addressVerified: true } },
       select: {
         id: true,
-        category: true,
+        newCategory: true,
         createdAt: true,
         activeThreadId: true,
         isPinned: true,

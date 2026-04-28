@@ -211,34 +211,31 @@
      itself is the single source of truth (no TS side-map of colors).
      Dark-mode counterparts below (.dark scope).
      ═══════════════════════════════════════════════════════════════════ */
-  --hai-category-ALERT-bg:              #fef2f2;
-  --hai-category-ALERT-fg:              #dc2626;
-  --hai-category-NEIGHBORHOOD_ISSUE-bg: #fff7ed;
-  --hai-category-NEIGHBORHOOD_ISSUE-fg: #ea580c;
-  --hai-category-LOOKING_FOR-bg:        #f0f9ff;
-  --hai-category-LOOKING_FOR-fg:        #0284c7;
-  --hai-category-MARKETPLACE-bg:        #fffbeb;
-  --hai-category-MARKETPLACE-fg:        #d97706;
-  --hai-category-FOOD_HOME-bg:          #f7fee7;
-  --hai-category-FOOD_HOME-fg:          #4d7c0f;
-  --hai-category-REAL_ESTATE-bg:        #f0fdfa;
-  --hai-category-REAL_ESTATE-fg:        #0f766e;
-  --hai-category-SERVICES-bg:           #eff6ff;
-  --hai-category-SERVICES-fg:           #2563eb;
-  --hai-category-LOST_FOUND-bg:         #faf5ff;
-  --hai-category-LOST_FOUND-fg:         #9333ea;
-  --hai-category-MOSQUE-bg:             #e0f7f2;
-  --hai-category-MOSQUE-fg:             #006d57;
-  --hai-category-EID_RAMADAN-bg:        #fefce8;
-  --hai-category-EID_RAMADAN-fg:        #a16207;
-  --hai-category-CONTESTS-bg:           #fdf4ff;
-  --hai-category-CONTESTS-fg:           #a21caf;
-  --hai-category-RIDE_REQUEST-bg:       #eef2ff;
-  --hai-category-RIDE_REQUEST-fg:       #4f46e5;
-  --hai-category-WOMEN_ONLY-bg:         #fdf2f8;
-  --hai-category-WOMEN_ONLY-fg:         #db2777;
-  --hai-category-GENERAL-bg:            #f9fafb;
-  --hai-category-GENERAL-fg:            #4b5563;
+  /* v2 PostCategoryV2 palette. Picks reuse the most-mapped legacy
+     palette for visual continuity (NEIGHBORHOOD_REPORTS keeps ALERT's
+     red, EVENTS keeps EID_RAMADAN's warm gold, HOME_BUSINESSES keeps
+     FOOD_HOME's olive, RIDES keeps RIDE_REQUEST's indigo,
+     COMPETITIONS keeps CONTESTS's magenta). */
+  --hai-category-NEIGHBORHOOD_REPORTS-bg: #fef2f2;
+  --hai-category-NEIGHBORHOOD_REPORTS-fg: #dc2626;
+  --hai-category-MARKETPLACE-bg:          #fffbeb;
+  --hai-category-MARKETPLACE-fg:          #d97706;
+  --hai-category-HOME_BUSINESSES-bg:      #f7fee7;
+  --hai-category-HOME_BUSINESSES-fg:      #4d7c0f;
+  --hai-category-REAL_ESTATE-bg:          #f0fdfa;
+  --hai-category-REAL_ESTATE-fg:          #0f766e;
+  --hai-category-SERVICES-bg:             #eff6ff;
+  --hai-category-SERVICES-fg:             #2563eb;
+  --hai-category-LOST_FOUND-bg:           #faf5ff;
+  --hai-category-LOST_FOUND-fg:           #9333ea;
+  --hai-category-EVENTS-bg:               #fefce8;
+  --hai-category-EVENTS-fg:               #a16207;
+  --hai-category-COMPETITIONS-bg:         #fdf4ff;
+  --hai-category-COMPETITIONS-fg:         #a21caf;
+  --hai-category-RIDES-bg:                #eef2ff;
+  --hai-category-RIDES-fg:                #4f46e5;
+  --hai-category-GENERAL-bg:              #f9fafb;
+  --hai-category-GENERAL-fg:              #4b5563;
 
   /* ═══════════════════════════════════════════════════════════════════
      PRODUCT-STATE TOKEN LAYER (Pass 7)
@@ -428,34 +425,27 @@
   --hai-shadow-fab: 0 8px 22px rgba(0, 168, 132, 0.38), 0 2px 6px rgba(0, 0, 0, 0.55);
 
   /* Category palette — muted dark-mode counterparts */
-  --hai-category-ALERT-bg:              rgba(239, 68, 68, 0.12);
-  --hai-category-ALERT-fg:              #fca5a5;
-  --hai-category-NEIGHBORHOOD_ISSUE-bg: rgba(249, 115, 22, 0.12);
-  --hai-category-NEIGHBORHOOD_ISSUE-fg: #fdba74;
-  --hai-category-LOOKING_FOR-bg:        rgba(14, 165, 233, 0.12);
-  --hai-category-LOOKING_FOR-fg:        #7dd3fc;
-  --hai-category-MARKETPLACE-bg:        rgba(234, 179, 8, 0.12);
-  --hai-category-MARKETPLACE-fg:        #fcd34d;
-  --hai-category-FOOD_HOME-bg:          rgba(132, 204, 22, 0.12);
-  --hai-category-FOOD_HOME-fg:          #bef264;
-  --hai-category-REAL_ESTATE-bg:        rgba(20, 184, 166, 0.12);
-  --hai-category-REAL_ESTATE-fg:        #5eead4;
-  --hai-category-SERVICES-bg:           rgba(59, 130, 246, 0.12);
-  --hai-category-SERVICES-fg:           #93c5fd;
-  --hai-category-LOST_FOUND-bg:         rgba(168, 85, 247, 0.12);
-  --hai-category-LOST_FOUND-fg:         #d8b4fe;
-  --hai-category-MOSQUE-bg:             rgba(0, 168, 132, 0.14);
-  --hai-category-MOSQUE-fg:             #00a884;
-  --hai-category-EID_RAMADAN-bg:        rgba(234, 179, 8, 0.12);
-  --hai-category-EID_RAMADAN-fg:        #fde68a;
-  --hai-category-CONTESTS-bg:           rgba(217, 70, 239, 0.12);
-  --hai-category-CONTESTS-fg:           #f0abfc;
-  --hai-category-RIDE_REQUEST-bg:       rgba(99, 102, 241, 0.12);
-  --hai-category-RIDE_REQUEST-fg:       #a5b4fc;
-  --hai-category-WOMEN_ONLY-bg:         rgba(236, 72, 153, 0.12);
-  --hai-category-WOMEN_ONLY-fg:         #f9a8d4;
-  --hai-category-GENERAL-bg:            rgba(255, 255, 255, 0.05);
-  --hai-category-GENERAL-fg:            #9ca3af;
+  /* v2 dark-mode palette — same merge rules as the light tokens. */
+  --hai-category-NEIGHBORHOOD_REPORTS-bg: rgba(239, 68, 68, 0.12);
+  --hai-category-NEIGHBORHOOD_REPORTS-fg: #fca5a5;
+  --hai-category-MARKETPLACE-bg:          rgba(234, 179, 8, 0.12);
+  --hai-category-MARKETPLACE-fg:          #fcd34d;
+  --hai-category-HOME_BUSINESSES-bg:      rgba(132, 204, 22, 0.12);
+  --hai-category-HOME_BUSINESSES-fg:      #bef264;
+  --hai-category-REAL_ESTATE-bg:          rgba(20, 184, 166, 0.12);
+  --hai-category-REAL_ESTATE-fg:          #5eead4;
+  --hai-category-SERVICES-bg:             rgba(59, 130, 246, 0.12);
+  --hai-category-SERVICES-fg:             #93c5fd;
+  --hai-category-LOST_FOUND-bg:           rgba(168, 85, 247, 0.12);
+  --hai-category-LOST_FOUND-fg:           #d8b4fe;
+  --hai-category-EVENTS-bg:               rgba(234, 179, 8, 0.12);
+  --hai-category-EVENTS-fg:               #fde68a;
+  --hai-category-COMPETITIONS-bg:         rgba(217, 70, 239, 0.12);
+  --hai-category-COMPETITIONS-fg:         #f0abfc;
+  --hai-category-RIDES-bg:                rgba(99, 102, 241, 0.12);
+  --hai-category-RIDES-fg:                #a5b4fc;
+  --hai-category-GENERAL-bg:              rgba(255, 255, 255, 0.05);
+  --hai-category-GENERAL-fg:              #9ca3af;
 
   /* Product-state palette — dark-mode. Foregrounds lightened to
      readable pastel tones on darker backgrounds (the previous
@@ -1172,25 +1162,17 @@ textarea.hai-input {
   background: var(--hai-category-GENERAL-bg);
   color:      var(--hai-category-GENERAL-fg);
 }
-.hai-category-badge[data-category="ALERT"] {
-  background: var(--hai-category-ALERT-bg);
-  color:      var(--hai-category-ALERT-fg);
-}
-.hai-category-badge[data-category="NEIGHBORHOOD_ISSUE"] {
-  background: var(--hai-category-NEIGHBORHOOD_ISSUE-bg);
-  color:      var(--hai-category-NEIGHBORHOOD_ISSUE-fg);
-}
-.hai-category-badge[data-category="LOOKING_FOR"] {
-  background: var(--hai-category-LOOKING_FOR-bg);
-  color:      var(--hai-category-LOOKING_FOR-fg);
+.hai-category-badge[data-category="NEIGHBORHOOD_REPORTS"] {
+  background: var(--hai-category-NEIGHBORHOOD_REPORTS-bg);
+  color:      var(--hai-category-NEIGHBORHOOD_REPORTS-fg);
 }
 .hai-category-badge[data-category="MARKETPLACE"] {
   background: var(--hai-category-MARKETPLACE-bg);
   color:      var(--hai-category-MARKETPLACE-fg);
 }
-.hai-category-badge[data-category="FOOD_HOME"] {
-  background: var(--hai-category-FOOD_HOME-bg);
-  color:      var(--hai-category-FOOD_HOME-fg);
+.hai-category-badge[data-category="HOME_BUSINESSES"] {
+  background: var(--hai-category-HOME_BUSINESSES-bg);
+  color:      var(--hai-category-HOME_BUSINESSES-fg);
 }
 .hai-category-badge[data-category="REAL_ESTATE"] {
   background: var(--hai-category-REAL_ESTATE-bg);
@@ -1204,25 +1186,17 @@ textarea.hai-input {
   background: var(--hai-category-LOST_FOUND-bg);
   color:      var(--hai-category-LOST_FOUND-fg);
 }
-.hai-category-badge[data-category="MOSQUE"] {
-  background: var(--hai-category-MOSQUE-bg);
-  color:      var(--hai-category-MOSQUE-fg);
+.hai-category-badge[data-category="EVENTS"] {
+  background: var(--hai-category-EVENTS-bg);
+  color:      var(--hai-category-EVENTS-fg);
 }
-.hai-category-badge[data-category="EID_RAMADAN"] {
-  background: var(--hai-category-EID_RAMADAN-bg);
-  color:      var(--hai-category-EID_RAMADAN-fg);
+.hai-category-badge[data-category="COMPETITIONS"] {
+  background: var(--hai-category-COMPETITIONS-bg);
+  color:      var(--hai-category-COMPETITIONS-fg);
 }
-.hai-category-badge[data-category="CONTESTS"] {
-  background: var(--hai-category-CONTESTS-bg);
-  color:      var(--hai-category-CONTESTS-fg);
-}
-.hai-category-badge[data-category="RIDE_REQUEST"] {
-  background: var(--hai-category-RIDE_REQUEST-bg);
-  color:      var(--hai-category-RIDE_REQUEST-fg);
-}
-.hai-category-badge[data-category="WOMEN_ONLY"] {
-  background: var(--hai-category-WOMEN_ONLY-bg);
-  color:      var(--hai-category-WOMEN_ONLY-fg);
+.hai-category-badge[data-category="RIDES"] {
+  background: var(--hai-category-RIDES-bg);
+  color:      var(--hai-category-RIDES-fg);
 }
 .hai-category-badge[data-category="GENERAL"] {
   background: var(--hai-category-GENERAL-bg);
@@ -1238,19 +1212,15 @@ textarea.hai-input {
   background: var(--hai-category-GENERAL-fg);
   flex-shrink: 0;
 }
-.hai-category-dot[data-category="ALERT"]              { background: var(--hai-category-ALERT-fg); }
-.hai-category-dot[data-category="NEIGHBORHOOD_ISSUE"] { background: var(--hai-category-NEIGHBORHOOD_ISSUE-fg); }
-.hai-category-dot[data-category="LOOKING_FOR"]        { background: var(--hai-category-LOOKING_FOR-fg); }
-.hai-category-dot[data-category="MARKETPLACE"]        { background: var(--hai-category-MARKETPLACE-fg); }
-.hai-category-dot[data-category="FOOD_HOME"]          { background: var(--hai-category-FOOD_HOME-fg); }
-.hai-category-dot[data-category="REAL_ESTATE"]        { background: var(--hai-category-REAL_ESTATE-fg); }
-.hai-category-dot[data-category="SERVICES"]           { background: var(--hai-category-SERVICES-fg); }
-.hai-category-dot[data-category="LOST_FOUND"]         { background: var(--hai-category-LOST_FOUND-fg); }
-.hai-category-dot[data-category="MOSQUE"]             { background: var(--hai-category-MOSQUE-fg); }
-.hai-category-dot[data-category="EID_RAMADAN"]        { background: var(--hai-category-EID_RAMADAN-fg); }
-.hai-category-dot[data-category="CONTESTS"]           { background: var(--hai-category-CONTESTS-fg); }
-.hai-category-dot[data-category="RIDE_REQUEST"]       { background: var(--hai-category-RIDE_REQUEST-fg); }
-.hai-category-dot[data-category="WOMEN_ONLY"]         { background: var(--hai-category-WOMEN_ONLY-fg); }
+.hai-category-dot[data-category="NEIGHBORHOOD_REPORTS"] { background: var(--hai-category-NEIGHBORHOOD_REPORTS-fg); }
+.hai-category-dot[data-category="MARKETPLACE"]          { background: var(--hai-category-MARKETPLACE-fg); }
+.hai-category-dot[data-category="HOME_BUSINESSES"]      { background: var(--hai-category-HOME_BUSINESSES-fg); }
+.hai-category-dot[data-category="REAL_ESTATE"]          { background: var(--hai-category-REAL_ESTATE-fg); }
+.hai-category-dot[data-category="SERVICES"]             { background: var(--hai-category-SERVICES-fg); }
+.hai-category-dot[data-category="LOST_FOUND"]           { background: var(--hai-category-LOST_FOUND-fg); }
+.hai-category-dot[data-category="EVENTS"]               { background: var(--hai-category-EVENTS-fg); }
+.hai-category-dot[data-category="COMPETITIONS"]         { background: var(--hai-category-COMPETITIONS-fg); }
+.hai-category-dot[data-category="RIDES"]                { background: var(--hai-category-RIDES-fg); }
 
 /* ═════════════════════════════════════════════════════════════════
    PRODUCT-STATE PRIMITIVES (Pass 7)

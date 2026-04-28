@@ -329,7 +329,7 @@ export default function ModDashboard({ data }: Props) {
               <div key={post.id} className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{post.title}</p>
-                  <p className="text-[11px] text-gray-400">{post.author?.name} · {post.category}</p>
+                  <p className="text-[11px] text-gray-400">{post.author?.name} · {post.newCategory ?? post.category}</p>
                 </div>
                 <button onClick={() => modAction('restore_post', { targetId: post.id })}
                   disabled={!!actionLoading}

@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
-import { PostCategory } from '@prisma/client'
+import { PostCategoryV2 as PostCategory, type PostIntent } from '@prisma/client'
+import { createPost } from '@/lib/posts/createPost'
 
 // ── Seed user personas — realistic Saudi-style first names ──────────────────
 // 12 distinct names that feel like real neighbors, not templates.
@@ -21,7 +22,10 @@ const SEED_PERSONAS = [
 // ── Content pool — multiple variants per category ───────────────────────────
 
 const CONTENT_POOL: Record<string, { title: string; body: string }[]> = {
-  LOOKING_FOR: [
+  // Legacy LOOKING_FOR entries fold into SERVICES — the seeder marks
+  // them with intent: 'REQUEST' below so they classify the same way the
+  // v2 Ask flow does.
+  SERVICES_REQUEST: [
     { title: 'أحد يعرف سباك كويس؟', body: 'عندي تسريب بالمطبخ من يومين وما لقيت أحد، اللي عنده رقم سباك زين ياليت يرسله' },
     { title: 'وين ألقى معلمة تأسيس؟', body: 'بنتي بثاني ابتدائي ومحتاجة معلمة تأسيس، يفضل وحدة من الحي عشان قريبة' },
     { title: 'محتاج كهربائي بأسرع وقت', body: 'الكهرب يفصل عندي كل شوي، أحد عنده رقم كهربائي يفهم شغله؟' },
@@ -31,15 +35,15 @@ const CONTENT_POOL: Record<string, { title: string; body: string }[]> = {
     { title: 'محتاج نجار يركب لي رفوف', body: 'أبي أحد يركب رفوف بالصالة، من عنده رقم نجار سعره معقول؟' },
     { title: 'أحد يوصي بحداد كويس؟', body: 'أبي أسوي باب حديد للمدخل، محتاج حداد شغله نظيف' },
   ],
-  NEIGHBORHOOD_ISSUE: [
+  // Legacy NEIGHBORHOOD_ISSUE + ALERT entries both fold into
+  // NEIGHBORHOOD_REPORTS in v2.
+  NEIGHBORHOOD_REPORTS: [
     { title: 'ليه الإنارة طافية بالشارع؟', body: 'الشارع الخلفي مظلم من أسبوع تقريباً، أحد بلّغ البلدية؟' },
     { title: 'فيه حفرة خطيرة عند المنعطف', body: 'انتبهوا فيه حفرة كبيرة عند المنعطف الثاني، بالليل ما تنشاف' },
     { title: 'مين رمى مخلفات بناء؟', body: 'أحد رمى أنقاض ومخلفات آخر الشارع، وش الحل؟ نبلّغ البلدية؟' },
     { title: 'السيارات تطير أمام المدرسة', body: 'السرعة أمام المدرسة مو طبيعية خصوصاً وقت الطلعة، لازم مطبات' },
     { title: 'ريحة المجاري ما تنطاق', body: 'عند تقاطع الشارع الرئيسي فيه ريحة صرف صحي قوية من كم يوم' },
     { title: 'القطط صارت كثيرة مرة', body: 'عند الحاويات القطط تكاثرت بشكل مو طبيعي، لازم نتصرف' },
-  ],
-  ALERT: [
     { title: 'فيه انقطاع موية اليوم؟', body: 'الموية قاطعة عندي من الصبح، هل عندكم نفس المشكلة ولا بس أنا؟' },
     { title: 'انتبهوا حفريات بالشارع الرئيسي', body: 'شركة الكهرب فاتحين الشارع الرئيسي، الله يعينكم بالزحمة' },
     { title: 'الجو يقلب الليلة ترى', body: 'الأرصاد محذرة من أمطار قوية، لا تنسون تسكرون شبابيككم' },
@@ -65,14 +69,10 @@ const CONTENT_POOL: Record<string, { title: string; body: string }[]> = {
     { title: 'أحد شاف قطة بيضا تايهة؟', body: 'قطتي شيرازي أبيض ضاع من أمس، آخر مرة كان عند الحديقة' },
     { title: 'لقيت جوال بالحديقة', body: 'لقيت آيفون على المقاعد بالحديقة، صاحبه يوصف لي إياه وأعطيه' },
   ],
-  MOSQUE: [
+  // Legacy MOSQUE entries fold into EVENTS in v2.
+  EVENTS: [
     { title: 'التراويح الليلة الساعة كم؟', body: 'أحد يعرف وقت صلاة التراويح الليلة بمسجد الحي؟' },
     { title: 'فيه درس كل ثلاثاء بالمسجد', body: 'تذكير: كل ثلاثاء بعد المغرب فيه درس بالمسجد، حياكم' },
-  ],
-  GENERAL: [
-    { title: 'الله يجزاه خير اللي رجع محفظتي', body: 'أشكر الجار اللي لقى محفظتي ورجعها لي أمس، ما قصّر والله' },
-    { title: 'رمضان مبارك يا جيران', body: 'كل سنة وأنتم طيبين، رمضان كريم على أهل الحي كلهم' },
-    { title: 'يعطيهم العافية شباب الحي', body: 'الشباب نظفوا الحديقة اليوم ما شاء الله عليهم، يستاهلون الشكر' },
   ],
 }
 
@@ -81,32 +81,54 @@ const CONTENT_POOL: Record<string, { title: string; body: string }[]> = {
 //   Core = always included, Optional = randomly included (0-2 of them)
 // Phase 2: lazy backfill (up to ~13 total) — triggered later if still low
 
-const PHASE_1_CORE: { category: PostCategory; count: number }[] = [
-  { category: 'LOOKING_FOR', count: 2 },
-  { category: 'NEIGHBORHOOD_ISSUE', count: 1 },
-  { category: 'ALERT', count: 1 },
-  { category: 'LOST_FOUND', count: 1 },
-  { category: 'SERVICES', count: 1 },
+// A "slot" is one CONTENT_POOL bucket key paired with the v2 category +
+// intent it maps to. Most slot keys equal the v2 category itself; the
+// only exception is SERVICES_REQUEST, which classifies as SERVICES with
+// intent: 'REQUEST' (the v2 version of the legacy LOOKING_FOR bucket).
+type SlotKey = keyof typeof CONTENT_POOL
+interface SlotMapping {
+  poolKey: SlotKey
+  category: PostCategory
+  intent: PostIntent
+}
+
+const SLOT_TO_V2: Record<SlotKey, { category: PostCategory; intent: PostIntent }> = {
+  SERVICES_REQUEST:     { category: 'SERVICES',             intent: 'REQUEST' },
+  NEIGHBORHOOD_REPORTS: { category: 'NEIGHBORHOOD_REPORTS', intent: 'NORMAL' },
+  SERVICES:             { category: 'SERVICES',             intent: 'NORMAL' },
+  MARKETPLACE:          { category: 'MARKETPLACE',          intent: 'NORMAL' },
+  LOST_FOUND:           { category: 'LOST_FOUND',           intent: 'NORMAL' },
+  EVENTS:               { category: 'EVENTS',               intent: 'NORMAL' },
+}
+
+function slot(poolKey: SlotKey, count: number): { slot: SlotMapping; count: number } {
+  return { slot: { poolKey, ...SLOT_TO_V2[poolKey] }, count }
+}
+
+const PHASE_1_CORE: { slot: SlotMapping; count: number }[] = [
+  slot('SERVICES_REQUEST', 2),
+  slot('NEIGHBORHOOD_REPORTS', 2), // fills former NEIGHBORHOOD_ISSUE + ALERT slots
+  slot('LOST_FOUND', 1),
+  slot('SERVICES', 1),
 ]
 // 0, 1, or 2 of these are randomly added each time → total 6-8
-const PHASE_1_OPTIONAL: { category: PostCategory; count: number }[] = [
-  { category: 'GENERAL', count: 1 },
-  { category: 'MOSQUE', count: 1 },
+const PHASE_1_OPTIONAL: { slot: SlotMapping; count: number }[] = [
+  slot('EVENTS', 1),
 ]
 
-function buildPhase1(): { category: PostCategory; count: number }[] {
+function buildPhase1(): { slot: SlotMapping; count: number }[] {
   const extras = pickRandom(PHASE_1_OPTIONAL, Math.floor(Math.random() * 3)) // 0, 1, or 2
   return [...PHASE_1_CORE, ...extras]
 }
 
 const PHASE_1_MIN = PHASE_1_CORE.reduce((s, d) => s + d.count, 0) // 6
-const PHASE_1_MAX = PHASE_1_MIN + PHASE_1_OPTIONAL.reduce((s, d) => s + d.count, 0) // 8
+const PHASE_1_MAX = PHASE_1_MIN + PHASE_1_OPTIONAL.reduce((s, d) => s + d.count, 0) // 7
 
-const PHASE_2: { category: PostCategory; count: number }[] = [
-  { category: 'LOOKING_FOR', count: 1 },
-  { category: 'NEIGHBORHOOD_ISSUE', count: 1 },
-  { category: 'MARKETPLACE', count: 2 },
-  { category: 'SERVICES', count: 1 },
+const PHASE_2: { slot: SlotMapping; count: number }[] = [
+  slot('SERVICES_REQUEST', 1),
+  slot('NEIGHBORHOOD_REPORTS', 1),
+  slot('MARKETPLACE', 2),
+  slot('SERVICES', 1),
 ]
 
 const MAX_SEED_POSTS = PHASE_1_MAX + PHASE_2.reduce((s, d) => s + d.count, 0) // 13
@@ -172,19 +194,19 @@ async function getOrCreateSeedUser(neighborhoodId: string, personaIndex: number)
 
 async function insertSeedPosts(
   neighborhoodId: string,
-  distribution: { category: PostCategory; count: number }[],
+  distribution: { slot: SlotMapping; count: number }[],
   existingTitles: Set<string>,
   timestampWindow: { minHours: number; maxHours: number },
 ): Promise<number> {
-  // Step 1: collect content picks per category
-  const rawPicks: { title: string; body: string; category: PostCategory }[] = []
+  // Step 1: collect content picks per slot
+  const rawPicks: { title: string; body: string; slot: SlotMapping }[] = []
 
-  for (const { category, count } of distribution) {
-    const pool = CONTENT_POOL[category] || []
+  for (const { slot, count } of distribution) {
+    const pool = CONTENT_POOL[slot.poolKey] || []
     const available = pool.filter(p => !existingTitles.has(p.title))
     const picks = pickRandom(available, Math.min(count, available.length))
     for (const pick of picks) {
-      rawPicks.push({ ...pick, category })
+      rawPicks.push({ ...pick, slot })
     }
   }
 
@@ -212,26 +234,37 @@ async function insertSeedPosts(
     timestampWindow.maxHours,
   )
 
-  // Step 5: build final post records (sequential to avoid user creation race)
-  const postsToCreate = []
+  // Step 5: build final post records via createPost so the dual-write
+  // (legacy + v2 columns) stays uniform with the API path. Sequential
+  // by design — getOrCreateSeedUser races otherwise, and createPost
+  // already batches its DB roundtrip per call.
+  let created = 0
   for (let i = 0; i < shuffledPicks.length; i++) {
     const pick = shuffledPicks[i]
     const authorId = await getOrCreateSeedUser(neighborhoodId, personaOrder[i])
     existingTitles.add(pick.title)
-    postsToCreate.push({
+    const post = await createPost({
       title: pick.title,
       body: pick.body,
-      category: pick.category,
       authorId,
       neighborhoodId,
-      status: 'ACTIVE' as const,
-      isSeed: true as const,
-      createdAt: timestamps[i],
+      classification: {
+        kind: 'v2',
+        newCategory: pick.slot.category,
+        intent: pick.slot.intent,
+      },
     })
+    // createPost defaults createdAt to now; backdate the row to match
+    // our spread-out timestamps, plus stamp the seed flag the API path
+    // doesn't set.
+    await db.post.update({
+      where: { id: post.id },
+      data: { isSeed: true, createdAt: timestamps[i] },
+    })
+    created++
   }
 
-  await db.post.createMany({ data: postsToCreate })
-  return postsToCreate.length
+  return created
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -419,41 +452,41 @@ export async function generateSeedPostsExact(
   })
   const existingTitles = new Set(existingSeeds.map((p) => p.title))
 
-  // Collect available picks per category, then round-robin until we
-  // reach targetCount. This guarantees we never exceed the target and
-  // keeps the mix diverse when the target < number of categories.
-  const categories = Object.keys(CONTENT_POOL) as PostCategory[]
+  // Collect available picks per slot, then round-robin until we reach
+  // targetCount. This guarantees we never exceed the target and keeps
+  // the mix diverse when the target < number of slot keys.
+  const slotKeys = Object.keys(CONTENT_POOL) as SlotKey[]
   const pools: Record<string, { title: string; body: string }[]> = {}
-  for (const cat of categories) {
-    pools[cat] = shuffle(
-      (CONTENT_POOL[cat] || []).filter((p) => !existingTitles.has(p.title)),
+  for (const key of slotKeys) {
+    pools[key] = shuffle(
+      (CONTENT_POOL[key] || []).filter((p) => !existingTitles.has(p.title)),
     )
   }
 
-  const picked: { category: PostCategory; count: number }[] = []
-  const catMap: Record<string, number> = {}
+  const picked: { slot: SlotMapping; count: number }[] = []
+  const slotMap: Record<string, number> = {}
   let total = 0
   let exhausted = 0
 
-  while (total < targetCount && exhausted < categories.length) {
+  while (total < targetCount && exhausted < slotKeys.length) {
     exhausted = 0
-    for (const cat of categories) {
+    for (const key of slotKeys) {
       if (total >= targetCount) break
-      const pool = pools[cat]
+      const pool = pools[key]
       if (!pool || pool.length === 0) {
         exhausted++
         continue
       }
       // Pop one — we only use it once
       pool.pop()
-      catMap[cat] = (catMap[cat] || 0) + 1
+      slotMap[key] = (slotMap[key] || 0) + 1
       total++
     }
   }
 
-  for (const cat of categories) {
-    if (catMap[cat]) {
-      picked.push({ category: cat, count: catMap[cat] })
+  for (const key of slotKeys) {
+    if (slotMap[key]) {
+      picked.push({ slot: { poolKey: key, ...SLOT_TO_V2[key] }, count: slotMap[key] })
     }
   }
 

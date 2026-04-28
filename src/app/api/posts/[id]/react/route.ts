@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
   const post = await db.post.findUnique({
     where: { id: params.id },
-    select: { neighborhoodId: true, authorId: true, title: true, category: true },
+    select: { neighborhoodId: true, authorId: true, title: true, intent: true },
   })
   if (!post) return NextResponse.json({ error: 'المنشور غير موجود' }, { status: 404 })
   if (!bypass && post.neighborhoodId !== user?.neighborhoodId) {
@@ -140,9 +140,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     })()
   }
 
-  // Rep: +2 to post author — but NOT for request/help posts (the requester didn't help anyone)
-  const NO_REP_CATEGORIES = ['LOOKING_FOR', 'RIDE_REQUEST']
-  if (!NO_REP_CATEGORIES.includes(post.category)) {
+  // Rep: +2 to post author — but NOT for request/help posts (the
+  // requester didn't help anyone). Driven by intent so it covers both
+  // legacy LOOKING_FOR/RIDE_REQUEST posts (mapped to intent=REQUEST in
+  // Phase 2) and the new Ask flow.
+  if (post.intent !== 'REQUEST') {
     await addReputation({
       userId: post.authorId,
       fromUserId: session.userId,

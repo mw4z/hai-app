@@ -27,10 +27,12 @@ export async function POST(req: NextRequest) {
 
   const { action, postId, userId, banType } = await req.json()
 
-  // Male mods cannot act on WOMEN_ONLY posts — route to female mods only
+  // Male mods cannot act on WOMEN-audience posts — route to female mods
+  // only. Audience targeting now lives on Post.audience instead of the
+  // legacy WOMEN_ONLY category.
   if (postId && admin.gender !== 'FEMALE') {
-    const post = await db.post.findUnique({ where: { id: postId }, select: { category: true } })
-    if (post?.category === 'WOMEN_ONLY') {
+    const post = await db.post.findUnique({ where: { id: postId }, select: { audience: true } })
+    if (post?.audience === 'WOMEN') {
       return NextResponse.json({ error: 'هذا المنشور مخصص للمشرفات فقط' }, { status: 403 })
     }
   }

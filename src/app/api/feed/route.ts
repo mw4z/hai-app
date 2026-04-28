@@ -1,30 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getValidatedSession } from '@/lib/auth-server'
-import { PostCategory, PostCategoryV2 } from '@prisma/client'
+import { PostCategoryV2 } from '@prisma/client'
 import { getFeedBoost } from '@/lib/reputation-levels'
-import { legacyOf } from '@/lib/postCategory'
-import { FLAGS } from '@/lib/flags'
 
 const V2_FILTER_VALUES: readonly string[] = [
   'HOME_BUSINESSES','MARKETPLACE','SERVICES','RIDES','REAL_ESTATE',
   'LOST_FOUND','NEIGHBORHOOD_REPORTS','EVENTS','COMPETITIONS','GENERAL',
 ]
 
-const TYPE_BOOST: Partial<Record<PostCategory, number>> = {
-  ALERT: 5,
-  NEIGHBORHOOD_ISSUE: 4,
-  LOOKING_FOR: 3,
+// v2 boost map. NEIGHBORHOOD_REPORTS absorbs the legacy ALERT +
+// NEIGHBORHOOD_ISSUE boosts (top of the list); EVENTS keeps the small
+// MOSQUE bump. Request-style "looking for" posts boost via the intent
+// field at the call site (see scorePost) rather than via category.
+const TYPE_BOOST: Partial<Record<PostCategoryV2, number>> = {
+  NEIGHBORHOOD_REPORTS: 5,
   LOST_FOUND: 2,
-  MOSQUE: 2,
+  EVENTS: 2,
 }
 
-const COMMERCIAL_TYPES = new Set(['MARKETPLACE', 'FOOD_HOME', 'REAL_ESTATE', 'SERVICES'])
+const COMMERCIAL_TYPES = new Set<PostCategoryV2>(['MARKETPLACE', 'HOME_BUSINESSES', 'REAL_ESTATE', 'SERVICES'])
 const PAGE_SIZE = 20
 
 function scorePost(post: {
   createdAt: Date
-  category: PostCategory
+  newCategory: PostCategoryV2 | null
+  intent: string | null
   isPinned: boolean
   isFeatured: boolean
   _count: { comments: number; reactions: number }
@@ -34,9 +35,11 @@ function scorePost(post: {
 
   const hoursAgo = (Date.now() - new Date(post.createdAt).getTime()) / 3600_000
   const engagement = Math.min(post._count.comments * 3 + post._count.reactions, 30)
-  const typeBoost = TYPE_BOOST[post.category] || 0
+  const typeBoost = (post.newCategory && TYPE_BOOST[post.newCategory]) || 0
+  // Replicate the legacy LOOKING_FOR +3 boost via intent: REQUEST.
+  const intentBoost = post.intent === 'REQUEST' ? 3 : 0
   const repBoost = getFeedBoost((post as any).author?.reputation || 0)
-  const base = 50 + engagement + typeBoost + repBoost
+  const base = 50 + engagement + typeBoost + intentBoost + repBoost
 
   return base / (hoursAgo + 2)
 }
@@ -60,17 +63,18 @@ function deduplicateAuthors<T extends { authorId: string }>(posts: T[]): T[] {
 }
 
 /** Ensure at least 1 non-commercial post every 3 posts */
-function balanceCommercial<T extends { category: string }>(posts: T[]): T[] {
+function balanceCommercial<T extends { newCategory: PostCategoryV2 | null }>(posts: T[]): T[] {
   const result: T[] = []
   let commercialStreak = 0
 
-  const nonCommercial = posts.filter(p => !COMMERCIAL_TYPES.has(p.category))
+  const isCommercial = (p: T) => p.newCategory != null && COMMERCIAL_TYPES.has(p.newCategory)
+  const nonCommercial = posts.filter(p => !isCommercial(p))
   const ncQueue = [...nonCommercial]
   const seen = new Set<number>()
 
   for (let i = 0; i < posts.length; i++) {
     const post = posts[i]
-    if (COMMERCIAL_TYPES.has(post.category)) {
+    if (isCommercial(post)) {
       commercialStreak++
       if (commercialStreak >= 3 && ncQueue.length > 0) {
         // Insert a non-commercial post to break the streak
@@ -104,21 +108,17 @@ export async function GET(req: NextRequest) {
   if (!neighborhoodId) return NextResponse.json({ error: 'neighborhoodId required' }, { status: 400 })
 
   const isFemale = gender === 'FEMALE'
-  // Accept either a v2 PostCategoryV2 value (new feed chips) or a legacy
-  // PostCategory value (older clients). v2 chips route through the v2
-  // column when the read flag is on, else through legacyOf().
+  // Audience-based ALL: female viewers see every audience; everyone
+  // else gets WOMEN-targeted posts filtered out. v2 chips route through
+  // the v2 column directly. Anything else (a legacy chip slipping
+  // through somehow) falls through with no category filter — defensive.
   let categoryFilter: object
   if (category === 'ALL') {
-    categoryFilter = isFemale ? {} : { category: { not: PostCategory.WOMEN_ONLY } }
-  } else if (category === 'WOMEN_ONLY') {
-    categoryFilter = isFemale ? { category: PostCategory.WOMEN_ONLY } : { id: '' }
+    categoryFilter = isFemale ? {} : { audience: { not: 'WOMEN' } }
   } else if (V2_FILTER_VALUES.includes(category)) {
-    const v2 = category as PostCategoryV2
-    categoryFilter = FLAGS.USE_NEW_CATEGORY
-      ? { newCategory: v2 }
-      : { category: legacyOf(v2) }
+    categoryFilter = { newCategory: category as PostCategoryV2 }
   } else {
-    categoryFilter = { category: category as PostCategory }
+    categoryFilter = {}
   }
 
   const posts = await db.post.findMany({
