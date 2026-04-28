@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus, FiEdit3, FiHelpCircle } from 'react-icons/fi'
+import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus, FiEdit3, FiSearch } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { hapticMedium } from '@/lib/haptic'
 import { playTap } from '@/lib/sound'
@@ -239,41 +239,90 @@ export default function BottomNav({
         })}
       </div>
 
-      {/* Post / Ask entry-point sheet — opens when the FAB is tapped
-          from the user's own neighborhood. Mirrors the visual pattern
-          of ImageSourceSheet so the chooser feels native to the app.
-          ~120px-tall content area + safe-area padding underneath. */}
+      {/* Post / Ask entry-point sheet — redesigned as two large
+          gradient tile cards with distinct visual identities so the
+          chooser feels intentional rather than a generic action sheet.
+          Each tile carries its own brand color, oversized icon in a
+          ringed circle, decorative background icon at low opacity, and
+          a title + subtitle stack. */}
       {showEntrySheet && (
         <div
-          className="fixed inset-0 z-[1000] bg-black/40 flex items-end justify-center"
+          className="fixed inset-0 z-[1000] bg-black/50 backdrop-blur-sm flex items-end justify-center"
           onClick={() => setShowEntrySheet(false)}
         >
           <div
-            className="w-full max-w-[480px] bg-white dark:bg-gray-800 rounded-t-3xl p-4 pb-6 space-y-2 animate-slide-up"
+            className="w-full max-w-[480px] bg-white dark:bg-gray-900 rounded-t-3xl p-5 animate-slide-up"
             onClick={(e) => e.stopPropagation()}
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.25rem)' }}
           >
-            <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-2" />
-            <p className="text-center text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-              {t('post_or_ask')}
-            </p>
+            <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4" />
+
+            <div className="text-center mb-5">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                {t('post_or_ask')}
+              </h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {t('post_or_ask_sub')}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {/* POST tile — brand teal gradient */}
+              <button
+                onClick={() => { setShowEntrySheet(false); router.push('/post/new') }}
+                className="relative overflow-hidden rounded-2xl p-4 text-start active:scale-[0.97] transition-transform shadow-md"
+                style={{
+                  background: 'linear-gradient(135deg, #00b894 0%, #00a884 50%, #006d57 100%)',
+                  minHeight: 150,
+                }}
+              >
+                {/* Decorative oversized icon at bottom-end, low opacity */}
+                <FiEdit3
+                  className="absolute -bottom-3 -end-3 w-24 h-24 text-white/10"
+                  aria-hidden="true"
+                />
+                {/* Foreground icon in ringed circle */}
+                <div className="relative z-10 w-11 h-11 rounded-full bg-white/20 ring-1 ring-white/30 flex items-center justify-center mb-3 backdrop-blur-sm">
+                  <FiEdit3 className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="relative z-10 text-base font-bold text-white leading-tight">
+                  {t('post_entry_post')}
+                </h3>
+                <p className="relative z-10 text-[11px] text-white/85 mt-1 leading-snug">
+                  {t('post_entry_post_sub')}
+                </p>
+              </button>
+
+              {/* ASK tile — sky blue gradient (distinct from POST) */}
+              <button
+                onClick={() => { setShowEntrySheet(false); router.push('/ask') }}
+                className="relative overflow-hidden rounded-2xl p-4 text-start active:scale-[0.97] transition-transform shadow-md"
+                style={{
+                  background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 50%, #075985 100%)',
+                  minHeight: 150,
+                }}
+              >
+                <FiSearch
+                  className="absolute -bottom-3 -end-3 w-24 h-24 text-white/10"
+                  aria-hidden="true"
+                />
+                <div className="relative z-10 w-11 h-11 rounded-full bg-white/20 ring-1 ring-white/30 flex items-center justify-center mb-3 backdrop-blur-sm">
+                  <FiSearch className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="relative z-10 text-base font-bold text-white leading-tight">
+                  {t('post_entry_ask')}
+                </h3>
+                <p className="relative z-10 text-[11px] text-white/85 mt-1 leading-snug">
+                  {t('post_entry_ask_sub')}
+                </p>
+              </button>
+            </div>
+
             <button
-              onClick={() => { setShowEntrySheet(false); router.push('/post/new') }}
-              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 active:scale-[0.98] transition-transform"
+              onClick={() => setShowEntrySheet(false)}
+              className="w-full mt-4 py-2.5 text-sm font-medium text-gray-500 dark:text-gray-400 active:scale-[0.98] transition-transform"
             >
-              <FiEdit3 className="w-5 h-5 text-primary-600" />
-              <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                {t('post_entry_post')}
-              </span>
-            </button>
-            <button
-              onClick={() => { setShowEntrySheet(false); router.push('/ask') }}
-              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 active:scale-[0.98] transition-transform"
-            >
-              <FiHelpCircle className="w-5 h-5 text-primary-600" />
-              <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                {t('post_entry_ask')}
-              </span>
+              {t('post_or_ask_cancel')}
             </button>
           </div>
         </div>

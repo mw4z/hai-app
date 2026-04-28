@@ -57,8 +57,12 @@ export const translations = {
   ask_submit:                   { ar: 'اسأل جيرانك',          en: 'Ask',                  ur: 'پوچھیں' },
 
   post_or_ask:                  { ar: 'ماذا تريد أن تنشر؟', en: 'What do you want to post?', ur: 'آپ کیا پوسٹ کرنا چاہتے ہیں؟' },
+  post_or_ask_sub:              { ar: 'اختر النوع المناسب لمنشورك', en: 'Pick how you want to share', ur: 'شیئر کرنے کا طریقہ منتخب کریں' },
   post_entry_post:              { ar: 'انشر',                 en: 'Post',                 ur: 'پوسٹ' },
+  post_entry_post_sub:          { ar: 'شارك إعلان أو فعالية أو خدمة', en: 'Share a listing, event, or service', ur: 'اشتہار، تقریب یا خدمت شیئر کریں' },
   post_entry_ask:               { ar: 'اسأل جيرانك',          en: 'Ask neighbors',        ur: 'ہمسایوں سے پوچھیں' },
+  post_entry_ask_sub:           { ar: 'اطلب ما تحتاجه من حيك', en: 'Ask for something you need', ur: 'جس چیز کی ضرورت ہو پوچھیں' },
+  post_or_ask_cancel:           { ar: 'إلغاء',                en: 'Cancel',               ur: 'منسوخ' },
 
   // ── Post Card ───────────────────────────────────────────────────────────────
   post_comment:       { ar: 'تعليق',         en: 'Comment'     , ur: 'تبصرہ' },
