@@ -492,7 +492,6 @@ html {
    exposing between body::before and the page content below it. */
 body {
   padding-top: env(safe-area-inset-top, 0px);
-  background: var(--hai-surface-1);
 }
 .sticky.top-0 {
   top: env(safe-area-inset-top, 0px) !important;
