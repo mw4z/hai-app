@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getValidatedSession } from '@/lib/auth-server'
-import { PostCategory } from '@prisma/client'
+import { PostCategory, PostCategoryV2 } from '@prisma/client'
 import { getFeedBoost } from '@/lib/reputation-levels'
+import { legacyOf } from '@/lib/postCategory'
+import { FLAGS } from '@/lib/flags'
+
+const V2_FILTER_VALUES: readonly string[] = [
+  'HOME_BUSINESSES','MARKETPLACE','SERVICES','RIDES','REAL_ESTATE',
+  'LOST_FOUND','NEIGHBORHOOD_REPORTS','EVENTS','COMPETITIONS','GENERAL',
+]
 
 const TYPE_BOOST: Partial<Record<PostCategory, number>> = {
   ALERT: 5,
@@ -97,11 +104,19 @@ export async function GET(req: NextRequest) {
   if (!neighborhoodId) return NextResponse.json({ error: 'neighborhoodId required' }, { status: 400 })
 
   const isFemale = gender === 'FEMALE'
+  // Accept either a v2 PostCategoryV2 value (new feed chips) or a legacy
+  // PostCategory value (older clients). v2 chips route through the v2
+  // column when the read flag is on, else through legacyOf().
   let categoryFilter: object
   if (category === 'ALL') {
     categoryFilter = isFemale ? {} : { category: { not: PostCategory.WOMEN_ONLY } }
   } else if (category === 'WOMEN_ONLY') {
     categoryFilter = isFemale ? { category: PostCategory.WOMEN_ONLY } : { id: '' }
+  } else if (V2_FILTER_VALUES.includes(category)) {
+    const v2 = category as PostCategoryV2
+    categoryFilter = FLAGS.USE_NEW_CATEGORY
+      ? { newCategory: v2 }
+      : { category: legacyOf(v2) }
   } else {
     categoryFilter = { category: category as PostCategory }
   }

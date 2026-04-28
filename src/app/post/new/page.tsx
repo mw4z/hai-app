@@ -2,11 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { FiArrowRight, FiArrowLeft, FiSend } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
-import { useNetworkStatus, isOfflineError } from '@/lib/network'
+import { useNetworkStatus } from '@/lib/network'
 import { translateApiError } from '@/lib/apiError'
 import RiyalIcon from '@/components/RiyalIcon'
 import { uploadFiles } from '@/lib/upload'
@@ -52,56 +51,123 @@ function clearDraft() {
 }
 function draftHasContent(d: PostDraft | null): boolean {
   if (!d) return false
-  // Category selection alone doesn't count — user must have actually written
-  // something (title/body/price) or attached media/location for the draft
-  // prompt to be useful. Otherwise tapping a category and backing out would
-  // incorrectly trigger the save/discard sheet.
   return !!(d.title.trim() || d.body.trim() || d.price || d.location || (d.imageUrls && d.imageUrls.length > 0))
 }
 
-const CATEGORIES = [
+// ── v2 categories (PostCategoryV2) ─────────────────────────────────────
+// Single flat list of the 9 user-facing v2 buckets. GENERAL is admin-
+// only fallback and is intentionally not exposed here. RIDES routes to
+// the structured /rides/new flow because requesting a ride uses a
+// dedicated form; the rest land in this composer's content step.
+interface CategoryItem {
+  key: string
+  label: string
+  labelEn: string
+  labelUr: string
+  icon: string
+  placeholder: string
+  placeholderEn: string
+  placeholderUr: string
+}
+
+const CATEGORIES: CategoryItem[] = [
   {
-    group: 'أخبار الحي',
-    items: [
-      { key: 'ALERT',             label: 'تنبيه أمني أو عام',     icon: '🔔', placeholder: 'مثال: انقطاع المياه في الشارع الرئيسي' },
-      { key: 'NEIGHBORHOOD_ISSUE',label: 'مشكلة في الحي',          icon: '⚠️', placeholder: 'مثال: الشارع الجانبي مقطوع، أو تجاوز السرعة أمام المدرسة' },
-      { key: 'LOST_FOUND',        label: 'مفقودات أو موجودات',     icon: '🔍', placeholder: 'مثال: وجدت مفاتيح عند المسجد' },
-    ]
+    key: 'HOME_BUSINESSES',
+    label: 'الأسر المنتجة',
+    labelEn: 'Home Businesses',
+    labelUr: 'گھریلو کاروبار',
+    icon: '🍱',
+    placeholder: 'مثال: متوفر اليوم كبسة دجاج وسمبوسة — الطلب على الخاص',
+    placeholderEn: 'Example: Today: chicken kabsa and samosa — order via DM',
+    placeholderUr: 'مثال: آج چکن کبسہ اور سموسے دستیاب — آرڈر ڈی ایم پر',
   },
   {
-    group: 'طلبات',
-    items: [
-      { key: 'RIDE_REQUEST', label: 'طلب مشوار',             icon: '🚗', placeholder: '' },
-      { key: 'LOOKING_FOR',  label: 'أبحث عن...',            icon: '🔎', placeholder: 'مثال: أبحث عن معلمة تأسيس، أو سباك موثوق، أو شقة للإيجار' },
-    ]
+    key: 'MARKETPLACE',
+    label: 'السوق',
+    labelEn: 'Marketplace',
+    labelUr: 'مارکیٹ',
+    icon: '🛒',
+    placeholder: 'مثال: للبيع جهاز تكييف مستعمل بحالة ممتازة',
+    placeholderEn: 'Example: Used AC for sale — excellent condition',
+    placeholderUr: 'مثال: استعمال شدہ اے سی برائے فروخت — بہترین حالت',
   },
   {
-    group: 'بيع وخدمات',
-    items: [
-      { key: 'MARKETPLACE',  label: 'بيع / شراء',             icon: '🛒', placeholder: 'مثال: للبيع جهاز تكييف مستعمل بحالة ممتازة' },
-      { key: 'FOOD_HOME',    label: 'الأسر المنتجة',          icon: '🍱', placeholder: 'مثال: متوفر اليوم كبسة دجاج وسمبوسة — الطلب على الخاص' },
-      { key: 'REAL_ESTATE',  label: 'عقارات (إيجار أو بيع)', icon: '🏠', placeholder: 'مثال: شقة للإيجار في حي الزايدي — 3 غرف — التواصل على الخاص' },
-      { key: 'SERVICES',     label: 'خدمة (سباك، كهربائي...)', icon: '🔧',placeholder: 'مثال: فني تكييف — خبرة 10 سنوات — يخدم حي الزايدي' },
-    ]
+    key: 'SERVICES',
+    label: 'خدمات',
+    labelEn: 'Services',
+    labelUr: 'خدمات',
+    icon: '🔧',
+    placeholder: 'مثال: فني تكييف — خبرة 10 سنوات — يخدم الحي',
+    placeholderEn: 'Example: AC technician — 10y experience — serves the area',
+    placeholderUr: 'مثال: اے سی ٹیکنیشن — 10 سال تجربہ — محلے میں خدمت',
   },
   {
-    group: 'مجتمع',
-    items: [
-      { key: 'MOSQUE',       label: 'إعلان مسجد',             icon: '🕌', placeholder: 'مثال: دروس تحفيظ قرآن للنساء بعد صلاة المغرب' },
-      { key: 'EID_RAMADAN',  label: 'فعاليات ومناسبات',       icon: '🎉', placeholder: 'مثال: توزيع إفطار رمضان عند مسجد الحي الساعة 6' },
-      { key: 'GENERAL',      label: 'عام',                    icon: '💬', placeholder: 'مثال: شكراً لمن أعاد محفظتي...' },
-    ]
+    key: 'RIDES',
+    label: 'مشاوير',
+    labelEn: 'Rides',
+    labelUr: 'سواری',
+    icon: '🚗',
+    placeholder: '',
+    placeholderEn: '',
+    placeholderUr: '',
+  },
+  {
+    key: 'REAL_ESTATE',
+    label: 'عقارات',
+    labelEn: 'Real Estate',
+    labelUr: 'جائیداد',
+    icon: '🏠',
+    placeholder: 'مثال: شقة للإيجار — 3 غرف — التواصل على الخاص',
+    placeholderEn: 'Example: Apartment for rent — 3 bedrooms — DM to contact',
+    placeholderUr: 'مثال: کرائے کیلئے فلیٹ — 3 کمرے — رابطہ ڈی ایم پر',
+  },
+  {
+    key: 'LOST_FOUND',
+    label: 'مفقودات',
+    labelEn: 'Lost & Found',
+    labelUr: 'گمشدہ اشیاء',
+    icon: '🔍',
+    placeholder: 'مثال: وجدت مفاتيح عند المسجد',
+    placeholderEn: 'Example: Found keys near the mosque',
+    placeholderUr: 'مثال: مسجد کے پاس چابیاں ملی ہیں',
+  },
+  {
+    key: 'NEIGHBORHOOD_REPORTS',
+    label: 'بلاغات الحي',
+    labelEn: 'Neighborhood Reports',
+    labelUr: 'محلے کی رپورٹس',
+    icon: '⚠️',
+    placeholder: 'مثال: انقطاع المياه في الشارع الرئيسي',
+    placeholderEn: 'Example: Water outage on main street',
+    placeholderUr: 'مثال: مین سٹریٹ پر پانی کی بندش',
+  },
+  {
+    key: 'EVENTS',
+    label: 'فعاليات ومناسبات',
+    labelEn: 'Events',
+    labelUr: 'تقریبات',
+    icon: '🎉',
+    placeholder: 'مثال: توزيع إفطار رمضان عند مسجد الحي الساعة 6',
+    placeholderEn: 'Example: Ramadan iftar distribution at the mosque at 6pm',
+    placeholderUr: 'مثال: محلے کی مسجد پر شام 6 بجے افطار کی تقسیم',
+  },
+  {
+    key: 'COMPETITIONS',
+    label: 'مسابقات وجوائز',
+    labelEn: 'Competitions',
+    labelUr: 'مقابلے',
+    icon: '🏆',
+    placeholder: 'مثال: مسابقة حفظ القرآن للأطفال — جوائز قيمة',
+    placeholderEn: 'Example: Quran memorization contest for kids — great prizes',
+    placeholderUr: 'مثال: بچوں کیلئے قرآن حفظ کا مقابلہ — قیمتی انعامات',
   },
 ]
 
-const WOMEN_ONLY_GROUP = {
-  group: 'خاص',
-  items: [
-    { key: 'WOMEN_ONLY', label: 'للنساء فقط', icon: '👩', placeholder: 'مثال: توصية طبيبة، أو خدمة نسائية' },
-  ]
-}
-
-const ALL_ITEMS = CATEGORIES.flatMap(g => g.items)
+// Categories that should show the price field in the content step.
+const PRICE_CATEGORIES = new Set(['MARKETPLACE', 'REAL_ESTATE', 'HOME_BUSINESSES'])
+// Server-side, COMPETITIONS posts are admin-only — surface this to the
+// user by hiding the entry instead of showing an error after submit.
+const ADMIN_ONLY_CATEGORIES = new Set(['COMPETITIONS'])
 
 export default function NewPostPage() {
   const router = useRouter()
@@ -112,19 +178,17 @@ export default function NewPostPage() {
   const { lang } = useLanguage()
   const [step, setStep] = useState<'category' | 'content'>('category')
   const [category, setCategory] = useState('')
-  const [isFemale, setIsFemale] = useState(false)
   // Only visible providers (ACTIVE/VERIFIED) may post in the SERVICES category.
   const [canPostServices, setCanPostServices] = useState(false)
-  // SUPER_ADMIN can post into any neighborhood. For everyone else this
-  // stays false and the server pins the post to their own neighborhood.
+  // SUPER_ADMIN can post into any neighborhood and any category.
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [isAdminLike, setIsAdminLike] = useState(false)
   const [ownNeighborhoodId, setOwnNeighborhoodId] = useState<string | null>(null)
   const [allNeighborhoods, setAllNeighborhoods] = useState<{ id: string; name: string; nameEn?: string; cityName?: string }[]>([])
   const [targetNeighborhoodId, setTargetNeighborhoodId] = useState<string>('')
 
   useEffect(() => {
     fetch('/api/profile').then(r => r.json()).then(d => {
-      if (d.gender === 'FEMALE') setIsFemale(true)
       if (d.providerStatus === 'ACTIVE' || d.providerStatus === 'VERIFIED') {
         setCanPostServices(true)
       }
@@ -135,13 +199,13 @@ export default function NewPostPage() {
           setTargetNeighborhoodId(d.neighborhoodId)
         }
       }
+      if (['SUPER_ADMIN', 'PLATFORM_MOD', 'NEIGHBORHOOD_MOD'].includes(d.role)) {
+        setIsAdminLike(true)
+      }
     }).catch(() => {})
   }, [])
 
-  // Super-admins: lazy-load the full neighborhood list once so they can
-  // pick any target neighborhood from a dropdown. If a ?neighborhood=<id>
-  // was passed in the URL (e.g. from the feed's + button while browsing
-  // another neighborhood), pre-select it once the list lands.
+  // Super-admins: lazy-load the full neighborhood list once.
   useEffect(() => {
     if (!isSuperAdmin || allNeighborhoods.length > 0) return
     fetch('/api/neighborhoods/all')
@@ -166,7 +230,7 @@ export default function NewPostPage() {
   const [location, setLocation] = useState<{ lat: number; lng: number; name: string } | null>(null)
   const [detectingLocation, setDetectingLocation] = useState(false)
 
-  // Draft state — if a saved draft exists, offer to restore it on mount.
+  // Draft state
   const [draftAvailable, setDraftAvailable] = useState<PostDraft | null>(null)
   const [showLeaveSheet, setShowLeaveSheet] = useState(false)
 
@@ -176,10 +240,7 @@ export default function NewPostPage() {
   }, [])
 
   // Mark the body as full-screen so globals.css swaps the template's
-  // translate slide for a pure opacity crossfade. The slide's transform
-  // creates a containing block that would briefly reparent this page's
-  // `fixed inset-0` <main> during the 280ms animation, making the
-  // whole form look broken on route-in.
+  // translate slide for a pure opacity crossfade.
   useEffect(() => {
     if (typeof document === 'undefined') return
     document.body.setAttribute('data-full-screen', 'true')
@@ -192,8 +253,6 @@ export default function NewPostPage() {
     setBody(d.body || '')
     setPrice(d.price || '')
     setLocation(d.location || null)
-    // Rehydrate images from uploaded URLs only — raw File objects can't
-    // be persisted, so previews from the previous session are lost.
     setImages(
       (d.imageUrls || []).map((url) => ({
         file: new File([], 'restored'),
@@ -235,20 +294,17 @@ export default function NewPostPage() {
     router.push('/feed')
   }
 
-  // SERVICES is hidden from NORMAL users (and PENDING providers) — posting in
-  // SERVICES is reserved for publicly-visible providers (ACTIVE/VERIFIED).
-  const hideServices = !canPostServices
-  const baseCategories = hideServices
-    ? CATEGORIES.map(g => ({ ...g, items: g.items.filter(i => i.key !== 'SERVICES') }))
-                .filter(g => g.items.length > 0)
-    : CATEGORIES
-  const baseItems = baseCategories.flatMap(g => g.items)
+  // Visible categories — provider gate hides SERVICES from non-providers,
+  // admin gate hides COMPETITIONS from non-admins. The order mirrors the
+  // spec list so the grid reads top-down as the user expects.
+  const visibleCategories = CATEGORIES.filter(c => {
+    if (c.key === 'SERVICES' && !canPostServices && !isAdminLike) return false
+    if (ADMIN_ONLY_CATEGORIES.has(c.key) && !isAdminLike) return false
+    return true
+  })
 
-  const allItems = isFemale ? [...baseItems, ...WOMEN_ONLY_GROUP.items] : baseItems
-  const categoryGroups = isFemale ? [...baseCategories, WOMEN_ONLY_GROUP] : baseCategories
-  const selected = allItems.find(i => i.key === category)
-  const isLookingFor = category === 'LOOKING_FOR'
-  const showPrice = ['MARKETPLACE', 'REAL_ESTATE', 'FOOD_HOME'].includes(category)
+  const selected = CATEGORIES.find(i => i.key === category)
+  const showPrice = PRICE_CATEGORIES.has(category)
 
   const imageInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -320,7 +376,7 @@ export default function NewPostPage() {
   }
 
   async function handleSubmit() {
-    if (loading || uploading) return // Prevent double-submit
+    if (loading || uploading) return
     if (!title.trim() || !body.trim()) {
       const missing =
         !title.trim() && !body.trim() ? 'both'
@@ -364,10 +420,12 @@ export default function NewPostPage() {
 
     setLoading(true)
     try {
-      // Upload images first — abort if upload fails
       const imageUrls = await uploadImages()
       if (imageUrls === null) { setLoading(false); return }
 
+      // The composer always sends a v2 PostCategoryV2 enum value. The
+      // /api/posts route detects v2 vs legacy and runs both through
+      // classifyPost — never duplicate the mapping logic here.
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -380,8 +438,6 @@ export default function NewPostPage() {
           locationLat: location?.lat || null,
           locationLng: location?.lng || null,
           locationName: location?.name || null,
-          // Server enforces: only SUPER_ADMIN may override neighborhoodId.
-          // For everyone else this field is ignored.
           ...(isSuperAdmin && targetNeighborhoodId && targetNeighborhoodId !== ownNeighborhoodId
             ? { neighborhoodId: targetNeighborhoodId }
             : {}),
@@ -392,9 +448,6 @@ export default function NewPostPage() {
 
       if (!res.ok) {
         playError()
-        // Surface the server's specific reason (category invalid, missing
-        // fields, rate-limit, content blocked, duplicate, etc.) instead of
-        // the generic fallback. 4.5s so the user can actually read it.
         toast.error(translateApiError(data, lang as 'ar' | 'en' | 'ur'), {
           duration: 4500,
         })
@@ -420,11 +473,13 @@ export default function NewPostPage() {
     }
   }
 
+  const labelOf = (c: CategoryItem) =>
+    lang === 'en' ? c.labelEn : lang === 'ur' ? c.labelUr : c.label
+  const placeholderOf = (c: CategoryItem) =>
+    lang === 'en' ? c.placeholderEn : lang === 'ur' ? c.placeholderUr : c.placeholder
+
   return (
     <main className="fixed inset-0 flex flex-col bg-white dark:bg-gray-900 z-10">
-      {/* Header — first flex child, naturally fixed at top; content area
-          below it scrolls. fixed inset-0 on main ignores body's global
-          safe-area padding so the page owns the full viewport. */}
       <div className="flex-shrink-0 flex items-center gap-3 px-4 py-4 border-b border-gray-100 dark:border-gray-700"
            style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}>
         {step === 'content' ? (
@@ -438,7 +493,9 @@ export default function NewPostPage() {
             <span className="text-sm font-medium">{lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء'}</span>
           </button>
         )}
-        <h1 className="flex-1 text-center font-bold text-gray-900 dark:text-white">منشور جديد</h1>
+        <h1 className="flex-1 text-center font-bold text-gray-900 dark:text-white">
+          {lang === 'en' ? 'New Post' : lang === 'ur' ? 'نئی پوسٹ' : 'منشور جديد'}
+        </h1>
         {step === 'content' && (
           <button
             onClick={handleSubmit}
@@ -462,9 +519,7 @@ export default function NewPostPage() {
 
       <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
 
-        {/* Draft-restore banner — inline at the top of the scroll area so it
-            sits above the list without overlapping. Shown on mount if an
-            unsaved draft exists. */}
+        {/* Draft-restore banner */}
         {draftAvailable && (
           <div className="mb-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 px-4 py-3 flex items-start gap-3">
             <span className="text-base leading-none mt-0.5">📝</span>
@@ -493,40 +548,31 @@ export default function NewPostPage() {
           </div>
         )}
 
-        {/* Step 1: Category */}
+        {/* Step 1: Category — flat 3-column grid of v2 buckets. */}
         {step === 'category' && (
-          <div className="space-y-5 pb-24" data-tour="post-categories" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">اختر نوع المنشور</p>
-            {categoryGroups.map((group) => (
-              <div key={group.group}>
-                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase mb-2">{group.group}</p>
-                <div className="space-y-2">
-                  {group.items.map((cat: any) => (
-                    <button
-                      key={cat.key}
-                      onClick={() => {
-                        // RIDE_REQUEST goes directly to the structured ride form
-                        if (cat.key === 'RIDE_REQUEST') { router.push('/rides/new'); return }
-                        setCategory(cat.key); setStep('content')
-                      }}
-                      className={`w-full flex items-center gap-3 p-3.5 rounded-xl border active:scale-[0.98] transition-transform text-start ${
-                        cat.highlight
-                          ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20'
-                          : 'border-gray-200 dark:border-gray-700'
-                      }`}
-                    >
-                      <span className="text-xl w-8 text-center">{cat.icon}</span>
-                      <span className={`flex-1 font-medium text-sm ${cat.highlight ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-800 dark:text-white'}`}>{cat.label}</span>
-                      {cat.highlight && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-600 text-white">
-                          {lang === 'en' ? 'NEW' : lang === 'ur' ? 'نیا' : 'جديد'}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
+          <div className="space-y-4 pb-24" data-tour="post-categories" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
+              {lang === 'en' ? 'Choose a category' : lang === 'ur' ? 'زمرہ منتخب کریں' : 'اختر نوع المنشور'}
+            </p>
+            <div className="grid grid-cols-3 gap-2.5">
+              {visibleCategories.map((cat) => (
+                <button
+                  key={cat.key}
+                  onClick={() => {
+                    // RIDES routes to the structured ride form — same
+                    // behavior as the legacy RIDE_REQUEST entry.
+                    if (cat.key === 'RIDES') { router.push('/rides/new'); return }
+                    setCategory(cat.key); setStep('content')
+                  }}
+                  className="flex flex-col items-center justify-center gap-1.5 aspect-square p-3 rounded-xl border border-gray-200 dark:border-gray-700 active:scale-[0.97] transition-transform bg-white dark:bg-gray-800 hover:border-primary-300"
+                >
+                  <span className="text-2xl">{cat.icon}</span>
+                  <span className="text-[11px] font-medium text-gray-800 dark:text-white text-center leading-tight">
+                    {labelOf(cat)}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -536,11 +582,10 @@ export default function NewPostPage() {
             {/* Selected type badge */}
             <div className="flex items-center gap-2 bg-primary-50 dark:bg-primary-900/30 rounded-xl px-3 py-2">
               <span>{selected.icon}</span>
-              <span className="text-primary-700 dark:text-primary-300 font-medium text-sm">{selected.label}</span>
+              <span className="text-primary-700 dark:text-primary-300 font-medium text-sm">{labelOf(selected)}</span>
             </div>
 
-            {/* SUPER_ADMIN — target neighborhood picker. Lets platform
-                owners publish into any neighborhood, not just their own. */}
+            {/* SUPER_ADMIN — target neighborhood picker. */}
             {isSuperAdmin && allNeighborhoods.length > 0 && (
               <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40 rounded-xl p-3 space-y-2">
                 <label className="block text-xs font-semibold text-amber-900 dark:text-amber-200">
@@ -562,225 +607,162 @@ export default function NewPostPage() {
               </div>
             )}
 
-            {/* For LOOKING_FOR: simplified single field */}
-            {isLookingFor ? (
-              <>
-                <input
-                  type="text"
-                  placeholder="أبحث عن..."
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="input-field font-semibold"
-                  autoFocus
-                  maxLength={100}
-                />
-                <textarea
-                  placeholder="اكتب تفاصيل أكثر — المنطقة، الميزانية، أي تفاصيل تساعد الجيران يجاوبوك..."
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  className="input-field resize-none"
-                  rows={4}
-                  maxLength={500}
-                />
-                <div className="bg-sky-50 dark:bg-sky-900/30 rounded-xl p-3">
-                  <p className="text-sky-700 dark:text-sky-300 text-xs">
-                    🔎 سيُعرض طلبك للجيران في حيّك — هم يردوا عليك مباشرة
-                  </p>
+            <input
+              type="text"
+              placeholder={lang === 'en' ? 'Title' : lang === 'ur' ? 'عنوان' : 'العنوان'}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="input-field font-semibold"
+              autoFocus
+              maxLength={100}
+            />
+            <textarea
+              placeholder={placeholderOf(selected)}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              className="input-field resize-none"
+              rows={5}
+              maxLength={1000}
+            />
+
+            {/* Contextual hint */}
+            {!body && (
+              <p className="text-xs text-gray-400 -mt-2 px-1">
+                {category === 'NEIGHBORHOOD_REPORTS'
+                  ? '💡 حدد الموقع أو الشارع لمساعدة الجيران بالتعرف على المشكلة'
+                  : category === 'SERVICES'
+                  ? '💡 اذكر المنطقة والميزانية لردود أسرع'
+                  : category === 'LOST_FOUND'
+                  ? '💡 اذكر المكان والوقت اللي شفت فيه الشيء'
+                  : ['MARKETPLACE', 'HOME_BUSINESSES', 'REAL_ESTATE'].includes(category)
+                  ? '💡 اذكر السعر والحالة لجذب المشترين'
+                  : null}
+              </p>
+            )}
+
+            {/* Price field */}
+            {showPrice && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  {lang === 'en' ? 'Price' : lang === 'ur' ? 'قیمت' : 'السعر'}
+                  {category === 'HOME_BUSINESSES' ? (lang === 'en' ? ' (per order)' : ' (للطلب الواحد)') : ''}
+                </label>
+                <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus-within:ring-2 focus-within:ring-primary-500">
+                  <span className="px-3 text-gray-500 dark:text-gray-400 text-sm border-l border-gray-200 dark:border-gray-700 py-3"><RiyalIcon /></span>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    className="flex-1 min-w-0 px-3 py-3 bg-transparent focus:outline-none text-start text-gray-900 dark:text-white"
+                    dir="ltr"
+                  />
                 </div>
+              </div>
+            )}
 
-                {/* Image picker */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">📷 {lang === 'en' ? 'Add photos (optional)' : lang === 'ur' ? 'تصاویر شامل کریں (اختیاری)' : 'إضافة صور (اختياري)'}</label>
-                    <span className="text-xs text-gray-400">{images.length}/5</span>
-                  </div>
+            {/* Image picker */}
+            <div data-tour="post-images">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">📷 {lang === 'en' ? 'Add photos' : lang === 'ur' ? 'تصاویر شامل کریں' : 'إضافة صور'}</label>
+                <span className="text-xs text-gray-400">{images.length}/5</span>
+              </div>
 
-                  {images.length > 0 && (
-                    <div className="flex gap-2 mb-2 overflow-x-auto">
-                      {images.map((img, i) => (
-                        <div key={i} className="relative flex-shrink-0">
-                          <img src={img.preview} alt="" className="w-20 h-20 object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
-                          <button type="button" onClick={() => removeImage(i)}
-                            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center">✕</button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {images.length < 5 && (
-                    <>
+              {images.length > 0 && (
+                <div className="flex gap-2 mb-2 overflow-x-auto">
+                  {images.map((img, i) => (
+                    <div key={i} className="relative flex-shrink-0">
+                      <img src={img.preview} alt="" className="w-20 h-20 object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
                       <button
                         type="button"
-                        onClick={openPostImagePicker}
-                        className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-3 text-sm text-gray-400 cursor-pointer hover:border-primary-300 hover:text-primary-500 transition-colors"
-                      >
-                        <span>+ {lang === 'en' ? 'Choose photo' : lang === 'ur' ? 'تصویر منتخب کریں' : 'اختر صورة'}</span>
-                      </button>
-                      <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleImageSelect} className="hidden" />
-                      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
-                    </>
-                  )}
+                        onClick={() => removeImage(i)}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                      >✕</button>
+                    </div>
+                  ))}
                 </div>
-              </>
-            ) : (
-              <>
-                <input
-                  type="text"
-                  placeholder="العنوان"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="input-field font-semibold"
-                  autoFocus
-                  maxLength={100}
-                />
-                <textarea
-                  placeholder={selected.placeholder}
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  className="input-field resize-none"
-                  rows={5}
-                  maxLength={1000}
-                />
+              )}
 
-                {/* Contextual hint */}
-                {!body && (
-                  <p className="text-xs text-gray-400 -mt-2 px-1">
-                    {['ALERT', 'NEIGHBORHOOD_ISSUE'].includes(category)
-                      ? '💡 حدد الموقع أو الشارع لمساعدة الجيران بالتعرف على المشكلة'
-                      : ['LOOKING_FOR', 'SERVICES'].includes(category)
-                      ? '💡 اذكر المنطقة والميزانية لردود أسرع'
-                      : ['LOST_FOUND'].includes(category)
-                      ? '💡 اذكر المكان والوقت اللي شفت فيه الشيء'
-                      : ['MARKETPLACE', 'FOOD_HOME', 'REAL_ESTATE'].includes(category)
-                      ? '💡 اذكر السعر والحالة لجذب المشترين'
-                      : null}
-                  </p>
-                )}
+              {images.length < 5 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={openPostImagePicker}
+                    className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-3 text-sm text-gray-400 cursor-pointer hover:border-primary-300 hover:text-primary-500 transition-colors"
+                  >
+                    <span>+ {lang === 'en' ? 'Choose photo' : lang === 'ur' ? 'تصویر منتخب کریں' : 'اختر صورة'}</span>
+                  </button>
+                  <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleImageSelect} className="hidden" />
+                  <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
+                </>
+              )}
+            </div>
 
-                {/* Price field */}
-                {showPrice && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      السعر {category === 'FOOD_HOME' ? '(للطلب الواحد)' : ''}
-                    </label>
-                    <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 focus-within:ring-2 focus-within:ring-primary-500">
-                      <span className="px-3 text-gray-500 dark:text-gray-400 text-sm border-l border-gray-200 dark:border-gray-700 py-3"><RiyalIcon /></span>
-                      <input
-                        type="number"
-                        placeholder="0"
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
-                        className="flex-1 min-w-0 px-3 py-3 bg-transparent focus:outline-none text-start text-gray-900 dark:text-white"
-                        dir="ltr"
-                      />
-                    </div>
+            {/* Location attachment */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5 mb-2">
+                📍 {lang === 'en' ? 'Attach location (optional)' : lang === 'ur' ? 'مقام شامل کریں (اختیاری)' : 'إرفاق موقع (اختياري)'}
+              </label>
+              {location ? (
+                <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3">
+                  <span className="text-lg">📍</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{location.name || `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`}</p>
                   </div>
-                )}
-
-                {/* Image picker */}
-                <div data-tour="post-images">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">📷 إضافة صور</label>
-                    <span className="text-xs text-gray-400">{images.length}/5</span>
-                  </div>
-
-                  {images.length > 0 && (
-                    <div className="flex gap-2 mb-2 overflow-x-auto">
-                      {images.map((img, i) => (
-                        <div key={i} className="relative flex-shrink-0">
-                          <img src={img.preview} alt="" className="w-20 h-20 object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
-                          <button
-                            type="button"
-                            onClick={() => removeImage(i)}
-                            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
-                          >✕</button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {images.length < 5 && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={openPostImagePicker}
-                        className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-3 text-sm text-gray-400 cursor-pointer hover:border-primary-300 hover:text-primary-500 transition-colors"
-                      >
-                        <span>+ {lang === 'en' ? 'Choose photo' : lang === 'ur' ? 'تصویر منتخب کریں' : 'اختر صورة'}</span>
-                      </button>
-                      <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleImageSelect} className="hidden" />
-                      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
-                    </>
-                  )}
+                  <button onClick={() => setLocation(null)} className="text-gray-400 p-1">✕</button>
                 </div>
-
-                {/* Location attachment */}
-                <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5 mb-2">
-                    📍 {lang === 'en' ? 'Attach location (optional)' : lang === 'ur' ? 'مقام شامل کریں (اختیاری)' : 'إرفاق موقع (اختياري)'}
-                  </label>
-                  {location ? (
-                    <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3">
-                      <span className="text-lg">📍</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{location.name || `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`}</p>
-                      </div>
-                      <button onClick={() => setLocation(null)} className="text-gray-400 p-1">✕</button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button type="button" onClick={async () => {
-                        setDetectingLocation(true)
-                        try {
-                          const pos = await getCurrentPositionSafe({ enableHighAccuracy: true, timeout: 10000 })
-                          const { latitude: lat, longitude: lng } = pos.coords
-                          let name = `${lat.toFixed(4)}, ${lng.toFixed(4)}`
-                          try {
-                            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=${lang}&addressdetails=1`)
-                            const data = await res.json()
-                            name = data.address?.suburb || data.address?.neighbourhood || data.address?.road || data.display_name?.split(',')[0] || name
-                          } catch { /* */ }
-                          setLocation({ lat, lng, name })
-                        } catch {
-                          toast.error(lang === 'en' ? 'Allow location access' : lang === 'ur' ? 'براہ کرم مقام کی اجازت دیں' : 'يرجى السماح بالوصول للموقع')
-                        } finally {
-                          setDetectingLocation(false)
-                        }
-                      }} disabled={detectingLocation}
-                        className="flex-1 flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 rounded-xl py-2.5 text-sm text-gray-600 dark:text-gray-300 hover:border-primary-400 transition-colors">
-                        {detectingLocation ? <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" /> : '📍'}
-                        {lang === 'en' ? 'My Location' : lang === 'ur' ? 'میرا مقام' : 'موقعي الحالي'}
-                      </button>
-                      <button type="button" onClick={async () => {
-                        const { openMapPicker } = await import('@/components/rides/openMapPicker')
-                        const result = await openMapPicker({
-                          centerLat: 21.4, centerLng: 39.8, lang,
-                          maptilerKey: process.env.NEXT_PUBLIC_MAPTILER_KEY || '',
-                        })
-                        if (result) setLocation({ lat: result.lat, lng: result.lng, name: result.area || result.address.split(',')[0] })
-                      }}
-                        className="flex-1 flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 rounded-xl py-2.5 text-sm text-gray-600 dark:text-gray-300 hover:border-primary-400 transition-colors">
-                        🗺️ {lang === 'en' ? 'Pick on map' : lang === 'ur' ? 'نقشے سے منتخب کریں' : 'اختر من الخريطة'}
-                      </button>
-                    </div>
-                  )}
+              ) : (
+                <div className="flex gap-2">
+                  <button type="button" onClick={async () => {
+                    setDetectingLocation(true)
+                    try {
+                      const pos = await getCurrentPositionSafe({ enableHighAccuracy: true, timeout: 10000 })
+                      const { latitude: lat, longitude: lng } = pos.coords
+                      let name = `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+                      try {
+                        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=${lang}&addressdetails=1`)
+                        const data = await res.json()
+                        name = data.address?.suburb || data.address?.neighbourhood || data.address?.road || data.display_name?.split(',')[0] || name
+                      } catch { /* */ }
+                      setLocation({ lat, lng, name })
+                    } catch {
+                      toast.error(lang === 'en' ? 'Allow location access' : lang === 'ur' ? 'براہ کرم مقام کی اجازت دیں' : 'يرجى السماح بالوصول للموقع')
+                    } finally {
+                      setDetectingLocation(false)
+                    }
+                  }} disabled={detectingLocation}
+                    className="flex-1 flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 rounded-xl py-2.5 text-sm text-gray-600 dark:text-gray-300 hover:border-primary-400 transition-colors">
+                    {detectingLocation ? <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" /> : '📍'}
+                    {lang === 'en' ? 'My Location' : lang === 'ur' ? 'میرا مقام' : 'موقعي الحالي'}
+                  </button>
+                  <button type="button" onClick={async () => {
+                    const { openMapPicker } = await import('@/components/rides/openMapPicker')
+                    const result = await openMapPicker({
+                      centerLat: 21.4, centerLng: 39.8, lang,
+                      maptilerKey: process.env.NEXT_PUBLIC_MAPTILER_KEY || '',
+                    })
+                    if (result) setLocation({ lat: result.lat, lng: result.lng, name: result.area || result.address.split(',')[0] })
+                  }}
+                    className="flex-1 flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 rounded-xl py-2.5 text-sm text-gray-600 dark:text-gray-300 hover:border-primary-400 transition-colors">
+                    🗺️ {lang === 'en' ? 'Pick on map' : lang === 'ur' ? 'نقشے سے منتخب کریں' : 'اختر من الخريطة'}
+                  </button>
                 </div>
+              )}
+            </div>
 
-                {/* Issue tip */}
-                {category === 'NEIGHBORHOOD_ISSUE' && (
-                  <div className="bg-orange-50 dark:bg-orange-900/30 rounded-xl p-3">
-                    <p className="text-orange-700 dark:text-orange-300 text-xs">
-                      ⚠️ سيتم إشعار مشرف الحي بالمشكلة — كن دقيقاً في الوصف والموقع
-                    </p>
-                  </div>
-                )}
-              </>
+            {/* Issue tip */}
+            {category === 'NEIGHBORHOOD_REPORTS' && (
+              <div className="bg-orange-50 dark:bg-orange-900/30 rounded-xl p-3">
+                <p className="text-orange-700 dark:text-orange-300 text-xs">
+                  ⚠️ سيتم إشعار مشرف الحي بالمشكلة — كن دقيقاً في الوصف والموقع
+                </p>
+              </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Leave-page sheet — save draft or discard */}
+      {/* Leave-page sheet */}
       {showLeaveSheet && (
         <div
           className="fixed inset-0 z-[1000] bg-black/40 flex items-end justify-center"

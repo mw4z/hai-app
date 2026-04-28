@@ -2,10 +2,20 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import FeedClient from './FeedClient'
-import { PostCategory } from '@prisma/client'
+import { PostCategory, PostCategoryV2 } from '@prisma/client'
 import { getFeedBoost } from '@/lib/reputation-levels'
 import { cached } from '@/lib/cache'
 import { shouldArchivePost } from '@/lib/postExpiry'
+import { legacyOf } from '@/lib/postCategory'
+import { FLAGS } from '@/lib/flags'
+
+// v2 chip values posted by the new feed UI. Phase 3 read switch maps
+// these to the v2 column when USE_NEW_CATEGORY is on, otherwise falls
+// back to legacyOf() so the legacy column still works.
+const V2_FILTER_VALUES: readonly string[] = [
+  'HOME_BUSINESSES','MARKETPLACE','SERVICES','RIDES','REAL_ESTATE',
+  'LOST_FOUND','NEIGHBORHOOD_REPORTS','EVENTS','COMPETITIONS','GENERAL',
+]
 
 export default async function FeedPage({
   searchParams,
@@ -31,11 +41,21 @@ export default async function FeedPage({
 
   const isFemale = user.gender === 'FEMALE'
 
+  // Filter mapping — accept either v2 chip values from the new feed UI
+  // or legacy enum values that older clients may still send. ALL +
+  // WOMEN_ONLY keep their existing semantics; v2 keys route through
+  // newCategory when the read flag is on, else through the legacy
+  // column via legacyOf().
   let categoryFilter: object
   if (category === 'ALL') {
     categoryFilter = isFemale ? {} : { category: { not: PostCategory.WOMEN_ONLY } }
   } else if (category === 'WOMEN_ONLY') {
     categoryFilter = isFemale ? { category: PostCategory.WOMEN_ONLY } : { id: '' }
+  } else if (V2_FILTER_VALUES.includes(category)) {
+    const v2 = category as PostCategoryV2
+    categoryFilter = FLAGS.USE_NEW_CATEGORY
+      ? { newCategory: v2 }
+      : { category: legacyOf(v2) }
   } else {
     categoryFilter = { category: category as PostCategory }
   }

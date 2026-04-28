@@ -35,6 +35,30 @@ export const translations = {
   contests_coming_soon:   { ar: 'قريباً',            en: 'Coming Soon'       , ur: 'جلد آرہا ہے' },
   contests_desc:          { ar: 'مسابقات وجوائز حصرية لسكان الحي — ترقبوا!', en: 'Exclusive contests & prizes for neighborhood residents — stay tuned!' , ur: 'محلے کے رہائشیوں کیلئے خصوصی مقابلے اور انعامات!' },
 
+  // ── v2 categories (PostCategoryV2) — single source of truth for the
+  // new composer + the v2-aware render path. Legacy cat_* keys above are
+  // kept around for historical posts (see readCategory fallback).
+  post_v2_HOME_BUSINESSES:      { ar: 'الأسر المنتجة',      en: 'Home Businesses',      ur: 'گھریلو کاروبار' },
+  post_v2_MARKETPLACE:          { ar: 'السوق',                en: 'Marketplace',          ur: 'مارکیٹ' },
+  post_v2_SERVICES:             { ar: 'خدمات',                en: 'Services',             ur: 'خدمات' },
+  post_v2_RIDES:                { ar: 'مشاوير',               en: 'Rides',                ur: 'سواری' },
+  post_v2_REAL_ESTATE:          { ar: 'عقارات',               en: 'Real Estate',          ur: 'جائیداد' },
+  post_v2_LOST_FOUND:           { ar: 'مفقودات',              en: 'Lost & Found',         ur: 'گمشدہ اشیاء' },
+  post_v2_NEIGHBORHOOD_REPORTS: { ar: 'بلاغات الحي',          en: 'Neighborhood Reports', ur: 'محلے کی رپورٹس' },
+  post_v2_EVENTS:               { ar: 'فعاليات ومناسبات',   en: 'Events',               ur: 'تقریبات' },
+  post_v2_COMPETITIONS:         { ar: 'مسابقات وجوائز',     en: 'Competitions',         ur: 'مقابلے' },
+
+  post_intent_request:          { ar: 'طلب',                  en: 'Request',              ur: 'درخواست' },
+  post_intent_offer:            { ar: 'عرض',                  en: 'Offer',                ur: 'پیشکش' },
+
+  ask_neighbors:                { ar: 'اسأل جيرانك',          en: 'Ask neighbors',        ur: 'ہمسایوں سے پوچھیں' },
+  ask_input_placeholder:        { ar: 'ما الذي تبحث عنه؟',  en: 'What are you looking for?', ur: 'آپ کیا تلاش کر رہے ہیں؟' },
+  ask_submit:                   { ar: 'اسأل جيرانك',          en: 'Ask',                  ur: 'پوچھیں' },
+
+  post_or_ask:                  { ar: 'ماذا تريد أن تنشر؟', en: 'What do you want to post?', ur: 'آپ کیا پوسٹ کرنا چاہتے ہیں؟' },
+  post_entry_post:              { ar: 'انشر',                 en: 'Post',                 ur: 'پوسٹ' },
+  post_entry_ask:               { ar: 'اسأل جيرانك',          en: 'Ask neighbors',        ur: 'ہمسایوں سے پوچھیں' },
+
   // ── Post Card ───────────────────────────────────────────────────────────────
   post_comment:       { ar: 'تعليق',         en: 'Comment'     , ur: 'تبصرہ' },
   post_comments:      { ar: 'تعليقات',       en: 'Comments'    , ur: 'تبصرے' },

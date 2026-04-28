@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus } from 'react-icons/fi'
+import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus, FiEdit3, FiHelpCircle } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { hapticMedium } from '@/lib/haptic'
 import { playTap } from '@/lib/sound'
@@ -86,6 +86,11 @@ export default function BottomNav({
 
   const isSuperAdmin = userRole === 'SUPER_ADMIN'
 
+  // FAB now opens a 2-option sheet: Post vs Ask neighbors. The split
+  // came out of the Phase 3.5 cutover — Ask is its own entry point, not
+  // a sub-toggle inside the post composer's category picker.
+  const [showEntrySheet, setShowEntrySheet] = useState(false)
+
   async function handleNewPost() {
     hapticMedium()
     playTap()
@@ -116,7 +121,7 @@ export default function BottomNav({
       if (ok) router.push('/feed')
       return
     }
-    router.push('/post/new')
+    setShowEntrySheet(true)
   }
 
   useEffect(() => {
@@ -233,6 +238,46 @@ export default function BottomNav({
           )
         })}
       </div>
+
+      {/* Post / Ask entry-point sheet — opens when the FAB is tapped
+          from the user's own neighborhood. Mirrors the visual pattern
+          of ImageSourceSheet so the chooser feels native to the app.
+          ~120px-tall content area + safe-area padding underneath. */}
+      {showEntrySheet && (
+        <div
+          className="fixed inset-0 z-[1000] bg-black/40 flex items-end justify-center"
+          onClick={() => setShowEntrySheet(false)}
+        >
+          <div
+            className="w-full max-w-[480px] bg-white dark:bg-gray-800 rounded-t-3xl p-4 pb-6 space-y-2 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+          >
+            <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-2" />
+            <p className="text-center text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+              {t('post_or_ask')}
+            </p>
+            <button
+              onClick={() => { setShowEntrySheet(false); router.push('/post/new') }}
+              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 active:scale-[0.98] transition-transform"
+            >
+              <FiEdit3 className="w-5 h-5 text-primary-600" />
+              <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                {t('post_entry_post')}
+              </span>
+            </button>
+            <button
+              onClick={() => { setShowEntrySheet(false); router.push('/ask') }}
+              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 dark:bg-gray-700 active:scale-[0.98] transition-transform"
+            >
+              <FiHelpCircle className="w-5 h-5 text-primary-600" />
+              <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                {t('post_entry_ask')}
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
     </nav>
   )
 }

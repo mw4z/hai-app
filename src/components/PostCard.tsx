@@ -31,29 +31,28 @@ import UserBadgeDisplay, { TierLabel } from './UserBadge'
 import { StatePill } from '@/lib/state-render'
 import { fullName } from '@/lib/displayName'
 
+import { readCategory } from '@/lib/posts/readCategory'
+
 /**
- * Category → semantic label + icon.
+ * v2 category → semantic label + icon.
  *
- * Appearance is NO LONGER stored here. All category colors (light + dark)
- * live in design-tokens.css as --hai-category-{ENUM}-{bg|fg} and are
- * applied by the `.hai-category-badge` primitive via `data-category`.
- * This map is pure business metadata (translation key + icon glyph).
+ * Appearance (light + dark colors) lives in design-tokens.css as
+ * --hai-category-{ENUM}-{bg|fg} keyed by `data-category`. This map is
+ * pure business metadata (translation key + icon glyph) for the v2
+ * (PostCategoryV2) values. Rendering goes through readCategory() so old
+ * posts with legacy categories show up as their v2 equivalent.
  */
-const CATEGORY_STYLES: Record<string, { tKey: TranslationKey; icon: string }> = {
-  ALERT:              { tKey: 'cat_ALERT',              icon: '🔔' },
-  NEIGHBORHOOD_ISSUE: { tKey: 'cat_NEIGHBORHOOD_ISSUE', icon: '⚠️' },
-  LOOKING_FOR:        { tKey: 'cat_LOOKING_FOR',        icon: '🔎' },
-  MARKETPLACE:        { tKey: 'cat_MARKETPLACE',        icon: '🛒' },
-  FOOD_HOME:          { tKey: 'cat_FOOD_HOME',          icon: '🍱' },
-  REAL_ESTATE:        { tKey: 'cat_REAL_ESTATE',        icon: '🏠' },
-  SERVICES:           { tKey: 'cat_SERVICES',           icon: '🔧' },
-  LOST_FOUND:         { tKey: 'cat_LOST_FOUND',         icon: '🔍' },
-  MOSQUE:             { tKey: 'cat_MOSQUE',             icon: '🕌' },
-  EID_RAMADAN:        { tKey: 'cat_EID_RAMADAN',        icon: '🎉' },
-  CONTESTS:           { tKey: 'cat_CONTESTS',           icon: '🏆' },
-  RIDE_REQUEST:       { tKey: 'cat_RIDE_REQUEST',       icon: '🚗' },
-  WOMEN_ONLY:         { tKey: 'cat_WOMEN_ONLY',         icon: '👩' },
-  GENERAL:            { tKey: 'cat_GENERAL',            icon: '💬' },
+const V2_CATEGORY_STYLES: Record<string, { tKey: TranslationKey; icon: string }> = {
+  HOME_BUSINESSES:      { tKey: 'post_v2_HOME_BUSINESSES',      icon: '🍱' },
+  MARKETPLACE:          { tKey: 'post_v2_MARKETPLACE',          icon: '🛒' },
+  SERVICES:             { tKey: 'post_v2_SERVICES',             icon: '🔧' },
+  RIDES:                { tKey: 'post_v2_RIDES',                icon: '🚗' },
+  REAL_ESTATE:          { tKey: 'post_v2_REAL_ESTATE',          icon: '🏠' },
+  LOST_FOUND:           { tKey: 'post_v2_LOST_FOUND',           icon: '🔍' },
+  NEIGHBORHOOD_REPORTS: { tKey: 'post_v2_NEIGHBORHOOD_REPORTS', icon: '⚠️' },
+  EVENTS:               { tKey: 'post_v2_EVENTS',               icon: '🎉' },
+  COMPETITIONS:         { tKey: 'post_v2_COMPETITIONS',         icon: '🏆' },
+  GENERAL:              { tKey: 'cat_GENERAL',                  icon: '💬' },
 }
 
 
@@ -83,6 +82,10 @@ interface Post {
   title: string
   body: string
   category: string
+  /** v2 fields — Phase 3 reads. May be null on the very oldest rows
+   *  (pre-Phase-2 backfill); readCategory() falls back to legacy. */
+  newCategory?: string | null
+  intent?: 'OFFER' | 'REQUEST' | 'NORMAL' | null
   isPaid: boolean
   isFeatured: boolean
   isPinned: boolean
@@ -381,7 +384,17 @@ export default function PostCard({
   const [following, setFollowing] = useState(initialFollowing)
   const [replyText, setReplyText] = useState('')
   const [submittingReply, setSubmittingReply] = useState(false)
-  const style = CATEGORY_STYLES[post.category] || CATEGORY_STYLES.GENERAL
+  // v2 read path — derive the canonical PostCategoryV2 (with legacy
+  // fallback for rows missing newCategory) and look up its presentation.
+  const v2Category = readCategory({
+    id: post.id,
+    category: post.category as any,
+    newCategory: (post.newCategory ?? null) as any,
+  })
+  const style = V2_CATEGORY_STYLES[v2Category] || V2_CATEGORY_STYLES.GENERAL
+  // REQUEST intent (Ask flow + legacy LOOKING_FOR/RIDE_REQUEST) gets a
+  // small secondary marker on the card.
+  const isRequest = post.intent === 'REQUEST'
   const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + b, 0)
   const serverCommentCount = post._count?.comments || 0
   // Before the full thread is loaded, the SSR `_count` is the truth —
@@ -797,7 +810,9 @@ export default function PostCard({
     setShowMenu(false)
   }
 
-  const isLookingFor = post.category === 'LOOKING_FOR'
+  // Visual styling for "looking for" cards is now driven by intent —
+  // covers both legacy LOOKING_FOR posts and the new Ask flow.
+  const isLookingFor = post.category === 'LOOKING_FOR' || isRequest
 
   return (
     <div className={`hai-card relative animate-fade-in-up glow-card ${post.isPinned ? 'hai-post--pinned' : ''} ${isLookingFor ? 'hai-post--looking-for' : ''}`}>
@@ -830,6 +845,14 @@ export default function PostCard({
         </div>
         <div className="hai-row-2">
           <span className="hai-category-badge" data-category={post.category}>{style.icon} {t(style.tKey)}</span>
+          {isRequest && (
+            <span
+              className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+              aria-label={t('post_intent_request')}
+            >
+              {t('post_intent_request')}
+            </span>
+          )}
           <div className="hai-menu-anchor" ref={menuRef}>
             <button
               onClick={() => { setShowMenu(!showMenu); hapticLight() }}

@@ -18,22 +18,24 @@ import { FiBell, FiPlus, FiMapPin, FiX, FiSearch, FiFilter, FiCheck, FiChevronDo
 import { useLanguage } from '@/hooks/useLanguage'
 import type { TranslationKey } from '@/lib/i18n'
 import { fullName } from '@/lib/displayName'
+import { readCategory } from '@/lib/posts/readCategory'
 
+// v2 filter chips — mirror the 9 PostCategoryV2 buckets the composer
+// uses. GENERAL is admin-only fallback so it stays out of the picker.
+// The `key` is the v2 enum and is translated to the legacy column when
+// the request hits /api/feed (the API itself still keys on legacy
+// during the Phase 3 read switch).
 const CATEGORIES: { key: string; tKey: TranslationKey; icon: string }[] = [
-  { key: 'ALL',                tKey: 'feed_all',              icon: '🏘️' },
-  { key: 'LOOKING_FOR',        tKey: 'cat_LOOKING_FOR',       icon: '🔎' },
-  { key: 'ALERT',              tKey: 'cat_ALERT',             icon: '🔔' },
-  { key: 'NEIGHBORHOOD_ISSUE', tKey: 'cat_NEIGHBORHOOD_ISSUE',icon: '⚠️' },
-  { key: 'RIDE_REQUEST',       tKey: 'cat_RIDE_REQUEST',      icon: '🚗' },
-  { key: 'MARKETPLACE',        tKey: 'cat_MARKETPLACE',       icon: '🛒' },
-  { key: 'FOOD_HOME',          tKey: 'cat_FOOD_HOME',         icon: '🍱' },
-  { key: 'REAL_ESTATE',        tKey: 'cat_REAL_ESTATE',       icon: '🏠' },
-  { key: 'SERVICES',           tKey: 'cat_SERVICES',          icon: '🔧' },
-  { key: 'LOST_FOUND',         tKey: 'cat_LOST_FOUND',        icon: '🔍' },
-  { key: 'MOSQUE',             tKey: 'cat_MOSQUE',            icon: '🕌' },
-  { key: 'EID_RAMADAN',        tKey: 'cat_EID_RAMADAN',       icon: '🎉' },
-  { key: 'CONTESTS',           tKey: 'cat_CONTESTS',          icon: '🏆' },
-  { key: 'GENERAL',            tKey: 'cat_GENERAL',           icon: '💬' },
+  { key: 'ALL',                  tKey: 'feed_all',                    icon: '🏘️' },
+  { key: 'HOME_BUSINESSES',      tKey: 'post_v2_HOME_BUSINESSES',     icon: '🍱' },
+  { key: 'MARKETPLACE',          tKey: 'post_v2_MARKETPLACE',         icon: '🛒' },
+  { key: 'SERVICES',             tKey: 'post_v2_SERVICES',            icon: '🔧' },
+  { key: 'RIDES',                tKey: 'post_v2_RIDES',               icon: '🚗' },
+  { key: 'REAL_ESTATE',          tKey: 'post_v2_REAL_ESTATE',         icon: '🏠' },
+  { key: 'LOST_FOUND',           tKey: 'post_v2_LOST_FOUND',          icon: '🔍' },
+  { key: 'NEIGHBORHOOD_REPORTS', tKey: 'post_v2_NEIGHBORHOOD_REPORTS',icon: '⚠️' },
+  { key: 'EVENTS',               tKey: 'post_v2_EVENTS',              icon: '🎉' },
+  { key: 'COMPETITIONS',         tKey: 'post_v2_COMPETITIONS',        icon: '🏆' },
 ]
 
 interface Post {
@@ -41,6 +43,10 @@ interface Post {
   title: string
   body: string
   category: string
+  /** v2 fields — hidden-categories filter and PostCard rendering use
+   *  `newCategory` when present (Phase 3 read switch). */
+  newCategory?: string | null
+  intent?: 'OFFER' | 'REQUEST' | 'NORMAL' | null
   isPaid: boolean
   isFeatured: boolean
   isPinned: boolean
@@ -305,15 +311,22 @@ export default function FeedClient({
     )
   }
 
-  const showWomenOnly = user.gender === 'FEMALE'
-  const categories = showWomenOnly
-    ? [...CATEGORIES, { key: 'WOMEN_ONLY', tKey: 'cat_WOMEN_ONLY' as TranslationKey, icon: '👩' }]
-    : CATEGORIES
+  // Audience targeting (women-only) is no longer a category — Phase 3 v2
+  // model represents it as `audience: WOMEN`. The filter chip is dropped
+  // from the composer surface; the legacy WOMEN_ONLY rows still live in
+  // historical posts and remain visible via the AUDIENCE filter on the
+  // API (handled by feedQuery.ts when ?gender=FEMALE).
+  const categories = CATEGORIES
 
-  // Filtered + sorted posts
+  // Filtered + sorted posts. hiddenCategories holds v2 enum keys (set by
+  // the v2 chips above) — resolve each post's effective v2 category via
+  // readCategory() so legacy posts also map correctly through the hide
+  // filter.
   const displayPosts = useMemo(() => {
     let result = selectedCategory === 'ALL' && hiddenCategories.size > 0
-      ? posts.filter((p: any) => !hiddenCategories.has(p.category))
+      ? posts.filter((p: any) => !hiddenCategories.has(
+          readCategory({ id: p.id, category: p.category, newCategory: p.newCategory ?? null }),
+        ))
       : posts
     if (sortMode === 'popular' && selectedCategory === 'ALL') {
       result = [...result].sort((a: any, b: any) => {
