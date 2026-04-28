@@ -476,6 +476,10 @@ body {
    page content behind it as the visible "gap above the header".
    Putting the cover on <html> keeps it anchored to the viewport
    regardless of body's positioning. */
+/* TEMP DIAGNOSTIC: bright magenta. If you see magenta in the
+   safe-area zone, html::before is rendering. If you see black,
+   iOS WKWebView is dropping html::before and we need a different
+   element to paint the safe-area cover. */
 html::before {
   content: '';
   position: fixed;
@@ -483,18 +487,12 @@ html::before {
   left: 0;
   right: 0;
   height: env(safe-area-inset-top, 0px);
-  /* z-index 1 keeps the cover BELOW every popup backdrop (z-40+) so
-     a backdrop dims it uniformly with the page content beneath.
-     Above the auto-stacked page content so the cover still wins in
-     the no-popup steady state. */
   z-index: 1;
   pointer-events: none;
-  background: #ffffff;
-  background: var(--hai-safe-top-bg, var(--hai-surface-1, #ffffff));
+  background: magenta !important;
 }
 html.dark::before {
-  background: #101619;
-  background: var(--hai-safe-top-bg, var(--hai-surface-1, #101619));
+  background: lime !important;
 }
 /* Safe-area cover is now rendered as #__hai_safe_top in layout.tsx —
    a real DOM node paints reliably across WKWebView versions. */
