@@ -391,8 +391,18 @@ body {
   position: relative;
 }
 .dark body {
-  background-color: #000000;
-  background-color: var(--bg, #000000);
+  /* Match the header `.glass` surface (#101619) — NOT the page bg
+     token. Why: body's padding-top zone (env(safe-area-inset-top))
+     paints the body bg in the iOS notch/status-bar area. If body bg
+     is #000 and the header below is #101619, popup backdrops dim
+     them to two different shades and the seam reads as a visible
+     "gap" above the header on iOS. Painting body the same colour as
+     the header means the safe-area + header sit on a continuous
+     surface, dimmed identically by any backdrop. Pages that need a
+     different page-area bg (feed gradient, etc.) still override on
+     their own root element. */
+  background-color: #101619;
+  background-color: var(--hai-surface-1, #101619);
   color: #e9edef;
   color: var(--text, #e9edef);
 }
