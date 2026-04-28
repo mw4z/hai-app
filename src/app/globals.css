@@ -479,19 +479,17 @@ html {
 
 /* ── iOS safe area — universal approach ──────────────────────── */
 /* env() = 0 on web (no-op), ~47px on iOS native.
-   NO body { padding-top: env(safe-area-inset-top) } here.
-   Why: the safe-area cover is painted by html::before at the
-   viewport top. Sticky headers (.glass.sticky.top-0) already use
-   `top: env(safe-area-inset-top)` so they sit flush against the
-   cover. Adding body.padding-top stacks ANOTHER env(...) of empty
-   space on top of the in-flow position of the header, so when
-   sticky engages on iOS the header lands at 2 * env(...) and a
-   visible band of body bg appears between the safe-area cover and
-   the header — the "header pushed down + gap" symptom.
-
-   Pages without a sticky header that want their content below the
-   notch zone should add `padding-top: env(safe-area-inset-top)` on
-   their own root element. */
+   body.padding-top reserves flow space at body's content top so
+   sticky headers' natural in-flow space is below the safe-area
+   zone. Without it, post cards flow up under the sticky header
+   (which renders at viewport y=env(...) but reserves natural space
+   at y=0) — the "main screen cut from up" symptom.
+   Required IN COMBINATION with the html-overflow scroll lock; the
+   old `position: fixed` body lock broke sticky and gave a different
+   "gap above header" symptom that this padding alone cannot fix. */
+body {
+  padding-top: env(safe-area-inset-top, 0px);
+}
 /* MUST be html::before, NOT body::before. Why:
    useBodyScrollLock applies position:fixed to <body> when a sheet
    opens. position:fixed on body makes body a containing block for
