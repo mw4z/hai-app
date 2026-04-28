@@ -15,7 +15,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiArrowRight, FiArrowLeft, FiSend } from 'react-icons/fi'
+import { FiArrowRight, FiArrowLeft, FiSend, FiImage, FiX } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useNetworkStatus } from '@/lib/network'
 import { translateApiError } from '@/lib/apiError'
@@ -23,6 +23,9 @@ import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { playSuccess, playError } from '@/lib/sound'
 import { t as translate } from '@/lib/i18n'
 import { inferAskCategory } from '@/lib/classify/inferAskCategory'
+import { pickImageOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
+import ImageSourceSheet from '@/components/ImageSourceSheet'
+import { uploadFiles } from '@/lib/upload'
 
 // Optional category strip — Ask flow excludes COMPETITIONS (admin-only,
 // nothing to ask there) and GENERAL (admin-only fallback). Order
@@ -99,6 +102,16 @@ export default function AskNeighborsPage() {
   const [loading, setLoading] = useState(false)
   const [placeholderIdx, setPlaceholderIdx] = useState(0)
 
+  // Optional image attach. Same pattern as the regular post composer:
+  // - pickImageOrFallback handles iOS native picker / Android WebView
+  // - ImageSourceSheet shows the camera-vs-gallery chooser
+  // - Hidden file inputs are the web fallback (Android pickImage routes
+  //   here too via webInputRef)
+  const [image, setImage] = useState<{ file: File; preview: string } | null>(null)
+  const [imageSheetOpen, setImageSheetOpen] = useState(false)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+
   // Cycle placeholder examples every 2.5s while the input is empty.
   useEffect(() => {
     if (text.trim()) return
@@ -128,6 +141,57 @@ export default function AskNeighborsPage() {
 
   const labelOf = (c: AskCategory) =>
     lang === 'en' ? c.labelEn : lang === 'ur' ? c.labelUr : c.label
+
+  // Revoke the blob URL when the image changes/unmounts so we don't
+  // leak object URLs on the client.
+  useEffect(() => {
+    if (!image) return
+    return () => {
+      try { URL.revokeObjectURL(image.preview) } catch { /* ignore */ }
+    }
+  }, [image])
+
+  function applyImage(file: File) {
+    if (!file.type.startsWith('image/')) {
+      toast.error(lang === 'en' ? 'Images only' : lang === 'ur' ? 'صرف تصاویر' : 'صور فقط')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(lang === 'en' ? 'Max 5MB' : lang === 'ur' ? 'زیادہ سے زیادہ 5MB' : 'الحد الأقصى 5 ميقا')
+      return
+    }
+    if (image) {
+      try { URL.revokeObjectURL(image.preview) } catch { /* ignore */ }
+    }
+    setImage({ file, preview: URL.createObjectURL(file) })
+  }
+
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (file) applyImage(file)
+  }
+
+  async function pickFromCamera() {
+    const isNative = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
+    if (isNative) {
+      try {
+        const file = await pickImageFromCamera()
+        applyImage(file)
+      } catch (err: any) {
+        if (!err?.message?.toLowerCase?.().includes('cancel') && err?.message !== 'no_image') {
+          console.warn('[ask] camera failed', err)
+        }
+      }
+    } else {
+      cameraInputRef.current?.click()
+    }
+  }
+
+  async function pickFromGallery() {
+    const file = await pickImageOrFallback(lang as any, galleryInputRef)
+    if (file) applyImage(file)
+  }
 
   const selectedCategory = ASK_CATEGORIES.find(c => c.key === category)
 
@@ -159,6 +223,23 @@ export default function AskNeighborsPage() {
 
     setLoading(true)
     try {
+      // Upload image first if attached. Surfacing upload failures
+      // BEFORE the post create keeps the post-create error path clean.
+      let imageUrls: string[] = []
+      if (image) {
+        try {
+          imageUrls = await uploadFiles([image.file])
+        } catch (err: any) {
+          playError()
+          toast.error(
+            lang === 'en' ? 'Image upload failed'
+            : lang === 'ur' ? 'تصویر اپ لوڈ ناکام'
+            : 'فشل رفع الصورة',
+          )
+          setLoading(false)
+          return
+        }
+      }
       // Title is the first line / first 60 chars; body is the full
       // input. The server enforces classify defaults (priority: HIGH
       // for LOST_FOUND/NEIGHBORHOOD_REPORTS) — we just send the v2
@@ -173,6 +254,7 @@ export default function AskNeighborsPage() {
           body: trimmed,
           category,
           intent: 'REQUEST',
+          imageUrls,
           locationLat: location?.lat || null,
           locationLng: location?.lng || null,
           locationName: location?.name || null,
@@ -301,6 +383,48 @@ export default function AskNeighborsPage() {
           )}
         </div>
 
+        {/* Optional image attach — same camera/gallery flow as the
+            regular post composer. Single image (asks rarely benefit
+            from a gallery). Hidden file inputs are the web fallback
+            used by ImageSourceSheet's gallery branch and the on-device
+            camera capture branch. */}
+        <div>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5 mb-2">
+            📷 {lang === 'en' ? 'Attach image (optional)' : lang === 'ur' ? 'تصویر شامل کریں (اختیاری)' : 'إرفاق صورة (اختياري)'}
+          </label>
+          {image ? (
+            <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-2">
+              <img src={image.preview} alt="" className="w-16 h-16 rounded-lg object-cover" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{image.file.name || 'image'}</p>
+                <p className="text-[10px] text-gray-400">{(image.file.size / 1024).toFixed(0)} KB</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (image) URL.revokeObjectURL(image.preview)
+                  setImage(null)
+                }}
+                className="text-gray-400 p-2 active:scale-90"
+                aria-label="remove image"
+              >
+                <FiX className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setImageSheetOpen(true)}
+              className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-3 text-sm text-gray-400 hover:border-primary-300 hover:text-primary-500 transition-colors"
+            >
+              <FiImage className="w-4 h-4" />
+              <span>{lang === 'en' ? 'Add a photo' : lang === 'ur' ? 'تصویر شامل کریں' : 'إضافة صورة'}</span>
+            </button>
+          )}
+          <input ref={galleryInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageSelect} className="hidden" />
+          <input ref={cameraInputRef}  type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
+        </div>
+
         {/* Optional location */}
         <div>
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5 mb-2">
@@ -366,6 +490,13 @@ export default function AskNeighborsPage() {
           </p>
         </div>
       </div>
+
+      <ImageSourceSheet
+        open={imageSheetOpen}
+        onClose={() => setImageSheetOpen(false)}
+        onCamera={pickFromCamera}
+        onGallery={pickFromGallery}
+      />
     </main>
   )
 }

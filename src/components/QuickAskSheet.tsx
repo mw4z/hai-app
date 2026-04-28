@@ -1,11 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiX, FiSend } from 'react-icons/fi'
+import { FiX, FiSend, FiImage } from 'react-icons/fi'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import { inferAskCategory, type V2Category } from '@/lib/classify/inferAskCategory'
+import { pickImageOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
+import ImageSourceSheet from '@/components/ImageSourceSheet'
+import { uploadFiles } from '@/lib/upload'
 
 const SUGGESTIONS = [
   { label: 'سباك',         icon: '🔧' },
@@ -43,6 +46,47 @@ export default function QuickAskSheet({ onClose }: { onClose: () => void }) {
   const [userOverrode, setUserOverrode] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
 
+  // Image attach (single image, same flow as /ask page).
+  const [image, setImage] = useState<{ file: File; preview: string } | null>(null)
+  const [imageSheetOpen, setImageSheetOpen] = useState(false)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Eager focus before paint — `autoFocus` defers focus to React's
+  // commit phase which on Android WebView landed AFTER the browser
+  // had painted the sheet. Synchronous focus in useLayoutEffect makes
+  // the keyboard rise the same frame the sheet appears.
+  useLayoutEffect(() => {
+    textareaRef.current?.focus()
+  }, [])
+
+  // Lock the feed scroll while this sheet is open. overflow:hidden on
+  // body alone doesn't stop iOS WKWebView / Android WebView touchmove
+  // from panning the document underneath; position:fixed + saved
+  // scrollY + width:100% is the bulletproof cross-platform lock. We
+  // restore scrollY on close so the feed doesn't jump to the top.
+  useEffect(() => {
+    const scrollY = window.scrollY
+    const prev = {
+      position: document.body.style.position,
+      top: document.body.style.top,
+      width: document.body.style.width,
+      overflow: document.body.style.overflow,
+    }
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.width = '100%'
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.position = prev.position
+      document.body.style.top = prev.top
+      document.body.style.width = prev.width
+      document.body.style.overflow = prev.overflow
+      window.scrollTo(0, scrollY)
+    }
+  }, [])
+
   // v1 rule-based suggestion — sub-millisecond, sync. Re-runs on every
   // keystroke unless the user has explicitly picked a category.
   useEffect(() => {
@@ -51,18 +95,78 @@ export default function QuickAskSheet({ onClose }: { onClose: () => void }) {
     setCategory((prev) => (prev === suggested ? prev : suggested))
   }, [text, userOverrode])
 
+  // Revoke blob URL on swap/unmount.
+  useEffect(() => {
+    if (!image) return
+    return () => {
+      try { URL.revokeObjectURL(image.preview) } catch { /* ignore */ }
+    }
+  }, [image])
+
+  function applyImage(file: File) {
+    if (!file.type.startsWith('image/')) {
+      toast.error('صور فقط')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('الحد الأقصى 5 ميقا')
+      return
+    }
+    if (image) {
+      try { URL.revokeObjectURL(image.preview) } catch { /* ignore */ }
+    }
+    setImage({ file, preview: URL.createObjectURL(file) })
+  }
+
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (file) applyImage(file)
+  }
+
+  async function pickFromCamera() {
+    const isNative = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
+    if (isNative) {
+      try {
+        const file = await pickImageFromCamera()
+        applyImage(file)
+      } catch (err: any) {
+        if (!err?.message?.toLowerCase?.().includes('cancel') && err?.message !== 'no_image') {
+          console.warn('[quickask] camera failed', err)
+        }
+      }
+    } else {
+      cameraInputRef.current?.click()
+    }
+  }
+
+  async function pickFromGallery() {
+    const file = await pickImageOrFallback('ar' as any, galleryInputRef)
+    if (file) applyImage(file)
+  }
+
   const selected = ASK_CATEGORIES.find((c) => c.key === category)
   const isSuggested = !userOverrode && category !== DEFAULT_CATEGORY
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!text.trim()) return
+    if (!text.trim() || loading) return
     setLoading(true)
     try {
+      let imageUrls: string[] = []
+      if (image) {
+        try {
+          imageUrls = await uploadFiles([image.file])
+        } catch {
+          toast.error('فشل رفع الصورة')
+          setLoading(false)
+          return
+        }
+      }
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: text.trim(), body: text.trim(), category, intent: 'REQUEST' }),
+        body: JSON.stringify({ title: text.trim(), body: text.trim(), category, intent: 'REQUEST', imageUrls }),
       })
       const data = await res.json()
       if (!res.ok) { toast.error(typeof data.error === 'string' ? data.error : data.error?.message || 'فشل النشر'); return }
@@ -165,17 +269,44 @@ export default function QuickAskSheet({ onClose }: { onClose: () => void }) {
             )}
           </div>
 
-          {/* Input + send */}
+          {/* Image preview (when attached) */}
+          {image && (
+            <div className="flex items-center gap-2 mb-3 bg-gray-50 border border-gray-200 rounded-xl p-2">
+              <img src={image.preview} alt="" className="w-12 h-12 rounded-lg object-cover" />
+              <span className="flex-1 min-w-0 text-[11px] text-gray-500 truncate">{(image.file.size / 1024).toFixed(0)} KB</span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (image) URL.revokeObjectURL(image.preview)
+                  setImage(null)
+                }}
+                className="p-1 text-gray-400 active:scale-90"
+                aria-label="remove image"
+              >
+                <FiX className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Input + image + send */}
           <form onSubmit={handleSubmit} className="flex gap-2 items-end min-w-0">
             <textarea
+              ref={textareaRef}
               value={text}
               onChange={e => setText(e.target.value)}
               placeholder="مثال: أبحث عن سباك موثوق في الحي..."
               className="flex-1 min-w-0 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-start focus:outline-none focus:ring-2 focus:ring-sky-400 resize-none leading-relaxed"
               rows={2}
               maxLength={200}
-              autoFocus
             />
+            <button
+              type="button"
+              onClick={() => setImageSheetOpen(true)}
+              className="w-11 h-11 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 flex-shrink-0 mb-0.5 active:scale-95 transition-transform"
+              aria-label="attach image"
+            >
+              <FiImage className="w-4 h-4" />
+            </button>
             <button
               type="submit"
               disabled={loading || !text.trim()}
@@ -187,9 +318,18 @@ export default function QuickAskSheet({ onClose }: { onClose: () => void }) {
               }
             </button>
           </form>
+          <input ref={galleryInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageSelect} className="hidden" />
+          <input ref={cameraInputRef}  type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
           <p className="text-xs text-gray-400 mt-2 text-center">سيصل طلبك لجميع جيرانك في الحي فوراً</p>
         </div>
       </div>
+
+      <ImageSourceSheet
+        open={imageSheetOpen}
+        onClose={() => setImageSheetOpen(false)}
+        onCamera={pickFromCamera}
+        onGallery={pickFromGallery}
+      />
     </>
   )
 }
