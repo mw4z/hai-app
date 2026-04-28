@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus, FiEdit3, FiSearch } from 'react-icons/fi'
@@ -100,25 +101,8 @@ export default function BottomNav({
     onDismiss: () => setShowEntrySheet(false),
   })
 
-  // Lock feed scroll while the sheet is open. Body-only — locking
-  // html caused iOS WKWebView to expose the html background at the
-  // safe-area-inset-top zone (visible black gap above the header).
-  // Body overflow:hidden + touch-action:none is enough to block the
-  // feed pan and doesn't disturb the WebView's safe-area layout.
-  useEffect(() => {
-    if (!showEntrySheet) return
-    const body = document.body
-    const prev = {
-      bodyOverflow: body.style.overflow,
-      bodyTouchAction: body.style.touchAction,
-    }
-    body.style.overflow = 'hidden'
-    body.style.touchAction = 'none'
-    return () => {
-      body.style.overflow = prev.bodyOverflow
-      body.style.touchAction = prev.bodyTouchAction
-    }
-  }, [showEntrySheet])
+  // Shared iOS-safe scroll lock — see useBodyScrollLock.
+  useBodyScrollLock(showEntrySheet)
 
   async function handleNewPost() {
     hapticMedium()

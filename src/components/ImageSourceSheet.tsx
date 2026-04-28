@@ -9,9 +9,9 @@
  * actual pick — this component only renders the UI and emits intent.
  */
 
-import { useEffect } from 'react'
 import { FiCamera, FiImage } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { t as translate } from '@/lib/i18n'
 
 interface Props {
@@ -24,14 +24,7 @@ interface Props {
 export default function ImageSourceSheet({ open, onClose, onCamera, onGallery }: Props) {
   const { lang } = useLanguage()
 
-  // Lock body scroll while the sheet is open so taps outside the sheet
-  // dismiss it instead of scrolling the page underneath.
-  useEffect(() => {
-    if (!open) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prev }
-  }, [open])
+  useBodyScrollLock(open)
 
   if (!open) return null
 

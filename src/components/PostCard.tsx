@@ -23,6 +23,7 @@ import { showApiError } from '@/lib/apiError'
 import { detectLang } from '@/lib/detectLang'
 import { HaiSpinner } from './HaiLoader'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import type { TranslationKey } from '@/lib/i18n'
 import { canStartPrivateThread } from '@/lib/thread-rules'
 import { getRepLevel } from '@/lib/reputation-levels'
@@ -527,23 +528,14 @@ export default function PostCard({
   // we restore scrollY on close so the feed doesn't jump to the
   // top when the sheet dismisses.
   //
-  // Same lock is applied to the user profile popup (showUserPopup)
-  // so swiping on the popup's backdrop or content doesn't scroll
-  // the feed underneath.
+  // Shared iOS-safe scroll lock — see useBodyScrollLock. Same hook is
+  // used by every other sheet/modal in the app, so opening (e.g.) a
+  // comments sheet on top of the user popup doesn't fight over body
+  // styles or jump-restore scrollY mid-stack.
+  useBodyScrollLock(showComments || showUserPopup)
+
   useEffect(() => {
     if (!showComments && !showUserPopup) return
-    const scrollY = window.scrollY
-    const prev = {
-      position: document.body.style.position,
-      top: document.body.style.top,
-      width: document.body.style.width,
-      overflow: document.body.style.overflow,
-    }
-    document.body.style.position = 'fixed'
-    document.body.style.top = `-${scrollY}px`
-    document.body.style.width = '100%'
-    document.body.style.overflow = 'hidden'
-
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (showUserPopup) setShowUserPopup(false)
@@ -551,17 +543,7 @@ export default function PostCard({
       }
     }
     window.addEventListener('keydown', onKey)
-
-    return () => {
-      document.body.style.position = prev.position
-      document.body.style.top = prev.top
-      document.body.style.width = prev.width
-      document.body.style.overflow = prev.overflow
-      // iOS resets scroll to 0 when position:fixed is cleared — jump
-      // back to where the user was before the sheet opened.
-      window.scrollTo(0, scrollY)
-      window.removeEventListener('keydown', onKey)
-    }
+    return () => window.removeEventListener('keydown', onKey)
   }, [showComments, showUserPopup])
 
   async function handleComment(e: React.FormEvent) {

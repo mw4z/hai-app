@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiX, FiSend, FiImage } from 'react-icons/fi'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { inferAskCategory, type V2Category } from '@/lib/classify/inferAskCategory'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
@@ -87,27 +88,11 @@ export default function QuickAskSheet({
     if (open) textareaRef.current?.focus({ preventScroll: true })
   }, [open])
 
-  // Lock feed scroll while open. Only locks BODY (not html). Locking
-  // html caused iOS WKWebView to expose the html-level background at
-  // the safe-area-inset-top zone above the header — visible as a
-  // black gap between the iOS status bar and the page's header glass.
-  // Body-only overflow:hidden + touch-action:none is enough to block
-  // the feed pan on iOS and Android, and doesn't disturb the WebView's
-  // safe-area layout.
-  useEffect(() => {
-    if (!open) return
-    const body = document.body
-    const prev = {
-      bodyOverflow: body.style.overflow,
-      bodyTouchAction: body.style.touchAction,
-    }
-    body.style.overflow = 'hidden'
-    body.style.touchAction = 'none'
-    return () => {
-      body.style.overflow = prev.bodyOverflow
-      body.style.touchAction = prev.bodyTouchAction
-    }
-  }, [open])
+  // Shared iOS-safe scroll lock — see useBodyScrollLock. Replaces the
+  // old overflow:hidden + touch-action:none lock that was insufficient
+  // on iOS WKWebView (document still scrolled under the sheet) and
+  // contributed to the visible gap above the header.
+  useBodyScrollLock(open)
 
   // v1 rule-based suggestion — sub-millisecond, sync. Re-runs on every
   // keystroke unless the user has explicitly picked a category.

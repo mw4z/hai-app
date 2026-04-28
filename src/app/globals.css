@@ -473,7 +473,15 @@ body::before {
   left: 0;
   right: 0;
   height: env(safe-area-inset-top, 0px);
-  z-index: 50;
+  /* z-index 1 keeps the safe-area paint LAYER below every popup
+     backdrop (z-40+) so a backdrop dims it uniformly with the page
+     content beneath. With z-50, the QuickAskSheet backdrop (z-40)
+     would render under the cover, leaving the safe-area visibly
+     bright while the page below was dimmed — the seam read as a
+     "gap" above the header on iOS. Below all popup z-indexes, but
+     above the auto-stacked page content so the cover still wins in
+     the no-popup steady state. */
+  z-index: 1;
   pointer-events: none;
   /* Safe-area cover tracks the APP HEADER colour, not the page
      background — so the notch / status-bar region always reads as

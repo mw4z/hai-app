@@ -5,6 +5,7 @@ import { FiMapPin, FiSearch, FiX, FiNavigation, FiCornerUpLeft } from 'react-ico
 import { useLanguage } from '@/hooks/useLanguage'
 import { hapticLight } from '@/lib/haptic'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
 type NeighborhoodItem = {
   id: string
@@ -70,14 +71,7 @@ export default function NeighborhoodSheet({
     return () => cancelAnimationFrame(id)
   }, [open])
 
-  useEffect(() => {
-    if (!open) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [open])
+  useBodyScrollLock(open)
 
   useEffect(() => {
     if (!open) return

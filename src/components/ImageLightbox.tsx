@@ -5,6 +5,7 @@ import { FiX, FiDownload } from 'react-icons/fi'
 import { hapticLight } from '@/lib/haptic'
 import { saveImageToDevice } from '@/lib/saveImage'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
 interface Props {
   images: string[]
@@ -113,14 +114,7 @@ export default function ImageLightbox({
   }, [open, initialIndex])
 
   // ── Body scroll lock while open ──────────────────────────────────────
-  useEffect(() => {
-    if (!mounted) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [mounted])
+  useBodyScrollLock(mounted)
 
   // ── Keyboard: Esc to close, arrows to navigate ───────────────────────
   useEffect(() => {
