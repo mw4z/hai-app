@@ -124,8 +124,7 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('thread_title')}</h1>
       </header>
 
-      <div className="hai-app-shell__scroll pb-24">
-      <div id="hai-pull-target" />
+      <div className="hai-app-shell__scroll pb-24 overscroll-y-contain">
       {threads.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 px-6">
           <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
@@ -142,7 +141,7 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
             <Link
               key={thread.id}
               href={`/threads/${thread.id}`}
-              className="flex items-center gap-3 px-5 py-3.5 transition-colors active:bg-gray-100 dark:active:bg-gray-800 border-b border-gray-50 dark:border-gray-800/50"
+              className="flex items-center gap-3 px-5 py-3.5 active:bg-gray-100 dark:active:bg-gray-800 border-b border-gray-50 dark:border-gray-800/50 focus:outline-none focus-visible:outline-none"
             >
               {/* Avatar */}
               <div className="relative flex-shrink-0">

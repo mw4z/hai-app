@@ -146,6 +146,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true })
     }
 
+    case 'highlight_pin': {
+      if (!await canModeratePost(admin, targetId)) return NextResponse.json({ error: 'خارج صلاحيتك' }, { status: 403 })
+      const { countActiveModPins, invalidateHighlights, HIGHLIGHT_CONFIG } = await import('@/lib/highlights')
+      const post = await db.post.findUnique({
+        where: { id: targetId },
+        select: { neighborhoodId: true, status: true, highlightPinnedAt: true },
+      })
+      if (!post) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+      if (post.status !== 'ACTIVE') return NextResponse.json({ error: 'post_not_active' }, { status: 400 })
+      if (!post.highlightPinnedAt) {
+        const active = await countActiveModPins(post.neighborhoodId)
+        if (active >= HIGHLIGHT_CONFIG.MAX_PINNED) {
+          return NextResponse.json({ error: 'pin_limit', max: HIGHLIGHT_CONFIG.MAX_PINNED }, { status: 409 })
+        }
+      }
+      await db.post.update({ where: { id: targetId }, data: { highlightPinnedAt: new Date() } })
+      invalidateHighlights(post.neighborhoodId)
+      await logAction(session.userId, admin.name, 'highlight_pin', 'post', targetId, reason)
+      return NextResponse.json({ success: true })
+    }
+
+    case 'highlight_unpin': {
+      if (!await canModeratePost(admin, targetId)) return NextResponse.json({ error: 'خارج صلاحيتك' }, { status: 403 })
+      const { invalidateHighlights } = await import('@/lib/highlights')
+      const post = await db.post.findUnique({
+        where: { id: targetId },
+        select: { neighborhoodId: true },
+      })
+      if (!post) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+      await db.post.update({ where: { id: targetId }, data: { highlightPinnedAt: null } })
+      invalidateHighlights(post.neighborhoodId)
+      await logAction(session.userId, admin.name, 'highlight_unpin', 'post', targetId, reason)
+      return NextResponse.json({ success: true })
+    }
+
     // ─── Users: ban/unban ────────────────────────────────────────────────
     case 'ban_user': {
       // NEIGHBORHOOD_MOD → neighborhood ban (BANNED_TEMP), SUPER_ADMIN → global (BANNED_PERM)

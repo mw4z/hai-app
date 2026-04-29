@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { logModAction, assertModConflictFree } from '@/lib/modAudit'
+import {
+  countActiveModPins,
+  invalidateHighlights,
+  HIGHLIGHT_CONFIG,
+} from '@/lib/highlights'
 
 const ADMIN_ROLES = ['NEIGHBORHOOD_MOD', 'PLATFORM_MOD', 'SUPER_ADMIN']
 
@@ -97,6 +102,51 @@ export async function POST(req: NextRequest) {
       if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
       await db.user.update({ where: { id: userId }, data: { status: 'ACTIVE' } })
       logModAction({ moderatorId: admin.id, actionType: 'unban_user', targetType: 'user', targetId: userId })
+      return NextResponse.json({ success: true })
+    }
+
+    case 'highlight_pin': {
+      if (!postId) return NextResponse.json({ error: 'postId required' }, { status: 400 })
+      const post = await db.post.findUnique({
+        where: { id: postId },
+        select: { neighborhoodId: true, status: true, highlightPinnedAt: true },
+      })
+      if (!post) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+      if (post.status !== 'ACTIVE') {
+        return NextResponse.json({ error: 'post_not_active' }, { status: 400 })
+      }
+      // Idempotent — repinning just refreshes the timestamp.
+      if (!post.highlightPinnedAt) {
+        const active = await countActiveModPins(post.neighborhoodId)
+        if (active >= HIGHLIGHT_CONFIG.MAX_PINNED) {
+          return NextResponse.json(
+            { error: 'pin_limit', max: HIGHLIGHT_CONFIG.MAX_PINNED },
+            { status: 409 },
+          )
+        }
+      }
+      await db.post.update({
+        where: { id: postId },
+        data: { highlightPinnedAt: new Date() },
+      })
+      invalidateHighlights(post.neighborhoodId)
+      logModAction({ moderatorId: admin.id, actionType: 'highlight_pin', targetType: 'post', targetId: postId })
+      return NextResponse.json({ success: true })
+    }
+
+    case 'highlight_unpin': {
+      if (!postId) return NextResponse.json({ error: 'postId required' }, { status: 400 })
+      const post = await db.post.findUnique({
+        where: { id: postId },
+        select: { neighborhoodId: true },
+      })
+      if (!post) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+      await db.post.update({
+        where: { id: postId },
+        data: { highlightPinnedAt: null },
+      })
+      invalidateHighlights(post.neighborhoodId)
+      logModAction({ moderatorId: admin.id, actionType: 'highlight_unpin', targetType: 'post', targetId: postId })
       return NextResponse.json({ success: true })
     }
 

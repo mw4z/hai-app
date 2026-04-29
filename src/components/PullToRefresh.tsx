@@ -95,9 +95,10 @@ export default function PullToRefresh() {
       if (document.querySelector('[data-overlay="true"]')) return
       if (isBodyScrollLocked()) return
       const path = window.location.pathname
-      if (path !== '/feed' && path !== '/market' && path !== '/threads') return
-      // Belt-and-suspenders — never run inside a chat thread.
-      if (path.startsWith('/threads/')) return
+      // Pull-to-refresh is feed + market only. Chat list (/threads) and
+      // chat conversations (/threads/:id) opt out — chat shouldn't
+      // pull-refresh; messages stream in already.
+      if (path !== '/feed' && path !== '/market') return
       startY.current = e.touches[0].clientY
       pulling.current = true
       hitThreshold.current = false

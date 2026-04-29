@@ -18,6 +18,7 @@ import { FiBell, FiPlus, FiMapPin, FiX, FiSearch, FiFilter, FiCheck, FiChevronDo
 import { useLanguage } from '@/hooks/useLanguage'
 import type { TranslationKey } from '@/lib/i18n'
 import { fullName } from '@/lib/displayName'
+import HighlightsSection, { type HighlightItemPayload } from '@/components/HighlightsSection'
 
 // v2 filter chips — REQUESTS is a special intent-based chip (not a
 // PostCategory value) elevated to position 2 to surface request
@@ -104,6 +105,8 @@ interface Props {
    *  Renders a small presence dot on the REQUESTS chip — deliberately
    *  not a count, to avoid reading as a "new / unread" notification. */
   requestsRecentDot?: boolean
+  /** SSR'd highlights bundle. Empty array = section hidden entirely. */
+  highlights?: HighlightItemPayload[]
 }
 
 export default function FeedClient({
@@ -120,6 +123,7 @@ export default function FeedClient({
   addressVerified,
   requestBoostOn = true,
   requestsRecentDot = false,
+  highlights = [],
 }: Props) {
   const router = useRouter()
   const { t, lang } = useLanguage()
@@ -548,6 +552,13 @@ export default function FeedClient({
           flow-aware indicator into here so it pushes the list down
           rather than overlaying it. */}
       <div id="hai-pull-target" />
+
+      {/* Neighborhood Highlights — hidden when empty. Auto-opens once
+          per device for first-time users. Skipped in read-only browse
+          mode (the highlights bundle is the user's home neighborhood). */}
+      {!isReadOnly && (
+        <HighlightsSection items={highlights} />
+      )}
 
       {/* Quick Ask bar — only in own neighborhood */}
       {!isReadOnly && (

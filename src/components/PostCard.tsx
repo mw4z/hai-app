@@ -83,6 +83,9 @@ interface Post {
   body: string
   category: string
   intent?: 'OFFER' | 'REQUEST' | 'NORMAL' | null
+  /** Moderator pin into Neighborhood Highlights. ISO string when pinned,
+   *  null/undefined otherwise. Drives the mod menu's Pin/Unpin label. */
+  highlightPinnedAt?: string | null
   isPaid: boolean
   isFeatured: boolean
   isPinned: boolean
@@ -933,6 +936,23 @@ export default function PostCard({
                   >
                     <FiFlag className="hai-icon-sm hai-menu-item__icon" />
                     <span className="hai-menu-item__label">{lang !== 'en' ? 'استعادة' : 'Restore'}</span>
+                  </button>
+                )}
+                {/* Highlights pin/unpin — admins only, eligible categories only. */}
+                {isAdmin && post.status !== 'HIDDEN' && (
+                  ['NEIGHBORHOOD_REPORTS','LOST_FOUND','SERVICES','EVENTS'].includes(post.category)
+                ) && (
+                  <button
+                    onClick={() => {
+                      handleAdminAction(post.highlightPinnedAt ? 'highlight_unpin' : 'highlight_pin')
+                      setShowMenu(false)
+                    }}
+                    className="hai-menu-item"
+                  >
+                    <FiFlag className="hai-icon-sm hai-menu-item__icon" />
+                    <span className="hai-menu-item__label">
+                      {t(post.highlightPinnedAt ? 'highlights_unpin_action' : 'highlights_pin_action')}
+                    </span>
                   </button>
                 )}
                 {/* Report post */}

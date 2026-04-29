@@ -281,6 +281,9 @@ model Post {
   isPinned       Boolean       @default(false)
   isFeatured     Boolean       @default(false)
   isSeed         Boolean       @default(false)
+  // Moderator pin into "Neighborhood Highlights". Null = not pinned.
+  // Pin auto-expires 14 days after this timestamp at the query layer.
+  highlightPinnedAt DateTime?
   coordinationMode CoordinationMode @default(OPEN)
   activeThreadId String?       // for exclusive mode: the one active thread
   price          Float?        // for marketplace items
@@ -306,6 +309,7 @@ model Post {
 
   @@index([neighborhoodId, category, status])
   @@index([authorId])
+  @@index([neighborhoodId, highlightPinnedAt])
 }
 
 // Canonical category enum (renamed from PostCategoryV2 in Phase 4).

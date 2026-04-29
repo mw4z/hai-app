@@ -56,6 +56,20 @@ export const translations = {
   post_intent_request:          { ar: 'طلب',                  en: 'Request',              ur: 'درخواست' },
   post_intent_offer:            { ar: 'عرض',                  en: 'Offer',                ur: 'پیشکش' },
 
+  // ── Highlights ─────────────────────────────────────────────────────────────
+  highlights_title:             { ar: 'أهم ما في الحي',       en: 'Neighborhood Highlights', ur: 'محلے کی نمایاں خبریں' },
+  highlights_intro:             { ar: 'أبرز ما يحدث في حيّك خلال الأسبوعين الماضيين', en: 'The most important posts in your neighborhood from the past two weeks', ur: 'پچھلے دو ہفتوں کی اہم پوسٹس' },
+  highlights_open:              { ar: 'عرض الأهم',            en: 'See highlights',         ur: 'نمایاں دیکھیں' },
+  highlights_close:             { ar: 'إغلاق',                en: 'Close',                  ur: 'بند کریں' },
+  highlights_empty:             { ar: 'لا يوجد محتوى مميز حالياً', en: 'No highlights yet',  ur: 'ابھی کوئی نمایاں نہیں' },
+  highlights_badge_pinned:      { ar: 'مثبّت',                en: 'Pinned',                 ur: 'پن شدہ' },
+  highlights_badge_important:   { ar: 'مهم',                  en: 'Important',              ur: 'اہم' },
+  highlights_badge_popular:     { ar: 'شائع',                 en: 'Popular',                ur: 'مقبول' },
+  highlights_open_post:         { ar: 'فتح المنشور',          en: 'Open post',              ur: 'پوسٹ کھولیں' },
+  highlights_pin_action:        { ar: 'تثبيت في الأهم',       en: 'Pin to Highlights',      ur: 'نمایاں میں پن کریں' },
+  highlights_unpin_action:      { ar: 'إزالة من الأهم',       en: 'Remove from Highlights', ur: 'نمایاں سے ہٹائیں' },
+  highlights_pin_limit:         { ar: 'وصلت الحد الأقصى للتثبيت (3)', en: 'Pin limit reached (3 max)', ur: 'پن کی حد مکمل (3)' },
+
   ask_neighbors:                { ar: 'اسأل جيرانك',          en: 'Ask neighbors',        ur: 'ہمسایوں سے پوچھیں' },
   ask_input_placeholder:        { ar: 'ما الذي تبحث عنه؟',  en: 'What are you looking for?', ur: 'آپ کیا تلاش کر رہے ہیں؟' },
   ask_submit:                   { ar: 'اسأل جيرانك',          en: 'Ask',                  ur: 'پوچھیں' },

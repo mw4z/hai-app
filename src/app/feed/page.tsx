@@ -7,6 +7,7 @@ import { PostCategory } from '@prisma/client'
 import { getFeedBoost } from '@/lib/reputation-levels'
 import { cached } from '@/lib/cache'
 import { shouldArchivePost } from '@/lib/postExpiry'
+import { getHighlights } from '@/lib/highlights'
 
 // v2 chip values posted by the feed UI — internal reads/writes go
 // through the v2 column directly during Phase 3 read-flag-on era.
@@ -256,6 +257,14 @@ export default async function FeedPage({
     && new Date(p.createdAt).getTime() >= sixHoursAgo,
   )
 
+  // Highlights bundle — SSR'd alongside the feed so the section can
+  // paint without a client roundtrip. Only meaningful on the user's own
+  // neighborhood (browseNeighborhoodId path falls through to ALL).
+  const highlightsBundle = await getHighlights(
+    activeNeighborhoodId,
+    user.gender as 'MALE' | 'FEMALE' | 'UNSPECIFIED' | null,
+  ).catch(() => ({ items: [], generatedAt: new Date().toISOString() }))
+
   return (
     <FeedClient
       user={{
@@ -319,6 +328,7 @@ export default async function FeedPage({
       addressVerified={!!user.addressVerified}
       requestBoostOn={REQUEST_BOOST_ON}
       requestsRecentDot={requestsRecentDot}
+      highlights={highlightsBundle.items}
     />
   )
 }
