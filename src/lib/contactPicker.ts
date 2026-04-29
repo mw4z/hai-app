@@ -24,17 +24,56 @@ export class ContactsPermissionDeniedError extends Error {
 }
 
 /**
- * Open the Android app's permission settings page directly. On
- * Capacitor Android, the WebView honors `intent://` URLs — this
- * launches ACTION_APPLICATION_DETAILS_SETTINGS for our package.
- * No-op on iOS / web.
+ * Open the Android app's permission settings page directly. Tries
+ * multiple methods in order of compatibility:
+ *   1. @capacitor/browser open() — works on modern Android,
+ *      Capacitor routes intent:// URLs to startActivity()
+ *   2. Plain window.location.href — fallback for older Android
+ *      WebView versions where Browser.open might reject the scheme
+ *   3. window.open(_system) — last resort, some Capacitor configs
+ *      let _system route through to native intent dispatch
+ *
+ * Returns true if at least one method appeared to launch (no
+ * thrown error). Caller should still treat this as best-effort —
+ * the user might come back without granting and need a retry.
  */
-export function openAndroidAppSettings(): void {
-  if (typeof window === 'undefined') return
-  if (getPlatform() !== 'android') return
-  // applicationId from android/app/build.gradle
-  window.location.href =
+export async function openAndroidAppSettings(): Promise<boolean> {
+  if (typeof window === 'undefined') return false
+  if (getPlatform() !== 'android') return false
+  const intentUrl =
     'intent://#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;package=com.hai.app;end'
+
+  // 1. Capacitor Browser plugin — preferred path
+  try {
+    const { Browser } = await import('@capacitor/browser')
+    await Browser.open({ url: intentUrl })
+    console.log('[contactPicker] settings opened via Browser plugin')
+    return true
+  } catch (err) {
+    console.warn('[contactPicker] Browser.open failed:', err)
+  }
+
+  // 2. window.location.href — direct WebView navigation
+  try {
+    window.location.href = intentUrl
+    console.log('[contactPicker] settings opened via window.location')
+    return true
+  } catch (err) {
+    console.warn('[contactPicker] window.location failed:', err)
+  }
+
+  // 3. window.open(_system) — last resort
+  try {
+    const opened = window.open(intentUrl, '_system')
+    if (opened) {
+      console.log('[contactPicker] settings opened via window.open _system')
+      return true
+    }
+  } catch (err) {
+    console.warn('[contactPicker] window.open failed:', err)
+  }
+
+  return false
 }
 
 function isNative(): boolean {

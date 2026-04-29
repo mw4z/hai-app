@@ -49,7 +49,31 @@ export function useAttachContact() {
           cancelText:
             lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء',
         })
-        if (ok) openAndroidAppSettings()
+        if (ok) {
+          const opened = await openAndroidAppSettings()
+          if (!opened) {
+            // All open-settings paths failed (older Android WebView,
+            // intent scheme blocked, etc.). Give the user explicit
+            // step-by-step instructions for their device's settings
+            // app — they can navigate manually from there.
+            await confirm({
+              title:
+                lang === 'en'
+                  ? 'How to enable contacts access'
+                  : lang === 'ur'
+                    ? 'رابطوں کی اجازت کیسے فعال کریں'
+                    : 'كيف تفعّل إذن جهات الاتصال',
+              message:
+                lang === 'en'
+                  ? 'Open your phone Settings → Apps → حي → Permissions → Contacts → Allow.'
+                  : lang === 'ur'
+                    ? 'فون سیٹنگز → ایپس → حي → اجازتیں → رابطے → اجازت دیں'
+                    : 'الإعدادات → التطبيقات → حي → الأذونات → جهات الاتصال → السماح',
+              confirmText: lang === 'en' ? 'OK' : lang === 'ur' ? 'ٹھیک ہے' : 'حسناً',
+              cancelText: '',
+            })
+          }
+        }
         return null
       }
       // Any other error: log and fall through to the manual prompt
