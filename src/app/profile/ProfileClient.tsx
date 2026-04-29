@@ -76,6 +76,43 @@ export default function ProfileClient({ user, postCount }: Props) {
   const [avatar, setAvatar] = useState(user.avatarUrl || '')
   const [cover, setCover] = useState(user.coverUrl || '')
   const coverInputRef = useRef<HTMLInputElement>(null)
+
+  // Status-bar tone follows the cover photo. The cover now bleeds
+  // up into the iOS notch zone (commit fe6b135), so the system
+  // clock / battery / wifi icons sit ON TOP of the cover. If the
+  // cover is dark and the icons stay black they're invisible.
+  // Sample the top of the cover, pick LIGHT or DARK status-bar
+  // text accordingly, and restore the app default on unmount /
+  // cover change.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { setStatusBarTone, analyzeImageBrightness, analyzeCssBackground } =
+        await import('@/lib/statusBarTone')
+      let tone: 'light' | 'dark' | null = null
+      if (cover && (cover.startsWith('http') || cover.startsWith('data:'))) {
+        tone = await analyzeImageBrightness(cover)
+      } else if (cover) {
+        tone = analyzeCssBackground(cover)
+      } else {
+        // No cover → default teal gradient → dark → use light text.
+        tone = 'light'
+      }
+      if (cancelled) return
+      // null = analysis failed (CORS, parse error). Fall back to
+      // 'light' — the default cover and most user uploads skew dark.
+      setStatusBarTone(tone || 'light')
+    })()
+    return () => {
+      cancelled = true
+      // Restore the app's normal theme-driven tone when the user
+      // navigates away from the profile screen or the cover changes.
+      ;(async () => {
+        const { setStatusBarTone } = await import('@/lib/statusBarTone')
+        await setStatusBarTone(null)
+      })()
+    }
+  }, [cover])
   const [name, setName] = useState(user.name || '')
   const [lastName, setLastName] = useState(user.lastName || '')
   const [email, setEmail] = useState(user.email || '')
