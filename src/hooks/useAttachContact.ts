@@ -30,50 +30,27 @@ export function useAttachContact() {
     } catch (err) {
       if (err instanceof ContactsPermissionDeniedError) {
         // Don't fall through to the manual form — the user wanted the
-        // picker, not a typing exercise. Offer them the recovery path.
-        const ok = await confirm({
+        // picker. Show a single dialog with the literal Settings path
+        // they need to follow. Auto-launching Settings via intent://
+        // navigated the WebView itself to an error page on older
+        // Android, so we're skipping the button and just telling the
+        // user where to go.
+        await confirm({
           title:
             lang === 'en'
-              ? 'Contacts permission needed'
+              ? 'Allow contacts access'
               : lang === 'ur'
-                ? 'رابطہ کی اجازت درکار ہے'
-                : 'يحتاج إذن الوصول لجهات الاتصال',
+                ? 'رابطوں کی اجازت دیں'
+                : 'فعّل إذن جهات الاتصال',
           message:
             lang === 'en'
-              ? 'Allow contacts access in Settings to pick a contact instead of typing it manually.'
+              ? 'To pick a contact, open phone Settings → Apps → حي → Permissions → Contacts → Allow. Then come back and tap Attach again.'
               : lang === 'ur'
-                ? 'رابطہ منتخب کرنے کیلئے سیٹنگز سے رابطوں کی اجازت دیں۔'
-                : 'فعّل إذن جهات الاتصال من الإعدادات لاختيار جهة اتصال بدلاً من كتابتها يدوياً.',
-          confirmText:
-            lang === 'en' ? 'Open Settings' : lang === 'ur' ? 'سیٹنگز کھولیں' : 'فتح الإعدادات',
-          cancelText:
-            lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء',
+                ? 'رابطہ منتخب کرنے کیلئے فون سیٹنگز → ایپس → حي → اجازتیں → رابطے → اجازت دیں۔ پھر واپس آئیں اور اٹیچ پر دوبارہ ٹیپ کریں۔'
+                : 'لاختيار جهة اتصال: الإعدادات → التطبيقات → حي → الأذونات → جهات الاتصال → السماح. ثم ارجع للتطبيق واضغط إرفاق مرة أخرى.',
+          confirmText: lang === 'en' ? 'OK' : lang === 'ur' ? 'ٹھیک ہے' : 'حسناً',
+          cancelText: '',
         })
-        if (ok) {
-          const opened = await openAndroidAppSettings()
-          if (!opened) {
-            // All open-settings paths failed (older Android WebView,
-            // intent scheme blocked, etc.). Give the user explicit
-            // step-by-step instructions for their device's settings
-            // app — they can navigate manually from there.
-            await confirm({
-              title:
-                lang === 'en'
-                  ? 'How to enable contacts access'
-                  : lang === 'ur'
-                    ? 'رابطوں کی اجازت کیسے فعال کریں'
-                    : 'كيف تفعّل إذن جهات الاتصال',
-              message:
-                lang === 'en'
-                  ? 'Open your phone Settings → Apps → حي → Permissions → Contacts → Allow.'
-                  : lang === 'ur'
-                    ? 'فون سیٹنگز → ایپس → حي → اجازتیں → رابطے → اجازت دیں'
-                    : 'الإعدادات → التطبيقات → حي → الأذونات → جهات الاتصال → السماح',
-              confirmText: lang === 'en' ? 'OK' : lang === 'ur' ? 'ٹھیک ہے' : 'حسناً',
-              cancelText: '',
-            })
-          }
-        }
         return null
       }
       // Any other error: log and fall through to the manual prompt
