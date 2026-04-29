@@ -53,3 +53,6 @@ android/capacitor.settings.gradle
 # TypeScript incremental build cache. Rewritten by `tsc` / `next build`
 # on every run; no value in source control.
 tsconfig.tsbuildinfo
+
+.vercel
+.env*.local

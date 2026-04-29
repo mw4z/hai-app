@@ -40,9 +40,9 @@ export const translations = {
   contests_coming_soon:   { ar: 'قريباً',            en: 'Coming Soon'       , ur: 'جلد آرہا ہے' },
   contests_desc:          { ar: 'مسابقات وجوائز حصرية لسكان الحي — ترقبوا!', en: 'Exclusive contests & prizes for neighborhood residents — stay tuned!' , ur: 'محلے کے رہائشیوں کیلئے خصوصی مقابلے اور انعامات!' },
 
-  // ── v2 categories (PostCategoryV2) — single source of truth for the
-  // new composer + the v2-aware render path. Legacy cat_* keys above are
-  // kept around for historical posts (see readCategory fallback).
+  // ── v2 categories (PostCategory) — single source of truth for the
+  // composer and the render path. Legacy cat_* keys above are kept
+  // for back-compat with any older bundle, but unused at runtime.
   post_v2_HOME_BUSINESSES:      { ar: 'الأسر المنتجة',      en: 'Home Businesses',      ur: 'گھریلو کاروبار' },
   post_v2_MARKETPLACE:          { ar: 'السوق',                en: 'Marketplace',          ur: 'مارکیٹ' },
   post_v2_SERVICES:             { ar: 'خدمات',                en: 'Services',             ur: 'خدمات' },

@@ -59,8 +59,16 @@ function timeAgo(dateStr: string, lang: string): string {
 }
 
 const CATEGORY_ICONS: Record<string, string> = {
-  MARKETPLACE: '🛒', SERVICES: '🛠', LOOKING_FOR: '🔍', FOOD_HOME: '🍲',
-  RIDE_REQUEST: '🚗', REAL_ESTATE: '🏠', LOST_FOUND: '📦', ALERT: '🚨',
+  MARKETPLACE: '🛒',
+  SERVICES: '🛠',
+  HOME_BUSINESSES: '🍲',
+  RIDES: '🚗',
+  REAL_ESTATE: '🏠',
+  LOST_FOUND: '📦',
+  NEIGHBORHOOD_REPORTS: '🚨',
+  EVENTS: '🎉',
+  COMPETITIONS: '🏆',
+  GENERAL: '💬',
 }
 
 export default function ThreadsClient({ threads: initialThreads }: { threads: Thread[] }) {

@@ -45,7 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (thread.postId) {
     const post = await db.post.findUnique({
       where: { id: thread.postId },
-      select: { activeThreadId: true, coordinationMode: true, authorId: true, newCategory: true },
+      select: { activeThreadId: true, coordinationMode: true, authorId: true, category: true },
     })
 
     if (post?.activeThreadId === params.id) {
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (post?.coordinationMode === 'EXCLUSIVE') {
       const msgCount = await db.message.count({ where: { threadId: params.id } })
       if (msgCount >= 3) {
-        const isRide = post?.newCategory === 'RIDES'
+        const isRide = post?.category === 'RIDES'
         const action = isRide ? 'ride_completed' : 'service_completed'
         const halfPoints = Math.floor((isRide ? REP_POINTS.ride_completed : REP_POINTS.service_completed) / 2)
 

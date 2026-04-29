@@ -4,7 +4,7 @@ import { classifyPost } from '@/lib/posts/classifyPost'
 import { getSession } from '@/lib/auth'
 import { notifyNeighborhood } from '@/lib/notifications'
 import { validateContent, normalizeForComparison, isSimilar, apiError } from '@/lib/validation'
-import { PostCategory, PostCategoryV2, PostIntent, PostPriority, PostAudience } from '@prisma/client'
+import { PostCategory, PostIntent, PostPriority, PostAudience } from '@prisma/client'
 import { getPostLimit } from '@/lib/reputation'
 import { getLimits } from '@/lib/capabilities'
 import { cacheDeletePrefix } from '@/lib/cache'
@@ -16,19 +16,7 @@ import { fullName } from '@/lib/displayName'
 
 const DEFAULT_POST_LIMIT = 5
 const POST_COOLDOWN_SECONDS = 60
-const VALID_LEGACY_CATEGORIES = Object.values(PostCategory)
-const V2_VALUES = [
-  'HOME_BUSINESSES',
-  'MARKETPLACE',
-  'SERVICES',
-  'RIDES',
-  'REAL_ESTATE',
-  'LOST_FOUND',
-  'NEIGHBORHOOD_REPORTS',
-  'EVENTS',
-  'COMPETITIONS',
-  'GENERAL',
-] as const
+const VALID_CATEGORIES = Object.values(PostCategory)
 const VALID_INTENTS = ['OFFER', 'REQUEST', 'NORMAL'] as const
 const VALID_PRIORITIES = ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'] as const
 const VALID_AUDIENCES = ['ALL', 'WOMEN', 'MEN'] as const
@@ -91,14 +79,11 @@ export async function POST(req: NextRequest) {
       targetNeighborhoodId = nbhd.id
     }
 
-    // Category validation — accept either a v2 PostCategoryV2 value (new
-    // composer / Ask flow) or a legacy PostCategory value (older clients
-    // still in the field). classifyPost normalizes both into the canonical
-    // (legacy + v2) tuple below, so the rest of this handler stays
-    // category-shape-agnostic.
-    const isV2 = typeof category === 'string' && (V2_VALUES as readonly string[]).includes(category)
-    const isLegacyCategory = typeof category === 'string' && (VALID_LEGACY_CATEGORIES as readonly string[]).includes(category)
-    if (!category || (!isV2 && !isLegacyCategory)) {
+    if (
+      !category ||
+      typeof category !== 'string' ||
+      !(VALID_CATEGORIES as readonly string[]).includes(category)
+    ) {
       return NextResponse.json(apiError('تصنيف غير صالح', 400), { status: 400 })
     }
     // Optional v2 secondary fields — validate against the enums but stay
@@ -131,34 +116,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Resolve the canonical (legacy + v2) tuple now so downstream checks
-    // can use either shape consistently. classifyPost is the single
-    // source of truth — see src/lib/posts/classifyPost.ts.
-    const c = classifyPost(
-      isV2
-        ? { kind: 'v2', newCategory: category as PostCategoryV2, intent, priority, audience }
-        : { kind: 'legacy', legacyCategory: category as PostCategory, intent, priority, audience },
-    )
+    // classifyPost fills defaults (intent/priority/audience) when the
+    // composer didn't pass them. Single source of truth — see
+    // src/lib/posts/classifyPost.ts.
+    const c = classifyPost({ category: category as PostCategory, intent, priority, audience })
 
     // Women-only audience check (SUPER_ADMIN bypasses).
-    // The legacy WOMEN_ONLY category mapped to audience=WOMEN; the v2
-    // composer no longer exposes a women-only entry, but if `audience`
-    // is explicitly set to WOMEN, only female users may post it.
     if (!bypass && c.audience === 'WOMEN' && user.gender !== 'FEMALE') {
       return NextResponse.json(apiError('هذا القسم للنساء فقط', 403), { status: 403 })
     }
 
     // SERVICES is reserved for publicly-visible providers. The provider
-    // gate applies only to OFFER intent (or legacy NORMAL — i.e. someone
-    // *offering* a service). REQUEST intent (Ask flow) is fine because
-    // the user is asking, not offering.
-    const isServiceOffer = c.newCategory === 'SERVICES' && c.intent !== 'REQUEST'
+    // gate applies only to OFFER intent — REQUEST (Ask flow) is fine
+    // because the user is asking, not offering.
+    const isServiceOffer = c.category === 'SERVICES' && c.intent !== 'REQUEST'
     if (!bypass && isServiceOffer && user.providerStatus !== 'ACTIVE' && user.providerStatus !== 'VERIFIED') {
       return NextResponse.json(apiError('هذا القسم متاح فقط لمقدمي الخدمات', 403), { status: 403 })
     }
 
     // Competitions — admin only (SUPER_ADMIN always allowed by the allowlist)
-    if (c.newCategory === 'COMPETITIONS' && !['SUPER_ADMIN', 'PLATFORM_MOD', 'NEIGHBORHOOD_MOD'].includes(user.role)) {
+    if (c.category === 'COMPETITIONS' && !['SUPER_ADMIN', 'PLATFORM_MOD', 'NEIGHBORHOOD_MOD'].includes(user.role)) {
       return NextResponse.json(apiError('المسابقات متاحة فقط للمشرفين', 403), { status: 403 })
     }
 
@@ -265,9 +242,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Ride requests use coordination=EXCLUSIVE so only one neighbor can
-    // claim the ride at a time. Detection works for both shapes via the
-    // resolved tuple.
-    const isRideRequest = c.newCategory === 'RIDES' && c.intent === 'REQUEST'
+    // claim the ride at a time.
+    const isRideRequest = c.category === 'RIDES' && c.intent === 'REQUEST'
     const coordinationMode = isRideRequest ? 'EXCLUSIVE' : 'OPEN'
 
     // Validate image URLs if provided
@@ -280,18 +256,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Dual-write — `c` was already resolved above by classifyPost so the
-    // gender/services/competitions checks could use it. Single source of
-    // truth for the mapping; never duplicate it anywhere else.
     const post = await db.post.create({
       data: {
         title: finalTitle,
         body: finalBody,
-        category:    c.legacyCategory,
-        newCategory: c.newCategory,
-        intent:      c.intent,
-        priority:    c.priority,
-        audience:    c.audience,
+        category: c.category,
+        intent:   c.intent,
+        priority: c.priority,
+        audience: c.audience,
         coordinationMode,
         price: price || null,
         imageUrls: validatedImages,
@@ -323,10 +295,7 @@ export async function POST(req: NextRequest) {
             authorId: user.id,
             authorName: fullName(user) || user.name || null,
             title: finalTitle.slice(0, 140),
-            // Always send the legacy enum on the wire so older push
-            // payload consumers keep working; v2 readers can derive
-            // newCategory from the post row directly.
-            category: c.legacyCategory,
+            category: c.category,
           },
         },
       })
@@ -335,9 +304,8 @@ export async function POST(req: NextRequest) {
     }
     kickNotifCron()
 
-    // "Looking for" / Ask flow — fan out a dedicated notification when the
-    // post is a REQUEST so neighbors see it as an explicit help-needed
-    // signal. Covers both legacy LOOKING_FOR posts and the new Ask flow.
+    // Ask flow — fan out a dedicated notification when the post is a
+    // REQUEST so neighbors see it as an explicit help-needed signal.
     if (c.intent === 'REQUEST') {
       notifyNeighborhood({
         type: 'LOOKING_FOR_POST',

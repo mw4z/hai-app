@@ -5,7 +5,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { FiShield, FiUsers, FiFileText, FiMapPin, FiActivity, FiStar } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
-import { HaiSpinner } from '@/components/HaiLoader'
+import HaiLoader, { HaiSpinner } from '@/components/HaiLoader'
 import { useConfirm, usePrompt } from '@/components/ConfirmProvider'
 import { getPrimaryBadge, getSecondaryBadge } from '@/lib/user-badge'
 import type { TranslationKey } from '@/lib/i18n'
@@ -311,7 +311,7 @@ export default function AdminClient({ role, adminName }: { role: string; adminNa
               <StatCard label={t('admin_banned')} value={stats.bannedUsers} color="red" />
             </div>
           ) : (
-            <p className="text-center text-gray-400 py-8">{t('admin_loading')}</p>
+            <div className="py-8"><HaiLoader size="md" /></div>
           )
         )}
 
@@ -739,7 +739,7 @@ export default function AdminClient({ role, adminName }: { role: string; adminNa
 
             {/* Global stats */}
             {seedLoading && !seedStats ? (
-              <div className="text-center text-gray-400 py-8">...</div>
+              <div className="py-8"><HaiLoader size="md" /></div>
             ) : seedStats ? (
               <>
                 <div className="grid grid-cols-3 gap-2">

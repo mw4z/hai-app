@@ -386,7 +386,7 @@ interface JobRow {
   maxAttempts: number
 }
 
-// v2 PostCategoryV2 keys. Push titles use the post's effective v2
+// v2 PostCategory keys. Push titles use the post's effective v2
 // category from the job payload. Request-flow posts (ask) get the
 // neutral category label — the "🙋 أبحث عن" affordance is now signaled
 // via intent, not a separate category.
@@ -425,7 +425,7 @@ async function processNewPost(job: JobRow): Promise<JobOutcome> {
       status: true,
       neighborhoodId: true,
       audience: true,
-      newCategory: true,
+      category: true,
       author: { select: { id: true, status: true } },
     },
   })
@@ -453,7 +453,7 @@ async function processNewPost(job: JobRow): Promise<JobOutcome> {
   // Prefer the post's stored v2 category for the label; fall back to
   // whatever the payload had (older enqueues may carry a legacy value
   // from a build still in the field).
-  const labelKey = post.newCategory || category
+  const labelKey = post.category || category
   const catLabel = (labelKey && CATEGORY_LABEL_AR[labelKey]) || ''
   const pushTitle = catLabel ? `${author} · ${catLabel}` : author
   const pushBody = title.slice(0, 180)

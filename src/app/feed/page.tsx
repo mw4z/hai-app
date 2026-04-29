@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import FeedClient from './FeedClient'
-import { PostCategoryV2 } from '@prisma/client'
+import { PostCategory } from '@prisma/client'
 import { getFeedBoost } from '@/lib/reputation-levels'
 import { cached } from '@/lib/cache'
 import { shouldArchivePost } from '@/lib/postExpiry'
@@ -52,9 +52,9 @@ export default async function FeedPage({
   } else if (category === 'REQUESTS') {
     categoryFilter = { intent: 'REQUEST' }
   } else if (category === 'MARKETPLACE') {
-    categoryFilter = { newCategory: 'MARKETPLACE' as PostCategoryV2, intent: 'OFFER' }
+    categoryFilter = { category: 'MARKETPLACE' as PostCategory, intent: 'OFFER' }
   } else if (V2_FILTER_VALUES.includes(category)) {
-    categoryFilter = { newCategory: category as PostCategoryV2 }
+    categoryFilter = { category: category as PostCategory }
   } else {
     categoryFilter = {}
   }
@@ -152,10 +152,10 @@ export default async function FeedPage({
   // NEIGHBORHOOD_ISSUE; EVENTS keeps the small MOSQUE bump. Request
   // posts are boosted via intent === 'REQUEST' below, replacing the
   // legacy LOOKING_FOR boost.
-  const TYPE_BOOST: Partial<Record<PostCategoryV2, number>> = {
+  const TYPE_BOOST: Partial<Record<PostCategory, number>> = {
     NEIGHBORHOOD_REPORTS: 5, LOST_FOUND: 2, EVENTS: 2,
   }
-  const COMMERCIAL = new Set<PostCategoryV2>(['MARKETPLACE', 'HOME_BUSINESSES', 'REAL_ESTATE', 'SERVICES'])
+  const COMMERCIAL = new Set<PostCategory>(['MARKETPLACE', 'HOME_BUSINESSES', 'REAL_ESTATE', 'SERVICES'])
 
   // Feature flag: increase REQUEST visibility. Set NEXT_PUBLIC_REQUEST_BOOST
   // to '0' to disable the bump + soft guarantee + first-screen
@@ -172,7 +172,7 @@ export default async function FeedPage({
     if (p.isFeatured) return { ...p, _score: 999998 }
     const hoursAgo = (Date.now() - new Date(p.createdAt).getTime()) / 3600_000
     const engagement = Math.min(p._count.comments * 3 + p._count.reactions, 30)
-    const boost = (p.newCategory && TYPE_BOOST[p.newCategory]) || 0
+    const boost = (p.category && TYPE_BOOST[p.category]) || 0
     const intentBoost = p.intent === 'REQUEST' ? REQUEST_INTENT_BOOST : 0
     const repBoost = getFeedBoost(p.author.reputation)
     return { ...p, _score: (50 + engagement + boost + intentBoost + repBoost) / (hoursAgo + 2) }
@@ -194,7 +194,7 @@ export default async function FeedPage({
   const balanced: typeof deduped = []
   let commercialStreak = 0
   for (const post of [...deduped, ...deferred]) {
-    if (post.newCategory && COMMERCIAL.has(post.newCategory)) {
+    if (post.category && COMMERCIAL.has(post.category)) {
       commercialStreak++
       if (commercialStreak >= 3) { balanced.push(post); continue }
     } else {

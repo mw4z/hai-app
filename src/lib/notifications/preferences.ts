@@ -10,11 +10,11 @@
 import { db } from '@/lib/db'
 import type {
   NotificationPreference,
-  PostCategoryV2,
+  PostCategory,
   Prisma,
 } from '@prisma/client'
 
-const ALL_CATEGORIES: PostCategoryV2[] = [
+const ALL_CATEGORIES: PostCategory[] = [
   'HOME_BUSINESSES',
   'MARKETPLACE',
   'SERVICES',
@@ -56,9 +56,9 @@ export async function createDefaultPreferences(userId: string): Promise<Notifica
  * the user has never explicitly set come back as default rows (NOT
  * persisted; they only persist on first PATCH).
  */
-export async function getPreferencesMap(userId: string): Promise<Map<PostCategoryV2, NotificationPreference>> {
+export async function getPreferencesMap(userId: string): Promise<Map<PostCategory, NotificationPreference>> {
   const stored = await db.notificationPreference.findMany({ where: { userId } })
-  const map = new Map<PostCategoryV2, NotificationPreference>()
+  const map = new Map<PostCategory, NotificationPreference>()
   for (const row of stored) map.set(row.category, row)
   for (const cat of ALL_CATEGORIES) {
     if (map.has(cat)) continue

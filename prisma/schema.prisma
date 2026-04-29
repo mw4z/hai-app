@@ -268,17 +268,14 @@ model Post {
   id             String        @id @default(cuid())
   title          String
   body           String
-  // Old (legacy) category — kept during the staged migration. Phase 1
-  // adds newCategory + intent + priority + audience as nullable fields.
-  // Phase 2 backfills them. Phase 3 switches reads to newCategory.
-  // Phase 4 drops `category` and renames `newCategory` → `category`.
+  // Canonical category (post-Phase-4 rename of newCategory → category;
+  // the old legacy `category PostCategory` was dropped in the same
+  // migration). Required, no nullable fallback — every row has a v2
+  // value after Phase 2 backfill.
   category       PostCategory
-  // ── Staged-migration columns (drop in Phase 4) ─────────────────────
-  newCategory    PostCategoryV2?
-  intent         PostIntent?      @default(NORMAL)
-  priority       PostPriority?    @default(NORMAL)
-  audience       PostAudience?    @default(ALL)
-  // ───────────────────────────────────────────────────────────────────
+  intent         PostIntent       @default(NORMAL)
+  priority       PostPriority     @default(NORMAL)
+  audience       PostAudience     @default(ALL)
   status         PostStatus    @default(PENDING_AI)
   isPaid         Boolean       @default(false)
   isPinned       Boolean       @default(false)
@@ -308,33 +305,11 @@ model Post {
   updatedAt      DateTime      @updatedAt
 
   @@index([neighborhoodId, category, status])
-  @@index([neighborhoodId, newCategory, status])
   @@index([authorId])
 }
 
-// LEGACY enum — frozen. Do not add or remove members during the
-// staged migration; Phase 4 will drop it entirely.
+// Canonical category enum (renamed from PostCategoryV2 in Phase 4).
 enum PostCategory {
-  ALERT              // تنبيهات
-  LOST_FOUND         // مفقودات ومصطبات
-  MARKETPLACE        // سوق الحي
-  FOOD_HOME          // أكل بيتي
-  REAL_ESTATE        // عقارات
-  SERVICES           // خدمات
-  LOOKING_FOR        // أبحث عن
-  RIDE_REQUEST       // طلب توصيل
-  NEIGHBORHOOD_ISSUE // مشكلة في الحي
-  MOSQUE             // إعلانات المسجد
-  GENERAL            // عام
-  WOMEN_ONLY         // للنساء فقط
-  EID_RAMADAN        // فعاليات ومناسبات
-  CONTESTS           // مسابقات وجوائز
-}
-
-// NEW canonical category enum. Suffixed with V2 during the staged
-// migration; Phase 4 renames PostCategoryV2 → PostCategory and the
-// new field newCategory → category.
-enum PostCategoryV2 {
   HOME_BUSINESSES       // الأسر المنتجة (was FOOD_HOME)
   MARKETPLACE           // سوق الحي
   SERVICES              // خدمات
@@ -1385,7 +1360,7 @@ model InviteFraudSignal {
 model NotificationPreference {
   id           String         @id @default(cuid())
   userId       String
-  category     PostCategoryV2
+  category     PostCategory
   pushEnabled  Boolean        @default(true)
   inAppEnabled Boolean        @default(true)
   createdAt    DateTime       @default(now())

@@ -47,8 +47,8 @@ const CONFLICT_BLOCKED_ACTIONS = new Set([
 
 // 7-day recency window for chat and competitor checks
 const RECENCY_MS = 7 * 24 * 60 * 60 * 1000
-// v2 PostCategoryV2 values — competitor checks below compare against
-// the post's newCategory column (the v2 source of truth in Phase 3
+// v2 PostCategory values — competitor checks below compare against
+// the post's category column (the v2 source of truth in Phase 3
 // read-flag-on era).
 const COMPETITIVE_CATEGORIES = new Set(['SERVICES', 'HOME_BUSINESSES', 'MARKETPLACE', 'REAL_ESTATE'])
 const MAX_ESCALATIONS_PER_HOUR = 5
@@ -86,7 +86,7 @@ export async function checkConflictOfInterest(
   if (targetType === 'post') {
     const post = await db.post.findUnique({
       where: { id: targetId },
-      select: { authorId: true, newCategory: true, neighborhoodId: true },
+      select: { authorId: true, category: true, neighborhoodId: true },
     })
     if (!post) return { hasConflict: false }
 
@@ -129,11 +129,11 @@ export async function checkConflictOfInterest(
     }
 
     // 5) Competitor: same v2 category + same neighborhood + both recent (7d)
-    if (post.newCategory && COMPETITIVE_CATEGORIES.has(post.newCategory)) {
+    if (post.category && COMPETITIVE_CATEGORIES.has(post.category)) {
       const modCompetingPost = await db.post.findFirst({
         where: {
           authorId: modId,
-          newCategory: post.newCategory,
+          category: post.category,
           neighborhoodId: post.neighborhoodId,
           status: 'ACTIVE',
           createdAt: { gte: recentCutoff },

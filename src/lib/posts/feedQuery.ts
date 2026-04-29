@@ -1,19 +1,9 @@
-/**
- * Feed query — flag-gated. When USE_NEW_CATEGORY is on, filters use
- * the v2 column directly. When off, falls back to mapping the v2
- * filter request through legacyOf() and querying the legacy column —
- * this keeps the API surface stable for the new composer while the
- * read switch is rolled out gradually.
- */
-
 import { db } from '@/lib/db'
-import type { Prisma, PostCategoryV2, PostAudience } from '@prisma/client'
-import { legacyOf } from '@/lib/postCategory'
-import { FLAGS } from '@/lib/flags'
+import type { Prisma, PostCategory, PostAudience } from '@prisma/client'
 
 export interface FeedFilter {
   neighborhoodId: string
-  category?: PostCategoryV2 | null
+  category?: PostCategory | null
   /** caller's gender — used to enforce audience targeting on the feed */
   viewerGender?: 'MALE' | 'FEMALE' | 'UNSPECIFIED' | null
   cursor?: string | null
@@ -30,11 +20,9 @@ export async function fetchFeed(f: FeedFilter) {
         ? { in: ['ALL', 'MEN'] satisfies PostAudience[] }
         : 'ALL'
 
-  const categoryClause: Prisma.PostWhereInput = !f.category
-    ? {}
-    : FLAGS.USE_NEW_CATEGORY
-      ? { newCategory: f.category }
-      : { category: legacyOf(f.category) }
+  const categoryClause: Prisma.PostWhereInput = f.category
+    ? { category: f.category }
+    : {}
 
   const rows = await db.post.findMany({
     where: {

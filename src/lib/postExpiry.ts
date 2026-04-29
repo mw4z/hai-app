@@ -5,9 +5,7 @@
  * Posts with active threads or high engagement get extended.
  */
 
-// Free durations in hours per v2 category. Callers pass the post's v2
-// category (post.newCategory or readCategory(post)) so legacy values
-// never reach this map.
+// Free durations in hours per category.
 const EXPIRY_HOURS: Record<string, number> = {
   LOST_FOUND:           168,   // 7 days
   MARKETPLACE:          72,    // 3 days
@@ -28,7 +26,7 @@ const HIGH_ENGAGEMENT_COMMENTS = 5
 
 /**
  * Get expiry date for a post based on its v2 category and creation time.
- * Pass post.newCategory (the v2 column) — legacy values are not
+ * Pass post.category (the v2 column) — legacy values are not
  * supported here and will fall through to DEFAULT_HOURS.
  */
 export function getPostExpiryDate(category: string | null | undefined, createdAt: Date): Date {
@@ -40,11 +38,11 @@ export function getPostExpiryDate(category: string | null | undefined, createdAt
  * Check if a post should be archived.
  * Returns true if expired and no active threads or high engagement.
  *
- * Reads post.newCategory (the v2 column) for the bucket lookup; falls
- * back to DEFAULT_HOURS for any row whose newCategory is null.
+ * Reads post.category (the v2 column) for the bucket lookup; falls
+ * back to DEFAULT_HOURS for any row whose category is null.
  */
 export function shouldArchivePost(post: {
-  newCategory?: string | null
+  category?: string | null
   createdAt: Date
   activeThreadId?: string | null
   isPinned?: boolean
@@ -56,7 +54,7 @@ export function shouldArchivePost(post: {
   // Posts with active coordination threads stay visible
   if (post.activeThreadId) return false
 
-  const hours = (post.newCategory && EXPIRY_HOURS[post.newCategory]) || DEFAULT_HOURS
+  const hours = (post.category && EXPIRY_HOURS[post.category]) || DEFAULT_HOURS
 
   // High engagement posts get 2x duration
   const commentCount = post._count?.comments || 0
@@ -70,7 +68,7 @@ export function shouldArchivePost(post: {
 
 /**
  * Get remaining time for a post in human-readable format.
- * Accepts the v2 category string (post.newCategory).
+ * Accepts the v2 category string (post.category).
  */
 export function getTimeRemaining(category: string | null | undefined, createdAt: Date, commentCount = 0): {
   expired: boolean

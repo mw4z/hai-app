@@ -54,7 +54,7 @@ function draftHasContent(d: PostDraft | null): boolean {
   return !!(d.title.trim() || d.body.trim() || d.price || d.location || (d.imageUrls && d.imageUrls.length > 0))
 }
 
-// ── v2 categories (PostCategoryV2) ─────────────────────────────────────
+// ── v2 categories (PostCategory) ─────────────────────────────────────
 // Single flat list of the 9 user-facing v2 buckets. GENERAL is admin-
 // only fallback and is intentionally not exposed here. RIDES routes to
 // the structured /rides/new flow because requesting a ride uses a
@@ -449,7 +449,7 @@ export default function NewPostPage() {
       const imageUrls = await uploadImages()
       if (imageUrls === null) { setLoading(false); return }
 
-      // The composer always sends a v2 PostCategoryV2 enum value. The
+      // The composer always sends a v2 PostCategory enum value. The
       // /api/posts route detects v2 vs legacy and runs both through
       // classifyPost — never duplicate the mapping logic here.
       const res = await fetch('/api/posts', {

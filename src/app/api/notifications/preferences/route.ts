@@ -5,9 +5,9 @@ import {
   createDefaultPreferences,
   getPreferencesMap,
 } from '@/lib/notifications/preferences'
-import type { PostCategoryV2 } from '@prisma/client'
+import type { PostCategory } from '@prisma/client'
 
-const VALID_CATEGORIES: PostCategoryV2[] = [
+const VALID_CATEGORIES: PostCategory[] = [
   'HOME_BUSINESSES',
   'MARKETPLACE',
   'SERVICES',
@@ -48,7 +48,7 @@ export async function GET() {
  * PATCH /api/notifications/preferences
  *
  * Body shape:
- *   { category: PostCategoryV2, pushEnabled?: boolean, inAppEnabled?: boolean }
+ *   { category: PostCategory, pushEnabled?: boolean, inAppEnabled?: boolean }
  * OR a batch:
  *   { updates: Array<{ category, pushEnabled?, inAppEnabled? }> }
  *
@@ -68,7 +68,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const updates: Array<{
-    category: PostCategoryV2
+    category: PostCategory
     pushEnabled?: boolean
     inAppEnabled?: boolean
   }> = Array.isArray(body?.updates) ? body.updates : [body]

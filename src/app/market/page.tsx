@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { cached } from '@/lib/cache'
-import { PostCategoryV2 } from '@prisma/client'
+import { PostCategory } from '@prisma/client'
 import PostCard from '@/components/PostCard'
 import Link from 'next/link'
 import MarketTab from './MarketTab'
@@ -24,7 +24,7 @@ import MarketTab from './MarketTab'
 // ─────────────────────────────────────────────────────────────────────
 
 // Categories that show on the market's offer-side tabs.
-const OFFER_CATEGORIES_ALL: PostCategoryV2[] = [
+const OFFER_CATEGORIES_ALL: PostCategory[] = [
   'MARKETPLACE',
   'HOME_BUSINESSES',
   'REAL_ESTATE',
@@ -32,13 +32,13 @@ const OFFER_CATEGORIES_ALL: PostCategoryV2[] = [
 ]
 
 // Just goods/property — no services.
-const OFFER_CATEGORIES_SELLING: PostCategoryV2[] = [
+const OFFER_CATEGORIES_SELLING: PostCategory[] = [
   'MARKETPLACE',
   'HOME_BUSINESSES',
   'REAL_ESTATE',
 ]
 
-const OFFER_CATEGORIES_SERVICES: PostCategoryV2[] = ['SERVICES']
+const OFFER_CATEGORIES_SERVICES: PostCategory[] = ['SERVICES']
 
 // Whitelist of valid Market tabs. Any unknown / legacy value (e.g. a
 // shared link to ?tab=REQUESTS from before this refactor) falls
@@ -73,14 +73,14 @@ export default async function MarketPage({
   let tabFilter: object
   switch (tab) {
     case 'SELLING':
-      tabFilter = { intent: 'OFFER', newCategory: { in: OFFER_CATEGORIES_SELLING } }
+      tabFilter = { intent: 'OFFER', category: { in: OFFER_CATEGORIES_SELLING } }
       break
     case 'SERVICES':
-      tabFilter = { intent: 'OFFER', newCategory: { in: OFFER_CATEGORIES_SERVICES } }
+      tabFilter = { intent: 'OFFER', category: { in: OFFER_CATEGORIES_SERVICES } }
       break
     case 'ALL':
     default:
-      tabFilter = { intent: 'OFFER', newCategory: { in: OFFER_CATEGORIES_ALL } }
+      tabFilter = { intent: 'OFFER', category: { in: OFFER_CATEGORIES_ALL } }
       break
   }
 

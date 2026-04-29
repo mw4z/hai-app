@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { PostCategoryV2 as PostCategory, type PostIntent } from '@prisma/client'
+import { PostCategory, type PostIntent } from '@prisma/client'
 import { createPost } from '@/lib/posts/createPost'
 
 // ── Seed user personas — realistic Saudi-style first names ──────────────────
@@ -249,8 +249,7 @@ async function insertSeedPosts(
       authorId,
       neighborhoodId,
       classification: {
-        kind: 'v2',
-        newCategory: pick.slot.category,
+        category: pick.slot.category,
         intent: pick.slot.intent,
       },
     })

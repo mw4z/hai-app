@@ -70,7 +70,7 @@ export async function GET() {
       where: { ...nbhdFilter, status: { in: ['ACTIVE', 'IN_PROGRESS'] }, author: { isSeed: false, isVerified: true, addressVerified: true } },
       select: {
         id: true,
-        newCategory: true,
+        category: true,
         createdAt: true,
         activeThreadId: true,
         isPinned: true,

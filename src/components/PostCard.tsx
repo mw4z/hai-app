@@ -34,16 +34,13 @@ import UserBadgeDisplay, { TierLabel } from './UserBadge'
 import { StatePill } from '@/lib/state-render'
 import { fullName } from '@/lib/displayName'
 
-import { readCategory } from '@/lib/posts/readCategory'
-
 /**
  * v2 category → semantic label + icon.
  *
  * Appearance (light + dark colors) lives in design-tokens.css as
  * --hai-category-{ENUM}-{bg|fg} keyed by `data-category`. This map is
  * pure business metadata (translation key + icon glyph) for the v2
- * (PostCategoryV2) values. Rendering goes through readCategory() so old
- * posts with legacy categories show up as their v2 equivalent.
+ * (PostCategory) values.
  */
 const V2_CATEGORY_STYLES: Record<string, { tKey: TranslationKey; icon: string }> = {
   HOME_BUSINESSES:      { tKey: 'post_v2_HOME_BUSINESSES',      icon: '🍱' },
@@ -85,9 +82,6 @@ interface Post {
   title: string
   body: string
   category: string
-  /** v2 fields — Phase 3 reads. May be null on the very oldest rows
-   *  (pre-Phase-2 backfill); readCategory() falls back to legacy. */
-  newCategory?: string | null
   intent?: 'OFFER' | 'REQUEST' | 'NORMAL' | null
   isPaid: boolean
   isFeatured: boolean
@@ -392,16 +386,9 @@ export default function PostCard({
   const [following, setFollowing] = useState(initialFollowing)
   const [replyText, setReplyText] = useState('')
   const [submittingReply, setSubmittingReply] = useState(false)
-  // v2 read path — derive the canonical PostCategoryV2 (with legacy
-  // fallback for rows missing newCategory) and look up its presentation.
-  const v2Category = readCategory({
-    id: post.id,
-    category: post.category as any,
-    newCategory: (post.newCategory ?? null) as any,
-  })
+  const v2Category = post.category
   const style = V2_CATEGORY_STYLES[v2Category] || V2_CATEGORY_STYLES.GENERAL
-  // REQUEST intent (Ask flow + legacy LOOKING_FOR/RIDE_REQUEST) gets a
-  // small secondary marker on the card.
+  // REQUEST intent gets a small secondary marker on the card.
   const isRequest = post.intent === 'REQUEST'
   const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + b, 0)
   const serverCommentCount = post._count?.comments || 0

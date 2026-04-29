@@ -22,8 +22,8 @@ export default async function PayPage({ params }: { params: { id: string } }) {
   if (!post) redirect('/feed')
 
   // Phase 3 read-flag-on era: read v2 column directly. Falls through
-  // to the default plan if newCategory is null (pre-Phase-2 row).
-  const plans = (post.newCategory && PRICING[post.newCategory]) || [{ label: 'نشر', price: 10 }]
+  // to the default plan if category is null (pre-Phase-2 row).
+  const plans = (post.category && PRICING[post.category]) || [{ label: 'نشر', price: 10 }]
 
   return (
     <main className="min-h-screen bg-white dark:bg-gray-900 flex flex-col px-4 pt-10">

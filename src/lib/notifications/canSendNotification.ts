@@ -12,28 +12,16 @@
  */
 
 import type {
-  Post,
   PostAudience,
   PostCategory,
-  PostCategoryV2,
   PostPriority,
-  User,
 } from '@prisma/client'
 import { getPreferencesMap } from './preferences'
-import { readCategory } from '@/lib/posts/readCategory'
 
 export type NotificationChannel = 'push' | 'inApp'
 
-/**
- * Notifications operate on a minimal subset of a post. We accept either
- * the v2 fields directly OR a row that still has the legacy `category`
- * column populated — readCategory() inside the helper picks whichever
- * is correct under the current feature-flag state, with mismatch
- * logging for soak observability.
- */
 interface MinimalPost {
-  category: PostCategory               // legacy — always present during Phase 3
-  newCategory?: PostCategoryV2 | null  // v2 — populated by dual-write
+  category: PostCategory
   priority: PostPriority
   audience: PostAudience
   neighborhoodId: string
@@ -80,12 +68,8 @@ export async function canSendNotification(
   // LOW is in-app only — never pushes a banner.
   if (post.priority === 'LOW' && channel === 'push') return false
 
-  // Per-category preference gate. readCategory picks v2 when available
-  // and the flag is on, otherwise derives from the legacy column —
-  // safe regardless of which side of the read switch we're on.
-  const effective = readCategory(post)
   const prefs = await getPreferencesMap(user.id)
-  const pref = prefs.get(effective)
+  const pref = prefs.get(post.category)
   if (!pref) return true // shouldn't happen — preferences map fills defaults
   return channel === 'push' ? pref.pushEnabled : pref.inAppEnabled
 }

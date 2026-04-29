@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getValidatedSession } from '@/lib/auth-server'
-import { PostCategoryV2 } from '@prisma/client'
+import { PostCategory } from '@prisma/client'
 import { getFeedBoost } from '@/lib/reputation-levels'
 
 const V2_FILTER_VALUES: readonly string[] = [
@@ -13,18 +13,18 @@ const V2_FILTER_VALUES: readonly string[] = [
 // NEIGHBORHOOD_ISSUE boosts (top of the list); EVENTS keeps the small
 // MOSQUE bump. Request-style "looking for" posts boost via the intent
 // field at the call site (see scorePost) rather than via category.
-const TYPE_BOOST: Partial<Record<PostCategoryV2, number>> = {
+const TYPE_BOOST: Partial<Record<PostCategory, number>> = {
   NEIGHBORHOOD_REPORTS: 5,
   LOST_FOUND: 2,
   EVENTS: 2,
 }
 
-const COMMERCIAL_TYPES = new Set<PostCategoryV2>(['MARKETPLACE', 'HOME_BUSINESSES', 'REAL_ESTATE', 'SERVICES'])
+const COMMERCIAL_TYPES = new Set<PostCategory>(['MARKETPLACE', 'HOME_BUSINESSES', 'REAL_ESTATE', 'SERVICES'])
 const PAGE_SIZE = 20
 
 function scorePost(post: {
   createdAt: Date
-  newCategory: PostCategoryV2 | null
+  category: PostCategory | null
   intent: string | null
   isPinned: boolean
   isFeatured: boolean
@@ -35,7 +35,7 @@ function scorePost(post: {
 
   const hoursAgo = (Date.now() - new Date(post.createdAt).getTime()) / 3600_000
   const engagement = Math.min(post._count.comments * 3 + post._count.reactions, 30)
-  const typeBoost = (post.newCategory && TYPE_BOOST[post.newCategory]) || 0
+  const typeBoost = (post.category && TYPE_BOOST[post.category]) || 0
   // Replicate the legacy LOOKING_FOR +3 boost via intent: REQUEST.
   const intentBoost = post.intent === 'REQUEST' ? 3 : 0
   const repBoost = getFeedBoost((post as any).author?.reputation || 0)
@@ -63,11 +63,11 @@ function deduplicateAuthors<T extends { authorId: string }>(posts: T[]): T[] {
 }
 
 /** Ensure at least 1 non-commercial post every 3 posts */
-function balanceCommercial<T extends { newCategory: PostCategoryV2 | null }>(posts: T[]): T[] {
+function balanceCommercial<T extends { category: PostCategory | null }>(posts: T[]): T[] {
   const result: T[] = []
   let commercialStreak = 0
 
-  const isCommercial = (p: T) => p.newCategory != null && COMMERCIAL_TYPES.has(p.newCategory)
+  const isCommercial = (p: T) => p.category != null && COMMERCIAL_TYPES.has(p.category)
   const nonCommercial = posts.filter(p => !isCommercial(p))
   const ncQueue = [...nonCommercial]
   const seen = new Set<number>()
@@ -120,9 +120,9 @@ export async function GET(req: NextRequest) {
   } else if (category === 'REQUESTS') {
     categoryFilter = { intent: 'REQUEST' }
   } else if (category === 'MARKETPLACE') {
-    categoryFilter = { newCategory: 'MARKETPLACE' as PostCategoryV2, intent: 'OFFER' }
+    categoryFilter = { category: 'MARKETPLACE' as PostCategory, intent: 'OFFER' }
   } else if (V2_FILTER_VALUES.includes(category)) {
-    categoryFilter = { newCategory: category as PostCategoryV2 }
+    categoryFilter = { category: category as PostCategory }
   } else {
     categoryFilter = {}
   }

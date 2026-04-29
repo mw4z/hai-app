@@ -18,10 +18,9 @@ import { FiBell, FiPlus, FiMapPin, FiX, FiSearch, FiFilter, FiCheck, FiChevronDo
 import { useLanguage } from '@/hooks/useLanguage'
 import type { TranslationKey } from '@/lib/i18n'
 import { fullName } from '@/lib/displayName'
-import { readCategory } from '@/lib/posts/readCategory'
 
 // v2 filter chips — REQUESTS is a special intent-based chip (not a
-// PostCategoryV2 value) elevated to position 2 to surface request
+// PostCategory value) elevated to position 2 to surface request
 // posts that were getting buried inside category-based browsing.
 // MARKETPLACE remains in the strip because Market has its own bottom
 // tab AND deserves a top chip, but with intent=OFFER scoping so
@@ -51,9 +50,6 @@ interface Post {
   title: string
   body: string
   category: string
-  /** v2 fields — hidden-categories filter and PostCard rendering use
-   *  `newCategory` when present (Phase 3 read switch). */
-  newCategory?: string | null
   intent?: 'OFFER' | 'REQUEST' | 'NORMAL' | null
   isPaid: boolean
   isFeatured: boolean
@@ -366,14 +362,10 @@ export default function FeedClient({
   const categories = CATEGORIES
 
   // Filtered + sorted posts. hiddenCategories holds v2 enum keys (set by
-  // the v2 chips above) — resolve each post's effective v2 category via
-  // readCategory() so legacy posts also map correctly through the hide
-  // filter.
+  // the v2 chips above) — filter each post by its category directly.
   const displayPosts = useMemo(() => {
     let result = selectedCategory === 'ALL' && hiddenCategories.size > 0
-      ? posts.filter((p: any) => !hiddenCategories.has(
-          readCategory({ id: p.id, category: p.category, newCategory: p.newCategory ?? null }),
-        ))
+      ? posts.filter((p: any) => !hiddenCategories.has(p.category))
       : posts
     if (sortMode === 'popular' && selectedCategory === 'ALL') {
       result = [...result].sort((a: any, b: any) => {
