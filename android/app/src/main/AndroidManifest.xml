@@ -48,6 +48,17 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- WRITE_CONTACTS is required by @capacitor-community/contacts'
+         permission alias "contacts", which groups BOTH read and write.
+         Capacitor's Plugin.getPermissionState() returns GRANTED only if
+         all permissions in the alias are granted; without WRITE_CONTACTS
+         declared here, ContextCompat.checkSelfPermission() returns
+         DENIED for it at the OS level (you can't grant a permission
+         not declared), so the alias is forever DENIED — the plugin
+         never opens the picker no matter what the user toggles in
+         Settings. We don't actually use write APIs from the plugin,
+         but declaring this is the only way to make the read picker work. -->
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
