@@ -22,6 +22,15 @@
 const API_BASE = process.env.AUTHENTICA_API_BASE || 'https://api.authentica.sa/api/v1'
 const API_KEY = process.env.AUTHENTICA_API_KEY || ''
 const SENDER = process.env.AUTHENTICA_SENDER || 'Hai'
+// Authentica SMS template ID. Pre-built templates with placeholders
+// like {{otp}} and {{app_name}} are listed in the dashboard under
+// Templates. We default to template 9 (ar): "استخدم الرمز {{otp}}
+// للتحقق من حسابك في {{app_name}}." — short, on-brand, mentions
+// "حي" via the app_name placeholder.
+const TEMPLATE_ID = process.env.AUTHENTICA_TEMPLATE_ID || '9'
+// Value substituted into the {{app_name}} placeholder. Arabic
+// "حي" reads more natural for Saudi users than the English "Hai".
+const APP_NAME = process.env.AUTHENTICA_APP_NAME || 'حي'
 
 // Google Play / App Store review test account — skip real OTP send.
 // Matches the same hardcoded test pair the previous Twilio impl
@@ -67,14 +76,20 @@ export async function sendOTP(phone: string): Promise<boolean> {
 
   const { ok, data } = await authenticaPost('/send-otp', {
     // E.164 phone (e.g. "+9665xxxxxxxx"). Authentica accepts the
-    // leading + on Saudi numbers; some integrations strip it — adjust
-    // here if your account requires the bare digits.
+    // leading + on Saudi numbers; some integrations strip it —
+    // adjust here if your account requires the bare digits.
     phone,
     // Channel. Authentica supports "sms" and "whatsapp"; sticking to
     // "sms" for parity with the previous Twilio Verify default.
     method: 'sms',
     // Code length. 4 matches the existing UI input which is 4 boxes.
     length: 4,
+    // Pre-built template (managed in the Authentica dashboard
+    // under Templates). The {{otp}} placeholder is filled by
+    // Authentica with the generated code; the {{app_name}}
+    // placeholder is filled with `app_name` below.
+    template_id: TEMPLATE_ID,
+    app_name: APP_NAME,
     // Sender name shown on the SMS. Must be pre-registered with
     // Authentica or this will fail with a sender-not-approved error.
     sender: SENDER,
