@@ -1365,6 +1365,13 @@ export default function ProfileClient({ user, postCount }: Props) {
           onToggle={toggleNotifPref}
         />
 
+        {/* ── Per-category push (NotificationPreference) ── */}
+        <CategoryPrefsGroup
+          title={lang === 'en' ? 'By category' : lang === 'ur' ? 'زمرے کے حساب سے' : 'حسب التصنيف'}
+          lang={lang}
+          t={t}
+        />
+
         {/* ── Diagnostic: live test push — hidden for now.
             Kept the PushTestButton component + /api/debug/push-test
             route for future debugging; just not rendered. Re-enable
@@ -2793,6 +2800,94 @@ function arPlural(n: number, one: string, two: string, many: string): string {
   if (n === 1) return one
   if (n === 2) return two
   return many.replace('{n}', String(n))
+}
+
+/**
+ * Per-PostCategory push preference picker. Loads from /api/notifications/
+ * preferences once the accordion is open; toggling PATCHes the same
+ * endpoint with optimistic UI. The backend already gates every
+ * neighborhood push through these prefs (canSendNotification).
+ */
+function CategoryPrefsGroup({ title, lang, t }: {
+  title: string
+  lang: string
+  t: (k: TranslationKey) => string
+}) {
+  const CATEGORIES: { key: string; tKey: TranslationKey; icon: string }[] = [
+    { key: 'NEIGHBORHOOD_REPORTS', tKey: 'post_v2_NEIGHBORHOOD_REPORTS', icon: '⚠️' },
+    { key: 'LOST_FOUND',           tKey: 'post_v2_LOST_FOUND',           icon: '🔍' },
+    { key: 'EVENTS',               tKey: 'post_v2_EVENTS',               icon: '🎉' },
+    { key: 'SERVICES',             tKey: 'post_v2_SERVICES',             icon: '🔧' },
+    { key: 'HOME_BUSINESSES',      tKey: 'post_v2_HOME_BUSINESSES',      icon: '🍱' },
+    { key: 'MARKETPLACE',          tKey: 'post_v2_MARKETPLACE',          icon: '🛒' },
+    { key: 'REAL_ESTATE',          tKey: 'post_v2_REAL_ESTATE',          icon: '🏠' },
+    { key: 'RIDES',                tKey: 'post_v2_RIDES',                icon: '🚗' },
+    { key: 'COMPETITIONS',         tKey: 'post_v2_COMPETITIONS',         icon: '🏆' },
+  ]
+
+  const [prefs, setPrefs] = useState<Record<string, boolean> | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    fetch('/api/notifications/preferences')
+      .then(r => r.ok ? r.json() : null)
+      .then((d: { items?: Array<{ category: string; pushEnabled: boolean }> } | null) => {
+        if (!alive || !d?.items) return
+        const map: Record<string, boolean> = {}
+        for (const row of d.items) map[row.category] = row.pushEnabled
+        setPrefs(map)
+      })
+      .catch(() => { /* ignore — defaults shown */ })
+    return () => { alive = false }
+  }, [])
+
+  async function toggle(category: string, next: boolean) {
+    setPrefs(prev => ({ ...(prev || {}), [category]: next }))
+    try {
+      const res = await fetch('/api/notifications/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, pushEnabled: next }),
+      })
+      if (!res.ok) throw new Error('patch failed')
+    } catch {
+      // Revert on failure
+      setPrefs(prev => ({ ...(prev || {}), [category]: !next }))
+    }
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+      <div className="px-4 pt-3 pb-1">
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">{title}</p>
+      </div>
+      {CATEGORIES.map((c, i) => {
+        const value = prefs ? (prefs[c.key] ?? true) : true
+        return (
+          <div key={c.key} className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? 'border-t border-gray-50 dark:border-gray-700' : ''}`}>
+            <span className="text-base w-6 text-center flex-shrink-0">{c.icon}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{t(c.tKey)}</p>
+            </div>
+            <button
+              onClick={() => toggle(c.key, !value)}
+              disabled={prefs === null}
+              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                value ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
+              } ${prefs === null ? 'opacity-50' : ''}`}
+              aria-label={t(c.tKey)}
+            >
+              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                value
+                  ? (lang === 'ar' ? 'right-[22px]' : 'left-[22px]')
+                  : (lang === 'ar' ? 'right-0.5' : 'left-0.5')
+              }`} />
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 function NotifGroup({ title, items, lang, onToggle }: {
