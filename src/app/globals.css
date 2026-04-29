@@ -895,15 +895,19 @@ body.hai-scroll-locked .hai-app-shell__scroll {
 }
 
 /* Highlights → tap → scrollIntoView → brief outline flash on the
-   target post card so the user can pick it out from neighbors. */
+   target post card so the user can pick it out from neighbors.
+   Each keyframe preserves the card's resting drop-shadow
+   (var(--hai-shadow-sm)) so the shadow is never visibly removed
+   during the animation — otherwise it pops back in when the
+   animation ends and reads as a small "card movement". */
 @keyframes hai-highlight-flash {
-  0%   { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.0); }
-  20%  { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.55); }
-  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.0); }
+  0%   { box-shadow: var(--hai-shadow-sm), 0 0 0 0 rgba(245, 158, 11, 0); }
+  20%  { box-shadow: var(--hai-shadow-sm), 0 0 0 4px rgba(245, 158, 11, 0.55); }
+  100% { box-shadow: var(--hai-shadow-sm), 0 0 0 0 rgba(245, 158, 11, 0); }
 }
 .hai-highlight-flash {
   animation: hai-highlight-flash 1.6s ease-out;
-  /* No border-radius override — host card keeps its own corners.
-     Overriding forces a layout recompute and the card visibly shifts
-     when the animation ends. box-shadow alone is enough. */
+}
+@media (prefers-reduced-motion: reduce) {
+  .hai-highlight-flash { animation: none; }
 }
