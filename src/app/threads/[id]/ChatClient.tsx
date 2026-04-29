@@ -45,6 +45,11 @@ interface Msg {
   reactions?: { emoji: string; userId: string }[]
   replyToId?: string | null
   replyTo?: ReplyTo | null
+  /** Stable client-side key. Set on optimistic inserts and PRESERVED
+   *  when the server response swaps `id` to the real one — the React
+   *  list keys by `tempId ?? id` so the same DOM node survives the
+   *  swap, otherwise .chat-bubble-in replays and the bubble flashes. */
+  tempId?: string
 }
 
 function WhatsAppCheck({ double, read }: { double: boolean; read: boolean }) {
@@ -547,6 +552,7 @@ export default function ChatClient({
     const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const optimistic: Msg = {
       id: tempId,
+      tempId,
       type: 'TEXT',
       text: body,
       lat: null,
@@ -572,13 +578,15 @@ export default function ChatClient({
       })
       if (res.ok) {
         const msg = await res.json()
-        // Replace the optimistic placeholder with the server row. If
-        // the 3s poll already inserted the real msg by id while we
+        // Swap the optimistic placeholder for the server row IN PLACE,
+        // preserving tempId so the React key stays the same and the
+        // bubble's DOM node (and entrance animation) doesn't replay.
+        // If the 3s poll already inserted the real msg by id while we
         // were awaiting, just drop the placeholder.
         setMessages(prev => {
           const hasReal = prev.some(m => m.id === msg.id)
-          const withoutTemp = prev.filter(m => m.id !== tempId)
-          return hasReal ? withoutTemp : [...withoutTemp, msg]
+          if (hasReal) return prev.filter(m => m.tempId !== tempId)
+          return prev.map(m => (m.tempId === tempId ? { ...msg, tempId } : m))
         })
       } else {
         await showApiError(res, lang as 'ar' | 'en' | 'ur')
@@ -962,12 +970,13 @@ export default function ChatClient({
 
           return (
             <MessageBubble
-              // Use the blob preview URL as the stable key for photos we just
-              // sent, so React keeps the same <img> element when the message
-              // id swaps from "pending-xxx" to the real server id. Otherwise
-              // the bubble unmounts+remounts and the image flashes blank
-              // while it re-decodes.
-              key={(msg as any).localPreview || msg.id}
+              // Stable key across the optimistic-→-server-id swap so the
+              // bubble's DOM node (and its .chat-bubble-in entrance) does
+              // NOT replay when the response lands. Order of preference:
+              //   1) tempId — set on text optimistic inserts
+              //   2) localPreview — blob URL for image optimistic inserts
+              //   3) msg.id — anything fetched from the server
+              key={msg.tempId || (msg as any).localPreview || msg.id}
               msg={msg}
               isMe={isMe}
               isLastInGroup={isLastInGroup}
