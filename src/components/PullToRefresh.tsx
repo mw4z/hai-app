@@ -96,6 +96,8 @@ export default function PullToRefresh() {
       if (isBodyScrollLocked()) return
       const path = window.location.pathname
       if (path !== '/feed' && path !== '/market' && path !== '/threads') return
+      // Belt-and-suspenders — never run inside a chat thread.
+      if (path.startsWith('/threads/')) return
       startY.current = e.touches[0].clientY
       pulling.current = true
       hitThreshold.current = false

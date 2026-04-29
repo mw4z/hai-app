@@ -142,7 +142,7 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
             <Link
               key={thread.id}
               href={`/threads/${thread.id}`}
-              className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors active:bg-gray-100 dark:active:bg-gray-800 border-b border-gray-50 dark:border-gray-800/50"
+              className="flex items-center gap-3 px-5 py-3.5 transition-colors active:bg-gray-100 dark:active:bg-gray-800 border-b border-gray-50 dark:border-gray-800/50"
             >
               {/* Avatar */}
               <div className="relative flex-shrink-0">
