@@ -23,13 +23,17 @@
         <item name="android:windowLightStatusBar">false</item>
     </style>
 
-    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
-        <item name="windowSplashScreenBackground">@color/splash_bg</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_splash</item>
-        <item name="windowSplashScreenIconBackgroundColor">#00a884</item>
-        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <!-- Dark variant of the iOS-style plain launch theme. See
+             values/styles.xml for the rationale. Solid splash colour,
+             no centred icon, immediate handoff to AppSplash. -->
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowBackground">@drawable/splash</item>
         <item name="android:statusBarColor">@color/splash_bg</item>
         <item name="android:navigationBarColor">@color/splash_bg</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>
