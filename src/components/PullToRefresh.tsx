@@ -6,8 +6,20 @@ import { useRouter } from 'next/navigation'
 import { hapticMedium, hapticLight } from '@/lib/haptic'
 import { isBodyScrollLocked } from '@/hooks/useBodyScrollLock'
 
-const THRESHOLD = 70
-const MAX_PULL = 110
+// Distance the finger must travel BEFORE anything visual happens.
+// Soft / accidental pulls in this window do nothing — no strip, no
+// haptic. Crossing it = the user is committed; we fire a haptic
+// and reveal the strip starting from height 0.
+const DEADZONE = 55
+// Resistance applied to the strip AFTER the deadzone. 1 = strip
+// tracks finger 1:1, >1 = rubber-band (strip lags behind finger).
+// 1.4 keeps growth visible but the strip never out-runs the touch.
+const STRIP_RESISTANCE = 1.4
+// Pull (above the deadzone) needed to ARM the refresh. Releasing
+// at or past this height commits; below it cancels back to 0.
+// Strip itself can keep growing unboundedly past this — there is
+// NO hard maximum, just the rubber-band resistance.
+const ARM_HEIGHT = 50
 
 /* Snapchat-style pull-to-refresh, Hai-branded.
  *
@@ -88,24 +100,38 @@ export default function PullToRefresh() {
     function onTouchMove(e: TouchEvent) {
       if (!pulling.current || refreshing) return
       const delta = e.touches[0].clientY - startY.current
-      if (delta <= 0) { setPullY(0); return }
-      const resistance = tokenNumber('--hai-resistance-soft', 2.2)
-      const clamped = Math.min(delta / resistance, MAX_PULL)
-      setPullY(clamped)
-      if (clamped >= THRESHOLD && !hitThreshold.current) {
+      // Inside the deadzone — finger moved but not enough to count
+      // as a deliberate pull. Strip stays hidden, no haptic.
+      if (delta <= DEADZONE) {
+        setPullY(0)
+        hitThreshold.current = false
+        return
+      }
+      // Crossed the deadzone for the first time → haptic fires
+      // BEFORE any strip becomes visible. Strip then appears
+      // starting at height 0 and grows from there.
+      if (!hitThreshold.current) {
         hitThreshold.current = true
         hapticLight()
       }
-      if (clamped < THRESHOLD) hitThreshold.current = false
+      // Distance past the deadzone, scaled by rubber-band resistance.
+      // No upper cap — strip keeps growing as long as the user keeps
+      // pulling. Resistance just slows the growth so 600px finger
+      // travel doesn't make a 600px strip.
+      const above = (delta - DEADZONE) / STRIP_RESISTANCE
+      setPullY(above)
     }
 
     function onTouchEnd() {
       if (!pulling.current) return
       pulling.current = false
-      if (pullY >= THRESHOLD) {
+      // Commit if the user pulled past ARM_HEIGHT. Anything less
+      // (including the deadzone-only case where pullY stayed 0)
+      // cancels back without refreshing.
+      if (pullY >= ARM_HEIGHT) {
         hapticMedium()
         setRefreshing(true)
-        setPullY(THRESHOLD)
+        setPullY(ARM_HEIGHT)
         setTimeout(() => {
           router.refresh()
           setTimeout(() => { setRefreshing(false); setPullY(0) }, 600)
@@ -135,10 +161,16 @@ export default function PullToRefresh() {
     )
   }
 
-  const progress = Math.min(pullY / THRESHOLD, 1)
-  const ready = pullY >= THRESHOLD || refreshing
+  // Progress drives the indicator's bloom — armed at >= ARM_HEIGHT.
+  // Strip itself keeps growing past 1.0; we only use progress for
+  // the visual confidence (mark scale / opacity / armed colour).
+  const progress = Math.min(pullY / ARM_HEIGHT, 1)
+  const ready = pullY >= ARM_HEIGHT || refreshing
   const isPulling = pulling.current
-  const height = refreshing ? THRESHOLD : pullY
+  // Strip height = the actual pull distance. While refreshing we
+  // pin to ARM_HEIGHT so the dots have a stable canvas. Otherwise
+  // the strip mirrors the user's pull with no upper bound.
+  const height = refreshing ? ARM_HEIGHT : pullY
 
   // Indicator scale grows from 0.5 → 1 across the pull. The dots
   // sit centered at all times; they don't grow with the strip the
