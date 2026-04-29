@@ -10,7 +10,7 @@ import { isBodyScrollLocked } from '@/hooks/useBodyScrollLock'
 // Soft / accidental pulls in this window do nothing — no strip, no
 // haptic. Crossing it = the user is committed; we fire a haptic
 // and reveal the strip starting from height 0.
-const DEADZONE = 55
+const DEADZONE = 80
 // Resistance applied to the strip AFTER the deadzone. 1 = strip
 // tracks finger 1:1, >1 = rubber-band (strip lags behind finger).
 // 1.4 keeps growth visible but the strip never out-runs the touch.
@@ -19,7 +19,11 @@ const STRIP_RESISTANCE = 1.4
 // at or past this height commits; below it cancels back to 0.
 // Strip itself can keep growing unboundedly past this — there is
 // NO hard maximum, just the rubber-band resistance.
-const ARM_HEIGHT = 50
+//
+// Total finger travel to commit = DEADZONE + (ARM_HEIGHT * RESIST)
+//   = 80 + (75 * 1.4) = ~185px — deliberately on the heavier side
+//   so accidental pulls don't refresh; user has to genuinely commit.
+const ARM_HEIGHT = 75
 
 /* Snapchat-style pull-to-refresh, Hai-branded.
  *
