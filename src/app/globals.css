@@ -527,6 +527,17 @@ html.dark::before {
   background: #101619;
   background: var(--hai-safe-top-bg, var(--hai-surface-1, #101619));
 }
+/* Pages built on `.hai-screen` (login, register, verify, OTP, etc.)
+   use `var(--hai-bg)` as their background — pure white in light mode,
+   pure black in dark mode. Without an override, the safe-area cover
+   above paints `--hai-surface-1` (#101619 in dark) which sits as a
+   visibly lighter band above the black/white page below.
+   `:has()` lets us override the cover colour at the html level when
+   any descendant has the `.hai-screen` class so the cover matches
+   the page bg edge-to-edge with no seam. */
+html:has(.hai-screen) {
+  --hai-safe-top-bg: var(--hai-bg);
+}
 /* Safe-area cover is now rendered as #__hai_safe_top in layout.tsx —
    a real DOM node paints reliably across WKWebView versions. */
 .sticky.top-0 {
