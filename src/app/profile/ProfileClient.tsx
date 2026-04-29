@@ -472,9 +472,23 @@ export default function ProfileClient({ user, postCount }: Props) {
           />
         </Suspense>
       )}
-      {/* Header with cover photo */}
-      <div className="relative bg-primary-600 pt-10 pb-6 px-4 text-white text-center overflow-hidden">
-        {/* Cover image */}
+      {/* Header with cover photo. Pulled UP by env(safe-area-inset-top)
+          via negative margin so the cover image fills the iOS notch /
+          status-bar zone, then padded by the same amount internally so
+          the foreground content (avatar, name) stays where it visually
+          was. z-10 puts the wrapper above html::before's safe-area
+          surface paint (z-1) — without that, the safe-area zone would
+          stay surface-coloured even with the cover extending into it. */}
+      <div
+        className="relative bg-primary-600 pb-6 px-4 text-white text-center overflow-hidden z-10"
+        style={{
+          marginTop: 'calc(0px - env(safe-area-inset-top, 0px))',
+          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2.5rem)',
+        }}
+      >
+        {/* Cover image — `inset-0` now stretches from the very top of
+            the viewport (behind the iOS status bar) down to the
+            wrapper's bottom, so the photo fills the safe-area zone too. */}
         {cover ? (
           cover.startsWith('http') || cover.startsWith('data:image/png') || cover.startsWith('data:image/jpeg') ? (
             <div className="absolute inset-0">
