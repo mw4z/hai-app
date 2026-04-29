@@ -538,6 +538,32 @@ export default function ChatClient({
     setText('')
     setReplyingTo(null)
     setSending(true)
+
+    // Optimistic insert — the bubble appears INSTANTLY, slides in via
+    // .chat-bubble-in like any other message. The server round-trip
+    // happens in the background; on response we replace by tempId.
+    // Without this, users saw a ~1s gap between tapping send and the
+    // bubble appearing on slow networks.
+    const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const optimistic: Msg = {
+      id: tempId,
+      type: 'TEXT',
+      text: body,
+      lat: null,
+      lng: null,
+      imageUrl: null,
+      senderId: currentUserId,
+      createdAt: new Date().toISOString(),
+      deliveredAt: null,
+      readAt: null,
+      replyToId: replyId,
+      replyTo: replyingTo
+        ? { id: replyingTo.id, senderId: replyingTo.senderId, type: replyingTo.type, text: replyingTo.text }
+        : null,
+    }
+    setMessages(prev => [...prev, optimistic])
+    playSend()
+
     try {
       const res = await fetch(`/api/threads/${threadId}/messages`, {
         method: 'POST',
@@ -546,19 +572,23 @@ export default function ChatClient({
       })
       if (res.ok) {
         const msg = await res.json()
-        playSend()
-        // Dedupe by id: the 3s poll can fetch this message from the
-        // server BEFORE this POST resolves, in which case the merged
-        // state already contains it. Without this guard, the poll-
-        // inserted copy + this insert produce two visible bubbles
-        // until the next poll consolidates by id.
-        setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
+        // Replace the optimistic placeholder with the server row. If
+        // the 3s poll already inserted the real msg by id while we
+        // were awaiting, just drop the placeholder.
+        setMessages(prev => {
+          const hasReal = prev.some(m => m.id === msg.id)
+          const withoutTemp = prev.filter(m => m.id !== tempId)
+          return hasReal ? withoutTemp : [...withoutTemp, msg]
+        })
       } else {
         await showApiError(res, lang as 'ar' | 'en' | 'ur')
+        // Roll back the optimistic bubble + restore the input.
+        setMessages(prev => prev.filter(m => m.id !== tempId))
         setText(body)
       }
     } catch (err) {
       toast.error(isOfflineError(err) || (err instanceof TypeError) ? offlineMsg() : t('common_error'))
+      setMessages(prev => prev.filter(m => m.id !== tempId))
       setText(body)
     } finally { setSending(false); sendLockRef.current = false }
   }
