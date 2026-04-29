@@ -9,6 +9,34 @@
 
 type PickedContact = { name: string; phone: string } | null
 
+/**
+ * Thrown by pickContact() when the OS has hard-denied the contacts
+ * permission ("Don't ask again" / equivalent on Android, Restricted
+ * on iOS). Callers should catch this specifically and offer the user
+ * a path to fix it (Settings deep-link), rather than silently
+ * falling through to a manual entry form.
+ */
+export class ContactsPermissionDeniedError extends Error {
+  constructor() {
+    super('Contacts permission denied')
+    this.name = 'ContactsPermissionDeniedError'
+  }
+}
+
+/**
+ * Open the Android app's permission settings page directly. On
+ * Capacitor Android, the WebView honors `intent://` URLs — this
+ * launches ACTION_APPLICATION_DETAILS_SETTINGS for our package.
+ * No-op on iOS / web.
+ */
+export function openAndroidAppSettings(): void {
+  if (typeof window === 'undefined') return
+  if (getPlatform() !== 'android') return
+  // applicationId from android/app/build.gradle
+  window.location.href =
+    'intent://#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;package=com.hai.app;end'
+}
+
 function isNative(): boolean {
   return typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
 }
@@ -125,18 +153,14 @@ export async function pickContact(): Promise<PickedContact> {
       const status = await Contacts.checkPermissions().catch(() => null)
       console.log('[contactPicker] android checkPermissions:', status)
       if (status?.contacts === 'denied') {
-        // Hard-denied: requestPermissions() will not re-prompt.
-        // Surface a toast so the user knows where to fix it.
-        try {
-          const { default: toast } = await import('react-hot-toast')
-          toast.error(
-            'الإذن مرفوض — فعّل جهات الاتصال من إعدادات الجهاز',
-            { duration: 5000 },
-          )
-        } catch { /* toast unavailable */ }
-        return null
+        // Hard-denied: requestPermissions() will not re-prompt. Throw
+        // so the caller can offer an "Open Settings" path instead of
+        // silently falling through to a manual form.
+        throw new ContactsPermissionDeniedError()
       }
-      // 'prompt' or 'granted' — pickContact() will request if needed.
+      // 'prompt' or 'granted' — pickContact() handles the runtime
+      // request itself when needed (its permissionCallback re-enters
+      // pickContact after the user grants).
       const result = await Contacts.pickContact({
         projection: { name: true, phones: true },
       })
@@ -154,19 +178,14 @@ export async function pickContact(): Promise<PickedContact> {
       if (!phone && !display) return null
       return { name: display, phone }
     } catch (err) {
+      if (err instanceof ContactsPermissionDeniedError) throw err
       console.warn('[contactPicker] android pickContact failed:', err)
-      // The plugin throws "Permission is required to access contacts."
-      // when the user dismisses the permission dialog (denies). Surface
-      // a toast so they know the picker isn't broken — it's a perm issue.
+      // Soft-deny path — plugin throws "Permission is required to
+      // access contacts." when the user dismisses or denies the
+      // dialog. Convert to the typed error so callers can react.
       const msg = (err as any)?.message || String(err)
       if (/permission/i.test(msg)) {
-        try {
-          const { default: toast } = await import('react-hot-toast')
-          toast.error(
-            'الإذن مرفوض — فعّل جهات الاتصال من إعدادات الجهاز',
-            { duration: 5000 },
-          )
-        } catch { /* toast unavailable */ }
+        throw new ContactsPermissionDeniedError()
       }
       return null
     }

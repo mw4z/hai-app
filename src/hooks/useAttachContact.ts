@@ -2,9 +2,14 @@
 
 import { useCallback } from 'react'
 import toast from 'react-hot-toast'
-import { usePrompt } from '@/components/ConfirmProvider'
+import { useConfirm, usePrompt } from '@/components/ConfirmProvider'
 import { useLanguage } from '@/hooks/useLanguage'
-import { pickContact, formatContactSnippet } from '@/lib/contactPicker'
+import {
+  pickContact,
+  formatContactSnippet,
+  ContactsPermissionDeniedError,
+  openAndroidAppSettings,
+} from '@/lib/contactPicker'
 
 /**
  * Returns an async function that produces a formatted "contact snippet"
@@ -15,10 +20,42 @@ import { pickContact, formatContactSnippet } from '@/lib/contactPicker'
  */
 export function useAttachContact() {
   const prompt = usePrompt()
+  const confirm = useConfirm()
   const { t, lang } = useLanguage()
 
   return useCallback(async (): Promise<string | null> => {
-    const picked = await pickContact()
+    let picked: { name: string; phone: string } | null = null
+    try {
+      picked = await pickContact()
+    } catch (err) {
+      if (err instanceof ContactsPermissionDeniedError) {
+        // Don't fall through to the manual form — the user wanted the
+        // picker, not a typing exercise. Offer them the recovery path.
+        const ok = await confirm({
+          title:
+            lang === 'en'
+              ? 'Contacts permission needed'
+              : lang === 'ur'
+                ? 'رابطہ کی اجازت درکار ہے'
+                : 'يحتاج إذن الوصول لجهات الاتصال',
+          message:
+            lang === 'en'
+              ? 'Allow contacts access in Settings to pick a contact instead of typing it manually.'
+              : lang === 'ur'
+                ? 'رابطہ منتخب کرنے کیلئے سیٹنگز سے رابطوں کی اجازت دیں۔'
+                : 'فعّل إذن جهات الاتصال من الإعدادات لاختيار جهة اتصال بدلاً من كتابتها يدوياً.',
+          confirmText:
+            lang === 'en' ? 'Open Settings' : lang === 'ur' ? 'سیٹنگز کھولیں' : 'فتح الإعدادات',
+          cancelText:
+            lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء',
+        })
+        if (ok) openAndroidAppSettings()
+        return null
+      }
+      // Any other error: log and fall through to the manual prompt
+      // path so attach isn't completely broken.
+      console.warn('[useAttachContact] picker error:', err)
+    }
 
     // If native picker returned a contact WITH a phone, we're done.
     if (picked?.phone) {
