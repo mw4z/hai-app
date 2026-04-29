@@ -10,6 +10,7 @@ import EmergencyRequestSheet from '@/components/EmergencyRequestSheet'
 import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useLanguage, LANGUAGE_CHANGE_EVENT } from '@/hooks/useLanguage'
 import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
+import { pushBackHandler } from '@/lib/backHandler'
 import { useConfirm } from '@/components/ConfirmProvider'
 import {
   FiMapPin, FiStar, FiFileText, FiLogOut, FiCamera,
@@ -321,6 +322,22 @@ export default function ProfileClient({ user, postCount }: Props) {
   useBodyScrollLock(showCoverPicker)
   useBodyScrollLock(showAvatarPicker)
   useBodyScrollLock(deleteStage !== null)
+
+  // Back-press isolation per modal — Android back / iOS swipe-back
+  // closes the topmost open modal instead of routing away from the
+  // profile screen.
+  useEffect(() => {
+    if (!showCoverPicker) return
+    return pushBackHandler(() => setShowCoverPicker(false))
+  }, [showCoverPicker])
+  useEffect(() => {
+    if (!showAvatarPicker) return
+    return pushBackHandler(() => setShowAvatarPicker(false))
+  }, [showAvatarPicker])
+  useEffect(() => {
+    if (deleteStage === null) return
+    return pushBackHandler(() => { if (!deleting) setDeleteStage(null) })
+  }, [deleteStage, deleting])
 
   function handleCoverClick() {
     setShowCoverPicker(true)
@@ -1880,6 +1897,10 @@ function BookmarkedPosts({ lang, currentUserId }: { lang: string; currentUserId:
   const [sortBy, setSortBy] = useState<'newest' | 'popular'>('newest')
   const [showAll, setShowAll] = useState(false)
   useBodyScrollLock(showAll)
+  useEffect(() => {
+    if (!showAll) return
+    return pushBackHandler(() => setShowAll(false))
+  }, [showAll])
   const router = useRouter()
 
   useEffect(() => {

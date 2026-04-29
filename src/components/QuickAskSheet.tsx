@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import { FiX, FiSend, FiImage } from 'react-icons/fi'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
+import { pushBackHandler } from '@/lib/backHandler'
 import { inferAskCategory, type V2Category } from '@/lib/classify/inferAskCategory'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
@@ -110,6 +111,17 @@ export default function QuickAskSheet({
   // on iOS WKWebView (document still scrolled under the sheet) and
   // contributed to the visible gap above the header.
   useBodyScrollLock(open)
+
+  // Back-press isolation: Android back / iOS swipe-back close the
+  // sheet instead of navigating away from the feed.
+  useEffect(() => {
+    if (!open) return
+    return pushBackHandler(closeAndReset)
+    // closeAndReset is stable enough — it only references onClose
+    // and a setter; running on every change of open is the desired
+    // mount/unmount semantics.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   // v1 rule-based suggestion — sub-millisecond, sync. Re-runs on every
   // keystroke unless the user has explicitly picked a category.

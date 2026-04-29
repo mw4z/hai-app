@@ -6,6 +6,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import { hapticLight } from '@/lib/haptic'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
+import { pushBackHandler } from '@/lib/backHandler'
 
 type NeighborhoodItem = {
   id: string
@@ -72,6 +73,10 @@ export default function NeighborhoodSheet({
   }, [open])
 
   useBodyScrollLock(open)
+  useEffect(() => {
+    if (!open) return
+    return pushBackHandler(onClose)
+  }, [open, onClose])
 
   useEffect(() => {
     if (!open) return

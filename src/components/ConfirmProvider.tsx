@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
+import { pushBackHandler } from '@/lib/backHandler'
 
 /**
  * In-app RTL-aware replacement for window.confirm().
@@ -112,6 +113,13 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   )
 
   useBodyScrollLock(pending !== null)
+
+  // Back-press cancels: hardware back / swipe-back dismisses the
+  // dialog (resolving as cancelled) instead of routing away.
+  useEffect(() => {
+    if (!pending) return
+    return pushBackHandler(() => close(false))
+  }, [pending, close])
 
   // ESC cancels
   useEffect(() => {

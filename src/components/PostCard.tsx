@@ -25,6 +25,7 @@ import { detectLang } from '@/lib/detectLang'
 import { HaiSpinner } from './HaiLoader'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
+import { pushBackHandler } from '@/lib/backHandler'
 import type { TranslationKey } from '@/lib/i18n'
 import { canStartPrivateThread } from '@/lib/thread-rules'
 import { getRepLevel } from '@/lib/reputation-levels'
@@ -539,6 +540,21 @@ export default function PostCard({
   // comments sheet on top of the user popup doesn't fight over body
   // styles or jump-restore scrollY mid-stack.
   useBodyScrollLock(showComments || showUserPopup)
+
+  // Back-press isolation. Android hardware back / iOS swipe-back now
+  // close the comments sheet (or user popup) instead of navigating
+  // away from the post page. Stack is LIFO — opening the user popup
+  // on top of the comments sheet pushes a second handler, so back
+  // closes the popup first, then a second back closes the comments.
+  // Each effect handles its own state so the priority works out.
+  useEffect(() => {
+    if (!showComments) return
+    return pushBackHandler(() => setShowComments(false))
+  }, [showComments])
+  useEffect(() => {
+    if (!showUserPopup) return
+    return pushBackHandler(() => setShowUserPopup(false))
+  }, [showUserPopup])
 
   useEffect(() => {
     if (!showComments && !showUserPopup) return

@@ -11,7 +11,9 @@
 
 import { FiCamera, FiImage } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useEffect } from 'react'
 import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
+import { pushBackHandler } from '@/lib/backHandler'
 import { t as translate } from '@/lib/i18n'
 
 interface Props {
@@ -25,6 +27,10 @@ export default function ImageSourceSheet({ open, onClose, onCamera, onGallery }:
   const { lang } = useLanguage()
 
   useBodyScrollLock(open)
+  useEffect(() => {
+    if (!open) return
+    return pushBackHandler(onClose)
+  }, [open, onClose])
 
   if (!open) return null
 

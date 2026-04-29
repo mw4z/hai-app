@@ -13,6 +13,7 @@ import {
 import { useLanguage } from '@/hooks/useLanguage'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
+import { pushBackHandler } from '@/lib/backHandler'
 
 /**
  * User-facing emergency alert request sheet.
@@ -54,6 +55,11 @@ export default function EmergencyRequestSheet({ open, onClose }: Props) {
   const [body, setBody] = useState('')
   const [severity, setSeverity] = useState<Severity>('critical')
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    return pushBackHandler(() => { if (!submitting) onClose() })
+  }, [open, onClose, submitting])
   const [myRequests, setMyRequests] = useState<MyRequest[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
 

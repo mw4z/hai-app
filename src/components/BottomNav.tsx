@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
+import { pushBackHandler } from '@/lib/backHandler'
 import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus, FiEdit3, FiSearch } from 'react-icons/fi'
@@ -103,6 +104,13 @@ export default function BottomNav({
 
   // Shared iOS-safe scroll lock — see useBodyScrollLock.
   useBodyScrollLock(showEntrySheet)
+
+  // Back-press isolation: hardware back / swipe-back close the sheet
+  // instead of navigating off the current tab.
+  useEffect(() => {
+    if (!showEntrySheet) return
+    return pushBackHandler(() => setShowEntrySheet(false))
+  }, [showEntrySheet])
 
   async function handleNewPost() {
     hapticMedium()

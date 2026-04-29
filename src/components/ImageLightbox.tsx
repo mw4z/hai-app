@@ -6,6 +6,7 @@ import { hapticLight } from '@/lib/haptic'
 import { saveImageToDevice } from '@/lib/saveImage'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { pushBackHandler } from '@/lib/backHandler'
 
 interface Props {
   images: string[]
@@ -115,6 +116,10 @@ export default function ImageLightbox({
 
   // ── Body scroll lock while open ──────────────────────────────────────
   useBodyScrollLock(mounted)
+  useEffect(() => {
+    if (!mounted) return
+    return pushBackHandler(onClose)
+  }, [mounted, onClose])
 
   // ── Keyboard: Esc to close, arrows to navigate ───────────────────────
   useEffect(() => {
