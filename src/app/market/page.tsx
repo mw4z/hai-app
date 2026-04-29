@@ -137,6 +137,7 @@ export default async function MarketPage({
       </header>
 
       <div className="hai-app-shell__scroll pb-24">
+      <div id="hai-pull-target" />
       <div className="px-4 py-4 space-y-3">
         {posts.length === 0 ? (
           <div className="text-center py-16">

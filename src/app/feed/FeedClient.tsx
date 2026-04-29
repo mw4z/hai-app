@@ -552,6 +552,10 @@ export default function FeedClient({
       {/* Inner scroll container — only this bounces. Header above
           stays glued to the top. */}
       <div className="hai-app-shell__scroll pb-24">
+      {/* Pull-to-refresh portal target — PullToRefresh portals its
+          flow-aware indicator into here so it pushes the list down
+          rather than overlaying it. */}
+      <div id="hai-pull-target" />
 
       {/* Quick Ask bar — only in own neighborhood */}
       {!isReadOnly && (

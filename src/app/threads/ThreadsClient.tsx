@@ -117,6 +117,7 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
       </header>
 
       <div className="hai-app-shell__scroll pb-24">
+      <div id="hai-pull-target" />
       {threads.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 px-6">
           <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
