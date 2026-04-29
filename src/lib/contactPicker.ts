@@ -152,6 +152,33 @@ export async function pickContact(): Promise<PickedContact> {
     //   - denied:     plugin's permissionCallback rejects with
     //                 "Permission is required to access contacts."
     //                 — caught below and converted to the typed error
+    // FIRST CHOICE on Android: the Web Contact Picker API
+    // (navigator.contacts.select) shipped in Chrome 80 / Android
+    // WebView 80+ — i.e. anything from late 2019 onward. It uses
+    // the OS contact picker via the browser and DOES NOT require
+    // the app to hold READ_CONTACTS at all. That sidesteps the
+    // entire @capacitor-community/contacts permission-cache hell
+    // that's been blocking this user.
+    try {
+      const nav = navigator as any
+      if (nav?.contacts?.select) {
+        console.log('[contactPicker] android: using Web Contact Picker API')
+        const props = ['name', 'tel']
+        const picked = await nav.contacts.select(props, { multiple: false })
+        const first = Array.isArray(picked) ? picked[0] : null
+        if (!first) return null
+        const name = Array.isArray(first.name) ? first.name[0] || '' : first.name || ''
+        const rawTel = Array.isArray(first.tel) ? first.tel[0] || '' : first.tel || ''
+        const phone = normalizePhone(rawTel)
+        if (!name && !phone) return null
+        return { name: String(name), phone }
+      }
+      console.log('[contactPicker] android: Web Contact Picker API not available, falling back to plugin')
+    } catch (err) {
+      // User cancelled, or API threw — fall through to plugin path.
+      console.warn('[contactPicker] android: Web Contact Picker API failed:', err)
+    }
+
     const { Contacts } = await import('@capacitor-community/contacts')
 
     // Helper: parse a successful pickContact result into our shape.
