@@ -538,6 +538,42 @@ html.dark::before {
   padding-bottom: calc(6rem + env(safe-area-inset-bottom)) !important;
 }
 
+/* ── Inner-scroll shell ─────────────────────────────────────────────────
+   Used by main feed-style screens (feed, market, threads list) so the
+   rubber-band / overscroll bounce happens on an INNER container instead
+   of the whole document. With document-scroll bounce the sticky `.glass`
+   header bounced along with the content because they shared the same
+   scroll view. Putting the header outside an inner scroller is the
+   standard mobile-app pattern: header stays glued to the top, only the
+   list bounces.
+
+   IMPORTANT: this shell is intentionally STATIC positioning (no
+   position:fixed, no z-index). A position:fixed wrapper creates both a
+   containing block AND a stacking context for its descendants per CSS
+   spec — that's what broke the comments sheet earlier today (its
+   position:fixed overlay got trapped at the shell's z-0 globally and
+   ended up under BottomNav z-10). With static positioning + flex
+   height, the shell is just a layout container — sheets inside still
+   anchor to the viewport and keep their normal global z-index. */
+.hai-app-shell {
+  display: flex;
+  flex-direction: column;
+  /* Fills body's content area exactly (body has padding-top:
+     env(safe-area-inset-top) above), so the shell's bottom edge lines
+     up with the viewport bottom on iPhones with a notch. */
+  height: calc(100dvh - env(safe-area-inset-top, 0px));
+}
+.hai-app-shell__scroll {
+  flex: 1 1 auto;
+  /* Required so the scroll child can shrink below its content's
+     intrinsic size in a flex column. Without this, the container
+     overflows the shell and the page document scrolls instead. */
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Hide scrollbar on mobile — users scroll by touch. On desktop
    (min-width 768px) show a thin custom scrollbar. */
 @media (max-width: 767px) {

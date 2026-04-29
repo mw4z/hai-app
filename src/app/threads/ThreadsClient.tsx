@@ -110,12 +110,13 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
   }, [])
 
   return (
-    <div className="bg-white dark:bg-gray-900 pb-24" style={{ minHeight: 'calc(100vh - env(safe-area-inset-top, 0px))' }}>
+    <div className="hai-app-shell bg-white dark:bg-gray-900">
       {/* Header */}
-      <header className="glass sticky top-0 z-10 px-5 pt-4 pb-3">
+      <header className="glass z-10 px-5 pt-4 pb-3">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('thread_title')}</h1>
       </header>
 
+      <div className="hai-app-shell__scroll pb-24">
       {threads.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 px-6">
           <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
@@ -187,6 +188,7 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
           ))}
         </div>
       )}
+      </div>{/* /hai-app-shell__scroll */}
 
       {/* BottomNav is mounted globally in src/app/layout.tsx */}
     </div>
