@@ -10,26 +10,30 @@ const MAX_PULL = 130
 
 /* Snapchat-style pull-to-refresh, Hai-branded.
  *
- * Design notes carried over from the Snapchat reference:
- *   - Indicator EASES in (rubber-band envelope) — finger drags far,
- *     indicator drifts; the easing is the existing
- *     --hai-resistance-soft token from design-tokens.css.
- *   - Scale + opacity grow with pull progress (0..1) so the indicator
- *     "blooms" into existence rather than appearing fully formed.
- *   - Threshold trigger: at 100% pull the capsule inverts colours
- *     (becomes teal-filled, dots flip white) — clear visual signal
- *     "you've armed the refresh, you can let go now".
- *   - Haptic tick exactly at the threshold crossing.
- *   - Settle bounce on release: spring-back curve when the user lets
- *     go below threshold; commit-then-release animation when above.
- *   - NO generic spinner. Uses the 4-dot Hai pattern (matches the
- *     HaiLoader / app brand mark).
+ * The visual is a FULL-WIDTH strip — not a floating circle. Snapchat's
+ * pulldown turns the top of the screen into a brand-coloured chrome
+ * block that GROWS in height as the user pulls; the indicator (their
+ * bitmoji/ghost) lives inside that block. Hai's version mirrors that:
+ * full-width teal strip just under the header, height = pull distance,
+ * Hai 4-dot brand mark centered inside.
  *
- * Positioning: anchored to JUST BELOW the page's sticky header (or
- * below the safe-area on header-less screens). Detected at runtime
- * via ResizeObserver on the first .hai-app-shell > header.glass
- * element so the indicator floats in the gap between header bottom
- * and list top — not over the status bar / not behind the header.
+ * Behaviour
+ * ─────────
+ *   - Rubber-band envelope on the pull (--hai-resistance-soft).
+ *   - Strip height = pull distance (no fixed capsule).
+ *   - Background colour darkens / saturates as progress 0→1.
+ *   - At threshold the strip "arms": brighter teal, dots flip
+ *     to white, soft glow ring appears.
+ *   - Threshold haptic tick + medium haptic on commit.
+ *   - Settle spring on release with a small overshoot bounce.
+ *   - Centre dot pulses + orbital dots stagger while refreshing
+ *     (matches HaiSpinner cadence).
+ *
+ * Position: anchored to JUST BELOW the page's sticky header (or the
+ * safe-area on header-less screens). Detected at runtime via
+ * ResizeObserver on the first .hai-app-shell > header.glass. The
+ * strip slides down from the header bottom into the gap above the
+ * list — never floats over the status bar.
  */
 function motionToken(name: string, fallback: string): string {
   if (typeof window === 'undefined') return fallback
@@ -50,32 +54,25 @@ export default function PullToRefresh() {
   const router = useRouter()
   const [pullY, setPullY] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
-  // Tracked header height (px) so the indicator parks just under it.
   const [headerH, setHeaderH] = useState(0)
   const startY = useRef(0)
   const pulling = useRef(false)
   const hitThreshold = useRef(false)
 
-  // Watch the page's sticky `.glass` header, if any, and follow its
-  // height. The shell layout puts the header outside the scroll, so
-  // the indicator belongs in the gap right below it. Falls back to
-  // 0 on screens without a shell — the indicator then floats below
-  // the safe-area cover, the old position.
+  // Watch the page's sticky `.glass` header so the strip always parks
+  // just below it. ResizeObserver on the first header element re-fires
+  // when chip rows / banners / search bars expand the header chrome.
   useEffect(() => {
     if (typeof document === 'undefined') return
     let observer: ResizeObserver | null = null
     let target: HTMLElement | null = null
-
     function findAndObserve() {
       const next = document.querySelector<HTMLElement>('.hai-app-shell > header.glass')
         || document.querySelector<HTMLElement>('header.glass')
       if (next === target) return
       if (observer) observer.disconnect()
       target = next
-      if (!target) {
-        setHeaderH(0)
-        return
-      }
+      if (!target) { setHeaderH(0); return }
       setHeaderH(target.getBoundingClientRect().height)
       if (typeof ResizeObserver !== 'undefined') {
         observer = new ResizeObserver((entries) => {
@@ -84,9 +81,7 @@ export default function PullToRefresh() {
         observer.observe(target)
       }
     }
-
     findAndObserve()
-    // Re-find on route changes (URL-bound, no need for router.events).
     const id = setInterval(findAndObserve, 500)
     return () => {
       clearInterval(id)
@@ -96,11 +91,8 @@ export default function PullToRefresh() {
 
   useEffect(() => {
     function activeScroller(): HTMLElement | null {
-      // On shell-using screens the scroll lives inside .hai-app-shell__scroll.
-      const inner = document.querySelector<HTMLElement>('.hai-app-shell__scroll')
-      return inner || null
+      return document.querySelector<HTMLElement>('.hai-app-shell__scroll')
     }
-
     function atTop(): boolean {
       const inner = activeScroller()
       if (inner) return inner.scrollTop <= 0
@@ -125,7 +117,6 @@ export default function PullToRefresh() {
       const resistance = tokenNumber('--hai-resistance-soft', 2.2)
       const clamped = Math.min(delta / resistance, MAX_PULL)
       setPullY(clamped)
-      // Threshold haptic
       if (clamped >= THRESHOLD && !hitThreshold.current) {
         hitThreshold.current = true
         hapticLight()
@@ -165,73 +156,75 @@ export default function PullToRefresh() {
   const ready = pullY >= THRESHOLD || refreshing
   const isPulling = pulling.current
 
-  // Capsule transform — start hidden up behind the header and slide
-  // down into view as the pull grows. translateY 0 = fully docked
-  // just below the header bottom; negative = tucked back under the
-  // header (used at rest before any pull).
-  const indicatorH = 56
-  // Anchor: header bottom = env(safe-area-inset-top) + headerH
-  // Park position: indicator's centre lands just below that anchor.
-  // We slide it down as pullY grows so it tracks the finger.
-  const slideY = pullY - indicatorH * 0.6
+  // Strip height = the actual pull distance. While refreshing we hold
+  // it at THRESHOLD so the dots have a stable canvas to animate on.
+  const stripHeight = refreshing ? THRESHOLD : pullY
 
-  // Visual lerps for the "bloom" effect.
-  const scale = 0.55 + Math.min(progress, 1) * 0.45     // 0.55 → 1.0
-  const blurAmount = (1 - Math.min(progress, 1)) * 4     // 4px → 0
-  const capsuleOpacity = 0.35 + Math.min(progress, 1) * 0.65 // 0.35 → 1
-  const dotsOpacity = 0.45 + Math.min(progress, 1) * 0.55    // 0.45 → 1
+  // Backdrop colour blends from a translucent teal-tint into solid
+  // primary-600 as progress climbs to 1. While armed/refreshing, hold
+  // at full primary.
+  const tintAlpha = 0.15 + Math.min(progress, 1) * 0.85
+  // Inline gradient for a soft-glass look during the pull, hard fill
+  // once armed.
+  const stripBg = ready
+    ? 'linear-gradient(to bottom, var(--hai-primary-600, #006d57), var(--hai-primary-500, #00a884))'
+    : `linear-gradient(to bottom, rgba(0, 109, 87, ${tintAlpha}), rgba(0, 168, 132, ${Math.min(tintAlpha + 0.05, 1)}))`
+
+  // Dots opacity scales with progress so the brand mark "fades in"
+  // alongside the strip itself.
+  const dotsOpacity = 0.5 + Math.min(progress, 1) * 0.5
 
   const settleSpring =
-    `transform ${motionToken('--hai-dur-slow', '260ms')} cubic-bezier(0.34, 1.56, 0.64, 1), ` +
-    `opacity 200ms ease`
+    `height ${motionToken('--hai-dur-slow', '260ms')} cubic-bezier(0.34, 1.56, 0.64, 1)`
 
   return (
     <div
-      className="fixed left-0 right-0 z-50 flex justify-center pointer-events-none"
+      className="fixed left-0 right-0 z-50 pointer-events-none overflow-hidden"
       style={{
-        // Anchor: just below the safe-area + the page's header.
+        // Park the strip just under the header bottom (or the safe-
+        // area on screens with no sticky header).
         top: `calc(env(safe-area-inset-top, 0px) + ${headerH}px)`,
-        transform: `translateY(${slideY}px)`,
-        transition: isPulling || reducedMotion() ? 'none' : settleSpring,
+        height: stripHeight,
+        background: stripBg,
+        // Soft drop shadow under the strip while it's visible — gives
+        // it a layered "chrome panel pulled out from behind the header"
+        // look, matching Snapchat's depth.
+        boxShadow: stripHeight > 0
+          ? '0 6px 16px -4px rgba(0, 109, 87, 0.35)'
+          : 'none',
+        transition: isPulling || reducedMotion()
+          ? 'background 200ms ease, box-shadow 200ms ease'
+          : `${settleSpring}, background 200ms ease, box-shadow 200ms ease`,
       }}
     >
+      {/* Hai 4-dot brand mark — centered both axes inside the strip.
+          Stays a fixed size; it's the STRIP that grows, not the mark.
+          That matches Snapchat — the bitmoji doesn't scale with the
+          pull, it just rides the growing chrome. */}
       <div
-        className={`flex items-center justify-center rounded-full transition-colors duration-200 ${
-          ready
-            ? 'bg-primary-600 shadow-[0_8px_24px_-4px_rgba(0,109,87,0.5)]'
-            : 'bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm shadow-lg'
-        }`}
+        className="absolute left-0 right-0 flex justify-center"
         style={{
-          width: 64,
-          height: 56,
-          opacity: capsuleOpacity,
-          transform: `scale(${scale})`,
-          transformOrigin: 'center',
-          // A subtle scale-into-view as the capsule blooms.
-          transition: isPulling
-            ? 'background-color 200ms ease, box-shadow 200ms ease'
-            : `${settleSpring}, background-color 200ms ease, box-shadow 200ms ease`,
-          filter: refreshing ? 'none' : `blur(${blurAmount}px)`,
+          // Vertically centre within the available strip height,
+          // clamped so the mark never overflows when the strip is
+          // smaller than the mark itself.
+          top: Math.max(0, (stripHeight - 40) / 2),
+          opacity: dotsOpacity,
+          transition: 'top 80ms linear',
         }}
       >
-        {/* Hai 4-dot brand mark — same pattern as the HaiLoader /
-            app launch icon. One large centre dot, three smaller dots
-            arranged 120° apart (top, lower-right, lower-left). The
-            three orbital dots animate in turn while refreshing,
-            matching the existing HaiSpinner cadence. */}
         <svg
           viewBox="0 0 64 64"
           width={40}
           height={40}
-          style={{ opacity: dotsOpacity }}
+          style={{
+            filter: ready
+              ? 'drop-shadow(0 0 6px rgba(255,255,255,0.5))'
+              : 'none',
+            transition: 'filter 200ms ease',
+          }}
         >
           {/* Centre dot */}
-          <circle
-            cx="32"
-            cy="35"
-            r="6"
-            fill={ready ? 'white' : 'var(--hai-primary-600, #006d57)'}
-          >
+          <circle cx="32" cy="35" r="6" fill="white">
             {refreshing && (
               <animate
                 attributeName="opacity"
@@ -242,12 +235,7 @@ export default function PullToRefresh() {
             )}
           </circle>
           {/* Top dot */}
-          <circle
-            cx="32"
-            cy="15"
-            r="4"
-            fill={ready ? 'white' : 'var(--hai-primary-500, #00a884)'}
-          >
+          <circle cx="32" cy="15" r="4" fill="white">
             {refreshing && (
               <animate
                 attributeName="opacity"
@@ -259,12 +247,7 @@ export default function PullToRefresh() {
             )}
           </circle>
           {/* Lower-right */}
-          <circle
-            cx="48"
-            cy="47"
-            r="4"
-            fill={ready ? 'white' : 'var(--hai-primary-500, #00a884)'}
-          >
+          <circle cx="48" cy="47" r="4" fill="white">
             {refreshing && (
               <animate
                 attributeName="opacity"
@@ -276,12 +259,7 @@ export default function PullToRefresh() {
             )}
           </circle>
           {/* Lower-left */}
-          <circle
-            cx="16"
-            cy="47"
-            r="4"
-            fill={ready ? 'white' : 'var(--hai-primary-500, #00a884)'}
-          >
+          <circle cx="16" cy="47" r="4" fill="white">
             {refreshing && (
               <animate
                 attributeName="opacity"
@@ -292,19 +270,6 @@ export default function PullToRefresh() {
               />
             )}
           </circle>
-          {/* Subtle ring at threshold to mark the "armed" state. */}
-          {ready && !refreshing && (
-            <circle
-              cx="32"
-              cy="32"
-              r="26"
-              fill="none"
-              stroke="white"
-              strokeWidth="1"
-              opacity="0.35"
-              strokeDasharray="4 4"
-            />
-          )}
         </svg>
       </div>
     </div>
