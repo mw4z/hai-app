@@ -495,7 +495,7 @@ export default function ProfileClient({ user, postCount }: Props) {
   const joinYear = new Date(user.createdAt).getFullYear()
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-28">
+    <div className="hai-app-shell bg-gray-50 dark:bg-gray-900">
       {/* Image cropper modal */}
       {cropImage && (
         <Suspense fallback={null}>
@@ -588,6 +588,12 @@ export default function ProfileClient({ user, postCount }: Props) {
           </p>
         )}
       </div>
+
+      {/* Inner scroll container — only this bounces during overscroll;
+          the identity card above (cover + avatar + name) stays glued
+          at the top of the viewport. Same pattern as feed / market /
+          threads. */}
+      <div className="hai-app-shell__scroll pb-28">
 
       {/* Stats */}
       <div className="mx-4 mt-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 grid grid-cols-3 gap-3 text-center">
@@ -1942,6 +1948,7 @@ export default function ProfileClient({ user, postCount }: Props) {
       )}
 
       {/* BottomNav is mounted globally in src/app/layout.tsx */}
+      </div>{/* /hai-app-shell__scroll */}
     </div>
   )
 }
