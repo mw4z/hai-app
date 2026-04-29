@@ -19,14 +19,20 @@ type Tone = 'light' | 'dark' | null
  * override and let the app's default (set by CapacitorBridge based
  * on the dark-mode toggle) take back over.
  *
- * 'light' = LIGHT TEXT on the status bar (good for dark backgrounds)
- * 'dark'  = DARK TEXT on the status bar (good for light backgrounds)
+ * Our `tone` describes the TEXT colour we want on the status bar:
+ *   'light' = light/white text → use this when the area BEHIND the
+ *             status bar is dark (a dark cover photo, etc.)
+ *   'dark'  = dark/black text  → use when the area is light
  *
- * Maps to @capacitor/status-bar's Style enum:
- *   Style.Light = light text → use on a dark cover
- *   Style.Dark  = dark text  → use on a light cover
- * (yes, the enum names are the OPPOSITE of intuition — they describe
- *  the BACKGROUND each style is meant for, not the text colour.)
+ * Capacitor's `Style` enum is named for the BACKGROUND the style is
+ * meant for, NOT the text colour. So the mapping is inverted from
+ * what the names suggest:
+ *   Style.Dark  → for DARK backgrounds → produces LIGHT text
+ *   Style.Light → for LIGHT backgrounds → produces DARK text
+ *
+ * Therefore:
+ *   tone='light' (we want white text)  → Style.Dark
+ *   tone='dark'  (we want black text)  → Style.Light
  */
 export async function setStatusBarTone(tone: Tone): Promise<void> {
   if (typeof window === 'undefined') return
@@ -36,15 +42,16 @@ export async function setStatusBarTone(tone: Tone): Promise<void> {
     const { StatusBar, Style } = await import('@capacitor/status-bar')
     if (tone === null) {
       // Restore: read the app's current dark-mode preference and
-      // pick the same tone CapacitorBridge would. Light icons in
+      // pick the same tone CapacitorBridge sets — same mapping it
+      // uses (`isDark ? Style.Dark : Style.Light`): light icons in
       // dark mode, dark icons in light mode.
       const isDark = document.documentElement.classList.contains('dark')
-      await StatusBar.setStyle({ style: isDark ? Style.Light : Style.Dark })
+      await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light })
       return
     }
-    // 'light' tone → light TEXT (Style.Light makes icons white)
-    // 'dark' tone  → dark TEXT (Style.Dark makes icons black)
-    await StatusBar.setStyle({ style: tone === 'light' ? Style.Light : Style.Dark })
+    // tone='light' → white text → Style.Dark
+    // tone='dark'  → black text → Style.Light
+    await StatusBar.setStyle({ style: tone === 'light' ? Style.Dark : Style.Light })
   } catch {
     /* status-bar plugin not available — ignore */
   }
