@@ -386,13 +386,12 @@ export default function FeedClient({
   }, [posts, selectedCategory, hiddenCategories, sortMode])
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="hai-app-shell bg-gray-50">
       {/* Guest mode banner — only for users with addressVerified=false */}
       <GuestBanner show={addressVerified === false} />
 
       {/* Read-only banner is rendered INSIDE the header below so the
-          two elements pin together as one sticky unit when scrolling.
-          See the banner row directly under the header opening tag. */}
+          two elements pin together as one block above the scroll. */}
 
       {/* Mod recruitment banner (max 3 shows, dismissable) */}
       {!isReadOnly && !hasNeighborhoodMod && user.role === 'RESIDENT' && showModBanner && (
@@ -409,7 +408,7 @@ export default function FeedClient({
       )}
 
       {/* Header */}
-      <header className="glass sticky top-0 z-10">
+      <header className="glass z-10">
         {/* Read-only banner — lives INSIDE the sticky header so it
             pins together with the header as the user scrolls. Without
             this nesting two separate sticky elements would overlap on
@@ -552,6 +551,10 @@ export default function FeedClient({
           </div>
         )}
       </header>
+
+      {/* Inner scroll container — only this bounces during overscroll;
+          the header above it stays glued to the top of the viewport. */}
+      <div className="hai-app-shell__scroll pb-24">
 
       {/* Quick Ask bar — only in own neighborhood */}
       {!isReadOnly && (
@@ -812,6 +815,8 @@ export default function FeedClient({
           </>
         )}
       </div>
+
+      </div>{/* /hai-app-shell__scroll */}
 
       {/* BottomNav is mounted globally in src/app/layout.tsx */}
 

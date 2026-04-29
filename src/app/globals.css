@@ -538,6 +538,55 @@ html.dark::before {
   padding-bottom: calc(6rem + env(safe-area-inset-bottom)) !important;
 }
 
+/* ── Inner-scroll shell ─────────────────────────────────────────────────
+   Used by main feed-style screens (feed, market, threads list, profile)
+   so the rubber-band / overscroll bounce happens on an INNER container
+   instead of the whole document. With document-scroll bounce, the
+   sticky `.glass` header bounces along with the content because it's
+   inside the same scroll view. Putting the header outside an inner
+   scroller is the standard mobile-app pattern: header stays glued to
+   the top of the viewport, only the list bounces.
+
+   Layout: position:fixed shell pinned to viewport (below the safe-area
+   cover at top:env(safe-area-inset-top), down to the bottom edge),
+   flex-column of header + scroll. The inner scroll element gets the
+   bounce; everything outside it stays put.
+
+   Why position:fixed instead of just height:100dvh on a normal flow
+   wrapper: relying on document height + body{overflow:hidden} fights
+   with iOS dynamic-toolbar resizing and breaks scroll restoration on
+   route changes. Fixed-positioning the shell sidesteps both. */
+.hai-app-shell {
+  position: fixed;
+  top: env(safe-area-inset-top, 0px);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  /* Base z below BottomNav (z-10) and below all sheets / popups so
+     overlays still cover the shell completely. */
+  z-index: 0;
+  /* The body underneath stays scrollable — important for screens
+     that don't use the shell. The shell is a position:fixed island,
+     it doesn't change document layout. */
+}
+.hai-app-shell__scroll {
+  flex: 1 1 auto;
+  /* Required so the scroll child can shrink below its content's
+     intrinsic size in a flex column. Without this, the container
+     overflows the shell and the page document scrolls instead. */
+  min-height: 0;
+  overflow-y: auto;
+  /* Block scroll-chaining out to body, but KEEP the inner bounce —
+     `contain` is exactly the right token. Combined with the iOS
+     `bounces=true` on the WebView's main scroll view (set in
+     MainViewController.swift), the inner scroll rubber-bands while
+     the outer page (and the header above this container) stays put. */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Hide scrollbar on mobile — users scroll by touch. On desktop
    (min-width 768px) show a thin custom scrollbar. */
 @media (max-width: 767px) {
