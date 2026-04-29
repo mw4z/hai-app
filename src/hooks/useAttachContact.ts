@@ -54,7 +54,7 @@ export function useAttachContact() {
         return null
       }
       // Any other error: log and fall through to the manual prompt
-      // path so attach isn't completely broken.
+      // path so attach isn't completely broken on web.
       console.warn('[useAttachContact] picker error:', err)
     }
 
@@ -63,10 +63,20 @@ export function useAttachContact() {
       return formatContactSnippet(picked) || null
     }
 
-    // Either the picker returned no contact (user cancelled / no picker
-    // available), or the contact had no phone number. In both cases,
-    // fall through to the manual prompt. If we got a name from the
-    // picker, pre-fill it so the user only needs to type the phone.
+    // Native (iOS/Android): the user cancelled the picker, or it
+    // returned a contact with no phone number. Either way, do NOT
+    // fall through to the manual name+phone form — that was
+    // surfacing whenever a user tapped "cancel" on the picker, which
+    // felt like the app didn't respect their cancellation. The
+    // manual form is now web-only, where there's no native picker
+    // available in the first place.
+    const isNativeApp =
+      typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.()
+    if (isNativeApp) return null
+
+    // Web fallback below — only path that still uses the manual prompt.
+    // If we got a name from the picker, pre-fill it so the user only
+    // needs to type the phone.
     const prefillName = picked?.name || ''
 
     const name = await prompt({

@@ -8,8 +8,11 @@ import { hapticLight } from '@/lib/haptic'
 
 interface Props {
   name: string
-  lat: number
-  lng: number
+  /** null when the URL is a short link (maps.app.goo.gl/abc) where
+   *  coords live behind a redirect — the chip still renders, just
+   *  without the lat/lng line. */
+  lat: number | null
+  lng: number | null
   url: string
   variant?: 'light' | 'onGreen'
 }
@@ -41,7 +44,14 @@ export default function LocationChip({ name, lat, lng, url, variant = 'light' }:
     }).catch(() => { /* ignore */ })
   }, [url, lang])
 
-  const coords = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+  const hasCoords = typeof lat === 'number' && typeof lng === 'number'
+  const coordsText = hasCoords ? `${lat!.toFixed(5)}, ${lng!.toFixed(5)}` : null
+  // Fallback subtitle for short links (maps.app.goo.gl / goo.gl):
+  // try to show the host so the chip still has a second line of
+  // information rather than just the place icon + nothing.
+  const fallbackSubtitle = (() => {
+    try { return new URL(url).host.replace(/^www\./, '') } catch { return 'maps' }
+  })()
 
   return (
     <div
@@ -61,16 +71,14 @@ export default function LocationChip({ name, lat, lng, url, variant = 'light' }:
           <FiMapPin className={`w-4 h-4 ${onGreen ? 'text-white' : 'text-sky-700 dark:text-sky-300'}`} />
         </div>
         <div className="min-w-0 flex-1">
-          {name && (
-            <p className={`text-sm font-bold truncate ${onGreen ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
-              {name}
-            </p>
-          )}
+          <p className={`text-sm font-bold truncate ${onGreen ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+            {name || (lang === 'en' ? 'Map location' : lang === 'ur' ? 'نقشے کا مقام' : 'موقع على الخريطة')}
+          </p>
           <p
-            className={`text-xs font-semibold tabular-nums ${onGreen ? 'text-white/80' : 'text-sky-700 dark:text-sky-300'}`}
+            className={`text-xs font-semibold tabular-nums truncate ${onGreen ? 'text-white/80' : 'text-sky-700 dark:text-sky-300'}`}
             dir="ltr"
           >
-            {coords}
+            {coordsText || fallbackSubtitle}
           </p>
         </div>
       </div>

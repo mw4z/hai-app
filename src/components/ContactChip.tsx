@@ -120,11 +120,16 @@ export default function ContactChip({ name, phone, variant = 'light' }: Props) {
 /**
  * Tagged-union segment type for SmartText. Each segment is either
  * raw text or a recognised inline element (contact / location / link).
+ *
+ * Location segments may have lat/lng = null when the URL is a
+ * resolvable short link (maps.app.goo.gl/abc, goo.gl/maps/abc) where
+ * the actual coords live behind a redirect. The chip still renders
+ * with an "Open in Maps" action — we just can't show coords inline.
  */
 export type MessageSegment =
   | { kind: 'text'; text: string }
   | { kind: 'contact'; name: string; phone: string }
-  | { kind: 'location'; name: string; lat: number; lng: number; url: string }
+  | { kind: 'location'; name: string; lat: number | null; lng: number | null; url: string }
   | { kind: 'link'; url: string }
 
 const CONTACT_RE = /📱\s*(?:(.+?)\s*[—–-]\s*)?(\+?\d[\d\s()-]{6,}\d)/g
@@ -137,26 +142,33 @@ const LOCATION_RE = /📍\s*(?:(.+?)\s*\n)?(https?:\/\/(?:www\.)?(?:google\.com\
 // that's almost never part of a real URL.
 const URL_RE = /https?:\/\/[^\s)]+[^\s).,;!?]/g
 
+// Recognised maps domains. Includes the short-link redirector domains
+// — even though they don't carry coords in the URL, the user still
+// pasted a "maps link" and deserves a tappable location chip rather
+// than a generic underlined URL.
+const MAPS_DOMAIN_RE = /(?:google\.com\/maps|maps\.google\.com|maps\.apple\.com|maps\.app\.goo\.gl|goo\.gl\/maps)/i
+
+/**
+ * Is this URL any kind of map link (Google Maps, Apple Maps, or one
+ * of their short-link redirectors)?
+ */
+export function isMapsUrl(url: string): boolean {
+  return MAPS_DOMAIN_RE.test(url)
+}
+
 /**
  * Try to recognise a bare URL as a Google / Apple maps link with
- * extractable coordinates. Returns { lat, lng } when parseable,
- * null otherwise. Used by the parser to upgrade plain-link segments
- * into location chips so a user pasting a maps URL into a comment
- * gets the rich card automatically — no 📍 prefix required.
+ * extractable coordinates. Returns { lat, lng } when parseable, or
+ * null when the URL is a short link (`maps.app.goo.gl/abc123`,
+ * `goo.gl/maps/abc123`) where the coords live behind a redirect.
  *
  * Recognises:
  *   - Google Maps `?q=lat,lng`, `?ll=lat,lng`, `?destination=lat,lng`
  *   - Google Maps path form `/maps/@lat,lng,zoom`
  *   - Apple Maps `?ll=lat,lng`, `?sll=lat,lng`
- *
- * Does NOT recognise short-link forms (`maps.app.goo.gl/abc123`,
- * `goo.gl/maps/abc123`) since those need a server-side resolve to
- * extract coords. They render as plain links.
  */
 export function tryExtractMapsCoords(url: string): { lat: number; lng: number } | null {
-  if (!/(?:google\.com\/maps|maps\.google\.com|maps\.apple\.com)/i.test(url)) {
-    return null
-  }
+  if (!isMapsUrl(url)) return null
   // ?q= / ?ll= / ?sll= / ?destination= followed by lat,lng
   const queryMatch = url.match(/[?&](?:q|ll|sll|destination)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)
   if (queryMatch) {
@@ -208,16 +220,23 @@ export function parseMessageSegments(text: string): MessageSegment[] {
         }))
       : [seg],
   )
-  // Pass 3: bare URLs. A URL that looks like a maps link with
-  // extractable coords is auto-upgraded to a location chip — same
-  // visual result as if the user had used the 📍 prefix.
+  // Pass 3: bare URLs. ANY recognised maps URL (including short
+  // links like maps.app.goo.gl that don't carry coords) is upgraded
+  // to a location chip — short links render with lat/lng = null and
+  // the chip just shows an "Open in Maps" action instead of coords.
   const pass3: Array<string | AnyParsed> = pass2.flatMap((seg) =>
     typeof seg === 'string'
       ? scan(seg, URL_RE, (m): AnyParsed => {
           const url = m[0]
-          const coords = tryExtractMapsCoords(url)
-          if (coords) {
-            return { kind: 'location', name: '', url, lat: coords.lat, lng: coords.lng }
+          if (isMapsUrl(url)) {
+            const coords = tryExtractMapsCoords(url)
+            return {
+              kind: 'location',
+              name: '',
+              url,
+              lat: coords?.lat ?? null,
+              lng: coords?.lng ?? null,
+            }
           }
           return { kind: 'link', url }
         })
