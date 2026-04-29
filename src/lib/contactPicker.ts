@@ -107,14 +107,26 @@ export async function pickContact(): Promise<PickedContact> {
     // READ_CONTACTS declared in AndroidManifest, <queries> for the
     // PICK intent in the manifest as well — see commit bf10774).
     //
-    // We do NOT gate this on requestPermissions(). pickContact() launches
-    // the OS contact-picker intent, which is privacy-preserving — the
-    // system grants the app one-shot access to just the contact the user
-    // picks, with no need for the READ_CONTACTS runtime grant. Gating on
-    // 'granted' meant a previously-denied permission silently fell
-    // through to the manual name+phone prompt.
+    // We MUST explicitly request READ_CONTACTS BEFORE calling
+    // pickContact(). Why: the plugin's pickContact() (see
+    // ContactsPlugin.java:208) silently calls requestContactsPermission()
+    // and exits when the permission isn't granted yet — it does NOT
+    // launch the picker after the user grants. So the first tap on a
+    // fresh install: user sees the permission dialog, allows, and the
+    // picker never opens; they have to tap again. By calling
+    // requestPermissions() first and only proceeding once granted, we
+    // bypass that silent path entirely. (The OS picker is technically
+    // privacy-preserving and could work without the runtime grant, but
+    // this plugin's implementation requires the grant.)
     try {
       const { Contacts } = await import('@capacitor-community/contacts')
+      const status = await Contacts.checkPermissions().catch(() => null)
+      let granted = status?.contacts === 'granted'
+      if (!granted) {
+        const req = await Contacts.requestPermissions().catch(() => null)
+        granted = req?.contacts === 'granted'
+      }
+      if (!granted) return null
       const result = await Contacts.pickContact({
         projection: { name: true, phones: true },
       })
@@ -130,31 +142,8 @@ export async function pickContact(): Promise<PickedContact> {
       if (!phone && !display) return null
       return { name: display, phone }
     } catch (err) {
-      // If the plugin throws (e.g. needs runtime READ_CONTACTS on this
-      // particular device build), fall back to requesting permission
-      // and retrying once before giving up.
-      try {
-        const { Contacts } = await import('@capacitor-community/contacts')
-        const perm = await Contacts.requestPermissions()
-        if (perm.contacts !== 'granted') return null
-        const result = await Contacts.pickContact({
-          projection: { name: true, phones: true },
-        })
-        const contact = (result as any)?.contact
-        if (!contact) return null
-        const display =
-          contact.name?.display ||
-          [contact.name?.given, contact.name?.family].filter(Boolean).join(' ').trim() ||
-          ''
-        let phone = pickBestPhone(contact.phones)
-        if (!phone) phone = pickBestPhone((contact as any).phoneNumbers)
-        if (!phone) phone = pickBestPhone(contact)
-        if (!phone && !display) return null
-        return { name: display, phone }
-      } catch {
-        console.warn('[contactPicker] android pickContact failed:', err)
-        return null
-      }
+      console.warn('[contactPicker] android pickContact failed:', err)
+      return null
     }
   }
 
