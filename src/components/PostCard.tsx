@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiBell, FiBellOff, FiImage, FiUser } from 'react-icons/fi'
+import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiBell, FiBellOff, FiImage, FiUser, FiPaperclip } from 'react-icons/fi'
+import AttachmentMenu from './AttachmentMenu'
 import { uploadFiles } from '@/lib/upload'
 import { playSend, playReaction, playDelete } from '@/lib/sound'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
@@ -379,6 +380,11 @@ export default function PostCard({
   const [commentsLoaded, setCommentsLoaded] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null)
+  // Which composer (if any) is currently showing the AttachmentMenu.
+  // null when closed; 'comment' or 'reply' identifies the target so
+  // the menu's image / contact / location handlers know where to
+  // route the picked content.
+  const [showAttachMenu, setShowAttachMenu] = useState<null | 'comment' | 'reply'>(null)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editCommentBody, setEditCommentBody] = useState('')
   const [bookmarked, setBookmarked] = useState(initialBookmarked)
@@ -1446,6 +1452,20 @@ export default function PostCard({
       {/* Comments — Instagram-style bottom sheet.
           Opens in a fixed-position overlay so long threads never push
           the feed around. Scrollable body + pinned input at the bottom. */}
+      <AttachmentMenu
+        open={showAttachMenu !== null}
+        onClose={() => setShowAttachMenu(null)}
+        onPickImage={() => {
+          if (showAttachMenu) openImagePicker(showAttachMenu)
+        }}
+        onPickContact={() => {
+          if (showAttachMenu) attachContactToComposer(showAttachMenu)
+        }}
+        onPickLocation={() => {
+          if (showAttachMenu) attachLocationToComposer(showAttachMenu)
+        }}
+        variant="comment"
+      />
       {showComments && (
         <div
           data-overlay="true"
@@ -1715,28 +1735,12 @@ export default function PostCard({
                           <input type="file" accept="image/*" ref={replyImgRef} onChange={e => handleCommentImageSelect(e, 'reply')} className="hai-hidden" />
                           <button
                             type="button"
-                            onClick={() => openImagePicker('reply')}
+                            onClick={() => { hapticLight(); setShowAttachMenu('reply') }}
                             className="hai-comment-input__attach-btn"
+                            aria-label={lang === 'en' ? 'Attach' : lang === 'ur' ? 'منسلک کریں' : 'إرفاق'}
+                            title={lang === 'en' ? 'Attach' : lang === 'ur' ? 'منسلک کریں' : 'إرفاق'}
                           >
-                            <FiImage className="hai-icon-sm" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => attachContactToComposer('reply')}
-                            className="hai-comment-input__attach-btn"
-                            aria-label={t('attach_contact')}
-                            title={t('attach_contact')}
-                          >
-                            <FiUser className="hai-icon-sm" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => attachLocationToComposer('reply')}
-                            className="hai-comment-input__attach-btn"
-                            aria-label={lang === 'en' ? 'Attach location' : lang === 'ur' ? 'مقام منسلک کریں' : 'إرفاق موقع'}
-                            title={lang === 'en' ? 'Attach location' : lang === 'ur' ? 'مقام منسلک کریں' : 'إرفاق موقع'}
-                          >
-                            <FiMapPin className="hai-icon-sm" />
+                            <FiPaperclip className="hai-icon-sm" />
                           </button>
                           <button
                             type="submit"
@@ -1779,28 +1783,12 @@ export default function PostCard({
                 <input type="file" accept="image/*" ref={commentImgRef} onChange={e => handleCommentImageSelect(e, 'comment')} className="hai-hidden" />
                 <button
                   type="button"
-                  onClick={() => openImagePicker('comment')}
+                  onClick={() => { hapticLight(); setShowAttachMenu('comment') }}
                   className="hai-comment-input__attach-btn"
+                  aria-label={lang === 'en' ? 'Attach' : lang === 'ur' ? 'منسلک کریں' : 'إرفاق'}
+                  title={lang === 'en' ? 'Attach' : lang === 'ur' ? 'منسلک کریں' : 'إرفاق'}
                 >
-                  <FiImage className="hai-icon-md" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => attachContactToComposer('comment')}
-                  className="hai-comment-input__attach-btn"
-                  aria-label={t('attach_contact')}
-                  title={t('attach_contact')}
-                >
-                  <FiUser className="hai-icon-md" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => attachLocationToComposer('comment')}
-                  className="hai-comment-input__attach-btn"
-                  aria-label={lang === 'en' ? 'Attach location' : lang === 'ur' ? 'مقام منسلک کریں' : 'إرفاق موقع'}
-                  title={lang === 'en' ? 'Attach location' : lang === 'ur' ? 'مقام منسلک کریں' : 'إرفاق موقع'}
-                >
-                  <FiMapPin className="hai-icon-md" />
+                  <FiPaperclip className="hai-icon-md" />
                 </button>
                 <button
                   type="submit"

@@ -132,10 +132,43 @@ const CONTACT_RE = /📱\s*(?:(.+?)\s*[—–-]\s*)?(\+?\d[\d\s()-]{6,}\d)/g
 // URL must be one of the known maps schemes AND carry the coords
 // we can parse out — Google Maps `?q=lat,lng`, the path form
 // `/maps/@lat,lng,...`, or an Apple Maps `?ll=lat,lng`.
-const LOCATION_RE = /📍\s*(?:(.+?)\s*\n)?(https?:\/\/(?:www\.)?(?:google\.com\/maps|maps\.google\.com|maps\.apple\.com)[^\s]*?(?:[?&](?:q|ll|sll|destination)=|\/@)(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)[^\s]*)/g
+const LOCATION_RE = /📍\s*(?:(.+?)\s*\n)?(https?:\/\/(?:www\.)?(?:google\.com\/maps|maps\.google\.com|maps\.apple\.com|goo\.gl\/maps|maps\.app\.goo\.gl)[^\s]*?(?:[?&](?:q|ll|sll|destination)=|\/@)(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)[^\s]*)/g
 // Plain URL — http(s) only, stops at whitespace and trailing punctuation
 // that's almost never part of a real URL.
 const URL_RE = /https?:\/\/[^\s)]+[^\s).,;!?]/g
+
+/**
+ * Try to recognise a bare URL as a Google / Apple maps link with
+ * extractable coordinates. Returns { lat, lng } when parseable,
+ * null otherwise. Used by the parser to upgrade plain-link segments
+ * into location chips so a user pasting a maps URL into a comment
+ * gets the rich card automatically — no 📍 prefix required.
+ *
+ * Recognises:
+ *   - Google Maps `?q=lat,lng`, `?ll=lat,lng`, `?destination=lat,lng`
+ *   - Google Maps path form `/maps/@lat,lng,zoom`
+ *   - Apple Maps `?ll=lat,lng`, `?sll=lat,lng`
+ *
+ * Does NOT recognise short-link forms (`maps.app.goo.gl/abc123`,
+ * `goo.gl/maps/abc123`) since those need a server-side resolve to
+ * extract coords. They render as plain links.
+ */
+export function tryExtractMapsCoords(url: string): { lat: number; lng: number } | null {
+  if (!/(?:google\.com\/maps|maps\.google\.com|maps\.apple\.com)/i.test(url)) {
+    return null
+  }
+  // ?q= / ?ll= / ?sll= / ?destination= followed by lat,lng
+  const queryMatch = url.match(/[?&](?:q|ll|sll|destination)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)
+  if (queryMatch) {
+    return { lat: parseFloat(queryMatch[1]), lng: parseFloat(queryMatch[2]) }
+  }
+  // /maps/@lat,lng,...
+  const pathMatch = url.match(/\/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)
+  if (pathMatch) {
+    return { lat: parseFloat(pathMatch[1]), lng: parseFloat(pathMatch[2]) }
+  }
+  return null
+}
 
 function scan<T>(text: string, re: RegExp, build: (m: RegExpExecArray) => T): Array<string | T> {
   const out: Array<string | T> = []
@@ -175,9 +208,19 @@ export function parseMessageSegments(text: string): MessageSegment[] {
         }))
       : [seg],
   )
+  // Pass 3: bare URLs. A URL that looks like a maps link with
+  // extractable coords is auto-upgraded to a location chip — same
+  // visual result as if the user had used the 📍 prefix.
   const pass3: Array<string | AnyParsed> = pass2.flatMap((seg) =>
     typeof seg === 'string'
-      ? scan(seg, URL_RE, (m): AnyParsed => ({ kind: 'link', url: m[0] }))
+      ? scan(seg, URL_RE, (m): AnyParsed => {
+          const url = m[0]
+          const coords = tryExtractMapsCoords(url)
+          if (coords) {
+            return { kind: 'location', name: '', url, lat: coords.lat, lng: coords.lng }
+          }
+          return { kind: 'link', url }
+        })
       : [seg],
   )
   return pass3.map((seg): MessageSegment =>

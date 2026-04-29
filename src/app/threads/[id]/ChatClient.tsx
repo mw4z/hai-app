@@ -7,7 +7,8 @@ import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useNetworkStatus, isOfflineError } from '@/lib/network'
 import { useConfirm } from '@/components/ConfirmProvider'
-import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, FiTrash2, FiCheck, FiCopy, FiFlag, FiImage, FiUser } from 'react-icons/fi'
+import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, FiTrash2, FiCheck, FiCopy, FiFlag, FiImage, FiUser, FiPaperclip } from 'react-icons/fi'
+import AttachmentMenu from '@/components/AttachmentMenu'
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
 import { uploadFiles } from '@/lib/upload'
@@ -316,6 +317,7 @@ export default function ChatClient({
   const [editText, setEditText] = useState('')
   const [selectedMsg, setSelectedMsg] = useState<string | null>(null)
   const [showLocationConfirm, setShowLocationConfirm] = useState(false)
+  const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [showWallpaperPicker, setShowWallpaperPicker] = useState(false)
   const [wallpaperId, setWallpaperId] = useState(() => {
     try { return localStorage.getItem('hai_chat_wallpaper') || 'default' } catch { return 'default' }
@@ -1193,6 +1195,18 @@ export default function ChatClient({
       )}
 
       {/* Location confirmation dialog */}
+      <AttachmentMenu
+        open={showAttachMenu}
+        onClose={() => setShowAttachMenu(false)}
+        onPickImage={() => setShowImageSheet(true)}
+        onPickContact={async () => {
+          const snippet = await attachContact()
+          if (!snippet) return
+          setText((prev) => (prev ? `${prev.trimEnd()}\n${snippet}` : snippet))
+        }}
+        onPickLocation={() => setShowLocationConfirm(true)}
+        variant="chat"
+      />
       {showLocationConfirm && (
         <>
           <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowLocationConfirm(false)} />
@@ -1292,27 +1306,14 @@ export default function ChatClient({
                 if (files.length > 0) sendImages(files)
                 if (cameraInputRef.current) cameraInputRef.current.value = ''
               }} />
-            <div className="flex items-center gap-1">
-              <button onClick={() => setShowImageSheet(true)} disabled={sendingImage}
-                className="p-2 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50 flex-shrink-0">
-                <FiCamera className={`w-5 h-5 ${sendingImage ? 'animate-pulse' : ''}`} />
-              </button>
-              <button onClick={async () => {
-                  hapticLight()
-                  const snippet = await attachContact()
-                  if (!snippet) return
-                  setText((prev) => (prev ? `${prev.trimEnd()}\n${snippet}` : snippet))
-                }}
-                aria-label={t('attach_contact')}
-                title={t('attach_contact')}
-                className="p-2 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all flex-shrink-0">
-                <FiUser className="w-5 h-5" />
-              </button>
-              <button data-tour="chat-location" onClick={() => setShowLocationConfirm(true)} disabled={sendingLocation}
-                className="p-2 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50 flex-shrink-0">
-                <FiMapPin className={`w-5 h-5 ${sendingLocation ? 'animate-pulse' : ''}`} />
-              </button>
-            </div>
+            <button
+              data-tour="chat-attach"
+              onClick={() => { hapticLight(); setShowAttachMenu(true) }}
+              disabled={sendingImage || sendingLocation}
+              aria-label={lang === 'en' ? 'Attach' : lang === 'ur' ? 'منسلک کریں' : 'إرفاق'}
+              className="p-2 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50 flex-shrink-0">
+              <FiPaperclip className={`w-5 h-5 ${(sendingImage || sendingLocation) ? 'animate-pulse' : ''}`} />
+            </button>
             <form onSubmit={sendText} className="flex-1 min-w-0 flex items-center gap-2">
               {/* min-w-0 on the input AND its parent form is required for the
                   flex-1 input to actually shrink below its content's min
