@@ -24,13 +24,18 @@ const API_KEY = process.env.AUTHENTICA_API_KEY || ''
 const SENDER = process.env.AUTHENTICA_SENDER || 'Hai'
 // Authentica SMS template ID. Pre-built templates with placeholders
 // like {{otp}} and {{app_name}} are listed in the dashboard under
-// Templates. We default to template 9 (ar): "استخدم الرمز {{otp}}
-// للتحقق من حسابك في {{app_name}}." — short, on-brand, mentions
-// "حي" via the app_name placeholder.
-const TEMPLATE_ID = process.env.AUTHENTICA_TEMPLATE_ID || '9'
-// Value substituted into the {{app_name}} placeholder. Arabic
-// "حي" reads more natural for Saudi users than the English "Hai".
-const APP_NAME = process.env.AUTHENTICA_APP_NAME || 'حي'
+// Templates. Default to template 10 (en): "Use the code {{otp}} to
+// verify your account in {{app_name}}." — English template chosen
+// over the Arabic equivalent (id 9) because iOS's auto-fill / OTP
+// detection heuristic recognises English verification patterns
+// reliably, while Arabic templates often slip past it. Auto-fill
+// matters more than message language here — the OTP code itself
+// is purely numeric and unambiguous in either language.
+const TEMPLATE_ID = process.env.AUTHENTICA_TEMPLATE_ID || '10'
+// Value substituted into the {{app_name}} placeholder. "Hai"
+// pairs with the English template; switch to "حي" if you flip
+// back to an Arabic template via env.
+const APP_NAME = process.env.AUTHENTICA_APP_NAME || 'Hai'
 
 // Google Play / App Store review test account — skip real OTP send.
 // Matches the same hardcoded test pair the previous Twilio impl
@@ -93,8 +98,10 @@ export async function sendOTP(phone: string): Promise<boolean> {
     // Sender name shown on the SMS. Must be pre-registered with
     // Authentica or this will fail with a sender-not-approved error.
     sender: SENDER,
-    // Body language — affects the localised message template.
-    language: 'ar',
+    // Body language — paired with the chosen template (10 = en).
+    // Flip to 'ar' here if you change AUTHENTICA_TEMPLATE_ID back
+    // to one of the Arabic templates (8, 9, 11, ...).
+    language: 'en',
   })
 
   if (!ok) {
