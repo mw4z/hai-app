@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { FiX } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { hapticLight } from '@/lib/haptic'
+import { pushBackHandler } from '@/lib/backHandler'
 
 interface Props {
   open: boolean
@@ -53,6 +54,16 @@ export default function AttachmentMenu({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  // Android hardware back / iOS swipe-back: register close as the
+  // top back-press handler so a back press dismisses the menu
+  // instead of navigating away from the post detail / chat thread.
+  // Stack is LIFO — if a confirm dialog opens on top of this menu,
+  // it'll handle back first.
+  useEffect(() => {
+    if (!open) return
+    return pushBackHandler(onClose)
   }, [open, onClose])
 
   if (!open) return null

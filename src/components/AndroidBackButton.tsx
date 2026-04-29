@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
+import { tryHandleBack } from '@/lib/backHandler'
 
 /**
  * Handles the Android hardware back button.
@@ -37,6 +38,12 @@ export default function AndroidBackButton() {
       try {
         const { App } = await import('@capacitor/app')
         listener = await App.addListener('backButton', ({ canGoBack }) => {
+          // Any open overlay (AttachmentMenu, future sheets/dialogs
+          // that register via pushBackHandler) gets the back press
+          // first. If a handler ran, suppress routing so we don't
+          // navigate away while the user is just trying to close a
+          // popup.
+          if (tryHandleBack()) return
           if (ROOT_PATHS.has(pathname || '')) {
             // Root screen — two-tap exit
             const now = Date.now()

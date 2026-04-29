@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
 import { isBodyScrollLocked } from '@/hooks/useBodyScrollLock'
+import { hasOpenOverlay } from '@/lib/backHandler'
 
 /**
  * Edge swipe-to-go-back gesture. Invisible — no visual indicator.
@@ -55,6 +56,11 @@ export default function SwipeBack() {
       // useBodyScrollLock no longer sets body.style.overflow; check
       // its module-level ref count via the helper instead.
       if (isBodyScrollLocked()) return true
+      // Lightweight overlays (AttachmentMenu, popovers) register via
+      // pushBackHandler without locking body scroll. Treat them as
+      // overlays so swipe-back doesn't navigate the page out from
+      // under them.
+      if (hasOpenOverlay()) return true
       const tag = (document.activeElement?.tagName || '').toLowerCase()
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return true
       return false
