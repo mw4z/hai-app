@@ -887,5 +887,7 @@ body.hai-scroll-locked .hai-app-shell__scroll {
 }
 .hai-highlight-flash {
   animation: hai-highlight-flash 1.6s ease-out;
-  border-radius: 16px;
+  /* No border-radius override — host card keeps its own corners.
+     Overriding forces a layout recompute and the card visibly shifts
+     when the animation ends. box-shadow alone is enough. */
 }

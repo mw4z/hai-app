@@ -87,17 +87,17 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
   function go(postId: string) {
     setOpen(false)
     // Posts only render inline in the feed — there's no /post/[id] route.
-    // Scroll the user to the post in the feed; if it isn't on screen
-    // (older than what's loaded), the dismiss alone is fine.
-    requestAnimationFrame(() => {
+    // Scroll the user to the post AFTER the body-scroll-lock release has
+    // settled (otherwise the browser's saved-scrollY restore fights the
+    // smooth scroll and the page visibly jiggles). 80ms is enough for
+    // useBodyScrollLock's effect cleanup + the next paint.
+    setTimeout(() => {
       const el = document.getElementById(`post-${postId}`)
       if (!el) return
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      // Brief outline flash so the user can pick the right card after the
-      // scroll lands.
       el.classList.add('hai-highlight-flash')
       setTimeout(() => el.classList.remove('hai-highlight-flash'), 1800)
-    })
+    }, 80)
   }
 
   return (
