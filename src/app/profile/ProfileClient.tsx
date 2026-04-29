@@ -501,9 +501,24 @@ export default function ProfileClient({ user, postCount }: Props) {
         <Suspense fallback={null}>
           <ImageCropper
             image={cropImage}
-            aspect={cropType === 'avatar' ? 1 : 800 / 300}
-            outputWidth={cropType === 'avatar' ? 256 : 800}
-            outputHeight={cropType === 'avatar' ? 256 : 300}
+            // Cover crop aspect = 4:3, matching the real rendered
+            // cover header. The cover element is ~390-430px wide
+            // (full phone width) and ~280-310px tall (avatar +
+            // name/role/location stack + safe-area-inset-top
+            // bleed). Real ratio lands around 1.33-1.40 across
+            // common iPhones; 4:3 (1.333) is the closest standard
+            // ratio. Previous 8:3 (=2.67) banner aspect made every
+            // upload lose its left/right edges to object-cover at
+            // display, so what the user cropped never matched what
+            // they actually saw on the profile screen.
+            aspect={cropType === 'avatar' ? 1 : 4 / 3}
+            // Bumped output res to 1200x900 (was 800x300) for high-
+            // dpi phones — the cover bleeds into the notch zone
+            // and shows on Pro Max devices up to 430px wide × 3x
+            // dpi, so source assets need to be sharper than the
+            // previous 800px wide.
+            outputWidth={cropType === 'avatar' ? 256 : 1200}
+            outputHeight={cropType === 'avatar' ? 256 : 900}
             onDone={cropType === 'avatar' ? handleCroppedAvatar : handleCroppedCover}
             onCancel={() => setCropImage(null)}
           />
