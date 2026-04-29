@@ -570,7 +570,18 @@ html.dark::before {
      overflows the shell and the page document scrolls instead. */
   min-height: 0;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  /* `none` (not `contain`) so iOS doesn't add its own rubber-band
+     space on top of our pull-to-refresh portal indicator. With
+     `contain`, the native WebView rubber-band kicked in alongside
+     our portal-driven height push — the user saw a big gray gap
+     ABOVE the green refresh strip (the OS bounce-space) plus the
+     strip itself. With `none`, the bounce is suppressed on this
+     scroll container, so only our portal drives the visible
+     stretch — finger-tight, single source of motion. The
+     document still bounces (set in MainViewController.swift +
+     html, body { overscroll-behavior: contain } from globals.css)
+     for screens that DON'T use the shell. */
+  overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
 }
 /* Freeze the inner shell scroll while a sheet/modal is open.
