@@ -805,6 +805,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                 <input
                   type="tel"
                   inputMode="numeric"
+                  autoComplete="one-time-code"
                   placeholder="000000"
                   value={phoneCode}
                   onChange={e => setPhoneCode(e.target.value)}
