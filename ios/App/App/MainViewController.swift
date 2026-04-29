@@ -49,13 +49,15 @@ class MainViewController: CAPBridgeViewController {
             self.capacitorDelegate = webView.navigationDelegate
             webView.navigationDelegate = self
 
-            // Kill the iOS rubber-band / over-scroll bounce on screens
-            // whose content already fits the viewport. Real scrollable
-            // pages (feed, chat) keep working — these flags only stop
-            // the elastic pull-past-the-edge effect, they don't
-            // disable scrolling itself.
-            webView.scrollView.bounces = false
-            webView.scrollView.alwaysBounceVertical = false
+            // iOS rubber-band is intentionally LEFT ON. The previous
+            // `bounces = false` killed the bounce-past-edge effect on
+            // the main feed / market / threads / profile screens,
+            // which made them feel inert next to the comments sheet
+            // (its inner scroller bounces because it's a separate
+            // scroll view). Letting the WebView's main scroll view
+            // bounce restores native iOS feel everywhere.
+            webView.scrollView.bounces = true
+            webView.scrollView.alwaysBounceVertical = true
             webView.scrollView.alwaysBounceHorizontal = false
             webView.scrollView.bouncesZoom = false
         }

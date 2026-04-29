@@ -16,16 +16,19 @@ html, body {
   user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
-  /* Kill the rubber-band overscroll bounce on screens whose content
-     already fits the viewport. Real scrollable surfaces (feed,
-     chat, comment sheet) still scroll normally — overscroll-behavior
-     only blocks the bounce-past-edge effect. iOS WKWebView reads
-     this on iOS 16+ via the WebKit polyfill; on older builds the
-     native bounces=false in MainViewController.swift catches it.
-     Android WebView already has OVER_SCROLL_NEVER from MainActivity. */
-  overscroll-behavior: none;
-  overscroll-behavior-y: none;
-  overscroll-behavior-x: none;
+  /* `overscroll-behavior: contain` blocks scroll-chaining (a swipe
+     past the edge of an inner sheet doesn't bleed up to the page)
+     while STILL allowing the iOS rubber-band / Android stretch
+     effect on the document scroll itself. Previously this was
+     `none`, which felt great inside the comments sheet (its inner
+     scroller bounced) but made the main feed / market / threads /
+     profile scrolls feel dead — they're the document scroll, so
+     `none` killed their bounce too.
+
+     iOS native `bounces = true` and Android `OVER_SCROLL_*` mode
+     in the platform code below also need to allow it for the
+     full effect. CSS alone isn't enough. */
+  overscroll-behavior: contain;
 }
 
 /* Allow selection and copy on actual content (post body, comments, replies) */

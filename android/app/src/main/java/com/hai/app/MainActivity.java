@@ -44,7 +44,14 @@ public class MainActivity extends BridgeActivity {
             WebView wv = getBridge().getWebView();
             wv.setBackgroundColor(isDarkMode() ? Color.BLACK : LIGHT_COLOR);
             wv.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-            wv.setOverScrollMode(View.OVER_SCROLL_NEVER);
+            // Default Android over-scroll: shows the stretch effect on
+            // Android 12+ (or the older "glow" on earlier versions)
+            // when the user pulls past the top/bottom of a scrollable
+            // page. Previously OVER_SCROLL_NEVER, which made every
+            // main-screen scroll feel inert next to the comments
+            // sheet (its inner scroll container has its own native
+            // overscroll behaviour that this flag doesn't touch).
+            wv.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
             WebSettings ws = wv.getSettings();
             ws.setCacheMode(WebSettings.LOAD_DEFAULT);
             ws.setDomStorageEnabled(true);
