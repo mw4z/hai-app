@@ -164,17 +164,24 @@ input, textarea, [contenteditable="true"] {
   animation: msg-jump-flash 1.6s ease-out;
 }
 
-/* Chat bubble entrance — soft slide-up + fade. CSS animations only
-   play on mount, so this fires once per newly-arrived message and
-   doesn't replay on re-renders. The translateY is small (8px) and
-   the duration is short (220ms) so the initial-load cascade reads
-   as polish, not a long sequence. */
+/* Chat bubble entrance — iMessage-style: slight scale-up + slide
+   with a soft spring at the end so it lands instead of just stopping.
+   CSS animations only play on mount, so this fires once per newly-
+   arrived message and doesn't replay on re-renders. transform +
+   opacity only → compositor-only (no layout/paint). */
 @keyframes chat-bubble-in {
-  from { transform: translateY(8px); opacity: 0; }
-  to   { transform: translateY(0);   opacity: 1; }
+  0%   { transform: translateY(14px) scale(0.94); opacity: 0; }
+  55%  { opacity: 1; }
+  100% { transform: translateY(0)    scale(1);    opacity: 1; }
 }
 .chat-bubble-in {
-  animation: chat-bubble-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: chat-bubble-in 340ms cubic-bezier(0.22, 1.18, 0.36, 1);
+  /* Origin at the bottom — the bubble appears to grow up from where
+     the next message would arrive, matching iMessage. */
+  transform-origin: 50% 100%;
+  /* Hint the compositor — no off-main-thread work, so paint stays
+     buttery on Capacitor WebView. */
+  will-change: transform, opacity;
 }
 @media (prefers-reduced-motion: reduce) {
   .chat-bubble-in { animation: none; }
