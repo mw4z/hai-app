@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { shouldArchivePost } from '@/lib/postExpiry'
 import { del } from '@vercel/blob'
+import { invalidateHighlights } from '@/lib/highlights'
 
 /**
  * Archives expired posts. Run periodically (e.g. every hour).
@@ -29,6 +30,7 @@ async function runArchive() {
         activeThreadId: true,
         isPinned: true,
         imageUrls: true,
+        neighborhoodId: true,
         _count: { select: { comments: true, bookmarks: true } },
       },
     })
@@ -59,6 +61,16 @@ async function runArchive() {
         data: { status: 'ARCHIVED' },
       })
       archived = result.count
+
+      // Drop highlight caches for every neighborhood that just lost a
+      // post — keeps Highlights clean immediately instead of waiting up
+      // to 30 min for the dynamic layer to refresh. Cheap (in-memory
+      // Map.delete per nbhd × 3 audience keys × 2 layers).
+      const affectedNbhds = new Set<string>()
+      for (const p of posts) {
+        if (toArchive.includes(p.id)) affectedNbhds.add(p.neighborhoodId)
+      }
+      affectedNbhds.forEach(invalidateHighlights)
 
       // Clear imageUrls for posts whose images we're deleting
       if (blobUrlsToDelete.length > 0) {
