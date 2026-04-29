@@ -828,7 +828,7 @@ export default function PostCard({
   const isLookingFor = isRequest
 
   return (
-    <div className={`hai-card relative animate-fade-in-up glow-card ${post.isPinned ? 'hai-post--pinned' : ''} ${isLookingFor ? 'hai-post--looking-for' : ''}`}>
+    <div id={`post-${post.id}`} data-post-id={post.id} className={`hai-card relative animate-fade-in-up glow-card ${post.isPinned ? 'hai-post--pinned' : ''} ${isLookingFor ? 'hai-post--looking-for' : ''}`}>
       {post.isPinned && (
         <StatePill state="pinned" label={t('post_pinned')} className="hai-mb-1" />
       )}

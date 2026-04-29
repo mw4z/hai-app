@@ -877,3 +877,15 @@ body.hai-scroll-locked .hai-app-shell__scroll {
   0%, 100% { opacity: 0.55; transform: scale(1); }
   50%      { opacity: 0.95; transform: scale(1.12); }
 }
+
+/* Highlights → tap → scrollIntoView → brief outline flash on the
+   target post card so the user can pick it out from neighbors. */
+@keyframes hai-highlight-flash {
+  0%   { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.0); }
+  20%  { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.55); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.0); }
+}
+.hai-highlight-flash {
+  animation: hai-highlight-flash 1.6s ease-out;
+  border-radius: 16px;
+}

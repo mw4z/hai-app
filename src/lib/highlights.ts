@@ -49,6 +49,7 @@ export interface HighlightItem {
   badge: 'pinned' | 'important' | 'popular' | null
   createdAt: string
   authorId: string
+  authorName: string | null
   imageUrls: string[]
   reactionCount: number
   commentCount: number
@@ -70,6 +71,7 @@ interface RawPost {
   priority: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL'
   audience: 'ALL' | 'WOMEN' | 'MEN'
   authorId: string
+  author: { name: string | null; lastName: string | null } | null
   imageUrls: string[]
   createdAt: Date
   highlightPinnedAt: Date | null
@@ -94,6 +96,9 @@ function scoreOf(p: RawPost): number {
 }
 
 function toItem(p: RawPost, badge: HighlightItem['badge']): HighlightItem {
+  const first = p.author?.name?.trim() || ''
+  const last = p.author?.lastName?.trim() || ''
+  const authorName = [first, last].filter(Boolean).join(' ') || null
   return {
     id: p.id,
     title: p.title,
@@ -103,6 +108,7 @@ function toItem(p: RawPost, badge: HighlightItem['badge']): HighlightItem {
     badge,
     createdAt: p.createdAt.toISOString(),
     authorId: p.authorId,
+    authorName,
     imageUrls: p.imageUrls ?? [],
     reactionCount: p._count.reactions,
     commentCount: p._count.comments,
@@ -128,6 +134,7 @@ const POST_SELECT = {
   imageUrls: true,
   createdAt: true,
   highlightPinnedAt: true,
+  author: { select: { name: true, lastName: true } },
   _count: { select: { reactions: true, comments: true } },
 } as const
 
