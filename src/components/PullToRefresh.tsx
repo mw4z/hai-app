@@ -100,23 +100,34 @@ export default function PullToRefresh() {
     function onTouchMove(e: TouchEvent) {
       if (!pulling.current || refreshing) return
       const delta = e.touches[0].clientY - startY.current
-      // Inside the deadzone — finger moved but not enough to count
-      // as a deliberate pull. Strip stays hidden, no haptic.
+      // Finger moving UP from the top — user is starting a normal
+      // scroll-down gesture, not a pull. Release our claim on the
+      // gesture so native scrolling (and bottom-edge rubber-band)
+      // takes over without any preventDefault interference.
+      if (delta <= 0) {
+        pulling.current = false
+        setPullY(0)
+        hitThreshold.current = false
+        return
+      }
+      // Finger moving DOWN at top — we ARE driving a pull from
+      // here on. preventDefault() must fire on EVERY frame from now
+      // (not just past the deadzone) — by the time we crossed the
+      // deadzone, iOS had already committed to its native rubber-
+      // band based on the first move, and the gray gap above our
+      // indicator would already be locked in. Calling preventDefault
+      // from frame 1 of a downward move at top is the only thing
+      // that actually suppresses the WebView's bounce.
+      if (e.cancelable) e.preventDefault()
+      // Inside the deadzone — strip stays hidden, no haptic, but
+      // the native bounce is still being suppressed (above).
       if (delta <= DEADZONE) {
         setPullY(0)
         hitThreshold.current = false
         return
       }
-      // We're now actively driving a pull — suppress the native
-      // rubber-band on this scroll so iOS doesn't ALSO add its own
-      // bounce-space on top of our portal indicator. The shell
-      // scroll's `overscroll-behavior: contain` still allows native
-      // bounce at the bottom edge and on idle scrolls; only the
-      // current touch sequence is suppressed via preventDefault.
-      if (e.cancelable) e.preventDefault()
       // Crossed the deadzone for the first time → haptic fires
-      // BEFORE any strip becomes visible. Strip then appears
-      // starting at height 0 and grows from there.
+      // BEFORE any strip becomes visible.
       if (!hitThreshold.current) {
         hitThreshold.current = true
         hapticLight()
