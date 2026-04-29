@@ -164,6 +164,22 @@ input, textarea, [contenteditable="true"] {
   animation: msg-jump-flash 1.6s ease-out;
 }
 
+/* Chat bubble entrance — soft slide-up + fade. CSS animations only
+   play on mount, so this fires once per newly-arrived message and
+   doesn't replay on re-renders. The translateY is small (8px) and
+   the duration is short (220ms) so the initial-load cascade reads
+   as polish, not a long sequence. */
+@keyframes chat-bubble-in {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+.chat-bubble-in {
+  animation: chat-bubble-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-bubble-in { animation: none; }
+}
+
 /* Glass bottom bar */
 .glass-bottom {
   background: #ffffff !important;

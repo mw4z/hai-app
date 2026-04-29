@@ -391,12 +391,20 @@ export default function ChatClient({
   // Tap on a reply quote → scroll the original into view and flash a
   // full-width horizontal highlight across its row that fades out.
   // Mirrors WhatsApp's behavior.
+  //
+  // Deferred a tick so any concurrent React render (e.g. the auto-
+  // scroll-to-bottom effect on messages.length, or the touch-end tap
+  // re-render) settles BEFORE the smooth scroll begins. Otherwise the
+  // page does its own scroll work first and the row visibly jiggles
+  // before our smooth scroll lands.
   function jumpToMessage(id: string) {
     const row = document.querySelector(`[data-msg-row="${id}"]`) as HTMLElement | null
     if (!row) return
-    row.scrollIntoView({ block: 'center', behavior: 'smooth' })
-    row.classList.add('msg-jump-highlight')
-    setTimeout(() => row.classList.remove('msg-jump-highlight'), 1600)
+    setTimeout(() => {
+      row.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      row.classList.add('msg-jump-highlight')
+      setTimeout(() => row.classList.remove('msg-jump-highlight'), 1600)
+    }, 60)
   }
 
   // When replying to a message, make sure it stays visible after the
@@ -1532,7 +1540,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
   ) : null
 
   return (
-    <div ref={rowRef} data-msg-row={msg.id}>
+    <div ref={rowRef} data-msg-row={msg.id} className="chat-bubble-in">
       {showUnreadDivider && (
         <div id="unread-divider" className="flex items-center gap-3 my-4">
           <div className="flex-1 h-px bg-primary-400/50" />
