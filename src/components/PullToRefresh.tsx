@@ -107,6 +107,13 @@ export default function PullToRefresh() {
         hitThreshold.current = false
         return
       }
+      // We're now actively driving a pull — suppress the native
+      // rubber-band on this scroll so iOS doesn't ALSO add its own
+      // bounce-space on top of our portal indicator. The shell
+      // scroll's `overscroll-behavior: contain` still allows native
+      // bounce at the bottom edge and on idle scrolls; only the
+      // current touch sequence is suppressed via preventDefault.
+      if (e.cancelable) e.preventDefault()
       // Crossed the deadzone for the first time → haptic fires
       // BEFORE any strip becomes visible. Strip then appears
       // starting at height 0 and grows from there.
@@ -142,7 +149,12 @@ export default function PullToRefresh() {
     }
 
     document.addEventListener('touchstart', onTouchStart, { passive: true })
-    document.addEventListener('touchmove', onTouchMove, { passive: true })
+    // touchmove is non-passive ONLY because we need preventDefault()
+    // available for the active-pull case (suppresses the native
+    // rubber-band so it doesn't stack with our portal indicator).
+    // The handler bails out fast when not pulling, so the perf hit
+    // outside of active pulls is negligible.
+    document.addEventListener('touchmove', onTouchMove, { passive: false })
     document.addEventListener('touchend', onTouchEnd)
     return () => {
       document.removeEventListener('touchstart', onTouchStart)
