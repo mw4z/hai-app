@@ -654,6 +654,24 @@ export default function PostCard({
     }
   }
 
+  async function attachLocationToComposer(target: 'comment' | 'reply') {
+    hapticLight()
+    const { attachLocation } = await import('@/lib/locationPicker')
+    // Default the map center to the post's attached location if there
+    // is one — most relevant point for a comment on that post.
+    const defaultCenter =
+      typeof (post as any).locationLat === 'number' && typeof (post as any).locationLng === 'number'
+        ? { lat: (post as any).locationLat as number, lng: (post as any).locationLng as number }
+        : undefined
+    const snippet = await attachLocation({ lang, defaultCenter })
+    if (!snippet) return
+    if (target === 'comment') {
+      setCommentText((prev) => (prev ? `${prev.trimEnd()}\n${snippet}` : snippet))
+    } else {
+      setReplyText((prev) => (prev ? `${prev.trimEnd()}\n${snippet}` : snippet))
+    }
+  }
+
   async function handleAdminAction(action: string) {
     try {
       const res = await fetch('/api/admin/action', {
@@ -1712,6 +1730,15 @@ export default function PostCard({
                             <FiUser className="hai-icon-sm" />
                           </button>
                           <button
+                            type="button"
+                            onClick={() => attachLocationToComposer('reply')}
+                            className="hai-comment-input__attach-btn"
+                            aria-label={lang === 'en' ? 'Attach location' : lang === 'ur' ? 'مقام منسلک کریں' : 'إرفاق موقع'}
+                            title={lang === 'en' ? 'Attach location' : lang === 'ur' ? 'مقام منسلک کریں' : 'إرفاق موقع'}
+                          >
+                            <FiMapPin className="hai-icon-sm" />
+                          </button>
+                          <button
                             type="submit"
                             disabled={submittingReply || (!replyText.trim() && !replyImage)}
                             className="hai-comment-input__send"
@@ -1765,6 +1792,15 @@ export default function PostCard({
                   title={t('attach_contact')}
                 >
                   <FiUser className="hai-icon-md" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => attachLocationToComposer('comment')}
+                  className="hai-comment-input__attach-btn"
+                  aria-label={lang === 'en' ? 'Attach location' : lang === 'ur' ? 'مقام منسلک کریں' : 'إرفاق موقع'}
+                  title={lang === 'en' ? 'Attach location' : lang === 'ur' ? 'مقام منسلک کریں' : 'إرفاق موقع'}
+                >
+                  <FiMapPin className="hai-icon-md" />
                 </button>
                 <button
                   type="submit"

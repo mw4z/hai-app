@@ -1203,21 +1203,34 @@ export default function ChatClient({
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
-                  {lang === 'en' ? 'Share your location?' : 'مشاركة موقعك؟'}
+                  {lang === 'en' ? 'Share location' : lang === 'ur' ? 'مقام شیئر کریں' : 'مشاركة موقع'}
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {lang === 'en' ? 'Your current location will be sent' : 'سيتم إرسال موقعك الحالي'}
+                  {lang === 'en' ? 'Send your current location, or pick a point on the map' : lang === 'ur' ? 'اپنا موجودہ مقام بھیجیں یا نقشے سے منتخب کریں' : 'أرسل موقعك الحالي أو اختر نقطة على الخريطة'}
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button onClick={() => setShowLocationConfirm(false)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700">
-                {lang === 'en' ? 'Cancel' : 'إلغاء'}
-              </button>
+            <div className="flex flex-col gap-2">
               <button onClick={sendLocation}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-primary-600 active:scale-95 transition-transform">
-                {lang === 'en' ? 'Share' : 'مشاركة'}
+                className="w-full py-2.5 rounded-xl text-sm font-medium text-white bg-primary-600 active:scale-95 transition-transform">
+                📍 {lang === 'en' ? 'Send my current location' : lang === 'ur' ? 'موجودہ مقام بھیجیں' : 'موقعي الحالي'}
+              </button>
+              <button
+                onClick={async () => {
+                  setShowLocationConfirm(false)
+                  const { attachLocation } = await import('@/lib/locationPicker')
+                  const snippet = await attachLocation({ lang })
+                  if (!snippet) return
+                  setText((prev) => (prev ? `${prev.trimEnd()}\n${snippet}` : snippet))
+                  // Focus the input so the user can add a note before sending.
+                  textInputRef.current?.focus()
+                }}
+                className="w-full py-2.5 rounded-xl text-sm font-medium text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800 active:scale-95 transition-transform">
+                🗺️ {lang === 'en' ? 'Pick on map' : lang === 'ur' ? 'نقشے سے منتخب کریں' : 'اختر من الخريطة'}
+              </button>
+              <button onClick={() => setShowLocationConfirm(false)}
+                className="w-full py-2 rounded-xl text-xs text-gray-500 dark:text-gray-400">
+                {lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء'}
               </button>
             </div>
           </div>

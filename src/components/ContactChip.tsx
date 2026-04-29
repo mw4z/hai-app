@@ -118,34 +118,87 @@ export default function ContactChip({ name, phone, variant = 'light' }: Props) {
 }
 
 /**
- * Regex to detect `📱 Name — +phone` or `📱 +phone` snippets in text.
- * Returns an array of segments: either plain strings or { name, phone } objects.
+ * Tagged-union segment type for SmartText. Each segment is either
+ * raw text or a recognised inline element (contact / location / link).
  */
+export type MessageSegment =
+  | { kind: 'text'; text: string }
+  | { kind: 'contact'; name: string; phone: string }
+  | { kind: 'location'; name: string; lat: number; lng: number; url: string }
+  | { kind: 'link'; url: string }
+
 const CONTACT_RE = /📱\s*(?:(.+?)\s*[—–-]\s*)?(\+?\d[\d\s()-]{6,}\d)/g
+// Location snippet: `📍 [Name\n]<map URL containing lat,lng>`. The
+// URL must be one of the known maps schemes AND carry the coords
+// we can parse out — Google Maps `?q=lat,lng`, the path form
+// `/maps/@lat,lng,...`, or an Apple Maps `?ll=lat,lng`.
+const LOCATION_RE = /📍\s*(?:(.+?)\s*\n)?(https?:\/\/(?:www\.)?(?:google\.com\/maps|maps\.google\.com|maps\.apple\.com)[^\s]*?(?:[?&](?:q|ll|sll|destination)=|\/@)(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)[^\s]*)/g
+// Plain URL — http(s) only, stops at whitespace and trailing punctuation
+// that's almost never part of a real URL.
+const URL_RE = /https?:\/\/[^\s)]+[^\s).,;!?]/g
 
+function scan<T>(text: string, re: RegExp, build: (m: RegExpExecArray) => T): Array<string | T> {
+  const out: Array<string | T> = []
+  let last = 0
+  let m: RegExpExecArray | null
+  re.lastIndex = 0
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) out.push(text.slice(last, m.index))
+    out.push(build(m))
+    last = m.index + m[0].length
+  }
+  if (last < text.length) out.push(text.slice(last))
+  return out
+}
+
+/**
+ * Three-pass scanner: contacts first, then locations within
+ * remaining text, then plain URLs in what's left over. Order matters
+ * because the location URL is also a plain URL — we want it consumed
+ * by the location pass first.
+ */
+export function parseMessageSegments(text: string): MessageSegment[] {
+  type AnyParsed = Exclude<MessageSegment, { kind: 'text' }>
+  const pass1: Array<string | AnyParsed> = scan(text, CONTACT_RE, (m) => ({
+    kind: 'contact' as const,
+    name: (m[1] || '').trim(),
+    phone: (m[2] || '').trim(),
+  }))
+  const pass2: Array<string | AnyParsed> = pass1.flatMap((seg) =>
+    typeof seg === 'string'
+      ? scan(seg, LOCATION_RE, (m): AnyParsed => ({
+          kind: 'location',
+          name: (m[1] || '').trim(),
+          url: m[2],
+          lat: parseFloat(m[3]),
+          lng: parseFloat(m[4]),
+        }))
+      : [seg],
+  )
+  const pass3: Array<string | AnyParsed> = pass2.flatMap((seg) =>
+    typeof seg === 'string'
+      ? scan(seg, URL_RE, (m): AnyParsed => ({ kind: 'link', url: m[0] }))
+      : [seg],
+  )
+  return pass3.map((seg): MessageSegment =>
+    typeof seg === 'string' ? { kind: 'text', text: seg } : seg,
+  )
+}
+
+/**
+ * Backward-compat wrapper used by existing callers that only need
+ * contact + text segments. New code should use parseMessageSegments.
+ */
 export type TextSegment = string | { name: string; phone: string }
-
 export function parseContactSnippets(text: string): TextSegment[] {
-  const segments: TextSegment[] = []
-  let lastIndex = 0
-  let match: RegExpExecArray | null
-
-  CONTACT_RE.lastIndex = 0
-  while ((match = CONTACT_RE.exec(text)) !== null) {
-    const start = match.index
-    if (start > lastIndex) {
-      segments.push(text.slice(lastIndex, start))
-    }
-    segments.push({
-      name: (match[1] || '').trim(),
-      phone: (match[2] || '').trim(),
-    })
-    lastIndex = start + match[0].length
-  }
-
-  if (lastIndex < text.length) {
-    segments.push(text.slice(lastIndex))
-  }
-
-  return segments.length > 0 ? segments : [text]
+  return parseMessageSegments(text).map((seg): TextSegment =>
+    seg.kind === 'contact'
+      ? { name: seg.name, phone: seg.phone }
+      : seg.kind === 'text'
+        ? seg.text
+        // Render location/link as their underlying text in legacy callers.
+        : seg.kind === 'location'
+          ? `📍 ${seg.name ? seg.name + '\n' : ''}${seg.url}`
+          : seg.url,
+  )
 }
