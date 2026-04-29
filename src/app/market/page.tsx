@@ -117,8 +117,8 @@ export default async function MarketPage({
   const empty = emptyStates[tab] || emptyStates.ALL
 
   return (
-    <div className="hai-app-shell bg-gray-50">
-      <header className="glass z-10">
+    <div className="min-h-screen bg-gray-50 pb-24">
+      <header className="glass sticky top-0 z-10">
         <div className="px-4 py-3">
           <h1 className="font-bold text-gray-900 text-lg">سوق الحي</h1>
           <p className="text-gray-400 text-xs">{user.neighborhood?.name} · {user.neighborhood?.city.name}</p>
@@ -136,7 +136,6 @@ export default async function MarketPage({
         </div>
       </header>
 
-      <div className="hai-app-shell__scroll pb-24">
       <div className="px-4 py-4 space-y-3">
         {posts.length === 0 ? (
           <div className="text-center py-16">
@@ -150,7 +149,6 @@ export default async function MarketPage({
           ))
         )}
       </div>
-      </div>{/* /hai-app-shell__scroll */}
 
       {/* BottomNav is mounted globally in src/app/layout.tsx */}
     </div>
