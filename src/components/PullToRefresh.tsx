@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { hapticMedium, hapticLight } from '@/lib/haptic'
+import { hapticMedium } from '@/lib/haptic'
 import { isBodyScrollLocked } from '@/hooks/useBodyScrollLock'
 
 // Distance the finger must travel BEFORE anything visual happens.
@@ -130,11 +130,13 @@ export default function PullToRefresh() {
         hitThreshold.current = false
         return
       }
-      // Crossed the deadzone for the first time → haptic fires
-      // BEFORE any strip becomes visible.
+      // Crossed the deadzone for the first time. We track this for
+      // visual state changes but do NOT fire a haptic here — the
+      // only haptic should be the refresh-commit one on release.
+      // Two haptics in a single gesture (one on cross, one on
+      // commit) felt noisy.
       if (!hitThreshold.current) {
         hitThreshold.current = true
-        hapticLight()
       }
       // Distance past the deadzone, scaled by rubber-band resistance.
       // No upper cap — strip keeps growing as long as the user keeps
