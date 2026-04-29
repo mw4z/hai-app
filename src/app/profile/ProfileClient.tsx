@@ -541,10 +541,15 @@ export default function ProfileClient({ user, postCount }: Props) {
           <div className="absolute inset-0 bg-gradient-to-b from-primary-700 to-primary-600" />
         )}
         <style>{`.profile-header-text { text-shadow: 0 1px 4px rgba(0,0,0,0.5); }`}</style>
-        {/* Cover change button */}
+        {/* Cover change button — pushed below the iOS notch / status
+            bar zone. The wrapper now bleeds into the safe-area top
+            (commit fe6b135), so a plain `top-3` would land the
+            button under the status bar where it can't be tapped.
+            Anchor below env(safe-area-inset-top) + the original 12px. */}
         <button
           onClick={handleCoverClick}
-          className="absolute top-3 right-3 z-10 bg-black/30 hover:bg-black/50 backdrop-blur-sm rounded-full p-2 transition-colors"
+          className="absolute right-3 z-10 bg-black/30 hover:bg-black/50 backdrop-blur-sm rounded-full p-2 transition-colors"
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
         >
           <FiCamera className="w-4 h-4 text-white" />
         </button>
