@@ -132,36 +132,28 @@ export async function pickContact(): Promise<PickedContact> {
       }
     }
 
-    // Android: use @capacitor-community/contacts (linked via Gradle,
-    // READ_CONTACTS declared in AndroidManifest, <queries> for the
-    // PICK intent in the manifest as well — see commit bf10774).
+    // Android: use @capacitor-community/contacts.
     //
-    // The plugin's pickContact() handles the permission flow itself:
-    // if READ_CONTACTS isn't granted yet, it triggers the system
-    // dialog and re-enters pickContact via permissionCallback once
-    // granted. So calling pickContact() directly is the correct path
-    // for the FIRST run on a fresh install. We only need to handle
-    // the HARD-DENIED state explicitly — Android stops showing the
-    // permission dialog after a previous deny + "Don't ask again",
-    // which means requestPermissions() returns 'denied' without
-    // surfacing anything to the user. They keep tapping Attach
-    // Contact, the picker never opens, and we silently fall through
-    // to the manual name+phone prompt — exactly what's been
-    // happening. Detecting that state and surfacing a toast pointing
-    // to Settings is the only way the user can recover.
+    // We DELIBERATELY skip the upfront checkPermissions() call: on
+    // some Android WebView builds it returns a stale 'denied' value
+    // for the entire app lifetime even after the user grants
+    // READ_CONTACTS in device Settings. The user enables access,
+    // comes back, taps Attach, and we still report "no access" —
+    // which is exactly the bug being reported. The plugin's INTERNAL
+    // permission check (inside pickContact's native code) reads the
+    // OS state fresh on each call, so calling pickContact() directly
+    // is the only way to see the up-to-date grant state.
+    //
+    // Behaviour by state:
+    //   - granted:    picker launches immediately
+    //   - prompt:     plugin requests perm; if user grants the
+    //                 permissionCallback re-enters pickContact and
+    //                 launches the picker
+    //   - denied:     plugin's permissionCallback rejects with
+    //                 "Permission is required to access contacts."
+    //                 — caught below and converted to the typed error
     try {
       const { Contacts } = await import('@capacitor-community/contacts')
-      const status = await Contacts.checkPermissions().catch(() => null)
-      console.log('[contactPicker] android checkPermissions:', status)
-      if (status?.contacts === 'denied') {
-        // Hard-denied: requestPermissions() will not re-prompt. Throw
-        // so the caller can offer an "Open Settings" path instead of
-        // silently falling through to a manual form.
-        throw new ContactsPermissionDeniedError()
-      }
-      // 'prompt' or 'granted' — pickContact() handles the runtime
-      // request itself when needed (its permissionCallback re-enters
-      // pickContact after the user grants).
       const result = await Contacts.pickContact({
         projection: { name: true, phones: true },
       })
@@ -179,11 +171,7 @@ export async function pickContact(): Promise<PickedContact> {
       if (!phone && !display) return null
       return { name: display, phone }
     } catch (err) {
-      if (err instanceof ContactsPermissionDeniedError) throw err
       console.warn('[contactPicker] android pickContact failed:', err)
-      // Soft-deny path — plugin throws "Permission is required to
-      // access contacts." when the user dismisses or denies the
-      // dialog. Convert to the typed error so callers can react.
       const msg = (err as any)?.message || String(err)
       if (/permission/i.test(msg)) {
         throw new ContactsPermissionDeniedError()
