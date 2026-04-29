@@ -152,12 +152,10 @@ export async function pickContact(): Promise<PickedContact> {
     //   - denied:     plugin's permissionCallback rejects with
     //                 "Permission is required to access contacts."
     //                 — caught below and converted to the typed error
-    try {
-      const { Contacts } = await import('@capacitor-community/contacts')
-      const result = await Contacts.pickContact({
-        projection: { name: true, phones: true },
-      })
-      console.log('[contactPicker] android pickContact result:', result)
+    const { Contacts } = await import('@capacitor-community/contacts')
+
+    // Helper: parse a successful pickContact result into our shape.
+    const toPicked = (result: unknown): PickedContact => {
       const contact = (result as any)?.contact
       if (!contact) return null
       const display =
@@ -167,16 +165,47 @@ export async function pickContact(): Promise<PickedContact> {
       let phone = pickBestPhone(contact.phones)
       if (!phone) phone = pickBestPhone((contact as any).phoneNumbers)
       if (!phone) phone = pickBestPhone(contact)
-      console.log('[contactPicker] android picked:', { display, phone })
       if (!phone && !display) return null
       return { name: display, phone }
+    }
+
+    // Try pickContact directly first. The plugin reads the OS perm
+    // state fresh on this call. If it throws a permission error and
+    // the user JUST granted access in Settings, fall through to a
+    // requestPermissions() retry which forces another fresh OS read.
+    try {
+      const result = await Contacts.pickContact({
+        projection: { name: true, phones: true },
+      })
+      console.log('[contactPicker] android pickContact (1) result:', result)
+      return toPicked(result)
     } catch (err) {
-      console.warn('[contactPicker] android pickContact failed:', err)
+      console.warn('[contactPicker] android pickContact (1) failed:', err)
       const msg = (err as any)?.message || String(err)
-      if (/permission/i.test(msg)) {
-        throw new ContactsPermissionDeniedError()
+      const isPermErr = /permission/i.test(msg)
+      if (!isPermErr) return null
+
+      // Permission-related throw: explicitly request permission. This
+      // re-reads the OS state through Android's permission system and,
+      // if the user has just granted in Settings, returns 'granted'
+      // even when checkPermissions / pickContact's internal check
+      // saw stale 'denied'. Then retry pickContact one more time.
+      try {
+        const req = await Contacts.requestPermissions()
+        console.log('[contactPicker] android requestPermissions:', req)
+        if (req?.contacts === 'granted') {
+          const result2 = await Contacts.pickContact({
+            projection: { name: true, phones: true },
+          })
+          console.log('[contactPicker] android pickContact (2) result:', result2)
+          return toPicked(result2)
+        }
+      } catch (err2) {
+        console.warn('[contactPicker] android retry failed:', err2)
       }
-      return null
+      // If we reach here, perm is genuinely not granted — surface to
+      // the caller so it can guide the user to Settings.
+      throw new ContactsPermissionDeniedError()
     }
   }
 
