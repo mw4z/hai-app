@@ -1519,7 +1519,21 @@ export default function PostCard({
             </div>
 
             <div className="hai-sheet__body">
-              {comments.length === 0 ? (
+              {/* Wait for the full thread to land before painting any
+                  comments — otherwise the SSR preview (1 comment)
+                  flashes for ~200-400ms and then the full 50 pop in
+                  underneath, which the user reads as "comments not
+                  loading all in one shot". A loading spinner during
+                  the fetch keeps the UX feeling intentional, and
+                  every comment appears together when the data is
+                  ready. The SSR preview is still useful as the inline
+                  row under each feed post — it just shouldn't drive
+                  this sheet's first paint. */}
+              {!commentsLoaded ? (
+                <div className="flex justify-center py-10">
+                  <HaiSpinner />
+                </div>
+              ) : comments.length === 0 ? (
                 <p className="hai-empty-state">{t('post_no_comments')}</p>
               ) : (
                 comments.map((c: any) => (
