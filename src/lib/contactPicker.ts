@@ -107,29 +107,40 @@ export async function pickContact(): Promise<PickedContact> {
     // READ_CONTACTS declared in AndroidManifest, <queries> for the
     // PICK intent in the manifest as well — see commit bf10774).
     //
-    // We MUST explicitly request READ_CONTACTS BEFORE calling
-    // pickContact(). Why: the plugin's pickContact() (see
-    // ContactsPlugin.java:208) silently calls requestContactsPermission()
-    // and exits when the permission isn't granted yet — it does NOT
-    // launch the picker after the user grants. So the first tap on a
-    // fresh install: user sees the permission dialog, allows, and the
-    // picker never opens; they have to tap again. By calling
-    // requestPermissions() first and only proceeding once granted, we
-    // bypass that silent path entirely. (The OS picker is technically
-    // privacy-preserving and could work without the runtime grant, but
-    // this plugin's implementation requires the grant.)
+    // The plugin's pickContact() handles the permission flow itself:
+    // if READ_CONTACTS isn't granted yet, it triggers the system
+    // dialog and re-enters pickContact via permissionCallback once
+    // granted. So calling pickContact() directly is the correct path
+    // for the FIRST run on a fresh install. We only need to handle
+    // the HARD-DENIED state explicitly — Android stops showing the
+    // permission dialog after a previous deny + "Don't ask again",
+    // which means requestPermissions() returns 'denied' without
+    // surfacing anything to the user. They keep tapping Attach
+    // Contact, the picker never opens, and we silently fall through
+    // to the manual name+phone prompt — exactly what's been
+    // happening. Detecting that state and surfacing a toast pointing
+    // to Settings is the only way the user can recover.
     try {
       const { Contacts } = await import('@capacitor-community/contacts')
       const status = await Contacts.checkPermissions().catch(() => null)
-      let granted = status?.contacts === 'granted'
-      if (!granted) {
-        const req = await Contacts.requestPermissions().catch(() => null)
-        granted = req?.contacts === 'granted'
+      console.log('[contactPicker] android checkPermissions:', status)
+      if (status?.contacts === 'denied') {
+        // Hard-denied: requestPermissions() will not re-prompt.
+        // Surface a toast so the user knows where to fix it.
+        try {
+          const { default: toast } = await import('react-hot-toast')
+          toast.error(
+            'الإذن مرفوض — فعّل جهات الاتصال من إعدادات الجهاز',
+            { duration: 5000 },
+          )
+        } catch { /* toast unavailable */ }
+        return null
       }
-      if (!granted) return null
+      // 'prompt' or 'granted' — pickContact() will request if needed.
       const result = await Contacts.pickContact({
         projection: { name: true, phones: true },
       })
+      console.log('[contactPicker] android pickContact result:', result)
       const contact = (result as any)?.contact
       if (!contact) return null
       const display =
@@ -139,10 +150,24 @@ export async function pickContact(): Promise<PickedContact> {
       let phone = pickBestPhone(contact.phones)
       if (!phone) phone = pickBestPhone((contact as any).phoneNumbers)
       if (!phone) phone = pickBestPhone(contact)
+      console.log('[contactPicker] android picked:', { display, phone })
       if (!phone && !display) return null
       return { name: display, phone }
     } catch (err) {
       console.warn('[contactPicker] android pickContact failed:', err)
+      // The plugin throws "Permission is required to access contacts."
+      // when the user dismisses the permission dialog (denies). Surface
+      // a toast so they know the picker isn't broken — it's a perm issue.
+      const msg = (err as any)?.message || String(err)
+      if (/permission/i.test(msg)) {
+        try {
+          const { default: toast } = await import('react-hot-toast')
+          toast.error(
+            'الإذن مرفوض — فعّل جهات الاتصال من إعدادات الجهاز',
+            { duration: 5000 },
+          )
+        } catch { /* toast unavailable */ }
+      }
       return null
     }
   }
