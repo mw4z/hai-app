@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { FiX, FiStar, FiHeart, FiMessageSquare, FiClock } from 'react-icons/fi'
 import type { TranslationKey } from '@/lib/i18n'
 
@@ -64,6 +65,10 @@ interface Props {
 export default function HighlightsSection({ items, autoOpenForFirstTime = true }: Props) {
   const { t, lang } = useLanguage()
   const [open, setOpen] = useState(false)
+
+  // Lock feed scroll while the modal is open — same hook every other
+  // sheet uses so the backdrop never bleeds touch into the page below.
+  useBodyScrollLock(open)
 
   useEffect(() => {
     if (!autoOpenForFirstTime) return
