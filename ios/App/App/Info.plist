@@ -55,7 +55,11 @@
 	<string>Allow Hai to access your photo library so you can pick images for your profile, posts, and chat messages</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Allow Hai to save images to your photo library</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Allow Hai to use the microphone for video recordings</string>
+	<!-- NSMicrophoneUsageDescription removed 2026-04-29: Hai does not
+	     record audio anywhere. Just declaring the key made iOS treat
+	     the app as a mic-capable client, which on some iOS versions
+	     escalates the WKWebView audio session to `.playAndRecord` —
+	     causing system sounds and other apps' notifications to play
+	     with a noticeable echo while Hai is in the foreground. -->
 </dict>
 </plist>

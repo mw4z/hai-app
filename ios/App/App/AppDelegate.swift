@@ -1,4 +1,5 @@
 import UIKit
+import AVFoundation
 import Capacitor
 
 @UIApplicationMain
@@ -7,7 +8,30 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Pin AVAudioSession to `.ambient`. iOS WKWebView otherwise
+        // defaults the session to `.playAndRecord` for apps that
+        // declare any media capability — even when the app never
+        // records. That category routes ALL audio (including other
+        // apps' notifications, incoming calls, etc.) through the
+        // shared audio engine with acoustic echo cancellation
+        // applied, which the user hears as "weird echoey" system
+        // sounds while Hai is in the foreground. `.ambient`
+        // explicitly says: play our UI sounds mixed with everyone
+        // else, never silence or process other apps' audio.
+        // mixWithOthers in options is implied by `.ambient` but set
+        // explicitly so a future iOS revision can't quietly change
+        // the default.
+        do {
+            try AVAudioSession.sharedInstance().setCategory(
+                .ambient,
+                mode: .default,
+                options: [.mixWithOthers]
+            )
+            try AVAudioSession.sharedInstance().setActive(true, options: [])
+        } catch {
+            // Non-fatal — UI sounds still play, the session just
+            // stays at whatever WKWebView's default is.
+        }
         return true
     }
 
