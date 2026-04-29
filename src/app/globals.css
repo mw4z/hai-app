@@ -573,6 +573,17 @@ html.dark::before {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
+/* Freeze the inner shell scroll while a sheet/modal is open.
+   useBodyScrollLock locks document scroll via html.overflow:hidden,
+   but the shell's overflow-y:auto is INDEPENDENT — without this
+   rule, the user could still pan the feed/market/threads list
+   underneath an open sheet, and the header / footer would visibly
+   shift along with that pan. The body class is added/removed by
+   the lock hook for the same lifetime as the document lock. */
+body.hai-scroll-locked .hai-app-shell__scroll {
+  overflow: hidden !important;
+  touch-action: none !important;
+}
 
 /* Hide scrollbar on mobile — users scroll by touch. On desktop
    (min-width 768px) show a thin custom scrollbar. */

@@ -48,6 +48,13 @@ function applyLock() {
   // that would otherwise pan the page even when document scroll is
   // disabled.
   body.style.touchAction = 'none'
+  // Tag body so CSS rules can reach into the inner shell scroll
+  // container (.hai-app-shell__scroll, which is INDEPENDENT of
+  // document scroll on the screens that use the shell) and freeze
+  // it too. Without this, sheets that open over a feed/market/
+  // threads screen would not lock the inner list — user could keep
+  // scrolling the page under the sheet.
+  body.classList.add('hai-scroll-locked')
   // CRITICAL: do NOT also set `body.style.overflow = 'hidden'`.
   // That makes <body> a scroll container in WebKit's eyes, and
   // every `position: sticky` descendant inside body switches its
@@ -70,6 +77,7 @@ function releaseLock() {
   const body = document.body
   html.style.overflow = prev.htmlOverflow
   body.style.touchAction = prev.bodyTouchAction
+  body.classList.remove('hai-scroll-locked')
   prev = null
 }
 
