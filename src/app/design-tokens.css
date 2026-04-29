@@ -925,7 +925,19 @@ textarea.hai-input {
 .hai-min-w-0   { min-width: 0; }
 .hai-flex-wrap { flex-wrap: wrap; }
 .hai-overflow-auto   { overflow-y: auto; overscroll-behavior: contain; }
-.hai-overflow-x-auto { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* Horizontal scroller (chip strip / tab strip).
+   touch-action: pan-x explicitly tells the browser this element
+   handles horizontal panning so it doesn't fight competing gesture
+   handlers (PullToRefresh, document-level touchmove listeners on
+   iOS WebView). Without this, sliding through the filter chips on
+   /feed could feel "sticky" — the page-scroll heuristic claims the
+   gesture before the chip strip's overflow-x kicks in. */
+.hai-overflow-x-auto {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
+}
 .hai-overflow-x-auto::-webkit-scrollbar { display: none; }
 .hai-w-full    { width: 100%; }
 .hai-max-xs    { max-width: 320px; }
