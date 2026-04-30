@@ -142,6 +142,15 @@ const LOCATION_RE = /📍\s*(?:(.+?)\s*\n)?(https?:\/\/(?:www\.)?(?:google\.com\
 // that's almost never part of a real URL.
 const URL_RE = /https?:\/\/[^\s)]+[^\s).,;!?]/g
 
+// Bare phone numbers — recognises in priority order:
+//   1. Saudi mobile international:  +9665XXXXXXXX  or  009665XXXXXXXX
+//   2. Saudi mobile local:          05XXXXXXXX
+//   3. Generic international:       +<cc> <8–14 digits>
+// Each option is wrapped with non-word-char boundaries (lookbehind /
+// lookahead) so we don't grab digits out of the middle of an order
+// number, year, or coordinate.
+const PHONE_RE = /(?<![\w+])(?:(?:\+|00)966[\s-]?5\d(?:[\s-]?\d){7}|0[\s-]?5\d(?:[\s-]?\d){7}|\+\d{1,3}(?:[\s-]?\d){7,12})(?!\w)/g
+
 // Recognised maps domains. Includes the short-link redirector domains
 // — even though they don't carry coords in the URL, the user still
 // pasted a "maps link" and deserves a tappable location chip rather
@@ -242,7 +251,20 @@ export function parseMessageSegments(text: string): MessageSegment[] {
         })
       : [seg],
   )
-  return pass3.map((seg): MessageSegment =>
+  // Pass 4: bare phone numbers in remaining text. Emits the same
+  // `contact` segment shape the 📱 snippet pass uses, with no name —
+  // ContactChip renders a Call / Copy / WhatsApp card sized to fit
+  // the number alone.
+  const pass4: Array<string | AnyParsed> = pass3.flatMap((seg) =>
+    typeof seg === 'string'
+      ? scan(seg, PHONE_RE, (m): AnyParsed => ({
+          kind: 'contact',
+          name: '',
+          phone: m[0].trim(),
+        }))
+      : [seg],
+  )
+  return pass4.map((seg): MessageSegment =>
     typeof seg === 'string' ? { kind: 'text', text: seg } : seg,
   )
 }
