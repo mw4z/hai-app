@@ -56,9 +56,21 @@ export default async function MarketPage({
   const session = await getSession()
   if (!session) redirect('/login')
 
+  // Slim select — only fields the page renders + PostCard needs.
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    include: { neighborhood: { include: { city: true } } },
+    select: {
+      id: true,
+      phone: true,
+      role: true,
+      neighborhoodId: true,
+      neighborhood: {
+        select: {
+          name: true,
+          city: { select: { name: true } },
+        },
+      },
+    },
   })
   if (!user?.neighborhoodId) redirect('/onboarding')
 
@@ -84,7 +96,10 @@ export default async function MarketPage({
       break
   }
 
-  const posts = await cached(`market:${user.neighborhoodId}:${tab}`, 30_000, () =>
+  // 60s cache (was 30s) — same tradeoff as feed: PostCard's poll
+  // catches author/engagement edits; market is offer-only so freshness
+  // is less critical than feed.
+  const posts = await cached(`market:${user.neighborhoodId}:${tab}`, 60_000, () =>
     db.post.findMany({
       where: {
         neighborhoodId: user.neighborhoodId!,

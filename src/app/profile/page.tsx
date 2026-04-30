@@ -8,17 +8,21 @@ export default async function ProfilePage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  const user = await db.user.findUnique({
-    where: { id: session.userId },
-    include: { neighborhood: { include: { city: true } } },
-  })
+  // Parallelize the user fetch and the post-count cache lookup.
+  // postCount keys off session.userId so it doesn't need user to
+  // resolve first. Saves one DB roundtrip per profile open.
+  const [user, postCount] = await Promise.all([
+    db.user.findUnique({
+      where: { id: session.userId },
+      include: { neighborhood: { include: { city: true } } },
+    }),
+    cached(`postcount:${session.userId}`, 60_000, () =>
+      db.post.count({
+        where: { authorId: session.userId, status: 'ACTIVE' },
+      })
+    ),
+  ])
   if (!user) redirect('/login')
-
-  const postCount = await cached(`postcount:${user.id}`, 60_000, () =>
-    db.post.count({
-      where: { authorId: user.id, status: 'ACTIVE' },
-    })
-  )
 
   return (
     <ProfileClient

@@ -26,9 +26,28 @@ export default async function FeedPage({
 
   // Always fetch fresh — caching here caused an onboarding loop on Vercel
   // when a stale row with neighborhoodId=null survived across instances.
+  // Slim select: only fields the FeedClient renders. The previous
+  // include-everything query pulled bio / service* / socialLinks /
+  // tokens / etc. on every request and added 50–100ms over the wire.
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    include: { neighborhood: { include: { city: true } } },
+    select: {
+      id: true,
+      name: true,
+      lastName: true,
+      gender: true,
+      phone: true,
+      role: true,
+      neighborhoodId: true,
+      addressVerified: true,
+      neighborhood: {
+        select: {
+          name: true,
+          nameEn: true,
+          city: { select: { name: true, nameEn: true } },
+        },
+      },
+    },
   })
 
   if (!user?.neighborhoodId) redirect('/onboarding')
@@ -60,10 +79,14 @@ export default async function FeedPage({
     categoryFilter = {}
   }
 
-  // Run all DB queries in parallel
-  const [posts, unreadNotifCount, browseNeighborhood, bookmarkedIds, followedIds] = await Promise.all([
-    // Posts — cache 30s per neighborhood+category combo
-    cached(`feed:${activeNeighborhoodId}:${category}:${isFemale}`, 30_000, () =>
+  // Run all DB queries in parallel — including highlights, which used
+  // to run sequentially after the batch and added a full DB roundtrip
+  // (~150ms) to every feed render.
+  const [posts, unreadNotifCount, browseNeighborhood, bookmarkedIds, followedIds, highlightsBundle] = await Promise.all([
+    // Posts — cache 60s per neighborhood+category combo (was 30s).
+    // Doubling the TTL halves the per-feed DB load with no user-visible
+    // change in freshness for posts (PostCard's poll catches edits).
+    cached(`feed:${activeNeighborhoodId}:${category}:${isFemale}`, 60_000, () =>
       db.post.findMany({
         where: {
           neighborhoodId: activeNeighborhoodId,
@@ -71,7 +94,18 @@ export default async function FeedPage({
           ...categoryFilter,
         },
         include: {
-          author: { select: { id: true, name: true, lastName: true, reputation: true, accountType: true, providerStatus: true, role: true, avatarUrl: true, coverUrl: true, gender: true, showGender: true, createdAt: true, bio: true, serviceDescription: true, serviceAddress: true, serviceLat: true, serviceLng: true, socialLinks: true, neighborhood: { select: { name: true, nameEn: true } }, _count: { select: { posts: true } } } },
+          // Slimmed author select — bio / service* / socialLinks were
+          // never read by PostCard's feed view; they belong on the
+          // author profile sheet which fetches its own user row.
+          author: {
+            select: {
+              id: true, name: true, lastName: true,
+              reputation: true, accountType: true, providerStatus: true,
+              role: true, avatarUrl: true, gender: true, showGender: true,
+              createdAt: true,
+              neighborhood: { select: { name: true, nameEn: true } },
+            },
+          },
           reactions: { select: { emoji: true, userId: true } },
           _count: { select: { comments: true, reactions: true } },
           // Preview comment — most-liked root comment, shipped with the
@@ -104,8 +138,8 @@ export default async function FeedPage({
         take: 20,
       })
     ),
-    // Unread notifications — cache 30s
-    cached(`notif:${session.userId}`, 30_000, () =>
+    // Unread notifications — cache 60s (was 30s).
+    cached(`notif:${session.userId}`, 60_000, () =>
       db.notification.count({
         where: { userId: session.userId, read: false },
       })
@@ -119,22 +153,25 @@ export default async function FeedPage({
           })
         )
       : null,
-    // User's bookmarked post IDs
-    cached(`bookmarks:${session.userId}`, 60_000, () =>
+    // Bookmarks — cache 5 min (was 1 min). User's own bookmarks rarely
+    // change between feed renders; their PostCard updates optimistically.
+    cached(`bookmarks:${session.userId}`, 300_000, () =>
       db.bookmark.findMany({
         where: { userId: session.userId },
         select: { postId: true },
       }).then(b => b.map(x => x.postId))
     ),
-    // Post IDs the user has subscribed to — drives the "Follow post"
-    // overflow-menu state so the button shows the right label on
-    // first paint instead of flashing from "Follow" to "Unfollow".
-    cached(`postsubs:${session.userId}`, 60_000, () =>
+    // Post subscriptions — cache 5 min (was 1 min). Same reasoning.
+    cached(`postsubs:${session.userId}`, 300_000, () =>
       db.postSubscription.findMany({
         where: { userId: session.userId },
         select: { postId: true },
       }).then(s => s.map(x => x.postId))
     ),
+    // Highlights bundle — was a sequential await after this batch;
+    // moved in so the whole page does ONE fan-out instead of two.
+    getHighlights(activeNeighborhoodId, user.gender as 'MALE' | 'FEMALE' | 'UNSPECIFIED' | null)
+      .catch(() => ({ items: [], generatedAt: new Date().toISOString() })),
   ])
 
   if (isReadOnly && !browseNeighborhood) redirect('/feed')
@@ -256,14 +293,6 @@ export default async function FeedPage({
     p.intent === 'REQUEST'
     && new Date(p.createdAt).getTime() >= sixHoursAgo,
   )
-
-  // Highlights bundle — SSR'd alongside the feed so the section can
-  // paint without a client roundtrip. Only meaningful on the user's own
-  // neighborhood (browseNeighborhoodId path falls through to ALL).
-  const highlightsBundle = await getHighlights(
-    activeNeighborhoodId,
-    user.gender as 'MALE' | 'FEMALE' | 'UNSPECIFIED' | null,
-  ).catch(() => ({ items: [], generatedAt: new Date().toISOString() }))
 
   return (
     <FeedClient

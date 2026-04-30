@@ -187,6 +187,17 @@ input, textarea, [contenteditable="true"] {
   .chat-bubble-in { animation: none; }
 }
 
+/* Bubble row gesture surface. touch-action: pan-y tells the WebView
+   that horizontal touches on a bubble are NOT browser-handled (we
+   own swipe-to-reply in JS), while vertical scroll on the messages
+   container is still allowed. Without this, the messages container
+   would scroll a few pixels vertically during the swipe deadzone
+   before our JS claimed the gesture — the "all bubbles nudge" feel
+   when starting a horizontal swipe. */
+[data-msg-row] {
+  touch-action: pan-y;
+}
+
 /* Long-press focus mode — when the user holds a bubble, the action
    sheet opens. Blur every other bubble so the eye locks onto the
    selected one (iMessage / WhatsApp). The selected row keeps full

@@ -8,38 +8,39 @@ export default async function ThreadsPage() {
   const session = await getSession()
   if (!session) redirect('/login')
 
-  // Mark message notifications as read when user opens threads.
-  // Previously was fire-and-forget — reverted because un-awaited
-  // promises in a Vercel Function can produce orphaned writes that
-  // never land before the function recycles, leaving the bell
-  // counter stuck.
-  await db.notification.updateMany({
-    where: { userId: session.userId, read: false, type: 'NEW_MESSAGE' },
-    data: { read: true },
-  })
-
-  // Only show active threads
-  const threads = await cached(`threads:${session.userId}`, 15_000, () =>
-    db.thread.findMany({
-      where: {
-        status: 'ACTIVE',
-        OR: [{ user1Id: session.userId }, { user2Id: session.userId }],
-      },
-      include: {
-        user1: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true } },
-        user2: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true } },
-        messages: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: {
-            text: true, type: true, createdAt: true, senderId: true,
-            deliveredAt: true, readAt: true,
+  // Run the "mark NEW_MESSAGE notifications read" write in parallel
+  // with the threads read. The notification update doesn't gate the
+  // page render — both queries can complete independently. Awaited
+  // (not fire-and-forget) so the function doesn't recycle before the
+  // write commits, but parallelized so the slower of the two is the
+  // page's effective latency, not their sum.
+  const [, threads] = await Promise.all([
+    db.notification.updateMany({
+      where: { userId: session.userId, read: false, type: 'NEW_MESSAGE' },
+      data: { read: true },
+    }),
+    cached(`threads:${session.userId}`, 15_000, () =>
+      db.thread.findMany({
+        where: {
+          status: 'ACTIVE',
+          OR: [{ user1Id: session.userId }, { user2Id: session.userId }],
+        },
+        include: {
+          user1: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true } },
+          user2: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true } },
+          messages: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: {
+              text: true, type: true, createdAt: true, senderId: true,
+              deliveredAt: true, readAt: true,
+            },
           },
         },
-      },
-      orderBy: { updatedAt: 'desc' },
-    })
-  )
+        orderBy: { updatedAt: 'desc' },
+      })
+    ),
+  ])
 
   // Look up related post titles for context
   const postIds = threads.map(t => t.postId).filter(Boolean) as string[]
