@@ -100,7 +100,40 @@ export default function CapacitorBridge() {
     })
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
 
-    return () => observer.disconnect()
+    // Re-apply theme when the app comes back to the foreground.
+    //
+    // Why: on iPadOS WKWebView the `prefers-color-scheme` matchMedia
+    // `change` event does NOT fire reliably when the user toggles
+    // iPadOS Appearance while the app is backgrounded — the WebView
+    // caches the value at creation time. Result: the user reports
+    // "dark mode not supported on iPad". Listening to App's
+    // appStateChange and re-evaluating the theme on resume is the
+    // canonical fix; it also covers iPhone and Android for free.
+    let appListenerHandle: { remove: () => void } | null = null
+    ;(async () => {
+      try {
+        const { App } = await import('@capacitor/app')
+        appListenerHandle = await App.addListener('appStateChange', ({ isActive }: { isActive: boolean }) => {
+          if (!isActive) return
+          // Re-read the theme cookie/localStorage AND the live
+          // matchMedia, so a user who's on "system" picks up an iPadOS
+          // appearance change made while we were backgrounded.
+          let th = readThemeCookie()
+          if (!th) {
+            try { th = localStorage.getItem('hai_theme') } catch {}
+          }
+          if (!th) th = 'system'
+          const isDarkNow = th === 'dark' ||
+            (th === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          document.documentElement.classList.toggle('dark', isDarkNow)
+        })
+      } catch { /* @capacitor/app not available — no-op on web */ }
+    })()
+
+    return () => {
+      observer.disconnect()
+      try { appListenerHandle?.remove() } catch {}
+    }
   }, [])
 
   return null
