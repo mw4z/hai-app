@@ -1546,8 +1546,18 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
   const longPress = useLongPress(onLongPress, onDoubleTap, 400)
   const rowRef = useRef<HTMLDivElement>(null)
   const bubbleRef = useRef<HTMLDivElement>(null)
-  const swipeRef = useRef<{ startX: number; dx: number; active: boolean } | null>(null)
-  const REPLY_THRESHOLD = 50
+  const swipeRef = useRef<{ startX: number; startY: number; dx: number; active: boolean; cancelled: boolean } | null>(null)
+  // Sensitivity tuned for fewer accidental triggers:
+  //   - 18px deadzone before we claim the gesture (was 8) — short
+  //     drifts during a vertical scroll don't get hijacked.
+  //   - 90px commit threshold (was 50) — user must clearly intend it.
+  //   - 120px clamp ceiling (was 80) so the bubble can still travel
+  //     past the threshold for haptic feedback.
+  //   - Vertical-drift cancel: if |dy| exceeds |dx| while still in
+  //     the deadzone, bail and let the page scroll.
+  const REPLY_DEADZONE = 18
+  const REPLY_THRESHOLD = 90
+  const REPLY_CLAMP = 120
 
   // Swipe-to-reply gesture — the touch listener lives on the row so
   // the user can start the swipe from anywhere in the message area,
@@ -1560,20 +1570,32 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
 
     function onTouchStart(e: TouchEvent) {
       if (e.touches.length !== 1) return
-      swipeRef.current = { startX: e.touches[0].clientX, dx: 0, active: false }
+      swipeRef.current = {
+        startX: e.touches[0].clientX,
+        startY: e.touches[0].clientY,
+        dx: 0,
+        active: false,
+        cancelled: false,
+      }
     }
     function onTouchMove(e: TouchEvent) {
       const s = swipeRef.current
-      if (!s || e.touches.length !== 1) return
+      if (!s || s.cancelled || e.touches.length !== 1) return
       const dx = e.touches[0].clientX - s.startX
-      // Swipe in reading direction: right in LTR, left in RTL.
+      const dy = e.touches[0].clientY - s.startY
       const isRTL = document.documentElement.getAttribute('dir') === 'rtl'
       const progress = isRTL ? -dx : dx
       if (progress < 0) { s.dx = 0; return }
-      if (progress > 8 && !s.active) { s.active = true }
+      // Vertical-drift bailout — if the user is mostly scrolling, give
+      // up on the swipe and never re-claim it for this gesture.
+      if (!s.active && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 6) {
+        s.cancelled = true
+        return
+      }
+      if (progress > REPLY_DEADZONE && !s.active) { s.active = true }
       if (!s.active) return
       e.preventDefault()
-      const clamped = Math.min(progress, 80)
+      const clamped = Math.min(progress, REPLY_CLAMP)
       s.dx = clamped
       const translate = isRTL ? -clamped : clamped
       const bubble = bubbleRef.current
