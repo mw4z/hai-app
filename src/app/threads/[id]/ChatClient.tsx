@@ -1585,13 +1585,30 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
       const dy = e.touches[0].clientY - s.startY
       const isRTL = document.documentElement.getAttribute('dir') === 'rtl'
       const progress = isRTL ? -dx : dx
-      if (progress < 0) { s.dx = 0; return }
-      // Vertical-drift bailout — if the user is mostly scrolling, give
-      // up on the swipe and never re-claim it for this gesture.
-      if (!s.active && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 6) {
-        s.cancelled = true
-        return
+
+      // Direction lock — decide on the FIRST few pixels whether this
+      // is a horizontal swipe or a vertical scroll. Locking early
+      // matters: without preventDefault, the messages container
+      // scrolls vertically during the deadzone (the "all bubbles
+      // nudge a bit" symptom). pan-y only blocks horizontal native
+      // pan; vertical leakage during a horizontal gesture has to be
+      // suppressed manually.
+      if (!s.active && !s.cancelled) {
+        const ax = Math.abs(dx)
+        const ay = Math.abs(dy)
+        if (ay > ax && ay > 6) {
+          // Vertical-dominant — the page should scroll. Bail.
+          s.cancelled = true
+          return
+        }
+        if (progress > 4 && ax > ay) {
+          // Horizontal-dominant — claim the gesture from this frame
+          // onwards so vertical drift doesn't pan the container.
+          e.preventDefault()
+        }
       }
+
+      if (progress < 0) { s.dx = 0; return }
       if (progress > REPLY_DEADZONE && !s.active) { s.active = true }
       if (!s.active) return
       e.preventDefault()
