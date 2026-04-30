@@ -865,7 +865,16 @@ textarea.hai-input {
 .hai-screen {
   display: flex;
   flex-direction: column;
-  padding: var(--hai-space-6) var(--hai-space-6) 0;
+  /* Bottom padding respects the OS safe-area inset (Android gesture
+     bar / iOS home indicator) and never shrinks below var(--hai-space-6)
+     — so on devices without a system inset there's still breathing
+     room before the screen edge. Without this, the submit button on
+     register/login/verify could sit flush against the Android nav
+     bar's transparent zone and feel cramped. */
+  padding:
+    var(--hai-space-6)
+    var(--hai-space-6)
+    max(env(safe-area-inset-bottom, 0px), var(--hai-space-6));
   background: var(--hai-bg);
   min-height: calc(100dvh - env(safe-area-inset-top, 0px));
 }
