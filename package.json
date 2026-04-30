@@ -12,6 +12,7 @@
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
     "test:policy": "cross-env TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\",\"esModuleInterop\":true,\"jsx\":\"react\",\"target\":\"ES2020\",\"skipLibCheck\":true}' node --require ts-node/register --test src/lib/display-policy.test.ts",
+    "test:classify": "cross-env TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\",\"esModuleInterop\":true,\"jsx\":\"react\",\"target\":\"ES2020\",\"skipLibCheck\":true}' node --require ts-node/register --test src/lib/posts/classify.test.ts",
     "lint:state-badges": "node scripts/lint-state-badges.mjs"
   },
   "dependencies": {

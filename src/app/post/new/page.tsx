@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiArrowRight, FiArrowLeft, FiSend } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import type { TranslationKey } from '@/lib/i18n'
 import { useNetworkStatus } from '@/lib/network'
 import { translateApiError } from '@/lib/apiError'
 import RiyalIcon from '@/components/RiyalIcon'
@@ -189,7 +190,7 @@ export default function NewPostPage() {
   // SUPER_ADMIN deep-link target: /post/new?neighborhood=<id> pre-selects
   // that neighborhood in the picker once the list has loaded.
   const initialNeighborhoodParam = searchParams?.get('neighborhood') || ''
-  const { lang } = useLanguage()
+  const { lang, t } = useLanguage()
   const [step, setStep] = useState<'category' | 'content'>('category')
   const [category, setCategory] = useState('')
   // Marketplace listing subtype — only meaningful when category=MARKETPLACE.
@@ -452,29 +453,56 @@ export default function NewPostPage() {
       const imageUrls = await uploadImages()
       if (imageUrls === null) { setLoading(false); return }
 
-      // The composer always sends a v2 PostCategory enum value. The
-      // /api/posts route detects v2 vs legacy and runs both through
-      // classifyPost — never duplicate the mapping logic here.
-      const res = await fetch('/api/posts', {
+      // Submit with overridable category/marketplaceType so we can
+      // resubmit with the classifier's suggestion if the user accepts.
+      const submit = async (
+        useCategory: string,
+        useMarketplaceType: 'SELL' | 'BUY' | 'JOB',
+      ) => fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
           body,
-          category,
+          category: useCategory,
           price: price ? parseFloat(price) : null,
           imageUrls,
           locationLat: location?.lat || null,
           locationLng: location?.lng || null,
           locationName: location?.name || null,
-          ...(category === 'MARKETPLACE' ? { marketplaceType } : {}),
+          ...(useCategory === 'MARKETPLACE' ? { marketplaceType: useMarketplaceType } : {}),
           ...(isSuperAdmin && targetNeighborhoodId && targetNeighborhoodId !== ownNeighborhoodId
             ? { neighborhoodId: targetNeighborhoodId }
             : {}),
         }),
       })
 
-      const data = await res.json()
+      let res = await submit(category, marketplaceType)
+      let data = await res.json()
+
+      // category_mismatch — the classifier flagged it. Ask the user
+      // to accept the suggestion; if they confirm, resubmit.
+      if (!res.ok && data?.error === 'category_mismatch' && data?.suggestedCategory) {
+        const suggested = String(data.suggestedCategory)
+        const suggestedMt = (data.suggestedMarketplaceType as 'SELL' | 'BUY' | 'JOB' | undefined) ?? 'SELL'
+        const labelKey = `post_v2_${suggested}` as TranslationKey
+        const suggestedLabel = (() => { try { return t(labelKey) } catch { return suggested } })()
+        const proceed = window.confirm(
+          lang === 'en'
+            ? `This post seems to fit "${suggestedLabel}" better. Continue with that category?`
+            : `يبدو أن المنشور أنسب لقسم "${suggestedLabel}". هل تريد المتابعة بهذا القسم؟`,
+        )
+        if (proceed) {
+          setCategory(suggested)
+          if (suggested === 'MARKETPLACE') setMarketplaceType(suggestedMt)
+          res = await submit(suggested, suggestedMt)
+          data = await res.json()
+        } else {
+          // User declined — let them edit the post.
+          setLoading(false)
+          return
+        }
+      }
 
       if (!res.ok) {
         playError()
@@ -485,7 +513,21 @@ export default function NewPostPage() {
       }
 
       playSuccess()
-      toast.success('تم نشر منشورك!')
+
+      // Auto-correct toast — the server silently moved the post.
+      if (data?.autoCorrected?.category) {
+        const movedKey = `post_v2_${data.autoCorrected.category}` as TranslationKey
+        const movedLabel = (() => { try { return t(movedKey) } catch { return String(data.autoCorrected.category) } })()
+        toast.success(
+          lang === 'en'
+            ? `Moved to the better-fit section: ${movedLabel}`
+            : `نقلنا المنشور إلى القسم الأنسب: ${movedLabel}`,
+          { duration: 3500 },
+        )
+      } else {
+        toast.success(lang === 'en' ? 'Posted!' : 'تم نشر منشورك!')
+      }
+
       clearDraft()
       sessionStorage.setItem('hai_feed_refresh', '1')
       router.push('/feed')

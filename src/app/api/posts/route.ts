@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { classifyPost } from '@/lib/posts/classifyPost'
+import { classifyPostCategory } from '@/lib/posts/classify'
 import { getSession } from '@/lib/auth'
 import { notifyNeighborhood } from '@/lib/notifications'
 import { validateContent, normalizeForComparison, isSimilar, apiError } from '@/lib/validation'
@@ -56,7 +57,6 @@ export async function POST(req: NextRequest) {
     const {
       title,
       body,
-      category,
       price,
       imageUrls,
       locationLat,
@@ -64,6 +64,9 @@ export async function POST(req: NextRequest) {
       locationName,
       neighborhoodId: requestedNeighborhoodId,
     } = reqBody
+    // `category` is `let` because the server-side classifier may
+    // AUTO_CORRECT it after content analysis below.
+    let category: string = reqBody.category
     // v2 optional fields — Ask flow sends `intent: 'REQUEST'`. Audience
     // and priority are reserved for future selectors; today they're only
     // populated server-side via classifyPost defaults.
@@ -156,6 +159,50 @@ export async function POST(req: NextRequest) {
     if (titleErr) return NextResponse.json(apiError(titleErr, 400), { status: 400 })
     const bodyErr = validateContent(body, 'body')
     if (bodyErr) return NextResponse.json(apiError(bodyErr, 400), { status: 400 })
+
+    // ── Server-side category normalization ────────────────────────────
+    // Trust nothing the client sent for category routing — analyze
+    // title+body and either ALLOW, AUTO_CORRECT (silently move),
+    // or REJECT_WITH_SUGGESTION (ask the user to confirm).
+    // SUPER_ADMIN bypasses (they often post broadcasts that don't fit
+    // any keyword shape).
+    let classifyAction: 'ALLOW' | 'AUTO_CORRECT' | 'REJECT_WITH_SUGGESTION' = 'ALLOW'
+    let classifyReason = ''
+    if (!bypass) {
+      const cls = classifyPostCategory({
+        title: title.trim(),
+        body: body.trim(),
+        selectedCategory: category as PostCategory,
+        selectedIntent: intent,
+        selectedMarketplaceType: marketplaceType,
+      })
+      classifyAction = cls.action
+      classifyReason = cls.reason
+
+      if (cls.action === 'REJECT_WITH_SUGGESTION') {
+        return NextResponse.json(
+          {
+            error: 'category_mismatch',
+            suggestedCategory: cls.suggestedCategory ?? cls.finalCategory,
+            suggestedIntent: cls.finalIntent,
+            suggestedMarketplaceType: cls.finalMarketplaceType,
+            confidence: cls.confidence,
+            message: 'يبدو أن المنشور أنسب لقسم آخر. أكّد القسم المقترح للمتابعة.',
+          },
+          { status: 400 },
+        )
+      }
+
+      if (cls.action === 'AUTO_CORRECT') {
+        // Replace the user-selected category + marketplaceType with
+        // the classifier's call. The downstream code reads from these
+        // same variable names — so the rest of the handler is unaware
+        // of the swap. classifyPost(...) below picks up `category` and
+        // resolves intent/priority from there.
+        category = cls.finalCategory
+        marketplaceType = cls.finalMarketplaceType
+      }
+    }
 
     // ── Anti-spam guards specific to JOB subtype ──────────────────────
     // JOB posts are the highest-spam vector in Saudi-region community
@@ -407,7 +454,19 @@ export async function POST(req: NextRequest) {
     // Invalidate feed cache for this neighborhood
     cacheDeletePrefix(`feed:${targetNeighborhoodId}`)
 
-    return NextResponse.json({ success: true, postId: post.id })
+    return NextResponse.json({
+      success: true,
+      postId: post.id,
+      // When the classifier silently moved the post, tell the client
+      // so the UI can show a "moved to {category}" toast.
+      ...(classifyAction === 'AUTO_CORRECT' && {
+        autoCorrected: {
+          category: c.category,
+          marketplaceType,
+          reason: classifyReason,
+        },
+      }),
+    })
   } catch (error) {
     console.error('[ERROR] create post:', error)
     return NextResponse.json(apiError('خطأ في الخادم', 500), { status: 500 })
