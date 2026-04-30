@@ -279,8 +279,30 @@ export default function ProfileClient({ user, postCount }: Props) {
   }
 
   async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    // 1. Server-side cookie clear. hai_token is httpOnly so it can
+    //    ONLY be invalidated via Set-Cookie from the server.
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    }).catch(() => { /* keep going — local wipe still matters */ })
+
+    // 2. Wipe Capacitor's WebView CookieManager directly. On Android,
+    //    the WebView keeps a separate cookie jar that doesn't always
+    //    honor the Set-Cookie clear from step 1 when the app is force-
+    //    closed and reopened — the user reported staying signed-in.
+    //    No-op on the web build (plugin proxies to document.cookie).
+    try {
+      const { CapacitorCookies } = await import('@capacitor/core')
+      await CapacitorCookies?.clearAllCookies?.()
+    } catch { /* not on Capacitor or older version */ }
+
+    // 3. Wipe storages — clears any cached user-id / preset / language
+    //    state so the next login starts clean.
     try { localStorage.clear() } catch {}
+    try { sessionStorage.clear() } catch {}
+
+    // 4. Hard reload to /. Bypasses the router cache so no SSR'd
+    //    /feed page (rendered while still authed) lingers in memory.
     window.location.href = '/'
   }
 
@@ -1920,7 +1942,11 @@ export default function ProfileClient({ user, postCount }: Props) {
                       try {
                         const res = await fetch('/api/account/delete', { method: 'DELETE' })
                         if (res.ok) {
-                          await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+                          await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
+                          try {
+                            const { CapacitorCookies } = await import('@capacitor/core')
+                            await CapacitorCookies?.clearAllCookies?.()
+                          } catch { /* not on Capacitor */ }
                           try { localStorage.clear() } catch {}
                           try { sessionStorage.clear() } catch {}
                           window.location.href = '/'
