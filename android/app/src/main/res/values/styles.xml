@@ -31,22 +31,27 @@
         <item name="android:windowLightStatusBar">true</item>
     </style>
 
-    <style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <!-- Plain coloured launch theme — NOT Theme.SplashScreen.
-             The Android 12+ system splash API forces a centred app
-             icon on top of the background, which read as an "intro
-             screen" before the real JS splash. iOS does not do
-             this — its LaunchScreen.storyboard just shows a solid
-             colour matching the JS splash bg and hands off cleanly.
-             We mirror that on Android: window background is the
-             splash colour (#e0f7f2 light / #000 dark via
-             values-night), no icon, no animated splash. The Capacitor
-             native splash is already disabled (launchShowDuration: 0
-             in capacitor.config.ts) so the user goes straight from
-             this coloured frame into AppSplash. -->
-        <item name="windowActionBar">false</item>
-        <item name="windowNoTitle">true</item>
-        <item name="android:windowBackground">@drawable/splash</item>
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <!-- Android 12+ uses the SplashScreen API regardless of what
+             parent theme we pick. The previous attempt to dodge it by
+             extending Theme.AppCompat.DayNight.NoActionBar still got
+             the system-default centered launcher icon on newer phones
+             — what the user reported as "large app icon intro before
+             the splash".
+             Now we OPT IN to Theme.SplashScreen and:
+               * paint the splash_bg the JS AppSplash also uses, so
+                 the handoff is seamless;
+               * supply a 1x1 transparent drawable as the animated
+                 icon — Android requires a drawable, but transparent
+                 means nothing visible;
+               * postSplashScreenTheme = AppTheme.NoActionBar so once
+                 the system splash dismisses we land directly on the
+                 normal app theme without a flash. -->
+        <item name="windowSplashScreenBackground">@color/splash_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_transparent_icon</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/splash_bg</item>
+        <item name="windowSplashScreenAnimationDuration">100</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
         <item name="android:statusBarColor">@color/splash_bg</item>
         <item name="android:navigationBarColor">@color/splash_bg</item>
         <item name="android:enforceNavigationBarContrast">false</item>

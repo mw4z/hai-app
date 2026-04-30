@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Transparent 1x1 placeholder used as the Android 12+ SplashScreen
+  windowSplashScreenAnimatedIcon. The OS's new splash API forces a
+  centered icon during cold start; supplying a transparent shape
+  effectively hides it, leaving only the splash background — which
+  matches the JS AppSplash that loads next, so the handoff is seamless.
+  Without this, Android falls back to the launcher icon on a colored
+  circle and the user sees a "large icon intro" before our real splash.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+    <size android:width="1dp" android:height="1dp" />
+</shape>

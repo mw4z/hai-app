@@ -23,13 +23,18 @@
         <item name="android:windowLightStatusBar">false</item>
     </style>
 
-    <style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <!-- Dark variant of the iOS-style plain launch theme. See
-             values/styles.xml for the rationale. Solid splash colour,
-             no centred icon, immediate handoff to AppSplash. -->
-        <item name="windowActionBar">false</item>
-        <item name="windowNoTitle">true</item>
-        <item name="android:windowBackground">@drawable/splash</item>
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <!-- Dark variant — uses the SplashScreen API with the same
+             transparent-icon trick as values/styles.xml so Android 12+
+             doesn't render its centered launcher icon. splash_bg in
+             dark mode is true black via values-night/colors.xml so the
+             handoff to AppSplash (which also paints black in dark) is
+             seamless. -->
+        <item name="windowSplashScreenBackground">@color/splash_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_transparent_icon</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/splash_bg</item>
+        <item name="windowSplashScreenAnimationDuration">100</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
         <item name="android:statusBarColor">@color/splash_bg</item>
         <item name="android:navigationBarColor">@color/splash_bg</item>
         <item name="android:enforceNavigationBarContrast">false</item>
