@@ -296,6 +296,9 @@ model Post {
   intent         PostIntent       @default(NORMAL)
   priority       PostPriority     @default(NORMAL)
   audience       PostAudience     @default(ALL)
+  // Subtype for category=MARKETPLACE only. Ignored otherwise. SELL is
+  // the default so every existing Marketplace row keeps its meaning.
+  marketplaceType MarketplaceType @default(SELL)
   status         PostStatus    @default(PENDING_AI)
   isPaid         Boolean       @default(false)
   isPinned       Boolean       @default(false)
@@ -363,6 +366,13 @@ enum PostAudience {
   ALL
   WOMEN       // was WOMEN_ONLY category
   MEN
+}
+
+// Marketplace listing subtype. Only meaningful when category=MARKETPLACE.
+enum MarketplaceType {
+  SELL  // default — selling an item / property
+  BUY   // looking to buy
+  JOB   // job opportunity (employer posting; not a job-seeker request)
 }
 
 enum CoordinationMode {

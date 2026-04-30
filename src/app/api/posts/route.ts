@@ -4,7 +4,7 @@ import { classifyPost } from '@/lib/posts/classifyPost'
 import { getSession } from '@/lib/auth'
 import { notifyNeighborhood } from '@/lib/notifications'
 import { validateContent, normalizeForComparison, isSimilar, apiError } from '@/lib/validation'
-import { PostCategory, PostIntent, PostPriority, PostAudience } from '@prisma/client'
+import { PostCategory, PostIntent, PostPriority, PostAudience, MarketplaceType } from '@prisma/client'
 import { getPostLimit } from '@/lib/reputation'
 import { getLimits } from '@/lib/capabilities'
 import { cacheDeletePrefix } from '@/lib/cache'
@@ -20,6 +20,14 @@ const VALID_CATEGORIES = Object.values(PostCategory)
 const VALID_INTENTS = ['OFFER', 'REQUEST', 'NORMAL'] as const
 const VALID_PRIORITIES = ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'] as const
 const VALID_AUDIENCES = ['ALL', 'WOMEN', 'MEN'] as const
+const VALID_MARKETPLACE_TYPES = ['SELL', 'BUY', 'JOB'] as const
+
+// Anti-spam knobs for JOB subtype
+const JOB_MIN_BODY_CHARS = 50
+const JOB_MAX_PER_DAY = 2
+// External-chat link pattern — WhatsApp groups / channels are the
+// dominant Saudi-region spam vector for "jobs". Block at write-time.
+const EXTERNAL_GROUP_LINK = /(?:chat\.whatsapp\.com|wa\.me\/[^\s]*\?|t\.me\/joinchat|t\.me\/\+)/i
 
 export async function POST(req: NextRequest) {
   try {
@@ -86,6 +94,26 @@ export async function POST(req: NextRequest) {
     ) {
       return NextResponse.json(apiError('تصنيف غير صالح', 400), { status: 400 })
     }
+
+    // Marketplace subtype — required when category=MARKETPLACE,
+    // ignored otherwise. Defaults to SELL on the way in if a legacy
+    // client doesn't send it (back-compat); JOB / BUY must be opt-in.
+    const marketplaceTypeInput = typeof reqBody.marketplaceType === 'string'
+      ? reqBody.marketplaceType
+      : undefined
+    let marketplaceType: MarketplaceType = 'SELL'
+    if (category === 'MARKETPLACE') {
+      if (!marketplaceTypeInput) {
+        return NextResponse.json(
+          apiError('نوع الإعلان مطلوب (بيع / شراء / فرصة عمل)', 400),
+          { status: 400 },
+        )
+      }
+      if (!(VALID_MARKETPLACE_TYPES as readonly string[]).includes(marketplaceTypeInput)) {
+        return NextResponse.json(apiError('نوع إعلان غير صالح', 400), { status: 400 })
+      }
+      marketplaceType = marketplaceTypeInput as MarketplaceType
+    }
     // Optional v2 secondary fields — validate against the enums but stay
     // permissive: unknown values are dropped, valid values become
     // overrides for classifyPost.
@@ -128,6 +156,44 @@ export async function POST(req: NextRequest) {
     if (titleErr) return NextResponse.json(apiError(titleErr, 400), { status: 400 })
     const bodyErr = validateContent(body, 'body')
     if (bodyErr) return NextResponse.json(apiError(bodyErr, 400), { status: 400 })
+
+    // ── Anti-spam guards specific to JOB subtype ──────────────────────
+    // JOB posts are the highest-spam vector in Saudi-region community
+    // apps (recruiters posting WhatsApp group invites). All three
+    // checks bypass for SUPER_ADMIN.
+    if (!bypass && category === 'MARKETPLACE' && marketplaceType === 'JOB') {
+      const trimmedBody = body.trim()
+      // a) external chat-link block
+      if (EXTERNAL_GROUP_LINK.test(trimmedBody) || EXTERNAL_GROUP_LINK.test(title.trim())) {
+        return NextResponse.json(
+          apiError('روابط مجموعات واتساب / تيليقرام غير مسموح بها', 400),
+          { status: 400 },
+        )
+      }
+      // b) min body length — discourages "WhatsApp 0512..." one-liners
+      if (trimmedBody.length < JOB_MIN_BODY_CHARS) {
+        return NextResponse.json(
+          apiError(`اكتب وصف الوظيفة بشكل أوضح (الحد الأدنى ${JOB_MIN_BODY_CHARS} حرف)`, 400),
+          { status: 400 },
+        )
+      }
+      // c) per-day cap (reuses the post cooldown window logic)
+      const since = new Date(new Date().setHours(0, 0, 0, 0))
+      const todayJobs = await db.post.count({
+        where: {
+          authorId: user.id,
+          category: 'MARKETPLACE',
+          marketplaceType: 'JOB',
+          createdAt: { gte: since },
+        },
+      })
+      if (todayJobs >= JOB_MAX_PER_DAY) {
+        return NextResponse.json(
+          apiError(`الحد الأقصى ${JOB_MAX_PER_DAY} إعلان وظيفة في اليوم`, 429),
+          { status: 429 },
+        )
+      }
+    }
 
     // Price validation
     if (price !== undefined && price !== null) {
@@ -284,6 +350,7 @@ export async function POST(req: NextRequest) {
         intent:   c.intent,
         priority: c.priority,
         audience: c.audience,
+        marketplaceType, // SELL by default, validated above for MARKETPLACE
         coordinationMode,
         price: price || null,
         imageUrls: validatedImages,

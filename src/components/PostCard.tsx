@@ -82,6 +82,9 @@ interface Post {
   title: string
   body: string
   category: string
+  /** Marketplace listing subtype. Only meaningful when category=MARKETPLACE.
+   *  Optional for back-compat with older API responses. */
+  marketplaceType?: 'SELL' | 'BUY' | 'JOB' | null
   intent?: 'OFFER' | 'REQUEST' | 'NORMAL' | null
   /** Moderator pin into Neighborhood Highlights. ISO string when pinned,
    *  null/undefined otherwise. Drives the mod menu's Pin/Unpin label. */
@@ -858,6 +861,24 @@ export default function PostCard({
         </div>
         <div className="hai-row-2">
           <span className="hai-category-badge" data-category={v2Category}>{style.icon} {t(style.tKey)}</span>
+          {/* Marketplace JOB subtype — distinct amber badge so a job
+              listing reads differently from a regular sell post inside
+              the same category. SELL renders no extra badge (default).
+              BUY shows a small "buying" tag. */}
+          {post.category === 'MARKETPLACE' && post.marketplaceType === 'JOB' && (
+            <span
+              className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+            >
+              💼 {lang === 'en' ? 'Job' : 'فرصة عمل'}
+            </span>
+          )}
+          {post.category === 'MARKETPLACE' && post.marketplaceType === 'BUY' && (
+            <span
+              className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
+            >
+              📥 {lang === 'en' ? 'Buying' : 'شراء'}
+            </span>
+          )}
           {isRequest && (
             <span
               className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"

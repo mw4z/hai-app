@@ -192,6 +192,9 @@ export default function NewPostPage() {
   const { lang } = useLanguage()
   const [step, setStep] = useState<'category' | 'content'>('category')
   const [category, setCategory] = useState('')
+  // Marketplace listing subtype — only meaningful when category=MARKETPLACE.
+  // Default SELL matches the schema default and keeps existing flows.
+  const [marketplaceType, setMarketplaceType] = useState<'SELL' | 'BUY' | 'JOB'>('SELL')
   // Only visible providers (ACTIVE/VERIFIED) may post in the SERVICES category.
   const [canPostServices, setCanPostServices] = useState(false)
   // SUPER_ADMIN can post into any neighborhood and any category.
@@ -464,6 +467,7 @@ export default function NewPostPage() {
           locationLat: location?.lat || null,
           locationLng: location?.lng || null,
           locationName: location?.name || null,
+          ...(category === 'MARKETPLACE' ? { marketplaceType } : {}),
           ...(isSuperAdmin && targetNeighborhoodId && targetNeighborhoodId !== ownNeighborhoodId
             ? { neighborhoodId: targetNeighborhoodId }
             : {}),
@@ -657,6 +661,39 @@ export default function NewPostPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {/* Marketplace subtype selector — only when posting in
+                MARKETPLACE. SELL is preselected (matches schema default
+                and existing flow). JOB triggers extra anti-spam rules
+                server-side. */}
+            {category === 'MARKETPLACE' && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 px-1">
+                  {lang === 'en' ? 'Listing type' : lang === 'ur' ? 'لسٹنگ کی قسم' : 'نوع الإعلان'}
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { key: 'SELL', icon: '🛒', ar: 'بيع',       en: 'Sell' },
+                    { key: 'BUY',  icon: '📥', ar: 'شراء',      en: 'Buy' },
+                    { key: 'JOB',  icon: '💼', ar: 'فرصة عمل', en: 'Job' },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setMarketplaceType(opt.key)}
+                      className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl border-2 text-sm font-semibold transition-colors ${
+                        marketplaceType === opt.key
+                          ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300'
+                          : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      <span>{opt.icon}</span>
+                      <span>{lang === 'en' ? opt.en : opt.ar}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
