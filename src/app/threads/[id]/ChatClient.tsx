@@ -975,10 +975,19 @@ export default function ChatClient({
       {/* Messages */}
       <div
         ref={messagesRef}
-        className={`px-4 py-3 flex-1 min-h-0 overflow-y-auto overscroll-y-contain ${selectedMsg ? 'chat-focus-mode' : ''}`}
+        className={`px-4 py-3 flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain ${selectedMsg ? 'chat-focus-mode' : ''}`}
         data-selected-msg={selectedMsg ?? ''}
         data-tour="chat-messages"
-        style={{ background: isDark ? wallpaper.dark : wallpaper.light }}
+        // touch-action: pan-y on the container itself, in addition to
+        // the rule on [data-msg-row], so any touch that starts in the
+        // padding/gutter between bubbles ALSO can't trigger native
+        // horizontal pan. overflow-x: hidden clips any sub-pixel
+        // horizontal layout drift the bubble's translateX could
+        // otherwise expose at the edges.
+        style={{
+          background: isDark ? wallpaper.dark : wallpaper.light,
+          touchAction: 'pan-y',
+        }}
       >
         {messages.length === 0 && (
           <div className="text-center py-12">
