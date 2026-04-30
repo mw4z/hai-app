@@ -766,15 +766,42 @@ export default function ChatClient({
     }
   }
 
-  async function deleteMessage(msgId: string) {
+  /**
+   * scope='me'  → hide for me only (always allowed). Drops the row
+   *               from local state; server appends my id to hiddenBy.
+   * scope='all' → tombstone for everyone (sender-only, ≤24h). Local
+   *               state flips type=DELETED so other UI logic (no
+   *               reactions, no edit) kicks in immediately.
+   */
+  async function deleteMessage(msgId: string, scope: 'me' | 'all') {
     try {
-      const res = await fetch(`/api/threads/${threadId}/messages/${msgId}`, { method: 'DELETE' })
+      const res = await fetch(
+        `/api/threads/${threadId}/messages/${msgId}?scope=${scope}`,
+        { method: 'DELETE' },
+      )
       if (res.ok) {
-        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, type: 'DELETED', text: null, imageUrl: null, lat: null, lng: null } : m))
+        if (scope === 'me') {
+          setMessages(prev => prev.filter(m => m.id !== msgId))
+        } else {
+          setMessages(prev => prev.map(m =>
+            m.id === msgId
+              ? { ...m, type: 'DELETED', text: null, imageUrl: null, lat: null, lng: null }
+              : m,
+          ))
+        }
         toast.success(lang === 'en' ? 'Deleted' : 'تم الحذف')
-      } else { toast.error(lang === 'en' ? 'Failed to delete' : 'فشل الحذف') }
+      } else {
+        const d = await res.json().catch(() => ({}))
+        toast.error(d?.error || (lang === 'en' ? 'Failed to delete' : 'فشل الحذف'))
+      }
     } catch { toast.error(t('common_error')) }
     setSelectedMsg(null)
+  }
+
+  /** "Delete for everyone" eligibility — sender + ≤24h. */
+  function canDeleteForAll(msg: Msg): boolean {
+    if (msg.senderId !== currentUserId) return false
+    return (Date.now() - new Date(msg.createdAt).getTime()) < 24 * 60 * 60_000
   }
 
   async function saveEdit(msgId: string) {
@@ -946,8 +973,13 @@ export default function ChatClient({
       </header>
 
       {/* Messages */}
-      <div ref={messagesRef} className="px-4 py-3 flex-1 min-h-0 overflow-y-auto overscroll-y-contain" data-tour="chat-messages"
-        style={{ background: isDark ? wallpaper.dark : wallpaper.light }}>
+      <div
+        ref={messagesRef}
+        className={`px-4 py-3 flex-1 min-h-0 overflow-y-auto overscroll-y-contain ${selectedMsg ? 'chat-focus-mode' : ''}`}
+        data-selected-msg={selectedMsg ?? ''}
+        data-tour="chat-messages"
+        style={{ background: isDark ? wallpaper.dark : wallpaper.light }}
+      >
         {messages.length === 0 && (
           <div className="text-center py-12">
             <div className="w-16 h-16 rounded-full bg-white dark:bg-gray-800 shadow-sm mx-auto mb-3 flex items-center justify-center">
@@ -1089,11 +1121,24 @@ export default function ChatClient({
                       <span className="text-[10px] text-blue-500 font-medium">{lang === 'en' ? 'Edit' : 'تعديل'}</span>
                     </button>
                   )}
-                  {canModify(selectedMsgData) && (
-                    <button onClick={() => deleteMessage(selectedMsgData.id)}
+                  {/* "Delete for me" — always available. Removes the
+                      message from MY view; the other person still sees it. */}
+                  <button onClick={() => deleteMessage(selectedMsgData.id, 'me')}
+                    className="flex flex-col items-center gap-1 px-5 py-2.5 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors active:scale-95">
+                    <FiTrash2 className="w-4.5 h-4.5 text-red-500" />
+                    <span className="text-[10px] text-red-500 font-medium">
+                      {lang === 'en' ? 'Delete for me' : 'احذف عندي'}
+                    </span>
+                  </button>
+                  {/* "Delete for everyone" — sender, within 24h. Tombstones
+                      the message globally (type=DELETED). */}
+                  {canDeleteForAll(selectedMsgData) && (
+                    <button onClick={() => deleteMessage(selectedMsgData.id, 'all')}
                       className="flex flex-col items-center gap-1 px-5 py-2.5 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors active:scale-95">
-                      <FiTrash2 className="w-4.5 h-4.5 text-red-500" />
-                      <span className="text-[10px] text-red-500 font-medium">{lang === 'en' ? 'Delete' : 'حذف'}</span>
+                      <FiTrash2 className="w-4.5 h-4.5 text-red-600" />
+                      <span className="text-[10px] text-red-600 font-semibold">
+                        {lang === 'en' ? 'Delete for all' : 'احذف للكل'}
+                      </span>
                     </button>
                   )}
                   {selectedMsgData.senderId !== currentUserId && (
@@ -1579,7 +1624,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
   ) : null
 
   return (
-    <div ref={rowRef} data-msg-row={msg.id} className="chat-bubble-in">
+    <div ref={rowRef} data-msg-row={msg.id} className={`chat-bubble-in ${selectedMsg === msg.id ? 'chat-bubble-focus' : ''}`}>
       {showUnreadDivider && (
         <div id="unread-divider" className="flex items-center gap-3 my-4">
           <div className="flex-1 h-px bg-primary-400/50" />

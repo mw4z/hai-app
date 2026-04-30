@@ -26,8 +26,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    // "Delete for me" filter — exclude rows where the current user is
+    // in hiddenBy. This is the per-user view; the row stays in the DB
+    // for the other participant.
     const messages = await db.message.findMany({
-      where: { threadId: params.id },
+      where: {
+        threadId: params.id,
+        NOT: { hiddenBy: { has: session.userId } },
+      },
       orderBy: { createdAt: 'asc' },
       select: {
         id: true, type: true, text: true, lat: true, lng: true,
@@ -91,9 +97,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       select: { showReadReceipts: true },
     })
 
-    // Re-read fresh data
+    // Re-read fresh data (same hiddenBy filter as above)
     const freshMessages = await db.message.findMany({
-      where: { threadId: params.id },
+      where: {
+        threadId: params.id,
+        NOT: { hiddenBy: { has: session.userId } },
+      },
       orderBy: { createdAt: 'asc' },
       select: {
         id: true, type: true, text: true, lat: true, lng: true,
