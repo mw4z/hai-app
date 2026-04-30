@@ -60,12 +60,23 @@ interface Rule {
 }
 
 const FOOD_HOME_RULES: Rule[] = [
-  // Arabic
-  { pattern: /(?:طبخ|طبخة|أكلات|اكلات|مأكولات|ماكولات|أكل|اكل|وجبات|وجبة)/i, weight: 3 },
-  { pattern: /(?:حلويات|حلى|كيك|بسبوسة|كنافة|كنافه|معمول|تمر|قهوة|شاي|عصير)/i, weight: 3 },
-  { pattern: /(?:أسرة منتجة|اسرة منتجة|بيتي|منزلي|صناعة منزلية)/i, weight: 3 },
-  { pattern: /(?:كاترينج|كيترنج|بوفيه|توصيل أكل|توصيل اكل)/i, weight: 3 },
-  { pattern: /(?:منسف|كبسة|مندي|مكبوس|إفطار|افطار|سحور|عشاء)/i, weight: 2 },
+  // Cooking + meal staples
+  { pattern: /(?:طبخ|طبخة|طباخة|طبّاخة|شيف|خبازة|أكلات|اكلات|مأكولات|ماكولات|أكل|اكل|وجبات|وجبة|وجبات\s*فردية|عائلية|باكج|صحن|صواني)/i, weight: 3 },
+  { pattern: /(?:غداء|عشاء|فطور|سحور|إفطار|افطار|رز|كبسة|برياني|مندي|منسف|مكبوس)/i, weight: 3 },
+  // Sweets + bakery
+  { pattern: /(?:حلويات|حلى|كيك|كيكة|كيكات|كوكيز|براونيز|تشيزكيك|بسبوسة|كنافة|كنافه|معمول|تمر|مخبوزات|خبز|فطاير|معجنات|بيتزا|سمبوسة)/i, weight: 3 },
+  // Drinks + hospitality
+  { pattern: /(?:قهوة|قهوجية|شاي|ضيافة|بوفيه|تقديم|عصير)/i, weight: 3 },
+  // Home-business framing
+  { pattern: /(?:أسرة\s*منتجة|اسرة\s*منتجة|بيتي|منزلي|طبخ\s*بيتي|شغل\s*منزلي|اسوي|نسوي|نجهز|صناعة\s*منزلية)/i, weight: 3 },
+  // Ordering / delivery flow
+  { pattern: /(?:طلب\s*مسبق|حجز|تجهيز|توصيل\s*يومي|توصيل\s*للبيت|كاترينج|كيترنج|توصيل\s*أكل|توصيل\s*اكل)/i, weight: 3 },
+  // Occasions
+  { pattern: /(?:عزيمة|مناسبات|حفلات|مواليد|زواج)/i, weight: 2 },
+  // Menu / pricing language
+  { pattern: /(?:اسعار|أسعار|قائمة|منيو|اطلب|اطلب\s*الآن|اطلب\s*الان|تواصل|طلب\s*واتساب)/i, weight: 1 },
+  // Diet / health-food framing
+  { pattern: /(?:اكل\s*صحي|أكل\s*صحي|دايت|رجيم|عضلات|بروتين)/i, weight: 2 },
   // English
   { pattern: /(?:home\s*food|home\s*cook(?:ing|ed)?|home\s*made|homemade)/i, weight: 3 },
   { pattern: /(?:catering|dessert|cake|cakes|coffee|tea|juice|baking|baked)/i, weight: 2 },
@@ -73,13 +84,27 @@ const FOOD_HOME_RULES: Rule[] = [
 ]
 
 const MARKETPLACE_RULES: Rule[] = [
-  // Selling — Arabic
-  { pattern: /(?:للبيع|للبيـع|أبيع|ابيع|بيع|عرض\s*للبيع|على\s*البيع)/i, weight: 3 },
-  { pattern: /(?:نظيف|مستعمل|جديد|بحالة\s*ممتازة|بحالة\s*جيدة)/i, weight: 1 },
-  { pattern: /(?:سعر|بسعر|السعر|قابل\s*للتفاوض|قابل\s*للنقاش)/i, weight: 2 },
-  // Items
-  { pattern: /(?:جوال|آيفون|ايفون|سامسونج|لابتوب|تلفزيون|تلفاز|طاولة|كرسي|أثاث|اثاث|ثلاجة|مكيف|غسالة|فرن|سرير|دولاب)/i, weight: 2 },
-  // Buying — Arabic
+  // Sell verbs / framing
+  { pattern: /(?:للبيع|للبيـع|أبيع|ابيع|بيع|عرض|معروض|عرض\s*للبيع|على\s*البيع|للبيع\s*فوري|تخفيض|تصفية|حراج|سومة)/i, weight: 3 },
+  // Buy framing
+  { pattern: /(?:أبغى\s*اشتري|ابغى\s*اشتري|أبي\s*اشتري|ابي\s*اشتري|طلب\s*شراء|مطلوب|شراء)/i, weight: 3 },
+  // Condition descriptors
+  { pattern: /(?:نظيف|مستعمل|جديد|شبه\s*جديد|بحالة\s*ممتازة|بحالة\s*جيدة)/i, weight: 1 },
+  // Pricing
+  { pattern: /(?:سعر|بسعر|السعر|كم\s*السعر|تفاوض|قابل\s*للتفاوض|قابل\s*للنقاش|سعر\s*نهائي|كاش)/i, weight: 2 },
+  // Logistics
+  { pattern: /(?:توصيل|شحن|استلام|تسليم|الموقع|قريب|بعيد)/i, weight: 1 },
+  // Furniture / appliances
+  { pattern: /(?:اثاث|أثاث|سرير|كنبة|طاولة|مكتب|كرسي|دولاب|مطبخ|غسالة|ثلاجة|فرن|مكيف)/i, weight: 2 },
+  // Electronics
+  { pattern: /(?:جوال|آيفون|ايفون|سامسونج|لابتوب|كمبيوتر|شاشة|تابلت|سماعة|شاحن|تلفزيون|تلفاز)/i, weight: 2 },
+  // Auto parts (the cars themselves are still MARKETPLACE)
+  { pattern: /(?:سيارة|سياره|قطع\s*غيار|كفرات|بطارية|زيوت|اكسسوارات)/i, weight: 2 },
+  // Apparel + accessories
+  { pattern: /(?:ملابس|شنطة|جزمة|عباية|فستان|نظارات|ساعات)/i, weight: 2 },
+  // Contact framing common in marketplace listings
+  { pattern: /(?:واتساب|تواصل\s*خاص|خاص\s*واتساب)/i, weight: 1 },
+  // Buying — Arabic (weak — many of these appear in services too)
   { pattern: /(?:أبغى|ابغى|أبي|ابي|محتاج|أدور|ادور|أبحث\s*عن|ابحث\s*عن|عند\s*أحد)/i, weight: 1 },
   // English
   { pattern: /(?:for\s*sale|selling|sell|buy|buying|second\s*hand|used)/i, weight: 3 },
@@ -90,18 +115,38 @@ const MARKETPLACE_RULES: Rule[] = [
 const JOB_RULES: Rule[] = [
   // Arabic — employer posting
   { pattern: /(?:فرصة\s*عمل|وظيفة|وظائف|مطلوب\s*موظف|مطلوب\s*موظفة|مطلوب\s*عامل|مطلوب\s*عمالة|مطلوب\s*سائق|مطلوب\s*محاسب)/i, weight: 3 },
-  { pattern: /(?:توظيف|تعيين|راتب|الراتب|دوام|دوام\s*كامل|دوام\s*جزئي|دوام\s*صباحي|دوام\s*مسائي)/i, weight: 3 },
-  { pattern: /(?:شفت|شفتات|عقد\s*عمل|سيرة\s*ذاتية|cv|سي\s*في)/i, weight: 3 },
+  { pattern: /(?:توظيف|تعيين|تقديم|راتب|الراتب|دوام|دوام\s*كامل|دوام\s*جزئي|دوام\s*صباحي|دوام\s*مسائي)/i, weight: 3 },
+  { pattern: /(?:شفت|شفتات|عقد|عقد\s*عمل|مؤقت|سيرة\s*ذاتية|السيرة\s*الذاتية|cv|سي\s*في)/i, weight: 3 },
   // English
   { pattern: /(?:job|jobs|hiring|hire|employment|vacancy|position|career|salary|shift|recruit(?:ing|ment)?)/i, weight: 3 },
   { pattern: /(?:full[-\s]*time|part[-\s]*time|contract|cv|resume)/i, weight: 3 },
 ]
 
-// SERVICES — provider category. Keywords are profession names.
+// SERVICES — provider category. Keywords are profession names + "I
+// need / I offer" framing.
 const SERVICES_RULES: Rule[] = [
-  { pattern: /(?:سباك|سباكة|كهربائي|كهرباء|نجار|نجارة|دهان|دهانات|حداد|حدادة|بناء|بنّاء|بناي)/i, weight: 3 },
-  { pattern: /(?:تنظيف|نظافة|عاملة\s*منزلية|عامل\s*نظافة|تكييف|صيانة|إصلاح|اصلاح|تركيب)/i, weight: 3 },
-  { pattern: /(?:خدمة|خدمات|أقدم\s*خدمة|اقدم\s*خدمة|توفر|أوفر|اوفر)/i, weight: 1 },
+  // Trades
+  { pattern: /(?:سباك|سباكة|كهربائي|كهرباء|نجار|نجارة|دهان|دهانات|حداد|حدادة|بلاط|سيراميك|بناء|بنّاء|بناي|لحام|تصليح|فني)/i, weight: 3 },
+  // Maintenance / appliances
+  { pattern: /(?:مكيف|تكييف|صيانة|اصلاح|إصلاح|تركيب|فك|نقل)/i, weight: 3 },
+  // Cleaning / household help
+  { pattern: /(?:تنظيف|نظافة|عاملة|عاملة\s*منزلية|عامل\s*نظافة|خادمة|شركة\s*تنظيف|مكافحة\s*حشرات)/i, weight: 3 },
+  // Moving / driving services (when offered as a service business)
+  { pattern: /(?:نقل\s*عفش|سائق|مشاوير|مشوار|شحن|توصيل)/i, weight: 2 },
+  // Personal care
+  { pattern: /(?:حلاق|كوافير|صالون|مكياج|عناية|عناية\s*بالبشرة)/i, weight: 3 },
+  // Tutoring / teaching
+  { pattern: /(?:مدرس|معلم|خصوصي|دروس|شرح|تعليم)/i, weight: 3 },
+  // Media / digital services
+  { pattern: /(?:تصوير|مصور|فيديو|مونتاج|برمجة|تصميم|موقع|تطبيق|سوشال\s*ميديا)/i, weight: 3 },
+  // Auto services
+  { pattern: /(?:غسيل\s*سيارات|تلميع|بنشر|بطارية)/i, weight: 2 },
+  // Service framing — REQUEST side
+  { pattern: /(?:طلب\s*خدمة|احتاج\s*سباك|أحتاج\s*سباك|مين\s*يعرف\s*كهربائي|ادور\s*فني)/i, weight: 3 },
+  // Service framing — OFFER side
+  { pattern: /(?:عرض\s*خدمة|نقدم\s*خدمات|نوفر|عندي\s*خدمة|أقدم\s*خدمة|اقدم\s*خدمة|أوفر|اوفر)/i, weight: 2 },
+  // Generic "service" word — weak signal
+  { pattern: /(?:خدمة|خدمات|توفر)/i, weight: 1 },
   // English
   { pattern: /(?:plumber|plumbing|electrician|electrical|carpenter|painter|cleaning|cleaner|maintenance|repair|handyman|technician|installation)/i, weight: 3 },
   { pattern: /(?:service|services|offering|provide|provider)/i, weight: 1 },
@@ -119,35 +164,79 @@ const OFFER_MARKERS: Rule[] = [
 ]
 
 const LOST_FOUND_RULES: Rule[] = [
-  { pattern: /(?:ضاع|ضاعت|فقدت|مفقود|مفقودة|لقيت|وجدت|عثرت\s*على)/i, weight: 3 },
-  { pattern: /(?:محفظة|قطة|قط|كلب|مفاتيح|جوال|بطاقة|هوية|اقامة|إقامة)/i, weight: 1 },
+  { pattern: /(?:ضاع|ضاعت|ضايع|فقدت|مفقود|مفقودة|لقيت|وجدت|تم\s*العثور|عثرت|عثرت\s*على|حصلت|اختفى|انسرق|بحثت|مالقيت)/i, weight: 3 },
+  { pattern: /(?:محفظة|جوال|مفاتيح|شنطة|بطاقة|هوية|اقامة|إقامة|كلب|قط|قطة|طير|حيوان)/i, weight: 1 },
+  { pattern: /(?:صاحبه|صاحبها|يرجى\s*التواصل|اللي\s*يعرف|يدل|يوصل|يرجع|موجود\s*عندي|استلم|تسليم|مكافأة|جائزة|تعويض)/i, weight: 2 },
   { pattern: /(?:lost|found|missing)/i, weight: 3 },
   { pattern: /(?:wallet|cat|dog|keys|phone|id\s*card|passport)/i, weight: 1 },
 ]
 
 const EVENTS_RULES: Rule[] = [
-  { pattern: /(?:فعالية|فعاليات|حفل|اجتماع|تجمع|دعوة|محاضرة|درس|دورة|ندوة|مهرجان)/i, weight: 3 },
+  { pattern: /(?:فعالية|فعاليات|حدث|مهرجان|نشاط|تجمع|لقاء|اجتماع|حفل|حفلة|احتفال|مناسبة)/i, weight: 3 },
+  { pattern: /(?:دعوة|حضور|تسجيل|حجز|انضم|شارك|سجل|احجز)/i, weight: 2 },
+  { pattern: /(?:يوم\s*مفتوح|بازار|معرض|سوق\s*خيري)/i, weight: 3 },
+  { pattern: /(?:دورة|ورشة|تدريب|محاضرة|ندوة|جلسة|نادي|مدرسة)/i, weight: 2 },
+  { pattern: /(?:مسابقة|بطولة|دوري)/i, weight: 2 },
+  { pattern: /(?:تاريخ|موعد|الساعة|المكان)/i, weight: 1 },
+  { pattern: /(?:الدخول\s*مجاني|برسوم|تذاكر)/i, weight: 2 },
+  { pattern: /(?:عائلي|نسائي|رجالي|للاطفال|للأطفال)/i, weight: 1 },
   { pattern: /(?:تراويح|عيد|رمضان|اليوم\s*الوطني|مولد|عقد\s*قران|عرس|تخرج)/i, weight: 3 },
   { pattern: /(?:event|gathering|meeting|celebration|festival|party|seminar|workshop|class|invite)/i, weight: 3 },
 ]
 
 const NEIGHBORHOOD_REPORTS_RULES: Rule[] = [
-  // Note: تسريب (leak) was removed from here — it matched plumbing
-  // requests too ("تسريب المطبخ" = kitchen sink leak, a plumber's
-  // job). Real outage reports use انقطاع / عطل anyway.
-  { pattern: /(?:انقطاع|انقطعت|عطل|خراب|انفجار|حريق|دخان|ريحة|رائحة|روائح|إنارة|انارة)/i, weight: 3 },
-  { pattern: /(?:حفرة|مطب|كسر|طريق\s*مغلق|شارع\s*مغلق|تحذير|انتبهوا|انتبهو|مشبوه|سرقة|اعتداء)/i, weight: 3 },
-  { pattern: /(?:بلدية|أمانة|امانة|بلاغ|تبليغ|اتصلت|الشرطة|الدفاع\s*المدني)/i, weight: 2 },
+  // Note: تسريب (leak) is intentionally NOT here — it overlaps with
+  // plumbing requests. Real outage reports use انقطاع / عطل.
+  // Generic alert framing
+  { pattern: /(?:بلاغ|مشكلة|خطر|انتبهوا|انتبهو|تحذير|احذروا|تنبيه)/i, weight: 3 },
+  // Theft / suspicious activity
+  { pattern: /(?:سرقة|حرامي|محاولة\s*سرقة|مشتبه|مشبوه|اعتداء)/i, weight: 3 },
+  // Traffic / accidents
+  { pattern: /(?:حادث|تصادم|انقلاب|طريق\s*مغلق|شارع\s*مغلق|اغلاق|زحمة)/i, weight: 3 },
+  // Utilities / outages
+  { pattern: /(?:انقطاع|انقطعت|عطل|خراب|كهرباء\s*طافية|مويه\s*مقطوعة|شبكة\s*ضعيفة|إنارة|انارة)/i, weight: 3 },
+  // Construction nuisance
+  { pattern: /(?:حفريات|اعمال|أعمال|ازعاج|إزعاج|ضوضاء|حفرة|مطب|كسر)/i, weight: 2 },
+  // Animal hazards
+  { pattern: /(?:كلب\s*ضال|حيوان\s*خطير|قطط\s*مريضة)/i, weight: 3 },
+  // Sanitation
+  { pattern: /(?:نفايات|وسخ|رائحة|روائح|ريحة|صرف\s*صحي)/i, weight: 2 },
+  // Authority routes (signals a real report)
+  { pattern: /(?:بلدية|أمانة|امانة|تبليغ|اتصلت\s*الشرطة|الشرطة|الدفاع\s*المدني|شكوى|رفع\s*شكوى|ضرر)/i, weight: 2 },
+  // Child safety
+  { pattern: /(?:اطفال\s*ضايعين|أطفال\s*ضايعين|خطر\s*على\s*الاطفال|خطر\s*على\s*الأطفال)/i, weight: 3 },
+  // Fire / emergency
+  { pattern: /(?:دخان|حريق|نار|طوارئ|انفجار)/i, weight: 3 },
+  // Urgency framing common in reports (low weight — also appears in
+  // help-requests, so don't over-weight)
+  { pattern: /(?:رجاء\s*الانتباه|يا\s*جماعة|اللي\s*ساكنين|مساعدة\s*عاجلة|عاجل|ضروري)/i, weight: 1 },
+  // English
   { pattern: /(?:outage|leak|fire|smoke|smell|hazard|warning|danger|suspicious|theft|broken|pothole|road\s*closed|power\s*cut|water\s*cut)/i, weight: 3 },
 ]
 
 const RIDES_RULES: Rule[] = [
-  { pattern: /(?:مشوار|توصيلة|توصيل|راكب|راكبة|سياره|سيارة|مع\s*السائق)/i, weight: 3 },
+  { pattern: /(?:مشوار|مشاوير|توصيلة|توصيل|راكب|راكبة|سائق|مع\s*السائق)/i, weight: 3 },
+  { pattern: /(?:ابغى\s*مشوار|أبغى\s*مشوار|محتاج\s*مشوار|اوصلني|أوصلني|رايح|جاي|طريق|وجهة)/i, weight: 3 },
+  { pattern: /(?:من\s*\S+\s*الى|الى\s*\S+|يومي)/i, weight: 1 },
   { pattern: /(?:ride|lift|carpool|drive|driver)/i, weight: 3 },
 ]
 
 const REAL_ESTATE_RULES: Rule[] = [
-  { pattern: /(?:شقة|فلة|فيلا|دور|عمارة|عقار|إيجار|ايجار|للإيجار|للايجار|تمليك|للبيع\s*أرض|للبيع\s*ارض|أرض\s*للبيع|ارض\s*للبيع)/i, weight: 3 },
+  // Property types
+  { pattern: /(?:شقة|غرفة|دور|فيلا|فلة|استراحة|عمارة)/i, weight: 3 },
+  // Rent / sale framing
+  { pattern: /(?:ايجار|إيجار|للايجار|للإيجار|تمليك|عقار|أرض|قطعة\s*أرض|قطعة\s*ارض|للبيع\s*أرض|للبيع\s*ارض|أرض\s*للبيع|ارض\s*للبيع)/i, weight: 3 },
+  // Lease structure
+  { pattern: /(?:عقد|سنوي|شهري|دفعة|تأمين|سعر\s*الايجار)/i, weight: 2 },
+  // Layout / amenities
+  { pattern: /(?:غرفتين|ثلاث\s*غرف|صالة|مطبخ|حمام|مؤثث|غير\s*مؤثث)/i, weight: 2 },
+  // Location
+  { pattern: /(?:موقع|حي|قريب\s*من)/i, weight: 1 },
+  // Utilities
+  { pattern: /(?:عداد|كهرباء|ماء|مويه)/i, weight: 1 },
+  // Real-estate roles
+  { pattern: /(?:سمسار|مكتب\s*عقار|عائلة|عزاب)/i, weight: 2 },
+  { pattern: /(?:متاح|شاغر|جاهز)/i, weight: 1 },
   { pattern: /(?:apartment|villa|flat|rent|rental|for\s*rent|real\s*estate|property|land\s*for\s*sale)/i, weight: 3 },
 ]
 

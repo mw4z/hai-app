@@ -299,6 +299,11 @@ model Post {
   // Subtype for category=MARKETPLACE only. Ignored otherwise. SELL is
   // the default so every existing Marketplace row keeps its meaning.
   marketplaceType MarketplaceType @default(SELL)
+  // Mod / admin manual category override audit. Null until a privileged
+  // user has used PATCH /api/posts/:id/category. Surfaces a small
+  // "edited by mod" signal in the PostCard for transparency.
+  categoryEditedById String?
+  categoryEditedAt   DateTime?
   status         PostStatus    @default(PENDING_AI)
   isPaid         Boolean       @default(false)
   isPinned       Boolean       @default(false)

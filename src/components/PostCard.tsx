@@ -188,6 +188,13 @@ export default function PostCard({
   const [reported, setReported] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [reportingUser, setReportingUser] = useState(false)
+  const [showEditCategory, setShowEditCategory] = useState(false)
+  const [editCatBusy, setEditCatBusy] = useState(false)
+  const [editCatCategory, setEditCatCategory] = useState<string>(post.category)
+  const [editCatIntent, setEditCatIntent] = useState<string>(post.intent || 'NORMAL')
+  const [editCatMarketplaceType, setEditCatMarketplaceType] = useState<string>(
+    post.marketplaceType || 'SELL',
+  )
   // Reporting a comment or reply author: opens the same sheet with a
   // different target. Kept separate from `reportingUser` (post author)
   // so one doesn't clobber the other.
@@ -973,6 +980,20 @@ export default function PostCard({
                     <FiFlag className="hai-icon-sm hai-menu-item__icon" />
                     <span className="hai-menu-item__label">
                       {t(post.highlightPinnedAt ? 'highlights_unpin_action' : 'highlights_pin_action')}
+                    </span>
+                  </button>
+                )}
+                {/* Mod / admin manual category override. Opens the
+                    EditCategorySheet which calls PATCH /api/posts/:id/category.
+                    Available on every post regardless of category. */}
+                {isAdmin && post.status !== 'HIDDEN' && (
+                  <button
+                    onClick={() => { setShowEditCategory(true); setShowMenu(false) }}
+                    className="hai-menu-item"
+                  >
+                    <FiFlag className="hai-icon-sm hai-menu-item__icon" />
+                    <span className="hai-menu-item__label">
+                      {lang === 'en' ? 'Edit category' : 'تعديل التصنيف'}
                     </span>
                   </button>
                 )}
@@ -2088,6 +2109,136 @@ export default function PostCard({
       })()}
 
       {/* Fullscreen Avatar */}
+      {/* Mod / admin: Edit category sheet — bypasses the keyword
+          classifier (manual override is authoritative). PATCHes
+          /api/posts/:id/category. */}
+      {showEditCategory && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 px-4"
+          data-overlay="true"
+          onClick={() => !editCatBusy && setShowEditCategory(false)}
+          style={{
+            paddingTop: 'max(env(safe-area-inset-top, 0px), 16px)',
+            paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 16px)',
+          }}
+        >
+          <div
+            className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                {lang === 'en' ? 'Edit category' : 'تعديل التصنيف'}
+              </h2>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                {lang === 'en'
+                  ? 'Manual override — bypasses the auto-classifier.'
+                  : 'تجاوز يدوي — يتجاهل المصنّف التلقائي.'}
+              </p>
+            </div>
+
+            <div className="px-4 py-3 space-y-3">
+              <label className="block">
+                <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  {lang === 'en' ? 'Category' : 'التصنيف'}
+                </span>
+                <select
+                  value={editCatCategory}
+                  onChange={(e) => setEditCatCategory(e.target.value)}
+                  className="mt-1 w-full bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200"
+                >
+                  {[
+                    'NEIGHBORHOOD_REPORTS','LOST_FOUND','EVENTS','SERVICES',
+                    'HOME_BUSINESSES','MARKETPLACE','REAL_ESTATE','RIDES',
+                    'COMPETITIONS','GENERAL',
+                  ].map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  {lang === 'en' ? 'Intent' : 'النوع'}
+                </span>
+                <select
+                  value={editCatIntent}
+                  onChange={(e) => setEditCatIntent(e.target.value)}
+                  className="mt-1 w-full bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200"
+                >
+                  <option value="NORMAL">NORMAL</option>
+                  <option value="OFFER">OFFER</option>
+                  <option value="REQUEST">REQUEST</option>
+                </select>
+              </label>
+
+              {editCatCategory === 'MARKETPLACE' && (
+                <label className="block">
+                  <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                    {lang === 'en' ? 'Marketplace type' : 'نوع الإعلان'}
+                  </span>
+                  <select
+                    value={editCatMarketplaceType}
+                    onChange={(e) => setEditCatMarketplaceType(e.target.value)}
+                    className="mt-1 w-full bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200"
+                  >
+                    <option value="SELL">SELL</option>
+                    <option value="BUY">BUY</option>
+                    <option value="JOB">JOB</option>
+                  </select>
+                </label>
+              )}
+            </div>
+
+            <div className="flex gap-2 px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+              <button
+                disabled={editCatBusy}
+                onClick={() => setShowEditCategory(false)}
+                className="flex-1 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-200 active:scale-95"
+              >
+                {lang === 'en' ? 'Cancel' : 'إلغاء'}
+              </button>
+              <button
+                disabled={editCatBusy}
+                onClick={async () => {
+                  setEditCatBusy(true)
+                  try {
+                    const res = await fetch(`/api/posts/${post.id}/category`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        category: editCatCategory,
+                        intent: editCatIntent,
+                        ...(editCatCategory === 'MARKETPLACE'
+                          ? { marketplaceType: editCatMarketplaceType }
+                          : {}),
+                      }),
+                    })
+                    if (res.ok) {
+                      toast.success(lang === 'en' ? 'Category updated' : 'تم تحديث التصنيف')
+                      setShowEditCategory(false)
+                      router.refresh()
+                    } else {
+                      const d = await res.json().catch(() => ({}))
+                      toast.error(d?.error || (lang === 'en' ? 'Failed' : 'فشل'))
+                    }
+                  } catch {
+                    toast.error(lang === 'en' ? 'Connection failed' : 'فشل الاتصال')
+                  } finally {
+                    setEditCatBusy(false)
+                  }
+                }}
+                className="flex-1 py-2 rounded-lg bg-primary-600 text-white text-sm font-semibold active:scale-95 disabled:opacity-60"
+              >
+                {editCatBusy
+                  ? (lang === 'en' ? 'Saving…' : 'جاري الحفظ…')
+                  : (lang === 'en' ? 'Save' : 'حفظ')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showFullAvatar && post.author.avatarUrl && (
         <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center" onClick={() => setShowFullAvatar(false)}>
           <button onClick={() => setShowFullAvatar(false)} className="absolute top-4 right-4 text-white/70 hover:text-white z-10">
