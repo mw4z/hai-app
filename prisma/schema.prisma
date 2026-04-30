@@ -123,6 +123,15 @@ model User {
   notifyMessages   Boolean       @default(true)
   notifyRides      Boolean       @default(true)
   notifySystem     Boolean       @default(true)
+  // ── Notification preset + quiet hours (Phase 1 of the redesign).
+  // notificationPreset = the user's chosen preset (or MANUAL when they
+  // edit a category directly). Per-category rows in NotificationPreference
+  // remain the source of truth that canSendNotification reads.
+  notificationPreset NotificationPreset @default(BALANCED)
+  quietHoursEnabled  Boolean            @default(true)
+  quietHoursStart    Int                @default(1320) // 22:00 in minutes from local midnight
+  quietHoursEnd      Int                @default(420)  // 07:00
+  timezone           String             @default("Asia/Riyadh")
   serviceItems     ServiceItem[]
 
   // ── Push notifications (FCM) ──
@@ -245,6 +254,17 @@ enum UserStatus {
   BANNED_TEMP
   BANNED_PERM
   PENDING_REVIEW
+}
+
+// Phase-1 notification preset model. Replaces "manage 9 toggles" with
+// a 4-card preset picker. MANUAL is the escape hatch — selecting any
+// individual category toggle demotes the user to MANUAL atomically
+// (enforced at the API layer in /api/notifications/preferences).
+enum NotificationPreset {
+  URGENT_ONLY
+  BALANCED
+  EVERYTHING
+  MANUAL
 }
 
 // ─── OTP ──────────────────────────────────────────────────────────────────────

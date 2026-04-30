@@ -13,19 +13,7 @@ import type {
   PostCategory,
   Prisma,
 } from '@prisma/client'
-
-const ALL_CATEGORIES: PostCategory[] = [
-  'HOME_BUSINESSES',
-  'MARKETPLACE',
-  'SERVICES',
-  'RIDES',
-  'REAL_ESTATE',
-  'LOST_FOUND',
-  'NEIGHBORHOOD_REPORTS',
-  'EVENTS',
-  'COMPETITIONS',
-  'GENERAL',
-]
+import { ALL_CATEGORIES } from './presets'
 
 /**
  * Idempotent: creates the missing rows for this user with the default
@@ -55,6 +43,8 @@ export async function createDefaultPreferences(userId: string): Promise<Notifica
  * Read-with-defaults — returns a Map<category, preference>. Categories
  * the user has never explicitly set come back as default rows (NOT
  * persisted; they only persist on first PATCH).
+ *
+ * For fanouts use getPreferencesMapBulk — this issues one query per call.
  */
 export async function getPreferencesMap(userId: string): Promise<Map<PostCategory, NotificationPreference>> {
   const stored = await db.notificationPreference.findMany({ where: { userId } })
@@ -73,4 +63,29 @@ export async function getPreferencesMap(userId: string): Promise<Map<PostCategor
     })
   }
   return map
+}
+
+/**
+ * Bulk variant for fanouts. Issues a SINGLE query for every requested
+ * userId and returns Map<userId, Map<category, preference>>. Inner
+ * maps are sparse — missing categories must be resolved by the caller
+ * via PRESET_PUSH (see canSendNotification.categoryAllowed).
+ *
+ * Collapsing the per-user N+1 was the dominant cost on every push
+ * fanout; this is the launch-blocking perf change.
+ */
+export async function getPreferencesMapBulk(
+  userIds: string[],
+): Promise<Map<string, Map<PostCategory, NotificationPreference>>> {
+  const out = new Map<string, Map<PostCategory, NotificationPreference>>()
+  if (userIds.length === 0) return out
+  const rows = await db.notificationPreference.findMany({
+    where: { userId: { in: userIds } },
+  })
+  for (const id of userIds) out.set(id, new Map())
+  for (const row of rows) {
+    const inner = out.get(row.userId)
+    if (inner) inner.set(row.category, row)
+  }
+  return out
 }

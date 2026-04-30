@@ -95,6 +95,26 @@ export async function POST(req: NextRequest) {
     const priority: PostPriority | undefined = priorityInput && (VALID_PRIORITIES as readonly string[]).includes(priorityInput)
       ? (priorityInput as PostPriority)
       : undefined
+
+    // Server-side priority clamp — gates the URGENT_ONLY intent override
+    // in canSendNotification, so abuse here would punch through user mutes.
+    //   NORMAL / LOW: anyone.
+    //   HIGH: classifyPost auto-sets it for LOST_FOUND + NEIGHBORHOOD_REPORTS.
+    //         Outside those categories, only mods/admins may set it.
+    //   CRITICAL: PLATFORM_MOD / SUPER_ADMIN only. Reject otherwise (no
+    //         silent downgrade — caller should know they were blocked).
+    const role = user.role
+    const isPlatformOrSuper = role === 'PLATFORM_MOD' || role === 'SUPER_ADMIN'
+    const isAnyMod = isPlatformOrSuper || role === 'NEIGHBORHOOD_MOD'
+    if (priority === 'CRITICAL' && !isPlatformOrSuper) {
+      return NextResponse.json(apiError('CRITICAL غير مسموح به', 403), { status: 403 })
+    }
+    if (priority === 'HIGH') {
+      const autoHighCategory = category === 'NEIGHBORHOOD_REPORTS' || category === 'LOST_FOUND'
+      if (!autoHighCategory && !isAnyMod) {
+        return NextResponse.json(apiError('HIGH priority غير مسموح به في هذا التصنيف', 403), { status: 403 })
+      }
+    }
     const audience: PostAudience | undefined = audienceInput && (VALID_AUDIENCES as readonly string[]).includes(audienceInput)
       ? (audienceInput as PostAudience)
       : undefined

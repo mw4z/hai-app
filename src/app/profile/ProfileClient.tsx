@@ -1322,6 +1322,12 @@ export default function ProfileClient({ user, postCount }: Props) {
         setOpenSection={setOpenSection}
       >
       <div className="space-y-3">
+        {/* ── Preset picker (4 cards: URGENT_ONLY / BALANCED / EVERYTHING / MANUAL) ── */}
+        <NotifPresetGroup lang={lang} t={t} />
+
+        {/* ── Quiet hours row ── */}
+        <NotifQuietHoursGroup lang={lang} t={t} />
+
         {/* ── Posts & Interactions ── */}
         <NotifGroup
           title={lang === 'en' ? 'Posts & Interactions' : lang === 'ur' ? 'پوسٹس اور ردعمل' : 'المنشورات والتفاعل'}
@@ -1365,12 +1371,8 @@ export default function ProfileClient({ user, postCount }: Props) {
           onToggle={toggleNotifPref}
         />
 
-        {/* ── Per-category push (NotificationPreference) ── */}
-        <CategoryPrefsGroup
-          title={lang === 'en' ? 'By category' : lang === 'ur' ? 'زمرے کے حساب سے' : 'حسب التصنيف'}
-          lang={lang}
-          t={t}
-        />
+        {/* Per-category list now lives inside <NotifPresetGroup> and only
+            renders when the user is on MANUAL — see top of this section. */}
 
         {/* ── Diagnostic: live test push — hidden for now.
             Kept the PushTestButton component + /api/debug/push-test
@@ -2802,47 +2804,85 @@ function arPlural(n: number, one: string, two: string, many: string): string {
   return many.replace('{n}', String(n))
 }
 
+type NotificationPresetKey = 'URGENT_ONLY' | 'BALANCED' | 'EVERYTHING' | 'MANUAL'
+
+const PRESET_CARDS: { key: NotificationPresetKey; ar: string; en: string; subAr: string; subEn: string; icon: string }[] = [
+  { key: 'URGENT_ONLY', ar: 'عاجل فقط',  en: 'Urgent only',          subAr: 'السلامة، المفقودات، الطلبات العاجلة', subEn: 'Safety, lost items, urgent help', icon: '🚨' },
+  { key: 'BALANCED',    ar: 'المتوازن',  en: 'Balanced',             subAr: 'نشاط حيّك اليومي بدون السوق',       subEn: 'Daily activity, no marketplace',   icon: '🏘️' },
+  { key: 'EVERYTHING',  ar: 'كل شيء',    en: 'Everything',           subAr: 'كل الفئات بما فيها السوق',           subEn: 'Every category including market',  icon: '📣' },
+  { key: 'MANUAL',      ar: 'يدوي',      en: 'Pick by category',     subAr: 'اضبط كل فئة بنفسك',                  subEn: 'Toggle each category yourself',    icon: '🎚️' },
+]
+
+const CATEGORY_META: { key: string; tKey: TranslationKey; icon: string }[] = [
+  { key: 'NEIGHBORHOOD_REPORTS', tKey: 'post_v2_NEIGHBORHOOD_REPORTS', icon: '⚠️' },
+  { key: 'LOST_FOUND',           tKey: 'post_v2_LOST_FOUND',           icon: '🔍' },
+  { key: 'EVENTS',               tKey: 'post_v2_EVENTS',               icon: '🎉' },
+  { key: 'SERVICES',             tKey: 'post_v2_SERVICES',             icon: '🔧' },
+  { key: 'HOME_BUSINESSES',      tKey: 'post_v2_HOME_BUSINESSES',      icon: '🍱' },
+  { key: 'MARKETPLACE',          tKey: 'post_v2_MARKETPLACE',          icon: '🛒' },
+  { key: 'REAL_ESTATE',          tKey: 'post_v2_REAL_ESTATE',          icon: '🏠' },
+  { key: 'RIDES',                tKey: 'post_v2_RIDES',                icon: '🚗' },
+  { key: 'COMPETITIONS',         tKey: 'post_v2_COMPETITIONS',         icon: '🏆' },
+]
+
 /**
- * Per-PostCategory push preference picker. Loads from /api/notifications/
- * preferences once the accordion is open; toggling PATCHes the same
- * endpoint with optimistic UI. The backend already gates every
- * neighborhood push through these prefs (canSendNotification).
+ * Preset picker — 4 radio cards. Selecting a preset PATCHes the
+ * /preset endpoint which atomically rewrites all NotificationPreference
+ * rows server-side. The Manual list below it is rendered only when
+ * preset = MANUAL so casual users never see the 9-toggle wall.
  */
-function CategoryPrefsGroup({ title, lang, t }: {
-  title: string
-  lang: string
-  t: (k: TranslationKey) => string
-}) {
-  const CATEGORIES: { key: string; tKey: TranslationKey; icon: string }[] = [
-    { key: 'NEIGHBORHOOD_REPORTS', tKey: 'post_v2_NEIGHBORHOOD_REPORTS', icon: '⚠️' },
-    { key: 'LOST_FOUND',           tKey: 'post_v2_LOST_FOUND',           icon: '🔍' },
-    { key: 'EVENTS',               tKey: 'post_v2_EVENTS',               icon: '🎉' },
-    { key: 'SERVICES',             tKey: 'post_v2_SERVICES',             icon: '🔧' },
-    { key: 'HOME_BUSINESSES',      tKey: 'post_v2_HOME_BUSINESSES',      icon: '🍱' },
-    { key: 'MARKETPLACE',          tKey: 'post_v2_MARKETPLACE',          icon: '🛒' },
-    { key: 'REAL_ESTATE',          tKey: 'post_v2_REAL_ESTATE',          icon: '🏠' },
-    { key: 'RIDES',                tKey: 'post_v2_RIDES',                icon: '🚗' },
-    { key: 'COMPETITIONS',         tKey: 'post_v2_COMPETITIONS',         icon: '🏆' },
-  ]
+function NotifPresetGroup({ lang, t: _t }: { lang: string; t: (k: TranslationKey) => string }) {
+  const [preset, setPreset] = useState<NotificationPresetKey | null>(null)
+  const [prefs, setPrefs] = useState<Record<string, boolean>>({})
+  const [busy, setBusy] = useState(false)
 
-  const [prefs, setPrefs] = useState<Record<string, boolean> | null>(null)
-
+  // Hydrate preset + per-category state from one GET on mount.
   useEffect(() => {
     let alive = true
     fetch('/api/notifications/preferences')
-      .then(r => r.ok ? r.json() : null)
-      .then((d: { preferences?: Array<{ category: string; pushEnabled: boolean }> } | null) => {
-        if (!alive || !d?.preferences) return
-        const map: Record<string, boolean> = {}
-        for (const row of d.preferences) map[row.category] = row.pushEnabled
-        setPrefs(map)
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: { preset?: NotificationPresetKey; preferences?: Array<{ category: string; pushEnabled: boolean }> } | null) => {
+        if (!alive || !d) return
+        if (d.preset) setPreset(d.preset)
+        if (d.preferences) {
+          const map: Record<string, boolean> = {}
+          for (const row of d.preferences) map[row.category] = row.pushEnabled
+          setPrefs(map)
+        }
       })
-      .catch(() => { /* ignore — defaults shown */ })
+      .catch(() => { /* ignore */ })
     return () => { alive = false }
   }, [])
 
-  async function toggle(category: string, next: boolean) {
-    setPrefs(prev => ({ ...(prev || {}), [category]: next }))
+  async function applyPreset(p: NotificationPresetKey) {
+    if (busy || preset === p) return
+    setBusy(true)
+    const before = preset
+    setPreset(p)
+    try {
+      const res = await fetch('/api/notifications/preset', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preset: p }),
+      })
+      if (!res.ok) throw new Error('patch failed')
+      const d = await res.json() as { preset?: NotificationPresetKey; preferences?: Array<{ category: string; pushEnabled: boolean }> }
+      if (d.preferences) {
+        const map: Record<string, boolean> = {}
+        for (const row of d.preferences) map[row.category] = row.pushEnabled
+        setPrefs(map)
+      }
+    } catch {
+      setPreset(before)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function togglePref(category: string, next: boolean) {
+    const prev = prefs[category] ?? true
+    setPrefs(p => ({ ...p, [category]: next }))
+    setPreset('MANUAL')  // optimistic — server demotes too
     try {
       const res = await fetch('/api/notifications/preferences', {
         method: 'PATCH',
@@ -2851,41 +2891,200 @@ function CategoryPrefsGroup({ title, lang, t }: {
       })
       if (!res.ok) throw new Error('patch failed')
     } catch {
-      // Revert on failure
-      setPrefs(prev => ({ ...(prev || {}), [category]: !next }))
+      setPrefs(p => ({ ...p, [category]: prev }))
     }
   }
 
+  const isAr = lang === 'ar'
+
+  return (
+    <>
+      {/* Preset cards */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div className="px-4 pt-3 pb-2">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+            {isAr ? 'حجم تنبيهات الحي' : lang === 'ur' ? 'محلے کی اطلاعات' : 'Neighborhood preset'}
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-2 px-3 pb-3">
+          {PRESET_CARDS.map((c) => {
+            const active = preset === c.key
+            return (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => applyPreset(c.key)}
+                disabled={busy}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 text-start transition-colors ${
+                  active
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                    : 'border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800'
+                } ${busy ? 'opacity-60' : ''}`}
+              >
+                <span className="text-xl flex-shrink-0">{c.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-semibold ${active ? 'text-primary-700 dark:text-primary-300' : 'text-gray-800 dark:text-gray-200'}`}>
+                    {isAr ? c.ar : c.en}
+                  </p>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                    {isAr ? c.subAr : c.subEn}
+                  </p>
+                </div>
+                <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${
+                  active ? 'border-primary-500 bg-primary-500' : 'border-gray-300 dark:border-gray-600'
+                }`} />
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Manual list — only when preset = MANUAL */}
+      {preset === 'MANUAL' && (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="px-4 pt-3 pb-1">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+              {isAr ? 'حسب التصنيف' : lang === 'ur' ? 'زمرے کے حساب سے' : 'By category'}
+            </p>
+          </div>
+          {CATEGORY_META.map((c, i) => {
+            const value = prefs[c.key] ?? true
+            return (
+              <div key={c.key} className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? 'border-t border-gray-50 dark:border-gray-700' : ''}`}>
+                <span className="text-base w-6 text-center flex-shrink-0">{c.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{_t(c.tKey)}</p>
+                </div>
+                <button
+                  onClick={() => togglePref(c.key, !value)}
+                  className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                    value ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                  aria-label={_t(c.tKey)}
+                >
+                  <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                    value
+                      ? (lang === 'ar' ? 'right-[22px]' : 'left-[22px]')
+                      : (lang === 'ar' ? 'right-0.5' : 'left-0.5')
+                  }`} />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </>
+  )
+}
+
+function pad2(n: number): string { return String(n).padStart(2, '0') }
+function minutesToHHMM(m: number): string { return `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}` }
+function hhmmToMinutes(s: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim())
+  if (!m) return null
+  const h = Number(m[1]), mm = Number(m[2])
+  if (h < 0 || h > 23 || mm < 0 || mm > 59) return null
+  return h * 60 + mm
+}
+
+/**
+ * Quiet hours row. Edits start/end via two <input type="time">; toggling
+ * the master switch off short-circuits the time controls. The "wake for
+ * urgent" sub-toggle is implicit — the gate already does this when the
+ * user is on URGENT_ONLY preset, so we don't need a UI control here yet.
+ */
+function NotifQuietHoursGroup({ lang, t: _t }: { lang: string; t: (k: TranslationKey) => string }) {
+  const [enabled, setEnabled] = useState(true)
+  const [start, setStart] = useState(1320)  // 22:00
+  const [end, setEnd] = useState(420)       // 07:00
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    fetch('/api/notifications/quiet-hours').then(r => r.ok ? r.json() : null).then((d: any) => {
+      if (!alive || !d) return
+      if (typeof d.quietHoursEnabled === 'boolean') setEnabled(d.quietHoursEnabled)
+      if (typeof d.quietHoursStart === 'number')   setStart(d.quietHoursStart)
+      if (typeof d.quietHoursEnd === 'number')     setEnd(d.quietHoursEnd)
+      setLoaded(true)
+    }).catch(() => setLoaded(true))
+    return () => { alive = false }
+  }, [])
+
+  async function patch(body: Record<string, unknown>) {
+    try {
+      await fetch('/api/notifications/quiet-hours', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    } catch { /* ignore — UI already optimistic */ }
+  }
+
+  function onToggle() {
+    const next = !enabled
+    setEnabled(next)
+    patch({ enabled: next })
+  }
+  function onStart(v: string) {
+    const m = hhmmToMinutes(v)
+    if (m == null || m === end) return
+    setStart(m); patch({ start: m })
+  }
+  function onEnd(v: string) {
+    const m = hhmmToMinutes(v)
+    if (m == null || m === start) return
+    setEnd(m); patch({ end: m })
+  }
+
+  const isAr = lang === 'ar'
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
-      <div className="px-4 pt-3 pb-1">
-        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">{title}</p>
+      <div className="flex items-center gap-3 px-4 py-3">
+        <span className="text-base w-6 text-center flex-shrink-0">🌙</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+            {isAr ? 'ساعات الهدوء' : lang === 'ur' ? 'خاموشی کے اوقات' : 'Quiet hours'}
+          </p>
+          <p className="text-[10px] text-gray-400 mt-0.5">
+            {isAr ? 'لا تنبيهات في هذه الفترة (ما عدا الطوارئ)' : 'No pushes during this window (except emergencies)'}
+          </p>
+        </div>
+        <button
+          onClick={onToggle}
+          disabled={!loaded}
+          className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+            enabled ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
+          } ${!loaded ? 'opacity-50' : ''}`}
+        >
+          <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+            enabled ? (isAr ? 'right-[22px]' : 'left-[22px]') : (isAr ? 'right-0.5' : 'left-0.5')
+          }`} />
+        </button>
       </div>
-      {CATEGORIES.map((c, i) => {
-        const value = prefs ? (prefs[c.key] ?? true) : true
-        return (
-          <div key={c.key} className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? 'border-t border-gray-50 dark:border-gray-700' : ''}`}>
-            <span className="text-base w-6 text-center flex-shrink-0">{c.icon}</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{t(c.tKey)}</p>
-            </div>
-            <button
-              onClick={() => toggle(c.key, !value)}
-              disabled={prefs === null}
-              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
-                value ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
-              } ${prefs === null ? 'opacity-50' : ''}`}
-              aria-label={t(c.tKey)}
-            >
-              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                value
-                  ? (lang === 'ar' ? 'right-[22px]' : 'left-[22px]')
-                  : (lang === 'ar' ? 'right-0.5' : 'left-0.5')
-              }`} />
-            </button>
-          </div>
-        )
-      })}
+      {enabled && (
+        <div className="flex items-center gap-3 px-4 py-3 border-t border-gray-50 dark:border-gray-700">
+          <span className="text-[10px] uppercase tracking-wide text-gray-400 w-12 flex-shrink-0">
+            {isAr ? 'من' : 'From'}
+          </span>
+          <input
+            type="time"
+            value={minutesToHHMM(start)}
+            onChange={(e) => onStart(e.target.value)}
+            className="flex-1 bg-gray-50 dark:bg-gray-900 rounded-lg px-2 py-1.5 text-sm text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
+          />
+          <span className="text-[10px] uppercase tracking-wide text-gray-400 w-12 flex-shrink-0">
+            {isAr ? 'إلى' : 'To'}
+          </span>
+          <input
+            type="time"
+            value={minutesToHHMM(end)}
+            onChange={(e) => onEnd(e.target.value)}
+            className="flex-1 bg-gray-50 dark:bg-gray-900 rounded-lg px-2 py-1.5 text-sm text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
+          />
+        </div>
+      )}
     </div>
   )
 }

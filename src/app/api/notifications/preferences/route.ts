@@ -5,20 +5,10 @@ import {
   createDefaultPreferences,
   getPreferencesMap,
 } from '@/lib/notifications/preferences'
+import { ALL_CATEGORIES } from '@/lib/notifications/presets'
 import type { PostCategory } from '@prisma/client'
 
-const VALID_CATEGORIES: PostCategory[] = [
-  'HOME_BUSINESSES',
-  'MARKETPLACE',
-  'SERVICES',
-  'RIDES',
-  'REAL_ESTATE',
-  'LOST_FOUND',
-  'NEIGHBORHOOD_REPORTS',
-  'EVENTS',
-  'COMPETITIONS',
-  'GENERAL',
-]
+const VALID_CATEGORIES = ALL_CATEGORIES
 
 /**
  * GET /api/notifications/preferences
@@ -33,9 +23,16 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   await createDefaultPreferences(session.userId)
-  const map = await getPreferencesMap(session.userId)
+  const [map, user] = await Promise.all([
+    getPreferencesMap(session.userId),
+    db.user.findUnique({
+      where: { id: session.userId },
+      select: { notificationPreset: true },
+    }),
+  ])
 
   return NextResponse.json({
+    preset: user?.notificationPreset ?? 'BALANCED',
     preferences: Array.from(map.values()).map((p) => ({
       category: p.category,
       pushEnabled: p.pushEnabled,
@@ -79,25 +76,36 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
-  const result = await db.$transaction(
-    updates.map((u) =>
-      db.notificationPreference.upsert({
-        where: { userId_category: { userId: session.userId, category: u.category } },
-        create: {
-          userId: session.userId,
-          category: u.category,
-          pushEnabled: u.pushEnabled ?? true,
-          inAppEnabled: u.inAppEnabled ?? true,
-        },
-        update: {
-          ...(u.pushEnabled  !== undefined && { pushEnabled:  u.pushEnabled  }),
-          ...(u.inAppEnabled !== undefined && { inAppEnabled: u.inAppEnabled }),
-        },
-      }),
-    ),
-  )
+  // Atomically: write the updates AND demote the user's preset to
+  // MANUAL if it was anything else. The state machine contract:
+  // a single per-category edit means the user is no longer on a
+  // preset — flip it now so the UI cannot lie.
+  const result = await db.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: session.userId },
+      data: { notificationPreset: 'MANUAL' },
+    })
+    return Promise.all(
+      updates.map((u) =>
+        tx.notificationPreference.upsert({
+          where: { userId_category: { userId: session.userId, category: u.category } },
+          create: {
+            userId: session.userId,
+            category: u.category,
+            pushEnabled: u.pushEnabled ?? true,
+            inAppEnabled: u.inAppEnabled ?? true,
+          },
+          update: {
+            ...(u.pushEnabled  !== undefined && { pushEnabled:  u.pushEnabled  }),
+            ...(u.inAppEnabled !== undefined && { inAppEnabled: u.inAppEnabled }),
+          },
+        }),
+      ),
+    )
+  })
 
   return NextResponse.json({
+    preset: 'MANUAL',
     preferences: result.map((r) => ({
       category: r.category,
       pushEnabled: r.pushEnabled,
