@@ -1040,11 +1040,16 @@ export default function ChatClient({
         <div ref={bottomRef} />
       </div>
 
-      {/* Message action overlay — WhatsApp style */}
+      {/* Message action overlay — WhatsApp / iMessage style.
+          The dim/blur of OTHER bubbles is handled per-row by the CSS
+          rule .chat-focus-mode [data-msg-row]:not(.chat-bubble-focus)
+          in globals.css, so the SELECTED bubble stays sharp and fully
+          visible. We render NO backdrop tint here — any z-50 backdrop
+          would sit ABOVE the bubble and dim it, defeating the focus
+          effect. Tap-outside still works via this transparent fullscreen
+          listener. */}
       {selectedMsg && selectedMsgData && (
         <div className="fixed inset-0 z-50" onClick={() => { setSelectedMsg(null); setShowMoreEmojis(false) }}>
-          {/* Dark backdrop with blur */}
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
           {/* Actions bar — positioned near the selected message */}
           {(() => {
