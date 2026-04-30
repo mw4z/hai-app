@@ -1642,13 +1642,13 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
         ) : msg.type === 'DELETED' ? (
           <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 ${
             isMe ? `bg-primary-600/30 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white/30 dark:bg-[#242625]/60 ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
-          } border border-dashed ${isMe ? 'border-primary-400/30' : 'border-gray-300/30 dark:border-gray-600/30'}`}>
-            <p className={`text-[13px] italic ${isMe ? 'text-primary-200/70' : 'text-gray-400 dark:text-gray-500'}`}>
+          } border border-dashed ${isMe ? 'border-primary-400/40' : 'border-gray-300/40 dark:border-gray-600/30'}`}>
+            <p className={`text-[13px] italic ${isMe ? 'text-primary-800/80 dark:text-primary-200/70' : 'text-gray-600 dark:text-gray-400'}`}>
               🚫 {isMe
                 ? (lang === 'en' ? 'You deleted this message' : 'حذفت هذه الرسالة')
                 : (lang === 'en' ? 'This message was deleted' : 'تم حذف هذه الرسالة')}
             </p>
-            <p className={`text-[10px] mt-1 ${isMe ? 'text-primary-200/50' : 'text-gray-400/50'}`}>{timeStr}</p>
+            <p className={`text-[10px] mt-1 ${isMe ? 'text-primary-700/60 dark:text-primary-200/50' : 'text-gray-500/70 dark:text-gray-400/50'}`}>{timeStr}</p>
           </div>
         ) : editingMsg === msg.id ? (
           <div className="max-w-[85%] w-full">
