@@ -2194,12 +2194,21 @@ export default function PostCard({
                   onChange={(e) => setEditCatCategory(e.target.value)}
                   className="mt-1 w-full bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200"
                 >
-                  {[
-                    'NEIGHBORHOOD_REPORTS','LOST_FOUND','EVENTS','SERVICES',
-                    'HOME_BUSINESSES','MARKETPLACE','REAL_ESTATE','RIDES',
-                    'COMPETITIONS','GENERAL',
-                  ].map((c) => (
-                    <option key={c} value={c}>{c}</option>
+                  {([
+                    { key: 'NEIGHBORHOOD_REPORTS', icon: '⚠️', tKey: 'post_v2_NEIGHBORHOOD_REPORTS' as TranslationKey },
+                    { key: 'LOST_FOUND',           icon: '🔍', tKey: 'post_v2_LOST_FOUND'           as TranslationKey },
+                    { key: 'EVENTS',               icon: '🎉', tKey: 'post_v2_EVENTS'               as TranslationKey },
+                    { key: 'SERVICES',             icon: '🔧', tKey: 'post_v2_SERVICES'             as TranslationKey },
+                    { key: 'HOME_BUSINESSES',      icon: '🍱', tKey: 'post_v2_HOME_BUSINESSES'      as TranslationKey },
+                    { key: 'MARKETPLACE',          icon: '🛒', tKey: 'post_v2_MARKETPLACE'          as TranslationKey },
+                    { key: 'REAL_ESTATE',          icon: '🏠', tKey: 'post_v2_REAL_ESTATE'          as TranslationKey },
+                    { key: 'RIDES',                icon: '🚗', tKey: 'post_v2_RIDES'                as TranslationKey },
+                    { key: 'COMPETITIONS',         icon: '🏆', tKey: 'post_v2_COMPETITIONS'         as TranslationKey },
+                    { key: 'GENERAL',              icon: '💬', tKey: 'cat_GENERAL'                  as TranslationKey },
+                  ]).map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.icon} {t(c.tKey)}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -2213,9 +2222,9 @@ export default function PostCard({
                   onChange={(e) => setEditCatIntent(e.target.value)}
                   className="mt-1 w-full bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200"
                 >
-                  <option value="NORMAL">NORMAL</option>
-                  <option value="OFFER">OFFER</option>
-                  <option value="REQUEST">REQUEST</option>
+                  <option value="NORMAL">{lang === 'en' ? 'Normal' : 'عادي'}</option>
+                  <option value="OFFER">{t('post_intent_offer')}</option>
+                  <option value="REQUEST">{t('post_intent_request')}</option>
                 </select>
               </label>
 
@@ -2229,9 +2238,9 @@ export default function PostCard({
                     onChange={(e) => setEditCatMarketplaceType(e.target.value)}
                     className="mt-1 w-full bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200"
                   >
-                    <option value="SELL">SELL</option>
-                    <option value="BUY">BUY</option>
-                    <option value="JOB">JOB</option>
+                    <option value="SELL">🛒 {lang === 'en' ? 'Sell' : 'بيع'}</option>
+                    <option value="BUY">📥 {lang === 'en' ? 'Buy' : 'شراء'}</option>
+                    <option value="JOB">💼 {lang === 'en' ? 'Job' : 'فرصة عمل'}</option>
                   </select>
                 </label>
               )}
