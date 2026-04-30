@@ -1235,7 +1235,9 @@ export default function PostCard({
               the full text inline (no navigation). dir="auto" keeps
               Arabic / English / mixed text rendering correctly per
               paragraph. whitespace-pre-wrap preserves user-entered
-              line breaks once expanded. */}
+              line breaks once expanded. SmartText turns bare URLs,
+              map links, and contact snippets into clickable
+              chips/anchors — same renderer the comments thread uses. */}
           <p
             ref={bodyRef}
             dir="auto"
@@ -1243,7 +1245,7 @@ export default function PostCard({
               bodyExpanded ? '' : 'line-clamp-5'
             }`}
           >
-            {displayBody}
+            <SmartText text={displayBody} />
           </p>
           {bodyOverflows && (
             <button
