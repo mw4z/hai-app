@@ -69,6 +69,20 @@ interface CategoryItem {
   placeholder: string
   placeholderEn: string
   placeholderUr: string
+  /** One-line "what is this for?" description. Renders below the
+   *  title in the picker — main aid for first-time / elderly users. */
+  desc: string
+  descEn: string
+  /** A concrete "مثال" line shown in lighter text. */
+  example: string
+  exampleEn: string
+  /** Search keywords (Arabic + English) — feeds the picker filter so
+   *  typing "سباك" surfaces SERVICES, "للبيع" surfaces MARKETPLACE,
+   *  etc. The category name and example are also matched. */
+  keywords: string[]
+  /** Visually elevate the card (urgent / safety). NEIGHBORHOOD_REPORTS
+   *  + LOST_FOUND get a subtle ring + warmer surface. */
+  important?: boolean
 }
 
 // Order is UX-driven (real frequency of use), NOT alphabetical and NOT
@@ -89,6 +103,11 @@ const CATEGORIES: CategoryItem[] = [
     labelEn: 'Marketplace',
     labelUr: 'مارکیٹ',
     icon: '🛒',
+    desc: 'بيع أو شراء أو فرص عمل',
+    descEn: 'Sell, buy, or post a job',
+    example: 'مثال: جوال للبيع، أبحث عن أثاث، فرصة عمل',
+    exampleEn: 'e.g., phone for sale, looking for furniture, job',
+    keywords: ['بيع', 'شراء', 'سوق', 'مستعمل', 'جوال', 'أثاث', 'وظيفة', 'فرصة عمل', 'sell', 'buy', 'job', 'used'],
     placeholder: 'مثال: للبيع جهاز تكييف مستعمل بحالة ممتازة',
     placeholderEn: 'Example: Used AC for sale — excellent condition',
     placeholderUr: 'مثال: استعمال شدہ اے سی برائے فروخت — بہترین حالت',
@@ -99,6 +118,11 @@ const CATEGORIES: CategoryItem[] = [
     labelEn: 'Services',
     labelUr: 'خدمات',
     icon: '🔧',
+    desc: 'اعرض خدماتك أو اطلب خدمة',
+    descEn: 'Offer or request a service',
+    example: 'مثال: سباك، كهربائي، تنظيف',
+    exampleEn: 'e.g., plumber, electrician, cleaning',
+    keywords: ['خدمة', 'سباك', 'كهربائي', 'نجار', 'تنظيف', 'صيانة', 'فني', 'service', 'plumber', 'electrician', 'cleaning'],
     placeholder: 'مثال: فني تكييف — خبرة 10 سنوات — يخدم الحي',
     placeholderEn: 'Example: AC technician — 10y experience — serves the area',
     placeholderUr: 'مثال: اے سی ٹیکنیشن — 10 سال تجربہ — محلے میں خدمت',
@@ -109,6 +133,11 @@ const CATEGORIES: CategoryItem[] = [
     labelEn: 'Home Businesses',
     labelUr: 'گھریلو کاروبار',
     icon: '🍱',
+    desc: 'أكل بيتي، حلويات، قهوة',
+    descEn: 'Home food, sweets, coffee',
+    example: 'مثال: كبسة، كيك، حلويات',
+    exampleEn: 'e.g., kabsa, cakes, sweets',
+    keywords: ['أكل', 'طبخ', 'حلويات', 'كيك', 'قهوة', 'كبسة', 'بيتي', 'food', 'cake', 'coffee', 'sweets'],
     placeholder: 'مثال: متوفر اليوم كبسة دجاج وسمبوسة — الطلب على الخاص',
     placeholderEn: 'Example: Today: chicken kabsa and samosa — order via DM',
     placeholderUr: 'مثال: آج چکن کبسہ اور سموسے دستیاب — آرڈر ڈی ایم پر',
@@ -120,6 +149,11 @@ const CATEGORIES: CategoryItem[] = [
     labelEn: 'Rides',
     labelUr: 'سواری',
     icon: '🚗',
+    desc: 'اطلب أو اعرض توصيلة',
+    descEn: 'Offer or request a ride',
+    example: 'مثال: محتاج توصيلة للعمل، أوصل يومياً',
+    exampleEn: 'e.g., need a ride to work, daily trips',
+    keywords: ['مشوار', 'توصيل', 'توصيلة', 'سائق', 'ride', 'lift'],
     placeholder: '',
     placeholderEn: '',
     placeholderUr: '',
@@ -130,17 +164,28 @@ const CATEGORIES: CategoryItem[] = [
     labelEn: 'Real Estate',
     labelUr: 'جائیداد',
     icon: '🏠',
+    desc: 'شقق، فلل، أراضي',
+    descEn: 'Apartments, villas, land',
+    example: 'مثال: شقة للإيجار، أرض للبيع',
+    exampleEn: 'e.g., apartment for rent, land for sale',
+    keywords: ['شقة', 'فيلا', 'إيجار', 'تمليك', 'أرض', 'عقار', 'apartment', 'rent', 'villa', 'land'],
     placeholder: 'مثال: شقة للإيجار — 3 غرف — التواصل على الخاص',
     placeholderEn: 'Example: Apartment for rent — 3 bedrooms — DM to contact',
     placeholderUr: 'مثال: کرائے کیلئے فلیٹ — 3 کمرے — رابطہ ڈی ایم پر',
   },
-  // Row 3
+  // Row 3 — important / urgent
   {
     key: 'NEIGHBORHOOD_REPORTS',
     label: 'بلاغات الحي',
     labelEn: 'Neighborhood Reports',
     labelUr: 'محلے کی رپورٹس',
     icon: '⚠️',
+    desc: 'سلامة وأمن وأعطال الحي',
+    descEn: 'Safety, security, outages',
+    example: 'مثال: انقطاع كهرباء، حادث، تحذير',
+    exampleEn: 'e.g., power outage, accident, warning',
+    keywords: ['بلاغ', 'تحذير', 'انقطاع', 'حريق', 'سرقة', 'حادث', 'مشبوه', 'report', 'warning', 'fire', 'theft'],
+    important: true,
     placeholder: 'مثال: انقطاع المياه في الشارع الرئيسي',
     placeholderEn: 'Example: Water outage on main street',
     placeholderUr: 'مثال: مین سٹریٹ پر پانی کی بندش',
@@ -151,17 +196,28 @@ const CATEGORIES: CategoryItem[] = [
     labelEn: 'Lost & Found',
     labelUr: 'گمشدہ اشیاء',
     icon: '🔍',
+    desc: 'فقدت أو وجدت شيئاً',
+    descEn: 'Lost or found something',
+    example: 'مثال: محفظة، مفاتيح، قطة',
+    exampleEn: 'e.g., wallet, keys, cat',
+    keywords: ['مفقود', 'ضاع', 'لقيت', 'محفظة', 'مفاتيح', 'قطة', 'كلب', 'lost', 'found', 'wallet', 'keys'],
+    important: true,
     placeholder: 'مثال: وجدت مفاتيح عند المسجد',
     placeholderEn: 'Example: Found keys near the mosque',
     placeholderUr: 'مثال: مسجد کے پاس چابیاں ملی ہیں',
   },
-  // Row 4
+  // Row 4 — social / optional
   {
     key: 'EVENTS',
     label: 'فعاليات ومناسبات',
     labelEn: 'Events',
     labelUr: 'تقریبات',
     icon: '🎉',
+    desc: 'فعاليات وتجمعات الحي',
+    descEn: 'Local events and gatherings',
+    example: 'مثال: تجمع إفطار، دورة، مسابقة',
+    exampleEn: 'e.g., iftar gathering, course, contest',
+    keywords: ['فعالية', 'حفل', 'دعوة', 'تجمع', 'دورة', 'event', 'gathering', 'class'],
     placeholder: 'مثال: توزيع إفطار رمضان عند مسجد الحي الساعة 6',
     placeholderEn: 'Example: Ramadan iftar distribution at the mosque at 6pm',
     placeholderUr: 'مثال: محلے کی مسجد پر شام 6 بجے افطار کی تقسیم',
@@ -172,6 +228,11 @@ const CATEGORIES: CategoryItem[] = [
     labelEn: 'Competitions',
     labelUr: 'مقابلے',
     icon: '🏆',
+    desc: 'مسابقات وجوائز للحي',
+    descEn: 'Contests and prizes',
+    example: 'مثال: مسابقة قرآن، جوائز رمضان',
+    exampleEn: 'e.g., Quran contest, Ramadan prizes',
+    keywords: ['مسابقة', 'جائزة', 'فائز', 'contest', 'prize', 'winner'],
     placeholder: 'مثال: مسابقة حفظ القرآن للأطفال — جوائز قيمة',
     placeholderEn: 'Example: Quran memorization contest for kids — great prizes',
     placeholderUr: 'مثال: بچوں کیلئے قرآن حفظ کا مقابلہ — قیمتی انعامات',
@@ -196,6 +257,9 @@ export default function NewPostPage() {
   // Marketplace listing subtype — only meaningful when category=MARKETPLACE.
   // Default SELL matches the schema default and keeps existing flows.
   const [marketplaceType, setMarketplaceType] = useState<'SELL' | 'BUY' | 'JOB'>('SELL')
+  // Picker search query — filters the category tiles by name + desc +
+  // example + keywords. Empty string shows everything.
+  const [pickerSearch, setPickerSearch] = useState('')
   // Only visible providers (ACTIVE/VERIFIED) may post in the SERVICES category.
   const [canPostServices, setCanPostServices] = useState(false)
   // SUPER_ADMIN can post into any neighborhood and any category.
@@ -620,58 +684,140 @@ export default function NewPostPage() {
           </div>
         )}
 
-        {/* Step 1: Category — flat 3-column grid of v2 buckets. */}
+        {/* Step 1: Category — elderly-friendly rich tiles. 2-column
+            grid with title + 1-line description + example, larger
+            touch targets, search filter, "Not sure?" escape hatch.
+            Visual hierarchy: NEIGHBORHOOD_REPORTS + LOST_FOUND get an
+            amber ring + warmer surface (cat.important). */}
         {step === 'category' && (
           <div className="space-y-4 pb-24" data-tour="post-categories" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">
-              {lang === 'en' ? 'Choose a category' : lang === 'ur' ? 'زمرہ منتخب کریں' : 'اختر نوع المنشور'}
-            </p>
-            <div className="grid grid-cols-3 gap-2.5">
-              {visibleCategories.map((cat) => {
-                const restricted = isCategoryRestricted(cat.key)
-                return (
-                  <button
-                    key={cat.key}
-                    onClick={() => {
-                      if (restricted) {
-                        // Tell the user why they can't pick this. The
-                        // server-side check is the canonical guard;
-                        // this is just UX feedback.
-                        if (cat.key === 'SERVICES') {
-                          toast.error(lang === 'en'
-                            ? 'Services posts are for verified providers only'
-                            : lang === 'ur'
-                              ? 'خدمات کی پوسٹس صرف تصدیق شدہ خدمات فراہم کرنے والوں کیلئے'
-                              : 'هذا القسم متاح فقط لمقدمي الخدمات')
-                        } else {
-                          toast.error(lang === 'en'
-                            ? 'Admin-only category'
-                            : lang === 'ur'
-                              ? 'صرف منتظمین کیلئے'
-                              : 'هذا القسم متاح فقط للمشرفين')
-                        }
-                        return
-                      }
-                      // RIDES routes to the structured ride form — same
-                      // behavior as the legacy RIDE_REQUEST entry.
-                      if (cat.key === 'RIDES') { router.push('/rides/new'); return }
-                      setCategory(cat.key); setStep('content')
-                    }}
-                    className={`flex flex-col items-center justify-center gap-1.5 aspect-square p-3 rounded-xl border active:scale-[0.97] transition-transform ${
-                      restricted
-                        ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 opacity-50'
-                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-primary-300'
-                    }`}
-                    aria-disabled={restricted}
-                  >
-                    <span className="text-2xl">{cat.icon}</span>
-                    <span className="text-[11px] font-medium text-gray-800 dark:text-white text-center leading-tight">
-                      {labelOf(cat)}
-                    </span>
-                  </button>
-                )
-              })}
+            {/* Top guidance — primary instruction + helper. Larger
+                font for older users; lang switches Arabic/English. */}
+            <div className="space-y-1">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                {lang === 'en' ? 'What do you want to post?' : lang === 'ur' ? 'آپ کیا پوسٹ کرنا چاہتے ہیں؟' : 'وش حاب تنشر اليوم؟'}
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {lang === 'en' ? 'Tap the section that fits to start posting.' : lang === 'ur' ? 'پوسٹ شروع کرنے کیلئے مناسب سیکشن دبائیں۔' : 'اضغط على القسم المناسب لبدء النشر'}
+              </p>
             </div>
+
+            {/* Search — typing "سباك" surfaces SERVICES, "للبيع"
+                surfaces MARKETPLACE, etc. Matches name + desc + example
+                + keywords case-insensitively. */}
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="search"
+                value={pickerSearch}
+                onChange={(e) => setPickerSearch(e.target.value)}
+                placeholder={lang === 'en' ? 'Search post type…' : lang === 'ur' ? 'پوسٹ کی قسم تلاش کریں…' : 'ابحث عن نوع المنشور...'}
+                aria-label={lang === 'en' ? 'Search post type' : 'ابحث عن نوع المنشور'}
+                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 pe-10 text-base text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:border-primary-400"
+              />
+              <span aria-hidden className="absolute top-1/2 -translate-y-1/2 end-3 text-gray-400">🔎</span>
+            </div>
+
+            {/* Tiles — 2-column on phones (more readable than 3),
+                3-column from sm+ (tablet/desktop). Square-ish on mobile,
+                slightly taller on larger screens for breathing room. */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {(() => {
+                const q = pickerSearch.trim().toLowerCase()
+                const filtered = q
+                  ? visibleCategories.filter((c) => {
+                      const haystack = [
+                        c.label, c.labelEn, c.labelUr,
+                        c.desc, c.descEn,
+                        c.example, c.exampleEn,
+                        ...(c.keywords || []),
+                      ].join(' ').toLowerCase()
+                      return haystack.includes(q)
+                    })
+                  : visibleCategories
+                if (filtered.length === 0) {
+                  return (
+                    <div className="col-span-2 sm:col-span-3 text-center py-8 text-sm text-gray-500 dark:text-gray-400">
+                      {lang === 'en'
+                        ? 'No matching section. Try a different word.'
+                        : 'لم نعثر على قسم مطابق. جرّب كلمة أخرى.'}
+                    </div>
+                  )
+                }
+                return filtered.map((cat) => {
+                  const restricted = isCategoryRestricted(cat.key)
+                  return (
+                    <button
+                      key={cat.key}
+                      onClick={() => {
+                        if (restricted) {
+                          if (cat.key === 'SERVICES') {
+                            toast.error(lang === 'en'
+                              ? 'Services posts are for verified providers only'
+                              : lang === 'ur'
+                                ? 'خدمات کی پوسٹس صرف تصدیق شدہ خدمات فراہم کرنے والوں کیلئے'
+                                : 'هذا القسم متاح فقط لمقدمي الخدمات')
+                          } else {
+                            toast.error(lang === 'en'
+                              ? 'Admin-only category'
+                              : lang === 'ur'
+                                ? 'صرف منتظمین کیلئے'
+                                : 'هذا القسم متاح فقط للمشرفين')
+                          }
+                          return
+                        }
+                        if (cat.key === 'RIDES') { router.push('/rides/new'); return }
+                        setCategory(cat.key); setStep('content')
+                      }}
+                      // min-h-[136px] keeps every tile a comfortable
+                      // touch target (>>44px), even when description
+                      // wraps. text-start so Arabic + English read
+                      // naturally per dir.
+                      className={`relative flex flex-col gap-1 text-start p-3.5 rounded-2xl border-2 min-h-[136px] active:scale-[0.97] transition-transform shadow-sm ${
+                        restricted
+                          ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 opacity-50'
+                          : cat.important
+                            ? 'border-amber-300 dark:border-amber-500/60 bg-amber-50 dark:bg-amber-900/20 hover:border-amber-400'
+                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-primary-300'
+                      }`}
+                      aria-disabled={restricted}
+                      aria-label={labelOf(cat)}
+                    >
+                      <span className="text-3xl leading-none mb-1" aria-hidden>{cat.icon}</span>
+                      <span className="text-[15px] font-bold text-gray-900 dark:text-white leading-tight">
+                        {labelOf(cat)}
+                      </span>
+                      <span className="text-[12px] text-gray-700 dark:text-gray-300 leading-tight">
+                        {lang === 'en' ? cat.descEn : cat.desc}
+                      </span>
+                      <span className="text-[11px] text-gray-400 dark:text-gray-500 leading-tight mt-auto pt-1">
+                        {lang === 'en' ? cat.exampleEn : cat.example}
+                      </span>
+                    </button>
+                  )
+                })
+              })()}
+            </div>
+
+            {/* "Not sure?" escape — sends the user straight to the Ask
+                composer; the server-side classifier auto-suggests a
+                category from their text. */}
+            <button
+              type="button"
+              onClick={() => router.push('/ask')}
+              className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-dashed border-primary-300 dark:border-primary-500/50 bg-primary-50/40 dark:bg-primary-900/10 active:scale-[0.99] transition-transform"
+            >
+              <span className="text-2xl flex-shrink-0" aria-hidden>🤔</span>
+              <div className="flex-1 min-w-0 text-start">
+                <p className="text-base font-bold text-gray-900 dark:text-white">
+                  {lang === 'en' ? 'Not sure?' : lang === 'ur' ? 'یقین نہیں؟' : 'مو متأكد؟'}
+                </p>
+                <p className="text-[12px] text-gray-600 dark:text-gray-400 leading-snug">
+                  {lang === 'en' ? "Just write — we'll suggest the right section." : 'اكتب فقط ونساعدك نختار القسم المناسب'}
+                </p>
+              </div>
+              <span aria-hidden className="text-gray-400">‹</span>
+            </button>
           </div>
         )}
 
