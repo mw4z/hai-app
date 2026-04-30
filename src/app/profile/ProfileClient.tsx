@@ -1322,57 +1322,38 @@ export default function ProfileClient({ user, postCount }: Props) {
         setOpenSection={setOpenSection}
       >
       <div className="space-y-3">
-        {/* ── Preset picker (4 cards: URGENT_ONLY / BALANCED / EVERYTHING / MANUAL) ── */}
+        {/* ── 1) Personal alerts (about YOUR activity — DMs, replies,
+                reactions, ride updates, system). Always at the top so
+                the user sees that the things touching them personally
+                are honored regardless of preset / quiet hours. ── */}
+        <NotifGroup
+          title={lang === 'en' ? 'Personal alerts' : lang === 'ur' ? 'ذاتی اطلاعات' : 'تنبيهاتك الشخصية'}
+          items={[
+            { key: 'notifyMessages',  label: t('notif_messages_toggle'),  value: notifyMessages,  set: setNotifyMessages,  icon: '✉️', desc: lang === 'en' ? 'Private messages from neighbors' : lang === 'ur' ? 'پڑوسیوں کے نجی پیغامات' : 'الرسائل الخاصة من الجيران' },
+            { key: 'notifyComments',  label: t('notif_comments_toggle'),  value: notifyComments,  set: setNotifyComments,  icon: '💬', desc: lang === 'en' ? 'When someone comments on your post' : lang === 'ur' ? 'جب کوئی تبصرہ کرے' : 'لما أحد يعلّق على منشورك' },
+            { key: 'notifyReplies',   label: t('notif_replies_toggle'),   value: notifyReplies,   set: setNotifyReplies,   icon: '↩️', desc: lang === 'en' ? 'When someone replies to your comment' : lang === 'ur' ? 'جب کوئی جواب دے' : 'لما أحد يرد على تعليقك' },
+            { key: 'notifyReactions', label: t('notif_reactions_toggle'), value: notifyReactions, set: setNotifyReactions, icon: '😊', desc: lang === 'en' ? 'When someone reacts to your post' : lang === 'ur' ? 'جب کوئی ردعمل دے' : 'لما أحد يتفاعل مع منشورك' },
+            { key: 'notifyRides',     label: t('notif_rides_toggle'),     value: notifyRides,     set: setNotifyRides,     icon: '🚗', desc: lang === 'en' ? 'Updates on rides you offered or requested' : lang === 'ur' ? 'سواری کی تازہ کاری' : 'تحديثات المشاوير اللي عرضتها أو طلبتها' },
+            { key: 'notifySystem',    label: t('notif_system_toggle'),    value: notifySystem,    set: setNotifySystem,    icon: '🔔', desc: lang === 'en' ? 'Important account & app updates' : lang === 'ur' ? 'اہم اپ ڈیٹس اور اعلانات' : 'تحديثات الحساب والتطبيق المهمة' },
+          ]}
+          lang={lang}
+          onToggle={toggleNotifPref}
+        />
+
+        {/* ── 2) Neighborhood preset (4 cards) ── */}
         <NotifPresetGroup lang={lang} t={t} />
 
-        {/* ── Quiet hours row ── */}
+        {/* ── 3) Quiet hours row ── */}
         <NotifQuietHoursGroup lang={lang} t={t} />
 
-        {/* ── Posts & Interactions ── */}
-        <NotifGroup
-          title={lang === 'en' ? 'Posts & Interactions' : lang === 'ur' ? 'پوسٹس اور ردعمل' : 'المنشورات والتفاعل'}
-          items={[
-            { key: 'notifyComments',   label: t('notif_comments_toggle'),  value: notifyComments,   set: setNotifyComments,   icon: '💬', desc: lang === 'en' ? 'When someone comments on your post' : lang === 'ur' ? 'جب کوئی تبصرہ کرے' : 'لما أحد يعلّق على منشورك' },
-            { key: 'notifyReactions',  label: t('notif_reactions_toggle'), value: notifyReactions,  set: setNotifyReactions,  icon: '😊', desc: lang === 'en' ? 'When someone reacts to your post' : lang === 'ur' ? 'جب کوئی ردعمل دے' : 'لما أحد يتفاعل مع منشورك' },
-            { key: 'notifyReplies',    label: t('notif_replies_toggle'),   value: notifyReplies,    set: setNotifyReplies,    icon: '↩️', desc: lang === 'en' ? 'When someone replies to your comment' : lang === 'ur' ? 'جب کوئی جواب دے' : 'لما أحد يرد على تعليقك' },
-          ]}
-          lang={lang}
-          onToggle={toggleNotifPref}
-        />
-
-        {/* ── Messages & Chat ── */}
-        <NotifGroup
-          title={lang === 'en' ? 'Messages & Chat' : lang === 'ur' ? 'پیغامات اور چیٹ' : 'الرسائل والمحادثات'}
-          items={[
-            { key: 'notifyMessages', label: t('notif_messages_toggle'), value: notifyMessages, set: setNotifyMessages, icon: '✉️', desc: lang === 'en' ? 'Private messages from neighbors' : lang === 'ur' ? 'پڑوسیوں کے نجی پیغامات' : 'الرسائل الخاصة من الجيران' },
-          ]}
-          lang={lang}
-          onToggle={toggleNotifPref}
-        />
-
-        {/* ── Rides ── */}
-        <NotifGroup
-          title={lang === 'en' ? 'Rides' : lang === 'ur' ? 'سواریاں' : 'المشاوير'}
-          items={[
-            { key: 'notifyRides', label: t('notif_rides_toggle'), value: notifyRides, set: setNotifyRides, icon: '🚗', desc: lang === 'en' ? 'Offers, status changes, arrivals' : lang === 'ur' ? 'پیشکشیں، حالت، آمد' : 'العروض، تحديثات الحالة، الوصول' },
-          ]}
-          lang={lang}
-          onToggle={toggleNotifPref}
-        />
-
-        {/* ── Neighborhood & System ── */}
-        <NotifGroup
-          title={lang === 'en' ? 'Neighborhood & System' : lang === 'ur' ? 'محلہ اور سسٹم' : 'الحي والنظام'}
-          items={[
-            { key: 'notifyLookingFor', label: t('notif_looking_toggle'),  value: notifyLookingFor, set: setNotifyLookingFor, icon: '🔎', desc: lang === 'en' ? 'When someone needs help nearby' : lang === 'ur' ? 'جب قریب مدد مانگی جائے' : 'لما أحد يطلب مساعدة في حيّك' },
-            { key: 'notifySystem',     label: t('notif_system_toggle'),   value: notifySystem,     set: setNotifySystem,     icon: '🔔', desc: lang === 'en' ? 'Important updates and announcements' : lang === 'ur' ? 'اہم اپ ڈیٹس اور اعلانات' : 'تحديثات وإعلانات مهمة' },
-          ]}
-          lang={lang}
-          onToggle={toggleNotifPref}
-        />
+        {/* notifyLookingFor was here — now subsumed by the preset model.
+            URGENT_ONLY users get help-requests via the intent override;
+            BALANCED + EVERYTHING get them via the SERVICES category. The
+            DB column is preserved for back-compat with the dedicated
+            LOOKING_FOR_POST notification path; no UI control needed. */}
 
         {/* Per-category list now lives inside <NotifPresetGroup> and only
-            renders when the user is on MANUAL — see top of this section. */}
+            renders when the user is on MANUAL — see above. */}
 
         {/* ── Diagnostic: live test push — hidden for now.
             Kept the PushTestButton component + /api/debug/push-test
