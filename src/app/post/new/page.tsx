@@ -257,9 +257,6 @@ export default function NewPostPage() {
   // Marketplace listing subtype — only meaningful when category=MARKETPLACE.
   // Default SELL matches the schema default and keeps existing flows.
   const [marketplaceType, setMarketplaceType] = useState<'SELL' | 'BUY' | 'JOB'>('SELL')
-  // Picker search query — filters the category tiles by name + desc +
-  // example + keywords. Empty string shows everything.
-  const [pickerSearch, setPickerSearch] = useState('')
   // Only visible providers (ACTIVE/VERIFIED) may post in the SERVICES category.
   const [canPostServices, setCanPostServices] = useState(false)
   // SUPER_ADMIN can post into any neighborhood and any category.
@@ -686,9 +683,9 @@ export default function NewPostPage() {
 
         {/* Step 1: Category — elderly-friendly rich tiles. 2-column
             grid with title + 1-line description + example, larger
-            touch targets, search filter, "Not sure?" escape hatch.
-            Visual hierarchy: NEIGHBORHOOD_REPORTS + LOST_FOUND get an
-            amber ring + warmer surface (cat.important). */}
+            touch targets. Visual hierarchy: NEIGHBORHOOD_REPORTS +
+            LOST_FOUND get an amber ring + warmer surface
+            (cat.important). */}
         {step === 'category' && (
           <div className="space-y-4 pb-24" data-tour="post-categories" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
             {/* Top guidance — primary instruction + helper. Larger
@@ -702,122 +699,62 @@ export default function NewPostPage() {
               </p>
             </div>
 
-            {/* Search — typing "سباك" surfaces SERVICES, "للبيع"
-                surfaces MARKETPLACE, etc. Matches name + desc + example
-                + keywords case-insensitively. */}
-            <div className="relative">
-              <input
-                type="text"
-                inputMode="search"
-                value={pickerSearch}
-                onChange={(e) => setPickerSearch(e.target.value)}
-                placeholder={lang === 'en' ? 'Search post type…' : lang === 'ur' ? 'پوسٹ کی قسم تلاش کریں…' : 'ابحث عن نوع المنشور...'}
-                aria-label={lang === 'en' ? 'Search post type' : 'ابحث عن نوع المنشور'}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 pe-10 text-base text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:border-primary-400"
-              />
-              <span aria-hidden className="absolute top-1/2 -translate-y-1/2 end-3 text-gray-400">🔎</span>
-            </div>
-
             {/* Tiles — 2-column on phones (more readable than 3),
-                3-column from sm+ (tablet/desktop). Square-ish on mobile,
-                slightly taller on larger screens for breathing room. */}
+                3-column from sm+ (tablet/desktop). */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {(() => {
-                const q = pickerSearch.trim().toLowerCase()
-                const filtered = q
-                  ? visibleCategories.filter((c) => {
-                      const haystack = [
-                        c.label, c.labelEn, c.labelUr,
-                        c.desc, c.descEn,
-                        c.example, c.exampleEn,
-                        ...(c.keywords || []),
-                      ].join(' ').toLowerCase()
-                      return haystack.includes(q)
-                    })
-                  : visibleCategories
-                if (filtered.length === 0) {
-                  return (
-                    <div className="col-span-2 sm:col-span-3 text-center py-8 text-sm text-gray-500 dark:text-gray-400">
-                      {lang === 'en'
-                        ? 'No matching section. Try a different word.'
-                        : 'لم نعثر على قسم مطابق. جرّب كلمة أخرى.'}
-                    </div>
-                  )
-                }
-                return filtered.map((cat) => {
-                  const restricted = isCategoryRestricted(cat.key)
-                  return (
-                    <button
-                      key={cat.key}
-                      onClick={() => {
-                        if (restricted) {
-                          if (cat.key === 'SERVICES') {
-                            toast.error(lang === 'en'
-                              ? 'Services posts are for verified providers only'
-                              : lang === 'ur'
-                                ? 'خدمات کی پوسٹس صرف تصدیق شدہ خدمات فراہم کرنے والوں کیلئے'
-                                : 'هذا القسم متاح فقط لمقدمي الخدمات')
-                          } else {
-                            toast.error(lang === 'en'
-                              ? 'Admin-only category'
-                              : lang === 'ur'
-                                ? 'صرف منتظمین کیلئے'
-                                : 'هذا القسم متاح فقط للمشرفين')
-                          }
-                          return
+              {visibleCategories.map((cat) => {
+                const restricted = isCategoryRestricted(cat.key)
+                return (
+                  <button
+                    key={cat.key}
+                    onClick={() => {
+                      if (restricted) {
+                        if (cat.key === 'SERVICES') {
+                          toast.error(lang === 'en'
+                            ? 'Services posts are for verified providers only'
+                            : lang === 'ur'
+                              ? 'خدمات کی پوسٹس صرف تصدیق شدہ خدمات فراہم کرنے والوں کیلئے'
+                              : 'هذا القسم متاح فقط لمقدمي الخدمات')
+                        } else {
+                          toast.error(lang === 'en'
+                            ? 'Admin-only category'
+                            : lang === 'ur'
+                              ? 'صرف منتظمین کیلئے'
+                              : 'هذا القسم متاح فقط للمشرفين')
                         }
-                        if (cat.key === 'RIDES') { router.push('/rides/new'); return }
-                        setCategory(cat.key); setStep('content')
-                      }}
-                      // min-h-[136px] keeps every tile a comfortable
-                      // touch target (>>44px), even when description
-                      // wraps. text-start so Arabic + English read
-                      // naturally per dir.
-                      className={`relative flex flex-col gap-1 text-start p-3.5 rounded-2xl border-2 min-h-[136px] active:scale-[0.97] transition-transform shadow-sm focus:outline-none focus-visible:outline-none ${
-                        restricted
-                          ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 opacity-50'
-                          : cat.important
-                            ? 'border-amber-300 dark:border-amber-500/60 bg-amber-50 dark:bg-amber-900/20'
-                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
-                      }`}
-                      aria-disabled={restricted}
-                      aria-label={labelOf(cat)}
-                    >
-                      <span className="text-3xl leading-none mb-1" aria-hidden>{cat.icon}</span>
-                      <span className="text-[15px] font-bold text-gray-900 dark:text-white leading-tight">
-                        {labelOf(cat)}
-                      </span>
-                      <span className="text-[12px] text-gray-700 dark:text-gray-300 leading-tight">
-                        {lang === 'en' ? cat.descEn : cat.desc}
-                      </span>
-                      <span className="text-[11px] text-gray-400 dark:text-gray-500 leading-tight mt-auto pt-1">
-                        {lang === 'en' ? cat.exampleEn : cat.example}
-                      </span>
-                    </button>
-                  )
-                })
-              })()}
+                        return
+                      }
+                      if (cat.key === 'RIDES') { router.push('/rides/new'); return }
+                      setCategory(cat.key); setStep('content')
+                    }}
+                    // min-h-[136px] keeps every tile a comfortable
+                    // touch target (>>44px), even when description
+                    // wraps. text-start so Arabic + English read
+                    // naturally per dir.
+                    className={`relative flex flex-col gap-1 text-start p-3.5 rounded-2xl border-2 min-h-[136px] active:scale-[0.97] transition-transform shadow-sm focus:outline-none focus-visible:outline-none ${
+                      restricted
+                        ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 opacity-50'
+                        : cat.important
+                          ? 'border-amber-300 dark:border-amber-500/60 bg-amber-50 dark:bg-amber-900/20'
+                          : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                    }`}
+                    aria-disabled={restricted}
+                    aria-label={labelOf(cat)}
+                  >
+                    <span className="text-3xl leading-none mb-1" aria-hidden>{cat.icon}</span>
+                    <span className="text-[15px] font-bold text-gray-900 dark:text-white leading-tight">
+                      {labelOf(cat)}
+                    </span>
+                    <span className="text-[12px] text-gray-700 dark:text-gray-300 leading-tight">
+                      {lang === 'en' ? cat.descEn : cat.desc}
+                    </span>
+                    <span className="text-[11px] text-gray-400 dark:text-gray-500 leading-tight mt-auto pt-1">
+                      {lang === 'en' ? cat.exampleEn : cat.example}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
-
-            {/* "Not sure?" escape — sends the user straight to the Ask
-                composer; the server-side classifier auto-suggests a
-                category from their text. */}
-            <button
-              type="button"
-              onClick={() => router.push('/ask')}
-              className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-dashed border-primary-300 dark:border-primary-500/50 bg-primary-50/40 dark:bg-primary-900/10 active:scale-[0.99] transition-transform"
-            >
-              <span className="text-2xl flex-shrink-0" aria-hidden>🤔</span>
-              <div className="flex-1 min-w-0 text-start">
-                <p className="text-base font-bold text-gray-900 dark:text-white">
-                  {lang === 'en' ? 'Not sure?' : lang === 'ur' ? 'یقین نہیں؟' : 'مو متأكد؟'}
-                </p>
-                <p className="text-[12px] text-gray-600 dark:text-gray-400 leading-snug">
-                  {lang === 'en' ? "Just write — we'll suggest the right section." : 'اكتب فقط ونساعدك نختار القسم المناسب'}
-                </p>
-              </div>
-              <span aria-hidden className="text-gray-400">‹</span>
-            </button>
           </div>
         )}
 
