@@ -773,12 +773,12 @@ export default function NewPostPage() {
                       // touch target (>>44px), even when description
                       // wraps. text-start so Arabic + English read
                       // naturally per dir.
-                      className={`relative flex flex-col gap-1 text-start p-3.5 rounded-2xl border-2 min-h-[136px] active:scale-[0.97] transition-transform shadow-sm ${
+                      className={`relative flex flex-col gap-1 text-start p-3.5 rounded-2xl border-2 min-h-[136px] active:scale-[0.97] transition-transform shadow-sm focus:outline-none focus-visible:outline-none ${
                         restricted
                           ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 opacity-50'
                           : cat.important
-                            ? 'border-amber-300 dark:border-amber-500/60 bg-amber-50 dark:bg-amber-900/20 hover:border-amber-400'
-                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-primary-300'
+                            ? 'border-amber-300 dark:border-amber-500/60 bg-amber-50 dark:bg-amber-900/20'
+                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
                       }`}
                       aria-disabled={restricted}
                       aria-label={labelOf(cat)}
