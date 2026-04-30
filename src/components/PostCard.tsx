@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -188,6 +188,13 @@ export default function PostCard({
   const [reported, setReported] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [reportingUser, setReportingUser] = useState(false)
+  // Long-body expand toggle. Default collapsed (clamped). The
+  // "overflow" flag is computed in a layout effect by comparing
+  // scrollHeight to clientHeight on the clamped paragraph; without
+  // this, every short post would show a useless "See more" button.
+  const [bodyExpanded, setBodyExpanded] = useState(false)
+  const [bodyOverflows, setBodyOverflows] = useState(false)
+  const bodyRef = useRef<HTMLParagraphElement | null>(null)
   const [showEditCategory, setShowEditCategory] = useState(false)
   const [editCatBusy, setEditCatBusy] = useState(false)
   const [editCatCategory, setEditCatCategory] = useState<string>(post.category)
@@ -323,6 +330,20 @@ export default function PostCard({
   }
   const displayTitle = showTranslated && translated ? translated.title : postData.title
   const displayBody  = showTranslated && translated ? translated.body  : postData.body
+
+  // Detect whether the clamped body actually overflows, so we only
+  // show "See more / عرض المزيد" when there's more content to reveal.
+  // Re-measures whenever the rendered body text changes (edit, translate).
+  // useLayoutEffect runs synchronously before paint so the button
+  // doesn't flicker into place after first paint on iOS WebView.
+  useLayoutEffect(() => {
+    if (bodyExpanded) return
+    const el = bodyRef.current
+    if (!el) return
+    // +1 px tolerance for sub-pixel rounding on hi-DPI screens.
+    const overflows = el.scrollHeight > el.clientHeight + 1
+    if (overflows !== bodyOverflows) setBodyOverflows(overflows)
+  }, [displayBody, bodyExpanded])
   const pickerRef = useRef<HTMLDivElement>(null)
   const reactionTriggerRef = useRef<HTMLButtonElement>(null)
 
@@ -1210,7 +1231,33 @@ export default function PostCard({
       ) : (
         <>
           <h3 className="hai-body-strong hai-mb-1 selectable-text">{displayTitle}</h3>
-          <p className="hai-body hai-tc-sub line-clamp-3 selectable-text">{displayBody}</p>
+          {/* Body — clamped to 5 lines by default. The toggle reveals
+              the full text inline (no navigation). dir="auto" keeps
+              Arabic / English / mixed text rendering correctly per
+              paragraph. whitespace-pre-wrap preserves user-entered
+              line breaks once expanded. */}
+          <p
+            ref={bodyRef}
+            dir="auto"
+            className={`hai-body hai-tc-sub selectable-text whitespace-pre-wrap ${
+              bodyExpanded ? '' : 'line-clamp-5'
+            }`}
+          >
+            {displayBody}
+          </p>
+          {bodyOverflows && (
+            <button
+              type="button"
+              onClick={() => setBodyExpanded((v) => !v)}
+              className="hai-meta hai-mt-1 text-primary-600 dark:text-primary-400"
+              style={{ cursor: 'pointer' }}
+              aria-expanded={bodyExpanded}
+            >
+              {bodyExpanded
+                ? (lang === 'en' ? 'See less' : lang === 'ur' ? 'کم دکھائیں' : 'عرض أقل')
+                : (lang === 'en' ? 'See more' : lang === 'ur' ? 'مزید دیکھیں' : 'عرض المزيد')}
+            </button>
+          )}
           {canTranslate && (
             <button
               type="button"
