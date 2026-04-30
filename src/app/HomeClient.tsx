@@ -14,9 +14,9 @@ function applyLanguage(l: Lang) {
 }
 
 const PHRASES: Record<Lang, string[]> = {
-  ar: ['ابدأ من حيّك', 'سوق، خدمات، تنبيهات', 'جارك أقرب مما تتوقع', 'حيّك يتكلم', 'كل شي قريب منك'],
-  en: ['Start from your block', 'Market, services, alerts', 'Closer than you think', 'Your block speaks', 'Everything nearby'],
-  ur: ['اپنے محلے سے شروع کریں', 'مارکیٹ، خدمات، الرٹس', 'جتنا سوچتے ہیں اتنا قریب', 'محلے کی آواز', 'سب کچھ قریب'],
+  ar: ['ابدأ من حيّك', 'اسأل واستفيد من جيرانك', 'سوق، خدمات، تنبيهات', 'جارك أقرب مما تتوقع', 'حيّك يتكلم', 'كل شي قريب منك'],
+  en: ['Start from your block', 'Ask your neighbors', 'Market, services, alerts', 'Closer than you think', 'Your block speaks', 'Everything nearby'],
+  ur: ['اپنے محلے سے شروع کریں', 'پڑوسیوں سے پوچھیں', 'مارکیٹ، خدمات، الرٹس', 'جتنا سوچتے ہیں اتنا قریب', 'محلے کی آواز', 'سب کچھ قریب'],
 }
 
 export default function HomeClient() {
@@ -79,7 +79,10 @@ export default function HomeClient() {
           <FeatureItem icon="🔔" text={t('home_feature_alerts')} />
           <FeatureItem icon="🛒" text={t('home_feature_market')} />
           <FeatureItem icon="🧑‍🔧" text={t('home_feature_services')} />
-          <FeatureItem icon="🕌" text={t('home_feature_mosque')} />
+          {/* Replaced the mosque card — too narrow to represent the
+              app's general value. "اسأل أهل الحي" frames the same
+              social-proximity benefit for every user. */}
+          <FeatureItem icon="💬" text={t('home_feature_ask')} />
         </div>
 
         <div className="w-full max-w-sm space-y-3">

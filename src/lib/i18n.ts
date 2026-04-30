@@ -175,7 +175,11 @@ export const translations = {
   home_feature_alerts:   { ar: 'اعرف وش يصير في حيّك أول بأول',         en: "Know what's happening around you"        , ur: 'جانیں محلے میں کیا ہو رہا ہے' },
   home_feature_market:   { ar: 'بيع واشتري من ناس قريبة منك',           en: 'Buy & sell from people nearby'            , ur: 'قریبی لوگوں سے خریدیں اور بیچیں' },
   home_feature_services: { ar: 'ابحث عن اللي يساعدك — سباك، كهربائي، مشاوير', en: 'Find help — plumber, electrician, rides', ur: 'مدد تلاش کریں — پلمبر، الیکٹریشن، سواریاں' },
-  home_feature_mosque:   { ar: 'أوقات الصلاة وأخبار مسجدك',             en: 'Prayer times & your mosque news'          , ur: 'نماز کے اوقات اور مسجد کی خبریں' },
+  // Was home_feature_mosque ("Prayer times & your mosque news") — too
+  // narrow to represent the app. Replaced with the broader "ask your
+  // neighborhood" framing. Mosque-related events still post freely
+  // under the EVENTS category.
+  home_feature_ask:      { ar: 'اسأل واستفيد من خبرة جيرانك',           en: 'Ask and learn from your neighbors'        , ur: 'پڑوسیوں سے پوچھیں اور سیکھیں' },
   home_cta_start:        { ar: 'انضم لحيّك',                             en: 'Join Your Neighborhood'                   , ur: 'اپنے محلے میں شامل ہوں' },
   home_login:            { ar: 'عندي حساب',                              en: 'I have an account'                        , ur: 'میرا اکاؤنٹ ہے' },
   home_cities:           { ar: 'متوفر في مكة · جدة · الرياض',            en: 'Available in Mecca · Jeddah · Riyadh'    , ur: 'مکہ · جدہ · ریاض میں دستیاب' },
