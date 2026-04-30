@@ -389,10 +389,20 @@ export default function NewPostPage() {
 
   const isCategoryRestricted = (key: string): boolean => {
     if (!profileLoaded) return false
-    if (key === 'SERVICES' && !canPostServices && !isAdminLike) return true
+    // NOTE: SERVICES is NOT restricted at the tile level. The tile
+    // description says "اعرض خدماتك أو اطلب خدمة" — both halves must
+    // be reachable. Non-providers are routed to /ask in the click
+    // handler (creates SERVICES + intent=REQUEST). Providers go to
+    // the normal composer where intent=OFFER is allowed.
+    // (The server-side check in /api/posts is the canonical guard
+    // for OFFER-side abuse, not the tile.)
     if (ADMIN_ONLY_CATEGORIES.has(key) && !isAdminLike) return true
     return false
   }
+
+  // Whether this user can post an OFFER under SERVICES. Used by the
+  // SERVICES tile click handler to decide between composer and Ask.
+  const canPostServiceOffer = canPostServices || isAdminLike
 
   const selected = CATEGORIES.find(i => i.key === category)
   const showPrice = PRICE_CATEGORIES.has(category)
@@ -725,6 +735,14 @@ export default function NewPostPage() {
                         return
                       }
                       if (cat.key === 'RIDES') { router.push('/rides/new'); return }
+                      // SERVICES tile = "offer or request". Non-providers
+                      // can only request — route them to /ask, which
+                      // creates a SERVICES + intent=REQUEST post. Providers
+                      // go to the normal composer where they can offer.
+                      if (cat.key === 'SERVICES' && !canPostServiceOffer) {
+                        router.push('/ask?category=SERVICES')
+                        return
+                      }
                       setCategory(cat.key); setStep('content')
                     }}
                     // min-h-[136px] keeps every tile a comfortable
