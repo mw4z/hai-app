@@ -2831,10 +2831,10 @@ function CategoryPrefsGroup({ title, lang, t }: {
     let alive = true
     fetch('/api/notifications/preferences')
       .then(r => r.ok ? r.json() : null)
-      .then((d: { items?: Array<{ category: string; pushEnabled: boolean }> } | null) => {
-        if (!alive || !d?.items) return
+      .then((d: { preferences?: Array<{ category: string; pushEnabled: boolean }> } | null) => {
+        if (!alive || !d?.preferences) return
         const map: Record<string, boolean> = {}
-        for (const row of d.items) map[row.category] = row.pushEnabled
+        for (const row of d.preferences) map[row.category] = row.pushEnabled
         setPrefs(map)
       })
       .catch(() => { /* ignore — defaults shown */ })
