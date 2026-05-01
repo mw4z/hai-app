@@ -249,23 +249,9 @@ export default function ChatClient({
       if (composerRef.current) composerRef.current.style.paddingBottom = pad
     }
 
-    // Dedup tiny height fluctuations and only auto-scroll if the user
-    // was already pinned at the bottom. Without the wasAtBottom guard,
-    // every keyboard or viewport tick yanks the user to the bottom —
-    // breaking the experience of reading older history, AND making the
-    // tap-Reply flow jitter (composer grows → keyboard opens → reply
-    // effect scrolls original into view, three competing scroll
-    // targets). Without the dedup, Keyboard.willShow and
-    // visualViewport.resize fight each other with 1–2px deltas on iPad
-    // and the composer wiggles after it should have settled.
-    let lastAppliedHeight = 0
     const setHeight = (visibleHeight: number) => {
-      if (Math.abs(visibleHeight - lastAppliedHeight) < 2) return
-      lastAppliedHeight = visibleHeight
-      const ms = messagesRef.current
-      const wasAtBottom = ms ? (ms.scrollHeight - ms.scrollTop - ms.clientHeight) < 80 : true
       root.style.height = `calc(${visibleHeight}px - env(safe-area-inset-top, 0px))`
-      if (wasAtBottom) bottomRef.current?.scrollIntoView({ block: 'end' })
+      bottomRef.current?.scrollIntoView({ block: 'end' })
     }
 
     // Android (resize mode: body) — the WebView is resized for us when
@@ -278,12 +264,16 @@ export default function ChatClient({
     // keyboardHeight value.
     let keyboardOpen = false
 
-    // Initial mount — force pin to bottom regardless of the wasAtBottom
-    // check, since there's nothing scrolled yet.
-    root.style.height = `calc(${vv.height}px - env(safe-area-inset-top, 0px))`
-    lastAppliedHeight = vv.height
-    bottomRef.current?.scrollIntoView({ block: 'end' })
+    setHeight(vv.height)
     const onVV = () => {
+      // Always trust visualViewport for the visible height. On iPad
+      // specifically, Keyboard.willShow can fire late (or not until
+      // the user actually types a key), which left the composer
+      // hidden below the keyboard. visualViewport.resize fires the
+      // moment the keyboard appears and gives us the correct
+      // shrunken height — so we use it as the primary source on
+      // every platform and let the Keyboard.willShow listener below
+      // act as a redundant fast-path on iPhone only.
       setHeight(vv.height)
       // Crude-but-reliable: if the viewport is notably shorter than
       // the window, the keyboard is up. Tighten composer bottom
@@ -293,10 +283,7 @@ export default function ChatClient({
       setComposerPad(keyboardIsOpen ? '10px' : safePad)
     }
     vv.addEventListener('resize', onVV)
-    // NOTE: deliberately not listening to vv.scroll. visualViewport
-    // scroll fires repeatedly during the iOS keyboard animation and
-    // on pinch-zoom; each fire re-ran setHeight which made bubbles
-    // appear to "drift" mid-keyboard-rise.
+    vv.addEventListener('scroll', onVV)
 
     let cleanupKb: (() => void) | null = null
     if (isIos) {
@@ -320,6 +307,7 @@ export default function ChatClient({
 
     return () => {
       vv.removeEventListener('resize', onVV)
+      vv.removeEventListener('scroll', onVV)
       cleanupKb?.()
     }
   }, [])
@@ -948,12 +936,6 @@ export default function ChatClient({
         bottom: 0,
         overscrollBehavior: 'none',
         touchAction: 'pan-y',
-        // Smooth-rise the composer with the keyboard. iOS keyboard
-        // animation is ~250ms with a soft ease-out curve; matching it
-        // here makes the composer track the keyboard frame-by-frame
-        // instead of snapping to its final position the moment
-        // Keyboard.willShow fires (which is what made it feel "cheap").
-        transition: 'height 250ms cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       {/* Header */}
@@ -1418,43 +1400,25 @@ export default function ChatClient({
           </div>
         )
       ) : (
-        <div ref={composerRef} className="glass-bottom px-4 w-full z-20 flex-shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)', transition: 'padding-bottom 250ms cubic-bezier(0.16, 1, 0.3, 1)' }}>
-          {/* Reply preview bar — uses grid-rows 0fr→1fr trick to animate
-              an unknown-height element from collapsed to expanded with a
-              real CSS transition (instead of popping in/out). The inner
-              div has overflow:hidden so its content gets clipped while
-              the row height interpolates, and a tiny opacity+translateY
-              fades the content in on top for the WhatsApp-style feel. */}
-          <div
-            className="grid"
-            style={{
-              gridTemplateRows: replyingTo ? '1fr' : '0fr',
-              transition: 'grid-template-rows 200ms cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-          >
-            <div className="overflow-hidden">
-              {replyingTo && (
-                <div
-                  className="flex items-center gap-2 px-1 pt-2 pb-1"
-                  style={{ animation: 'reply-bar-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both' }}
-                >
-                  <div className="flex-1 min-w-0 border-s-2 border-primary-500 ps-2.5 py-0.5">
-                    <p className="text-[10px] font-bold text-primary-600 dark:text-primary-400">
-                      {replyingTo.senderId === currentUserId
-                        ? (lang === 'en' ? 'You' : lang === 'ur' ? 'آپ' : 'أنت')
-                        : (fullName(other) || (lang === 'en' ? 'Neighbor' : 'جار'))}
-                    </p>
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-                      {replyingTo.type === 'IMAGE' ? '📷' : replyingTo.type === 'LOCATION' ? '📍' : (replyingTo.text || '').slice(0, 80)}
-                    </p>
-                  </div>
-                  <button onClick={() => setReplyingTo(null)} className="p-1 text-gray-400 active:scale-90">
-                    <FiX className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
+        <div ref={composerRef} className="glass-bottom px-4 w-full z-20 flex-shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
+          {/* Reply preview bar */}
+          {replyingTo && (
+            <div className="flex items-center gap-2 px-1 pt-2 pb-1">
+              <div className="flex-1 min-w-0 border-s-2 border-primary-500 ps-2.5 py-0.5">
+                <p className="text-[10px] font-bold text-primary-600 dark:text-primary-400">
+                  {replyingTo.senderId === currentUserId
+                    ? (lang === 'en' ? 'You' : lang === 'ur' ? 'آپ' : 'أنت')
+                    : (fullName(other) || (lang === 'en' ? 'Neighbor' : 'جار'))}
+                </p>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                  {replyingTo.type === 'IMAGE' ? '📷' : replyingTo.type === 'LOCATION' ? '📍' : (replyingTo.text || '').slice(0, 80)}
+                </p>
+              </div>
+              <button onClick={() => setReplyingTo(null)} className="p-1 text-gray-400 active:scale-90">
+                <FiX className="w-4 h-4" />
+              </button>
             </div>
-          </div>
+          )}
           <div className="flex items-center gap-2 py-2.5">
             <input ref={imgInputRef} type="file" accept="image/*" multiple className="hidden"
               onChange={e => {
