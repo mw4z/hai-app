@@ -190,6 +190,33 @@ export default function PushRegistration() {
           return
         }
 
+        // CRITICAL ORDERING: attach the 'registration' listener BEFORE
+        // calling register(). The plugin dispatches the token via that
+        // event as soon as APNs replies — on fresh iOS reinstalls the
+        // round-trip can be < 200ms, which is faster than the await
+        // returns control. Listeners attached after register() were
+        // missing the event entirely on reinstall, leaving the server
+        // with the dead pre-uninstall token and dropping every push.
+        await PushNotifications.addListener('registration', async (token) => {
+          try {
+            const res = await fetch('/api/devices/register', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: token.value, platform }),
+            })
+            if (!res.ok) {
+              console.error('[PUSH] server register failed:', res.status)
+              return
+            }
+            console.log('[PUSH] device registered')
+          } catch (err) {
+            console.error('[PUSH] registration post failed:', err)
+          }
+        })
+        await PushNotifications.addListener('registrationError', (err) => {
+          console.error('[PUSH] registrationError:', err)
+        })
+
         await PushNotifications.register()
 
         // Create a high-importance Android channel for emergency alerts.
@@ -232,31 +259,13 @@ export default function PushRegistration() {
           } catch {}
         }
 
-        await PushNotifications.addListener('registration', async (token) => {
-          try {
-            const res = await fetch('/api/devices/register', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ token: token.value, platform }),
-            })
-            if (!res.ok) {
-              console.error('[PUSH] server register failed:', res.status)
-              return
-            }
-            console.log('[PUSH] device registered')
-          } catch (err) {
-            console.error('[PUSH] registration post failed:', err)
-          }
-        })
-
-        await PushNotifications.addListener('registrationError', (err) => {
-          console.error('[PUSH] registrationError:', err)
-        })
-
         // Foreground toast + tap→deeplink listeners are attached
         // eagerly above by installDeeplinkListener(), before auth — so
         // a cold-start tap on Android OEMs that race the auth probe
-        // doesn't lose the event. Don't re-attach here.
+        // doesn't lose the event. Registration + registrationError
+        // listeners are attached at the top of init() (before
+        // register()) to avoid the iOS reinstall race. Don't re-attach
+        // here.
       } catch (err) {
         console.error('[PUSH] init failed:', err)
         registeredRef.current = false
