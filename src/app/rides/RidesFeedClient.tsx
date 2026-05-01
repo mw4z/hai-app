@@ -103,19 +103,29 @@ export default function RidesFeedClient({ userId }: { userId: string }) {
             <button key={r.id} onClick={() => router.push(`/rides/${r.id}`)}
               style={{ animationDelay: `${Math.min(idx * 60, 400)}ms`, animationFillMode: 'backwards' }}
               className="w-full bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 text-start active:scale-[0.99] transition-transform animate-fade-in-up">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+              <div className="flex items-start justify-between mb-2 gap-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white min-w-0">
                   <FiMapPin className="w-3.5 h-3.5 text-primary-600 flex-shrink-0" />
                   <span className="truncate">{r.pickupArea}</span>
                   <FiNavigation className="w-3 h-3 text-gray-300 flex-shrink-0" />
                   <span className="truncate">{r.dropoffArea}</span>
                 </div>
-                {r.isLate && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300 flex items-center gap-0.5 flex-shrink-0">
-                    <FiAlertTriangle className="w-3 h-3" /> {t('rides_late')}
-                  </span>
-                )}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {r.type === 'DELIVERY' && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+                      📦 {lang === 'en' ? 'Delivery' : lang === 'ur' ? 'ڈیلیوری' : 'توصيل'}
+                    </span>
+                  )}
+                  {r.isLate && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300 flex items-center gap-0.5">
+                      <FiAlertTriangle className="w-3 h-3" /> {t('rides_late')}
+                    </span>
+                  )}
+                </div>
               </div>
+              {r.type === 'DELIVERY' && r.itemDescription && (
+                <p className="text-xs text-gray-600 dark:text-gray-300 mb-2 line-clamp-1">{r.itemDescription}</p>
+              )}
               <div className="flex items-center gap-4 text-[11px] text-gray-400 dark:text-gray-500">
                 <span>{r.distanceKm} {t('ride_km')}</span>
                 <span>{r.durationMin} {t('ride_min')}</span>
@@ -152,9 +162,14 @@ export default function RidesFeedClient({ userId }: { userId: string }) {
           ) : myRequests.map((r: any) => (
             <button key={r.id} onClick={() => router.push(`/rides/${r.id}`)}
               className="w-full bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 text-start">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium text-gray-900 dark:text-white">{r.pickupArea} {lang !== 'en' ? '←' : '→'} {r.dropoffArea}</span>
-                <StatusBadge status={r.status} />
+              <div className="flex items-center justify-between mb-1 gap-2">
+                <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{r.pickupArea} {lang !== 'en' ? '←' : '→'} {r.dropoffArea}</span>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {r.type === 'DELIVERY' && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">📦</span>
+                  )}
+                  <StatusBadge status={r.status} />
+                </div>
               </div>
               <div className="text-[11px] text-gray-400">{r.distanceKm} {t('ride_km')} · {r._count?.offers || 0} {t('rides_offers')}</div>
             </button>
@@ -170,9 +185,14 @@ export default function RidesFeedClient({ userId }: { userId: string }) {
           ) : myOffers.map((o: any) => (
             <button key={o.id} onClick={() => router.push(`/rides/${o.rideRequest.id}`)}
               className="w-full bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 text-start">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium text-gray-900 dark:text-white">{o.rideRequest.pickupArea} {lang !== 'en' ? '←' : '→'} {o.rideRequest.dropoffArea}</span>
-                <StatusBadge status={o.status} />
+              <div className="flex items-center justify-between mb-1 gap-2">
+                <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{o.rideRequest.pickupArea} {lang !== 'en' ? '←' : '→'} {o.rideRequest.dropoffArea}</span>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {o.rideRequest.type === 'DELIVERY' && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">📦</span>
+                  )}
+                  <StatusBadge status={o.status} />
+                </div>
               </div>
               <div className="text-[11px] text-gray-400">
                 <StatusBadge status={o.rideRequest.status} />

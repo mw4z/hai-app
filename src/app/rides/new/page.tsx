@@ -8,7 +8,7 @@ import BackButton from '@/components/BackButton'
 import LocationPicker from '@/components/rides/LocationPicker'
 import RiyalIcon from '@/components/RiyalIcon'
 import { translateApiError } from '@/lib/apiError'
-import { FiNavigation, FiClock, FiFileText } from 'react-icons/fi'
+import { FiNavigation, FiClock, FiFileText, FiPackage, FiUser } from 'react-icons/fi'
 
 interface Location {
   lat: number
@@ -21,6 +21,8 @@ export default function NewRidePage() {
   const router = useRouter()
   const { t, lang } = useLanguage()
 
+  const [requestType, setRequestType] = useState<'RIDE' | 'DELIVERY'>('RIDE')
+  const [itemDescription, setItemDescription] = useState('')
   const [pickup, setPickup] = useState<Location | null>(null)
   const [dropoff, setDropoff] = useState<Location | null>(null)
   const [isImmediate, setIsImmediate] = useState(true)
@@ -46,6 +48,10 @@ export default function NewRidePage() {
     if (!pickup) { toast.error(lang === 'en' ? 'Set pickup location' : lang === 'ur' ? 'اٹھانے کی جگہ مقرر کریں' : 'حدد نقطة الانطلاق'); return }
     if (!dropoff) { toast.error(lang === 'en' ? 'Set drop-off location' : lang === 'ur' ? 'منزل مقرر کریں' : 'حدد الوجهة'); return }
     if (!isImmediate && !scheduledAt) { toast.error(lang === 'en' ? 'Set trip time' : lang === 'ur' ? 'سفر کا وقت مقرر کریں' : 'حدد وقت الرحلة'); return }
+    if (requestType === 'DELIVERY' && !itemDescription.trim()) {
+      toast.error(lang === 'en' ? 'Describe what you want delivered' : lang === 'ur' ? 'بتائیں کیا منگوانا ہے' : 'حدد ما تريد توصيله')
+      return
+    }
     // Validate coordinates are real numbers
     if (!pickup.lat || !pickup.lng || !dropoff.lat || !dropoff.lng ||
         isNaN(pickup.lat) || isNaN(pickup.lng) || isNaN(dropoff.lat) || isNaN(dropoff.lng)) {
@@ -69,6 +75,8 @@ export default function NewRidePage() {
           isImmediate,
           scheduledAt: isImmediate ? undefined : scheduledAt,
           notes: notes.trim() || undefined,
+          type: requestType,
+          itemDescription: requestType === 'DELIVERY' ? itemDescription.trim() : undefined,
         }),
       })
       const data = await res.json()
@@ -87,7 +95,7 @@ export default function NewRidePage() {
     }
   }
 
-  const canSubmit = !!pickup && !!dropoff && (isImmediate || !!scheduledAt)
+  const canSubmit = !!pickup && !!dropoff && (isImmediate || !!scheduledAt) && (requestType !== 'DELIVERY' || !!itemDescription.trim())
 
   return (
     <main className="min-h-screen bg-white dark:bg-gray-900 flex flex-col">
@@ -98,6 +106,54 @@ export default function NewRidePage() {
       </header>
 
       <div className="flex-1 px-4 py-5 space-y-5">
+
+        {/* ── Type toggle: Ride vs Delivery ────────────────────────────────── */}
+        <div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setRequestType('RIDE')}
+              className={`flex-1 py-3 rounded-xl text-sm font-semibold border-2 transition-colors flex items-center justify-center gap-2 ${
+                requestType === 'RIDE'
+                  ? 'border-primary-600 bg-primary-600 text-white'
+                  : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              <FiUser className="w-4 h-4" />
+              {lang === 'en' ? 'Ride' : lang === 'ur' ? 'سفر' : 'ركوب'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setRequestType('DELIVERY')}
+              className={`flex-1 py-3 rounded-xl text-sm font-semibold border-2 transition-colors flex items-center justify-center gap-2 ${
+                requestType === 'DELIVERY'
+                  ? 'border-primary-600 bg-primary-600 text-white'
+                  : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              <FiPackage className="w-4 h-4" />
+              {lang === 'en' ? 'Delivery' : lang === 'ur' ? 'ڈیلیوری' : 'توصيل طلب'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Item description (DELIVERY only) ─────────────────────────────── */}
+        {requestType === 'DELIVERY' && (
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5 mb-2">
+              <FiPackage className="w-4 h-4" />
+              {lang === 'en' ? 'What to deliver' : lang === 'ur' ? 'کیا منگوانا ہے' : 'ما تريد توصيله'}
+            </label>
+            <textarea
+              value={itemDescription}
+              onChange={e => setItemDescription(e.target.value)}
+              placeholder={lang === 'en' ? 'e.g. 2 kg apples from Lulu' : lang === 'ur' ? 'مثلاً 2 کلو سیب لولو سے' : 'مثلاً ٢ كيلو تفاح من لولو'}
+              className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm bg-transparent text-gray-900 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-primary-500"
+              rows={2}
+              maxLength={200}
+            />
+          </div>
+        )}
 
         {/* ── Pickup Location ──────────────────────────────────────────────── */}
         <div data-tour="ride-pickup">

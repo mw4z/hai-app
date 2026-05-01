@@ -1007,6 +1007,19 @@ enum CompletionMode {
   AUTO_CLOSED
 }
 
+// What kind of trip this RideRequest represents:
+//   RIDE     — moving a person from A to B (the original product)
+//   DELIVERY — moving an item the requester needs picked up and dropped
+//              off (e.g. groceries from Lulu, food from a restaurant).
+// Drivers offer/price the same way for both; the type just changes
+// what fields the requester fills in (item description vs passenger
+// count) and where the request surfaces (DELIVERY also appears in
+// the LOOKING_FOR feed as a slim cross-listing card).
+enum RideRequestType {
+  RIDE
+  DELIVERY
+}
+
 // ─── Ride Requests ──────────────────────────────────────────────────────────
 
 model RideRequest {
@@ -1037,7 +1050,14 @@ model RideRequest {
   isImmediate        Boolean     @default(true)
   scheduledAt        DateTime?
 
-  notes              String?
+  // RIDE vs DELIVERY. Defaults to RIDE so existing rows are unchanged.
+  type               RideRequestType @default(RIDE)
+  // For DELIVERY only — what the requester wants delivered. e.g.
+  // "2kg apples from Lulu" or "ready order from Albaik in Khurais".
+  // Optional even on DELIVERY because the requester may pre-fill it
+  // through a sheet that asks for the item separately. Drivers see
+  // this string verbatim on the offer screen.
+  itemDescription    String?
 
   // State
   status             RideStatus  @default(RIDE_OPEN)

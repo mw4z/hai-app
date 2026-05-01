@@ -107,6 +107,18 @@ interface Props {
   requestsRecentDot?: boolean
   /** SSR'd highlights bundle. Empty array = section hidden entirely. */
   highlights?: HighlightItemPayload[]
+  /** Open DELIVERY ride requests in this neighborhood. Surfaced as a
+   *  slim strip in the REQUESTS / RIDES / ALL feeds so neighbors see
+   *  delivery requests alongside posts. Source of truth stays on the
+   *  RideRequest row — tapping a card jumps to /rides/[id]. */
+  deliveryRequests?: Array<{
+    id: string
+    pickupArea: string
+    dropoffArea: string
+    itemDescription: string | null
+    createdAt: string
+    requester: { id: string; name: string | null; lastName: string | null; avatarUrl: string | null }
+  }>
 }
 
 export default function FeedClient({
@@ -124,6 +136,7 @@ export default function FeedClient({
   requestBoostOn = true,
   requestsRecentDot = false,
   highlights = [],
+  deliveryRequests = [],
 }: Props) {
   const router = useRouter()
   const { t, lang } = useLanguage()
@@ -558,6 +571,44 @@ export default function FeedClient({
           mode (the highlights bundle is the user's home neighborhood). */}
       {!isReadOnly && (
         <HighlightsSection items={highlights} />
+      )}
+
+      {/* Delivery requests strip — DELIVERY-typed RideRequests surfaced
+          in the LOOKING_FOR / REQUESTS feed. Single source of truth
+          stays on the RideRequest row; tapping a card opens the rides
+          detail screen where the offer/pricing flow lives. */}
+      {!isReadOnly && deliveryRequests.length > 0 && (selectedCategory === 'REQUESTS' || selectedCategory === 'RIDES' || selectedCategory === 'ALL') && (
+        <div className="px-4 pt-3">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1">
+              📦 {lang === 'en' ? 'Delivery requests nearby' : lang === 'ur' ? 'قریبی ڈیلیوری درخواستیں' : 'طلبات توصيل قريبة'}
+            </h2>
+            <button onClick={() => router.push('/rides')} className="text-[11px] text-primary-600 active:scale-95">
+              {lang === 'en' ? 'See all' : lang === 'ur' ? 'سب دیکھیں' : 'عرض الكل'}
+            </button>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 snap-x snap-mandatory">
+            {deliveryRequests.map(d => (
+              <button
+                key={d.id}
+                onClick={() => router.push(`/rides/${d.id}`)}
+                className="flex-shrink-0 w-[78%] sm:w-[60%] snap-start bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-2xl p-3 text-start active:scale-[0.98] transition-transform"
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="w-6 h-6 rounded-full bg-amber-200 dark:bg-amber-800 overflow-hidden flex-shrink-0">
+                    {d.requester.avatarUrl ? <img src={d.requester.avatarUrl} alt="" className="w-full h-full object-cover" /> : null}
+                  </div>
+                  <span className="text-xs font-semibold text-gray-800 dark:text-white truncate">{d.requester.name || '—'}</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 ms-auto flex-shrink-0">📦</span>
+                </div>
+                {d.itemDescription && (
+                  <p className="text-xs text-gray-700 dark:text-gray-200 line-clamp-2 leading-snug mb-1">{d.itemDescription}</p>
+                )}
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{d.pickupArea} {lang !== 'en' ? '←' : '→'} {d.dropoffArea}</p>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Quick Ask bar — only in own neighborhood */}

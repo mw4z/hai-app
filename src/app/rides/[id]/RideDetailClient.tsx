@@ -982,6 +982,16 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
           </div>
         )}
 
+        {/* ── Item to deliver (DELIVERY only) ─────────────────────────────────── */}
+        {ride.type === 'DELIVERY' && ride.itemDescription && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-2xl p-4">
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 mb-1">
+              📦 {lang === 'en' ? 'Item to deliver' : lang === 'ur' ? 'منگوانے کی چیز' : 'الطلب المراد توصيله'}
+            </p>
+            <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed">{ride.itemDescription}</p>
+          </div>
+        )}
+
         {/* ── Notes ───────────────────────────────────────────────────────────── */}
         {ride.notes && phase === 'offers' && (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-2xl p-4">

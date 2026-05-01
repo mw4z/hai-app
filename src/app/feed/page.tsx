@@ -176,6 +176,32 @@ export default async function FeedPage({
 
   if (isReadOnly && !browseNeighborhood) redirect('/feed')
 
+  // ── Cross-list DELIVERY ride requests in REQUESTS ("looking for")
+  // ── feed. Drivers offer/price through the rides surface; this just
+  // ── makes the request visible to neighbors browsing requests so they
+  // ── can also chime in or know what's going on. Limited to 5 — meant
+  // ── as a strip, not a takeover.
+  const deliveryRequests = (!isReadOnly && (category === 'REQUESTS' || category === 'RIDES' || category === 'ALL'))
+    ? await db.rideRequest.findMany({
+        where: {
+          neighborhoodId: activeNeighborhoodId,
+          type: 'DELIVERY',
+          status: 'RIDE_OPEN',
+          expiresAt: { gt: new Date() },
+        },
+        select: {
+          id: true,
+          pickupArea: true,
+          dropoffArea: true,
+          itemDescription: true,
+          createdAt: true,
+          requester: { select: { id: true, name: true, lastName: true, avatarUrl: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }).catch(() => [])
+    : []
+
   // Filter out expired posts + archive them in background
   const activePosts = posts.filter(p => !shouldArchivePost(p))
   const expiredIds = posts.filter(p => shouldArchivePost(p)).map(p => p.id)
@@ -358,6 +384,7 @@ export default async function FeedPage({
       requestBoostOn={REQUEST_BOOST_ON}
       requestsRecentDot={requestsRecentDot}
       highlights={highlightsBundle.items}
+      deliveryRequests={JSON.parse(JSON.stringify(deliveryRequests))}
     />
   )
 }

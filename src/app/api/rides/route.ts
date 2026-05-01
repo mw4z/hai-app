@@ -30,7 +30,10 @@ export async function POST(req: NextRequest) {
       pickupLat, pickupLng, pickupAddress, pickupArea,
       dropoffLat, dropoffLng, dropoffAddress, dropoffArea,
       isImmediate, scheduledAt, notes,
+      type, itemDescription,
     } = body
+    // Default to RIDE so existing clients keep working unchanged.
+    const requestType = type === 'DELIVERY' ? 'DELIVERY' : 'RIDE'
 
     // ── Validation ──────────────────────────────────────────────────────────────
 
@@ -54,6 +57,12 @@ export async function POST(req: NextRequest) {
     }
     if (notes && notes.length > 200) {
       return NextResponse.json({ error: 'الملاحظات طويلة جداً' }, { status: 400 })
+    }
+    if (itemDescription && (typeof itemDescription !== 'string' || itemDescription.length > 200)) {
+      return NextResponse.json({ error: 'وصف الطلب طويل جداً' }, { status: 400 })
+    }
+    if (requestType === 'DELIVERY' && !itemDescription?.trim()) {
+      return NextResponse.json({ error: 'حدد ما تريد توصيله' }, { status: 400 })
     }
 
     // Distance validation
@@ -137,6 +146,8 @@ export async function POST(req: NextRequest) {
         isImmediate: isImmediate !== false,
         scheduledAt: isImmediate ? null : new Date(scheduledAt),
         notes: notes?.trim() || null,
+        type: requestType,
+        itemDescription: requestType === 'DELIVERY' ? itemDescription.trim() : null,
         expiresAt,
         neighborhoodId: user?.neighborhoodId || null,
       },
@@ -230,6 +241,8 @@ export async function GET(req: NextRequest) {
         isImmediate: true,
         scheduledAt: true,
         notes: true,
+        type: true,
+        itemDescription: true,
         status: true,
         createdAt: true,
         requester: {

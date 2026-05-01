@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
       id: true, pickupArea: true, dropoffArea: true,
       distanceKm: true, durationMin: true,
       status: true, isImmediate: true, scheduledAt: true,
+      type: true, itemDescription: true,
       createdAt: true,
       _count: { select: { offers: true } },
       trip: { select: { agreedPrice: true, driverId: true, completedAt: true, completionMode: true } },
@@ -71,6 +72,7 @@ export async function GET(req: NextRequest) {
         select: {
           id: true, pickupArea: true, dropoffArea: true,
           distanceKm: true, status: true, createdAt: true,
+          type: true, itemDescription: true,
         },
       },
     },
