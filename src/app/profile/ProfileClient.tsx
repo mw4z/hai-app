@@ -1385,6 +1385,11 @@ export default function ProfileClient({ user, postCount }: Props) {
         {user.role === 'SUPER_ADMIN' && (
           <PushTestButton lang={lang as 'ar' | 'en' | 'ur'} />
         )}
+
+        {/* ── Diagnostic: on-device [KB] log overlay (SUPER_ADMIN) ──── */}
+        {user.role === 'SUPER_ADMIN' && (
+          <DebugKbToggle lang={lang as 'ar' | 'en' | 'ur'} />
+        )}
       </div>
 
       </AccordionSection>
@@ -2351,6 +2356,43 @@ function PrivacySettings({ lang }: { lang: string }) {
  * user can see which link of the chain is broken without leaving the
  * app. Arabic default, English/Urdu translations available.
  */
+/**
+ * SUPER_ADMIN-only toggle for the on-device [KB] log overlay.
+ * Reads / writes localStorage 'hai_debugkb' and reloads the page so
+ * DebugOverlay re-evaluates the flag at mount.
+ */
+function DebugKbToggle({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
+  const [enabled, setEnabled] = useState(false)
+  useEffect(() => {
+    try { setEnabled(localStorage.getItem('hai_debugkb') === '1') } catch {}
+  }, [])
+  function toggle() {
+    try {
+      if (enabled) {
+        localStorage.removeItem('hai_debugkb')
+      } else {
+        localStorage.setItem('hai_debugkb', '1')
+      }
+    } catch {}
+    // Hard reload so DebugOverlay's useEffect re-reads the flag and
+    // re-mounts the console patches.
+    window.location.reload()
+  }
+  return (
+    <button
+      onClick={toggle}
+      className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 active:scale-[0.99]"
+    >
+      <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+        {lang === 'en' ? '[KB] debug overlay' : '[KB] طبقة التشخيص'}
+      </span>
+      <span className={`text-[11px] font-bold ${enabled ? 'text-primary-600' : 'text-gray-400'}`}>
+        {enabled ? 'ON' : 'OFF'}
+      </span>
+    </button>
+  )
+}
+
 function PushTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<null | {
