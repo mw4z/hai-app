@@ -8,6 +8,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import { showApiError } from '@/lib/apiError'
 import { HaiSpinner } from './HaiLoader'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 
 /**
  * Account-level report sheet. Reused across every surface where a
@@ -120,6 +121,13 @@ export default function ReportUserSheet({
   // by every other sheet/modal in the app — handles iOS WKWebView's
   // "overflow:hidden alone isn't enough" quirk.
   useBodyScrollLock(open)
+  // Swipe-down-to-close: the hook listens on `handleRef` (the grab
+  // bar + header), so a finger drag on the scrollable body still
+  // scrolls the form instead of dismissing the sheet.
+  const { sheetRef, handleRef } = useDragToDismiss<HTMLDivElement, HTMLDivElement>({
+    open,
+    onDismiss: handleClose,
+  })
 
   if (!open) return null
   if (!portalReady || typeof document === 'undefined') return null
@@ -189,21 +197,27 @@ export default function ReportUserSheet({
       dir={dir}
     >
       <div
+        ref={sheetRef}
         className="hai-sheet animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="hai-sheet__handle" />
-
-        <div className="hai-sheet__header">
-          <h3 className="hai-sheet__header-title">{header}</h3>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="hai-sheet__close"
-            aria-label="Close"
-          >
-            <FiX className="hai-icon-lg" />
-          </button>
+        {/* Drag-zone — only touches that start on the grab bar +
+            header dismiss the sheet. The form body below stays
+            scrollable / interactive. touchAction:none so the WebView
+            doesn't claim the gesture. */}
+        <div ref={handleRef} style={{ touchAction: 'none' }}>
+          <div className="hai-sheet__handle" />
+          <div className="hai-sheet__header">
+            <h3 className="hai-sheet__header-title">{header}</h3>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="hai-sheet__close"
+              aria-label="Close"
+            >
+              <FiX className="hai-icon-lg" />
+            </button>
+          </div>
         </div>
 
         <div className="hai-sheet__body hai-stack-3">
