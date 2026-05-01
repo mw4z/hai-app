@@ -478,22 +478,43 @@ export default function FeedClient({
               // activity in this filter" rather than "X unread", so
               // we don't promise an unread inbox we can't deliver.
               const showDot = cat.key === 'REQUESTS' && requestBoostOn && requestsRecentDot
+              const isRides = cat.key === 'RIDES'
               return (
-                <button
+                <span
                   key={cat.key}
-                  onClick={() => handleCategoryChange(cat.key)}
-                  data-active={selectedCategory === cat.key ? 'true' : 'false'}
-                  className="hai-chip hai-shrink-0 relative"
+                  className="hai-shrink-0 inline-flex items-stretch relative"
                 >
-                  <span>{cat.icon}</span>
-                  <span>{t(cat.tKey)}</span>
-                  {showDot && (
-                    <span
-                      className="absolute top-0.5 end-1 w-2 h-2 rounded-full bg-sky-500 ring-2 ring-white dark:ring-gray-900"
-                      aria-label="recent activity"
-                    />
+                  <button
+                    onClick={() => handleCategoryChange(cat.key)}
+                    data-active={selectedCategory === cat.key ? 'true' : 'false'}
+                    className={`hai-chip relative ${isRides ? 'rounded-e-none border-e-0' : ''}`}
+                  >
+                    <span>{cat.icon}</span>
+                    <span>{t(cat.tKey)}</span>
+                    {showDot && (
+                      <span
+                        className="absolute top-0.5 end-1 w-2 h-2 rounded-full bg-sky-500 ring-2 ring-white dark:ring-gray-900"
+                        aria-label="recent activity"
+                      />
+                    )}
+                  </button>
+                  {/* RIDES chip ships with an attached dashboard
+                      shortcut so users can reach /rides without
+                      hunting for the entry point. The chip itself
+                      keeps filtering posts; this side-button opens
+                      the rides dashboard (all rides + my requests +
+                      my offers + delivery toggle CTA). */}
+                  {isRides && (
+                    <button
+                      onClick={() => { hapticLight(); router.push('/rides') }}
+                      className="hai-chip rounded-s-none px-2"
+                      aria-label={lang === 'en' ? 'Open rides dashboard' : 'فتح لوحة المشاوير'}
+                      title={lang === 'en' ? 'Rides dashboard' : 'لوحة المشاوير'}
+                    >
+                      <span>↗</span>
+                    </button>
                   )}
-                </button>
+                </span>
               )
             })}
           </div>
