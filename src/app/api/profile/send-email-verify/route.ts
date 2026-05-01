@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { sendEmailOTP } from '@/lib/sms'
 
 export async function POST(req: NextRequest) {
   const session = await getSession()
@@ -8,32 +9,29 @@ export async function POST(req: NextRequest) {
 
   const { email } = await req.json()
 
-  // Validate email format
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!email || !emailRegex.test(email)) {
     return NextResponse.json({ error: 'البريد الإلكتروني غير صحيح' }, { status: 400 })
   }
 
-  // Generate 6-digit code
-  const code = Math.floor(100000 + Math.random() * 900000).toString()
+  const normalized = email.trim().toLowerCase()
 
-  // Expiry: 10 minutes from now
-  const expiry = new Date(Date.now() + 10 * 60 * 1000)
-
-  // Save to user record
+  // Save the candidate email (unverified) on the user record so the
+  // verify step can re-read it later. Code lifecycle is owned by
+  // Authentica — we no longer keep emailVerifyToken/Expiry locally.
   await db.user.update({
     where: { id: session.userId },
     data: {
-      email: email.trim().toLowerCase(),
+      email: normalized,
       emailVerified: false,
-      emailVerifyToken: code,
-      emailVerifyExpiry: expiry,
+      emailVerifyToken: null,
+      emailVerifyExpiry: null,
     },
   })
 
-  // In dev: log the code to console
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(`Email verification code for ${email}: ${code}`)
+  const sent = await sendEmailOTP(normalized)
+  if (!sent) {
+    return NextResponse.json({ error: 'تعذر إرسال الرمز' }, { status: 502 })
   }
 
   return NextResponse.json({ success: true })

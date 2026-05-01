@@ -20,8 +20,19 @@
  */
 
 const API_BASE = process.env.AUTHENTICA_API_BASE || 'https://api.authentica.sa/api/v1'
+// Authentica's email OTP endpoints live under /api/v2 per the public
+// docs (https://docs.authentica.sa/guides/otp-workflow), separate from
+// the v1 SMS endpoints used above. We hard-code the v2 prefix for the
+// email channel rather than reading a second env var, since v1 does
+// NOT serve the email channel and all known Authentica accounts use
+// the same hosted base URL.
+const API_BASE_V2 = (process.env.AUTHENTICA_API_BASE_V2 || 'https://api.authentica.sa/api/v2')
 const API_KEY = process.env.AUTHENTICA_API_KEY || ''
 const SENDER = process.env.AUTHENTICA_SENDER || 'Hai'
+// Email-specific template ID. Authentica ships a default email
+// verification template (id 31 per docs); allow override via env so
+// teams can register a custom-branded email template.
+const EMAIL_TEMPLATE_ID = process.env.AUTHENTICA_EMAIL_TEMPLATE_ID || '31'
 // Authentica SMS template ID. Pre-built templates with placeholders
 // like {{otp}} and {{app_name}} are listed in the dashboard under
 // Templates. Default to template 10 (en): "Use the code {{otp}} to
@@ -48,9 +59,13 @@ function isConfigured(): boolean {
   return API_KEY.length > 0
 }
 
-async function authenticaPost(path: string, body: Record<string, unknown>): Promise<{ ok: boolean; data: any }> {
+async function authenticaPost(
+  path: string,
+  body: Record<string, unknown>,
+  base: string = API_BASE,
+): Promise<{ ok: boolean; data: any }> {
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await fetch(`${base}${path}`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
@@ -133,6 +148,64 @@ export async function verifyOTP(phone: string, code: string): Promise<boolean> {
   // OTP. Treat any 2xx response with no explicit failure marker as
   // approved — strict-equal on a status field can vary by API version,
   // so the looser check is safer across upgrades.
+  if (typeof data === 'object' && data !== null) {
+    if (data.status === 'failure' || data.success === false) return false
+  }
+  return true
+}
+
+// ─── Email OTP (Authentica v2) ──────────────────────────────────────
+// Same provider, separate channel: Authentica's /api/v2/send-otp +
+// /api/v2/verify-otp accept `method: "email"` and an `email` field in
+// place of `phone`. Code generation + storage stays on Authentica's
+// side (we don't keep our own emailVerifyToken/Expiry), matching the
+// SMS flow.
+
+/** Send Email OTP via Authentica. */
+export async function sendEmailOTP(email: string): Promise<boolean> {
+  if (!isConfigured()) {
+    console.log(`\n📧 DEV MODE — Email OTP requested for ${email}\n`)
+    return true
+  }
+
+  const { ok, data } = await authenticaPost(
+    '/send-otp',
+    {
+      method: 'email',
+      email,
+      length: 6,
+      template_id: EMAIL_TEMPLATE_ID,
+      app_name: APP_NAME,
+      sender: SENDER,
+      language: 'en',
+    },
+    API_BASE_V2,
+  )
+
+  if (!ok) {
+    console.error('[OTP] Authentica email send failed:', data)
+    return false
+  }
+  console.log(`[OTP] Authentica email sent to ${email}`)
+  return true
+}
+
+/** Verify Email OTP via Authentica. */
+export async function verifyEmailOTP(email: string, code: string): Promise<boolean> {
+  if (!isConfigured()) {
+    return code === '123456'
+  }
+
+  const { ok, data } = await authenticaPost(
+    '/verify-otp',
+    { email, otp: code },
+    API_BASE_V2,
+  )
+
+  if (!ok) {
+    console.warn('[OTP] Authentica email verify failed:', data)
+    return false
+  }
   if (typeof data === 'object' && data !== null) {
     if (data.status === 'failure' || data.success === false) return false
   }
