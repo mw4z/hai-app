@@ -187,6 +187,14 @@ input, textarea, [contenteditable="true"] {
   .chat-bubble-in { animation: none; }
 }
 
+/* Reply preview content fade-up. The grid-template-rows transition on
+   the wrapper handles the height animation; this animation just adds a
+   subtle vertical fade to the content so it doesn't feel "punched in". */
+@keyframes reply-bar-in {
+  0%   { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
 /* Bubble row gesture surface. touch-action: pan-y tells the WebView
    that horizontal touches on a bubble are NOT browser-handled (we
    own swipe-to-reply in JS), while vertical scroll on the messages
