@@ -93,8 +93,15 @@ export default function CapacitorBridge() {
         // No-op on Android.
         if (platform === 'ios') {
           const isDark = document.documentElement.classList.contains('dark')
-          console.log('[KB] init setStyle call', { platform, isDark, style: isDark ? 'DARK' : 'LIGHT' })
-          await Keyboard.setStyle({ style: isDark ? KeyboardStyle.Dark : KeyboardStyle.Light })
+          // Light app → Default (modern white iOS keyboard, what
+          // WhatsApp / Notes / Messages all show in iOS Light mode).
+          // KeyboardStyle.Light is the LEGACY style — visible gray
+          // substrate, looks dated against the rest of iOS.
+          // Dark app → force Dark explicitly so the keyboard is dark
+          // even if iOS system is in light mode.
+          const style = isDark ? KeyboardStyle.Dark : KeyboardStyle.Default
+          console.log('[KB] init setStyle call', { platform, isDark, style: isDark ? 'DARK' : 'DEFAULT' })
+          await Keyboard.setStyle({ style })
           console.log('[KB] init setStyle resolved')
         }
       } catch (err) {
@@ -119,8 +126,9 @@ export default function CapacitorBridge() {
         const platform = window.Capacitor?.getPlatform?.() || 'web'
         if (platform === 'ios') {
           const { Keyboard, KeyboardStyle } = await import('@capacitor/keyboard')
-          console.log('[KB] observer setStyle call', { isDark, style: isDark ? 'DARK' : 'LIGHT' })
-          await Keyboard.setStyle({ style: isDark ? KeyboardStyle.Dark : KeyboardStyle.Light })
+          const style = isDark ? KeyboardStyle.Dark : KeyboardStyle.Default
+          console.log('[KB] observer setStyle call', { isDark, style: isDark ? 'DARK' : 'DEFAULT' })
+          await Keyboard.setStyle({ style })
           console.log('[KB] observer setStyle resolved')
         }
       } catch (err) {
