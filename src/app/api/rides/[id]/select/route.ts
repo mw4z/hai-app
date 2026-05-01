@@ -110,7 +110,11 @@ export async function POST(
         })
       }
 
-      await notifyDriverSelected(offer.driverId, session.userId, params.id)
+      const rideTypeRow = await db.rideRequest.findUnique({
+        where: { id: params.id },
+        select: { type: true },
+      })
+      await notifyDriverSelected(offer.driverId, session.userId, params.id, rideTypeRow?.type as 'RIDE' | 'DELIVERY')
       await notifyOffersPassed(passedOffers.map(o => o.driverId), params.id)
 
     } catch (notifError) {

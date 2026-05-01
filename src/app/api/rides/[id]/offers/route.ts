@@ -30,6 +30,7 @@ export async function POST(
       select: {
         id: true, status: true, requesterId: true,
         estimatedMinPrice: true, estimatedMaxPrice: true,
+        type: true,
       },
     })
 
@@ -118,7 +119,7 @@ export async function POST(
     })
 
     // Notify requester
-    await notifyNewOffer(ride.requesterId, session.userId, user.name || 'سائق', ride.id, price)
+    await notifyNewOffer(ride.requesterId, session.userId, user.name || 'سائق', ride.id, price, ride.type as 'RIDE' | 'DELIVERY')
 
     return NextResponse.json({
       id: offer.id,

@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
         id: true,
         status: true,
         requesterId: true,
+        type: true,
         trip: { select: { driverId: true } },
       },
     })
@@ -40,6 +41,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(rides.map(r => ({
       id: r.id,
       status: r.status,
+      type: r.type,
       role: r.requesterId === session.userId ? 'requester' : 'driver',
       driverName: r.trip?.driverId ? nameMap[r.trip.driverId] || null : null,
       requesterName: nameMap[r.requesterId] || null,

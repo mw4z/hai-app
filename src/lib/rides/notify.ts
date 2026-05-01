@@ -74,12 +74,14 @@ export async function notifyNewOffer(
   driverName: string,
   rideRequestId: string,
   price: number,
+  requestType: 'RIDE' | 'DELIVERY' = 'RIDE',
 ): Promise<void> {
+  const isDelivery = requestType === 'DELIVERY'
   await notifyRide({
     userId: requesterId,
     type: 'RIDE_OFFER',
-    titleAr: `🚗 عرض جديد — ${driverName}`,
-    titleEn: `🚗 New offer — ${driverName}`,
+    titleAr: `${isDelivery ? '📦' : '🚗'} عرض جديد — ${driverName}`,
+    titleEn: `${isDelivery ? '📦' : '🚗'} New offer — ${driverName}`,
     bodyAr: `${price} ريال • اضغط للتفاصيل`,
     bodyEn: `${price} SAR • tap to view`,
     actorId: driverId,
@@ -94,12 +96,14 @@ export async function notifyDriverSelected(
   driverId: string,
   requesterId: string,
   rideRequestId: string,
+  requestType: 'RIDE' | 'DELIVERY' = 'RIDE',
 ): Promise<void> {
+  const isDelivery = requestType === 'DELIVERY'
   await notifyRide({
     userId: driverId,
     type: 'RIDE_STATUS',
-    titleAr: '🎯 تم اختيارك!',
-    titleEn: '🎯 You were selected!',
+    titleAr: isDelivery ? '🎯 تم اختيارك للتوصيل!' : '🎯 تم اختيارك!',
+    titleEn: isDelivery ? '🎯 You were chosen to deliver!' : '🎯 You were selected!',
     bodyAr: 'أكّد خلال 5 دقائق — اضغط الآن',
     bodyEn: 'Confirm within 5 minutes — tap now',
     actorId: requesterId,
@@ -150,17 +154,20 @@ export async function notifyRequesterStatus(
 }
 
 /**
- * Notify both parties of trip completion.
+ * Notify both parties of trip completion. requestType swaps in
+ * delivery vocabulary when the underlying RideRequest is DELIVERY.
  */
 export async function notifyTripCompleted(
   requesterId: string,
   driverId: string,
   rideRequestId: string,
+  requestType: 'RIDE' | 'DELIVERY' = 'RIDE',
 ): Promise<void> {
-  const titleAr = '🎉 اكتمل المشوار بأمان'
-  const titleEn = '🎉 Ride completed safely'
-  const bodyAr = 'قيّم تجربتك بنجمة أو أكثر ⭐'
-  const bodyEn = 'Rate your experience ⭐'
+  const isDelivery = requestType === 'DELIVERY'
+  const titleAr = isDelivery ? '📦 تم التسليم' : '🎉 اكتمل المشوار بأمان'
+  const titleEn = isDelivery ? '📦 Delivered' : '🎉 Ride completed safely'
+  const bodyAr = isDelivery ? 'قيّم تجربة التوصيل ⭐' : 'قيّم تجربتك بنجمة أو أكثر ⭐'
+  const bodyEn = isDelivery ? 'Rate the delivery ⭐' : 'Rate your experience ⭐'
 
   await Promise.all([
     notifyRide({ userId: requesterId, type: 'RIDE_STATUS', titleAr, titleEn, bodyAr, bodyEn, actorId: driverId, rideRequestId }),
@@ -174,14 +181,16 @@ export async function notifyTripCompleted(
 export async function notifyConfirmTimeout(
   requesterId: string,
   rideRequestId: string,
+  requestType: 'RIDE' | 'DELIVERY' = 'RIDE',
 ): Promise<void> {
+  const isDelivery = requestType === 'DELIVERY'
   await notifyRide({
     userId: requesterId,
     type: 'RIDE_STATUS',
-    titleAr: '⏰ السائق لم يؤكّد في الوقت',
-    titleEn: '⏰ Driver didn’t confirm in time',
-    bodyAr: 'طلبك مفتوح مجدداً — في انتظار عروض جديدة',
-    bodyEn: 'Your ride is open again — waiting for new offers',
+    titleAr: isDelivery ? '⏰ المندوب لم يؤكّد في الوقت' : '⏰ السائق لم يؤكّد في الوقت',
+    titleEn: isDelivery ? '⏰ Courier didn’t confirm in time' : '⏰ Driver didn’t confirm in time',
+    bodyAr: isDelivery ? 'طلبك مفتوح مجدداً — في انتظار مندوب آخر' : 'طلبك مفتوح مجدداً — في انتظار عروض جديدة',
+    bodyEn: isDelivery ? 'Your delivery is open again — waiting for another courier' : 'Your ride is open again — waiting for new offers',
     actorId: 'system',
     rideRequestId,
   })

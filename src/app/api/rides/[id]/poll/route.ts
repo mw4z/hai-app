@@ -28,6 +28,7 @@ export async function GET(
       expiresAt: true,
       isImmediate: true,
       scheduledAt: true,
+      type: true,
       _count: { select: { offers: true } },
       trip: {
         select: {
@@ -64,7 +65,7 @@ export async function GET(
       timedOutDriverId = timedOutOffer.driverId
     }
     await logRideEvent({ rideRequestId: ride.id, eventType: 'TIMEOUT_REOPEN', actorType: 'system', metadata: { previousOfferId: ride.selectedOfferId } })
-    await notifyConfirmTimeout(ride.requesterId, ride.id)
+    await notifyConfirmTimeout(ride.requesterId, ride.id, ride.type as 'RIDE' | 'DELIVERY')
     // Notify the driver their deadline expired
     if (timedOutDriverId) {
       await db.notification.create({
@@ -111,7 +112,7 @@ export async function GET(
       await addReputation({ userId: ride.trip.driverId, action: 'ride_completed', points: rewards.driverRep, fromUserId: ride.requesterId })
       await db.user.update({ where: { id: ride.trip.driverId }, data: { driverTripsCount: { increment: 1 } } })
       await logRideEvent({ rideRequestId: ride.id, tripId: ride.trip.id, eventType: 'AUTO_COMPLETED', actorType: 'system' })
-      await notifyTripCompleted(ride.requesterId, ride.trip.driverId, ride.id)
+      await notifyTripCompleted(ride.requesterId, ride.trip.driverId, ride.id, ride.type as 'RIDE' | 'DELIVERY')
     }
   }
 

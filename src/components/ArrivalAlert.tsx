@@ -5,14 +5,16 @@ import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/hooks/useLanguage'
 
 type AlertType = 'arrived' | 'selected'
+type AlertKey = 'arrived' | 'arrived_delivery' | 'selected' | 'selected_delivery'
 
 interface AlertData {
   type: AlertType
+  requestType: 'RIDE' | 'DELIVERY'
   rideId: string
   otherName: string
 }
 
-const ALERT_CONFIG: Record<AlertType, {
+const ALERT_CONFIG: Record<AlertKey, {
   icon: string
   title: { ar: string; en: string; ur: string }
   body: { ar: string; en: string; ur: string }
@@ -24,10 +26,22 @@ const ALERT_CONFIG: Record<AlertType, {
     body: { ar: 'الشخص ينتظرك عند نقطة الانطلاق', en: 'The person is waiting at the pickup point', ur: 'شخص پک اپ پوائنٹ پر منتظر ہے' },
     cta: { ar: 'افتح الرحلة', en: 'Open Ride', ur: 'سواری کھولیں' },
   },
+  arrived_delivery: {
+    icon: '📦',
+    title: { ar: 'تم استلام طلبك!', en: 'Order picked up!', ur: 'آپ کا آرڈر لے لیا!' },
+    body: { ar: 'المندوب استلم الطلب وفي طريقه إليك', en: 'Courier picked up your order and is on the way', ur: 'کورئیر آرڈر لے کر آپ کی طرف آ رہا ہے' },
+    cta: { ar: 'افتح الطلب', en: 'Open Order', ur: 'آرڈر کھولیں' },
+  },
   selected: {
     icon: '🎉',
     title: { ar: 'تم اختيارك!', en: 'You were selected!', ur: 'آپ منتخب ہو گئے!' },
     body: { ar: 'الطالب اختارك — أكّد الآن قبل انتهاء المهلة', en: 'The requester chose you — confirm now before the deadline', ur: 'درخواست گزار نے آپ کو چنا — مہلت ختم ہونے سے پہلے تصدیق کریں' },
+    cta: { ar: 'أكّد الآن', en: 'Confirm Now', ur: 'ابھی تصدیق کریں' },
+  },
+  selected_delivery: {
+    icon: '🎯',
+    title: { ar: 'تم اختيارك للتوصيل!', en: 'You were chosen to deliver!', ur: 'آپ کو ڈیلیوری کے لیے چنا گیا!' },
+    body: { ar: 'الطالب اختارك للتوصيل — أكّد الآن قبل انتهاء المهلة', en: 'The requester chose you to deliver — confirm now before the deadline', ur: 'درخواست گزار نے آپ کو ڈیلیوری کے لیے چنا — مہلت سے پہلے تصدیق کریں' },
     cta: { ar: 'أكّد الآن', en: 'Confirm Now', ur: 'ابھی تصدیق کریں' },
   },
 }
@@ -61,7 +75,7 @@ export default function ArrivalAlert() {
               const key = `arrived-${ride.id}`
               if (alerted.current.has(key)) continue
               alerted.current.add(key)
-              setAlert({ type: 'arrived', rideId: ride.id, otherName: ride.driverName || '' })
+              setAlert({ type: 'arrived', requestType: ride.type === 'DELIVERY' ? 'DELIVERY' : 'RIDE', rideId: ride.id, otherName: ride.driverName || '' })
               import('@/lib/arrival-alert').then(m => m.triggerArrivalAlert()).catch(() => {})
               return
             }
@@ -77,7 +91,7 @@ export default function ArrivalAlert() {
               const key = `selected-${ride.id}`
               if (alerted.current.has(key)) continue
               alerted.current.add(key)
-              setAlert({ type: 'selected', rideId: ride.id, otherName: ride.requesterName || '' })
+              setAlert({ type: 'selected', requestType: ride.type === 'DELIVERY' ? 'DELIVERY' : 'RIDE', rideId: ride.id, otherName: ride.requesterName || '' })
               import('@/lib/arrival-alert').then(m => m.triggerArrivalAlert()).catch(() => {})
               return
             }
@@ -96,7 +110,10 @@ export default function ArrivalAlert() {
 
   if (!alert) return null
 
-  const config = ALERT_CONFIG[alert.type]
+  const configKey: AlertKey = alert.requestType === 'DELIVERY'
+    ? (alert.type === 'arrived' ? 'arrived_delivery' : 'selected_delivery')
+    : alert.type
+  const config = ALERT_CONFIG[configKey]
   const t = (obj: { ar: string; en: string; ur: string }) =>
     lang === 'en' ? obj.en : lang === 'ur' ? obj.ur : obj.ar
 

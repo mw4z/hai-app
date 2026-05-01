@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 
   const expiredSelections = await db.rideRequest.findMany({
     where: { status: 'RIDE_SELECTED', confirmDeadline: { lt: now } },
-    select: { id: true, requesterId: true, selectedOfferId: true },
+    select: { id: true, requesterId: true, selectedOfferId: true, type: true },
   })
 
   for (const ride of expiredSelections) {
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
       rideRequestId: ride.id, eventType: 'TIMEOUT_REOPEN', actorType: 'system',
       metadata: { previousOfferId: ride.selectedOfferId, timeoutMin: 5 },
     })
-    await notifyConfirmTimeout(ride.requesterId, ride.id)
+    await notifyConfirmTimeout(ride.requesterId, ride.id, ride.type as 'RIDE' | 'DELIVERY')
     processed++
   }
 
@@ -175,7 +175,10 @@ export async function GET(req: NextRequest) {
       completedAt: null, cancelledAt: null,
       rideRequest: { status: 'RIDE_PENDING_COMPLETION' },
     },
-    select: { id: true, rideRequestId: true, requesterId: true, driverId: true, driverMarkedDoneAt: true },
+    select: {
+      id: true, rideRequestId: true, requesterId: true, driverId: true, driverMarkedDoneAt: true,
+      rideRequest: { select: { type: true } },
+    },
   })
 
   for (const trip of autoCompleteTrips) {
@@ -206,7 +209,7 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    await notifyTripCompleted(trip.requesterId, trip.driverId, trip.rideRequestId)
+    await notifyTripCompleted(trip.requesterId, trip.driverId, trip.rideRequestId, trip.rideRequest?.type as 'RIDE' | 'DELIVERY')
     processed++
   }
 

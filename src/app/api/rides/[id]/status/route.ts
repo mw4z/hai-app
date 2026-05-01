@@ -134,7 +134,7 @@ export async function POST(
         metadata: { completionMode: 'REQUESTER_CONFIRMED', driverRep: rewards.driverRep, requesterRep: rewards.requesterRep },
       })
 
-      await notifyTripCompleted(ride.requesterId, driverId!, ride.id)
+      await notifyTripCompleted(ride.requesterId, driverId!, ride.id, ride.type as 'RIDE' | 'DELIVERY')
 
       return NextResponse.json({ status: 'RIDE_COMPLETED', completionMode: 'REQUESTER_CONFIRMED' })
     }
@@ -341,8 +341,12 @@ export async function POST(
       actorId: session.userId,
     })
 
-    // Notify BOTH parties for every status change
-    const STATUS_MESSAGES: Record<string, {
+    // Notify BOTH parties for every status change. Copy varies by
+    // RideRequest type — DELIVERY couriers go to a store, pick up an
+    // item, and deliver it; addressing the requester as if they're
+    // about to be picked up by a driver is wrong for that flow.
+    const isDelivery = ride.type === 'DELIVERY'
+    const STATUS_MESSAGES_RIDE: Record<string, {
       requester: { ar: string; en: string; bodyAr: string; bodyEn: string }
       driver: { ar: string; en: string; bodyAr: string; bodyEn: string }
     }> = {
@@ -359,6 +363,21 @@ export async function POST(
         driver: { ar: 'بدأ المشوار', en: 'Ride started', bodyAr: 'في الطريق إلى الوجهة', bodyEn: 'On the way to destination' },
       },
     }
+    const STATUS_MESSAGES_DELIVERY: typeof STATUS_MESSAGES_RIDE = {
+      en_route: {
+        requester: { ar: '🛵 في الطريق للاستلام', en: '🛵 Heading to pickup', bodyAr: 'المندوب توجّه لاستلام طلبك', bodyEn: 'Courier is heading to pick up your order' },
+        driver:    { ar: '🛵 أنت في الطريق للاستلام', en: '🛵 Heading to pickup', bodyAr: 'توجّه لنقطة الاستلام', bodyEn: 'Head to the pickup point' },
+      },
+      arrived: {
+        requester: { ar: '🏬 المندوب عند نقطة الاستلام', en: '🏬 Courier at pickup', bodyAr: 'يستلم طلبك الآن', bodyEn: 'Picking up your order now' },
+        driver:    { ar: '🏬 أنت عند نقطة الاستلام', en: '🏬 At pickup', bodyAr: 'استلم الطلب ثم اضغط التالي', bodyEn: 'Pick up the order then tap next' },
+      },
+      start: {
+        requester: { ar: '📦 جاري التوصيل', en: '📦 Out for delivery', bodyAr: 'طلبك في طريقه إليك', bodyEn: 'Your order is on its way' },
+        driver:    { ar: '📦 جاري التوصيل', en: '📦 Out for delivery', bodyAr: 'في الطريق لنقطة التسليم', bodyEn: 'Heading to the drop-off' },
+      },
+    }
+    const STATUS_MESSAGES = isDelivery ? STATUS_MESSAGES_DELIVERY : STATUS_MESSAGES_RIDE
 
     const msg = STATUS_MESSAGES[action]
     if (msg) {
