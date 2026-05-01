@@ -157,7 +157,7 @@ export default function NewRidePage() {
 
         {/* ── Pickup Location ──────────────────────────────────────────────── */}
         <div data-tour="ride-pickup">
-        <LocationPicker type="pickup" value={pickup} onChange={setPickup} />
+        <LocationPicker type="pickup" value={pickup} onChange={setPickup} mode={requestType === 'DELIVERY' ? 'delivery' : 'ride'} />
         </div>
 
         {/* ── Route line between pickup and dropoff ────────────────────────── */}
@@ -169,7 +169,7 @@ export default function NewRidePage() {
 
         {/* ── Dropoff Location ─────────────────────────────────────────────── */}
         <div data-tour="ride-dropoff">
-        <LocationPicker type="dropoff" value={dropoff} onChange={setDropoff} userLat={pickup?.lat} userLng={pickup?.lng} />
+        <LocationPicker type="dropoff" value={dropoff} onChange={setDropoff} userLat={pickup?.lat} userLng={pickup?.lng} mode={requestType === 'DELIVERY' ? 'delivery' : 'ride'} />
         </div>
 
         {/* ── Estimate Preview ─────────────────────────────────────────────── */}

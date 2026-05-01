@@ -26,6 +26,11 @@ interface Props {
   onChange: (loc: Location) => void
   userLat?: number
   userLng?: number
+  // 'ride' (default) renders the original "نقطة الانطلاق" / "الوجهة"
+  // labels. 'delivery' swaps them to "نقطة الاستلام" / "نقطة التسليم"
+  // — semantically clearer when the user is asking for an item to be
+  // picked up and dropped off rather than themselves.
+  mode?: 'ride' | 'delivery'
 }
 
 interface SearchResult {
@@ -50,7 +55,7 @@ function formatDist(km: number): string {
   return km < 1 ? `${Math.round(km * 1000)}m` : `${Math.round(km * 10) / 10}km`
 }
 
-export default function LocationPicker({ type, value, onChange, userLat, userLng }: Props) {
+export default function LocationPicker({ type, value, onChange, userLat, userLng, mode = 'ride' }: Props) {
   const { lang } = useLanguage()
   const [detecting, setDetecting] = useState(false)
   const [searching, setSearching] = useState(false)
@@ -288,7 +293,18 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
   const dotColor = isPickup ? 'bg-green-500' : 'bg-red-500'
   const borderColor = isPickup ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20' : 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20'
   const iconColor = isPickup ? 'text-green-600' : 'text-red-600'
-  const label = isPickup ? (lang === 'en' ? 'Pickup' : lang === 'ur' ? 'اٹھانے کی جگہ' : 'نقطة الانطلاق') : (lang === 'en' ? 'Drop-off' : lang === 'ur' ? 'منزل' : 'الوجهة')
+  const isDelivery = mode === 'delivery'
+  const label = isPickup
+    ? (lang === 'en'
+        ? (isDelivery ? 'Pickup point' : 'Pickup')
+        : lang === 'ur'
+          ? (isDelivery ? 'وصول کی جگہ' : 'اٹھانے کی جگہ')
+          : (isDelivery ? 'نقطة الاستلام' : 'نقطة الانطلاق'))
+    : (lang === 'en'
+        ? (isDelivery ? 'Drop-off point' : 'Drop-off')
+        : lang === 'ur'
+          ? (isDelivery ? 'حوالگی کی جگہ' : 'منزل')
+          : (isDelivery ? 'نقطة التسليم' : 'الوجهة'))
 
   // ── Normal View ───────────────────────────────────────────────────────────
 
