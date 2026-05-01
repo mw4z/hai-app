@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import BackButton from '@/components/BackButton'
@@ -19,9 +19,15 @@ interface Location {
 
 export default function NewRidePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { t, lang } = useLanguage()
 
-  const [requestType, setRequestType] = useState<'RIDE' | 'DELIVERY'>('RIDE')
+  // Deep-link support: /rides/new?type=delivery preselects the toggle
+  // so direct entry points (rides feed "+ توصيل" button, push deep
+  // links, share URLs) drop straight into the delivery flow without an
+  // extra tap.
+  const initialType = searchParams.get('type')?.toLowerCase() === 'delivery' ? 'DELIVERY' : 'RIDE'
+  const [requestType, setRequestType] = useState<'RIDE' | 'DELIVERY'>(initialType)
   const [itemDescription, setItemDescription] = useState('')
   const [pickup, setPickup] = useState<Location | null>(null)
   const [dropoff, setDropoff] = useState<Location | null>(null)

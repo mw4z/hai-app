@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useLanguage } from '@/hooks/useLanguage'
 import StatusBadge from '@/components/rides/StatusBadge'
 import RiyalIcon from '@/components/RiyalIcon'
-import { FiPlus, FiMapPin, FiNavigation, FiClock, FiAlertTriangle } from 'react-icons/fi'
+import { FiPlus, FiMapPin, FiNavigation, FiClock, FiAlertTriangle, FiPackage } from 'react-icons/fi'
 
 type Tab = 'all' | 'mine' | 'offers'
 
@@ -65,12 +65,23 @@ export default function RidesFeedClient({ userId }: { userId: string }) {
       {/* Header */}
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
-        <div className="flex items-center justify-between px-4 pt-4 pb-3">
+        <div className="flex items-center justify-between px-4 pt-4 pb-3 gap-2">
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">{t('rides_title')}</h1>
-          <Link href="/rides/new"
-            className="bg-primary-600 text-white rounded-full px-5 py-2.5 text-sm font-semibold flex items-center gap-2 active:scale-95 transition-transform shadow-sm">
-            <FiPlus className="w-4 h-4" /> {t('rides_new')}
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/rides/new?type=delivery"
+              className="bg-amber-500 text-white rounded-full px-4 py-2.5 text-sm font-semibold flex items-center gap-1.5 active:scale-95 transition-transform shadow-sm"
+            >
+              <FiPackage className="w-4 h-4" />
+              {lang === 'en' ? 'Delivery' : lang === 'ur' ? 'ڈیلیوری' : 'توصيل'}
+            </Link>
+            <Link
+              href="/rides/new"
+              className="bg-primary-600 text-white rounded-full px-4 py-2.5 text-sm font-semibold flex items-center gap-1.5 active:scale-95 transition-transform shadow-sm"
+            >
+              <FiPlus className="w-4 h-4" /> {t('rides_new')}
+            </Link>
+          </div>
         </div>
         {/* Tabs */}
         <div className="flex px-4 pb-3 gap-2">
