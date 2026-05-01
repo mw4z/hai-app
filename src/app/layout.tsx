@@ -27,6 +27,13 @@ import './globals.css'
 checkEnvironment()
 
 export const metadata: Metadata = {
+  // Resolve relative og:image / og:url paths against the production
+  // domain instead of the request host. Without this, link previews on
+  // WhatsApp / Twitter / iMessage land on a relative URL the crawler
+  // can't resolve, and the unfurl falls back to the bare domain text.
+  // Reads NEXT_PUBLIC_BASE_URL so previews still resolve correctly on
+  // Vercel preview deploys.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://app.hai-app.net'),
   title: 'حي | Hai',
   description: 'منصة الحي - تواصل مع جيرانك بشكل منظم وآمن',
   manifest: '/manifest.json',
