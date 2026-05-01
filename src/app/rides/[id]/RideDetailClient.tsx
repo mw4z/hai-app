@@ -914,8 +914,12 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
           <>
             {status === 'RIDE_COMPLETED' && (
               <div className="text-center py-8">
-                <div className="text-5xl mb-3">✅</div>
-                <p className="text-xl font-black text-gray-900 dark:text-white">{t('ride_completed')}</p>
+                <div className="text-5xl mb-3">{ride.type === 'DELIVERY' ? '📦' : '✅'}</div>
+                <p className="text-xl font-black text-gray-900 dark:text-white">
+                  {ride.type === 'DELIVERY'
+                    ? (lang === 'en' ? 'Delivered' : lang === 'ur' ? 'پہنچا دیا' : 'تم التسليم')
+                    : t('ride_completed')}
+                </p>
                 {ride.trip?.completionMode === 'AUTO_CLOSED' && (
                   <span className="inline-block mt-2 text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">{t('ride_auto_closed')}</span>
                 )}
