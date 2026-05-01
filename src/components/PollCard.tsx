@@ -1,12 +1,17 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useConfirm } from './ConfirmProvider'
 import { hapticLight, hapticMedium, hapticSuccess } from '@/lib/haptic'
-import { FiMessageCircle, FiSend, FiTrash2 } from 'react-icons/fi'
+import { FiMessageCircle, FiSend, FiTrash2, FiX } from 'react-icons/fi'
 import { fullName } from '@/lib/displayName'
+import SmartText from './SmartText'
+import { useDragToDismiss } from '@/hooks/useDragToDismiss'
+import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
+import { pushBackHandler } from '@/lib/backHandler'
+import { playSend } from '@/lib/sound'
 
 interface Props {
   poll: {
@@ -45,6 +50,27 @@ export default function PollCard({ poll, currentUserId, onDelete }: Props) {
   useEffect(() => { setVotes(poll.votes); setTotalVotes(poll._count.votes); setReactions(poll.reactions); setCommentCount(poll._count.comments) }, [voteSignature, poll._count.comments])
   useEffect(() => { setTimeout(() => setAnimated(true), 100) }, [])
 
+  // Drag-to-dismiss + scroll lock + back-press parity with the post
+  // comments sheet. Same hooks, same hai-sheet class skeleton — keeps
+  // the two surfaces visually and behaviourally identical.
+  const { sheetRef, handleRef } = useDragToDismiss<HTMLDivElement, HTMLDivElement>({
+    open: showComments,
+    onDismiss: () => setShowComments(false),
+  })
+  const [commentsLoaded, setCommentsLoaded] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  useBodyScrollLock(showComments)
+  useEffect(() => {
+    if (!showComments) return
+    return pushBackHandler(() => setShowComments(false))
+  }, [showComments])
+  useEffect(() => {
+    if (!showComments) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowComments(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [showComments])
+
   const myVote = votes.find(v => v.userId === currentUserId)
   const hasVoted = !!myVote
   const isClosed = poll.status === 'closed' || !!(poll.expiresAt && new Date(poll.expiresAt) < new Date())
@@ -77,13 +103,38 @@ export default function PollCard({ poll, currentUserId, onDelete }: Props) {
 
   async function loadComments() {
     const res = await fetch(`/api/polls/${poll.id}/comments`)
-    if (res.ok) setComments(await res.json())
+    if (res.ok) {
+      setComments(await res.json())
+      setCommentsLoaded(true)
+    }
   }
 
-  async function addComment() {
-    if (!newComment.trim()) return
-    const res = await fetch(`/api/polls/${poll.id}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: newComment.trim() }) })
-    if (res.ok) { const c = await res.json(); setComments(prev => [...prev, c]); setNewComment(''); setCommentCount(prev => prev + 1); hapticLight() }
+  async function addComment(e?: React.FormEvent) {
+    e?.preventDefault()
+    if (!newComment.trim() || submitting) return
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/polls/${poll.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: newComment.trim() }),
+      })
+      if (res.ok) {
+        const c = await res.json()
+        playSend()
+        setComments(prev => [...prev, c])
+        setNewComment('')
+        setCommentCount(prev => prev + 1)
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function openComments() {
+    hapticLight()
+    setShowComments(true)
+    if (!commentsLoaded) void loadComments()
   }
 
   async function deletePoll() {
@@ -178,36 +229,112 @@ export default function PollCard({ poll, currentUserId, onDelete }: Props) {
           )
         })}
 
-        {/* Comment toggle */}
-        <button onClick={() => { setShowComments(!showComments); if (!showComments) loadComments() }}
+        {/* Comment toggle — opens the bottom sheet, mirroring PostCard. */}
+        <button onClick={openComments}
           className="flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-gray-50 dark:bg-gray-700 border border-transparent active:scale-90 mr-auto">
           <FiMessageCircle className="w-3.5 h-3.5 text-gray-400" />
           {commentCount > 0 && <span className="text-[10px] text-gray-400">{commentCount}</span>}
         </button>
       </div>
 
-      {/* Comments section */}
+      {/* Comments bottom sheet — same hai-sheet skeleton, drag-to-
+          dismiss, scroll lock, back-press, and playSend on submit as
+          the post comments. Kept inline rather than extracted into a
+          shared component because the data shape (PollComment) and
+          feature surface (no images / threads / edits / likes for v1)
+          differ enough that a generic CommentsSheet would have to
+          branch on type — cheaper to duplicate the ~70 LOC of shell. */}
       {showComments && (
-        <div className="mt-3 border-t border-gray-100 dark:border-gray-700 pt-3 animate-fade-in-up">
-          <div className="space-y-2 max-h-40 overflow-y-auto mb-2">
-            {comments.map(c => (
-              <div key={c.id} className="flex items-start gap-2">
-                <div className="w-6 h-6 rounded-full bg-primary-100 overflow-hidden flex-shrink-0 mt-0.5">
-                  {c.authorAvatar ? <img src={c.authorAvatar} alt="" className="w-full h-full object-cover" /> : null}
-                </div>
-                <div>
-                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{c.authorName} </span>
-                  <span className="text-xs text-gray-600 dark:text-gray-400">{c.body}</span>
-                </div>
+        <div
+          data-overlay="true"
+          className="hai-sheet-overlay"
+          onPointerDown={(e) => {
+            if (e.target !== e.currentTarget) return
+            e.preventDefault()
+            consumeNextClick()
+            setShowComments(false)
+          }}
+        >
+          <div
+            ref={sheetRef}
+            className="hai-sheet animate-slide-up"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div ref={handleRef} style={{ touchAction: 'none' }}>
+              <div className="hai-sheet__handle" />
+              <div className="hai-sheet__header">
+                <h3 className="hai-sheet__header-title">
+                  {lang === 'en' ? 'Comments' : lang === 'ur' ? 'تبصرے' : 'التعليقات'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowComments(false)}
+                  className="hai-sheet__close"
+                >
+                  <FiX className="hai-icon-lg" />
+                </button>
               </div>
-            ))}
-            {comments.length === 0 && <p className="text-xs text-gray-400 text-center py-2">{lang === 'en' ? 'No comments' : lang === 'ur' ? 'کوئی تبصرہ نہیں' : 'لا توجد تعليقات'}</p>}
-          </div>
-          <div className="flex items-center gap-2 min-w-0">
-            <input value={newComment} onChange={e => setNewComment(e.target.value)} onKeyDown={e => e.key === 'Enter' && addComment()}
-              placeholder={lang === 'en' ? 'Add comment...' : lang === 'ur' ? 'تبصرہ شامل کریں...' : 'أضف تعليق...'}
-              className="flex-1 min-w-0 bg-gray-50 dark:bg-gray-700 rounded-full px-3 py-2 text-xs focus:outline-none text-gray-900 dark:text-white" />
-            <button onClick={addComment} className="text-primary-600 p-1.5"><FiSend className="w-3.5 h-3.5" /></button>
+            </div>
+
+            <div className="hai-sheet__body">
+              {!commentsLoaded ? (
+                <p className="hai-empty-state">…</p>
+              ) : comments.length === 0 ? (
+                <p className="hai-empty-state">
+                  {lang === 'en' ? 'No comments yet' : lang === 'ur' ? 'ابھی تک کوئی تبصرہ نہیں' : 'لا توجد تعليقات'}
+                </p>
+              ) : (
+                comments.map((c: any) => (
+                  <div key={c.id} className="hai-comment">
+                    {c.authorAvatar ? (
+                      <img src={c.authorAvatar} alt="" className="hai-avatar hai-avatar--sm" />
+                    ) : (
+                      <div className="hai-avatar hai-avatar--sm">
+                        {c.authorName?.[0] || '؟'}
+                      </div>
+                    )}
+                    <div className="hai-comment__body">
+                      <div className="hai-comment__meta">
+                        <span className="hai-comment__author">{c.authorName}</span>
+                        <span className="hai-comment__time">
+                          {(() => {
+                            const mins = Math.floor((Date.now() - new Date(c.createdAt).getTime()) / 60000)
+                            if (mins < 1) return lang === 'en' ? 'now' : 'الآن'
+                            if (mins < 60) return lang === 'en' ? `${mins}m` : `${mins}د`
+                            const hrs = Math.floor(mins / 60)
+                            if (hrs < 24) return lang === 'en' ? `${hrs}h` : `${hrs}س`
+                            return lang === 'en' ? `${Math.floor(hrs/24)}d` : `${Math.floor(hrs/24)}ي`
+                          })()}
+                        </span>
+                      </div>
+                      <div className="hai-comment__text">
+                        <SmartText text={c.body} />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="hai-sheet__footer">
+              <form onSubmit={addComment} className="hai-comment-input">
+                <input
+                  type="text"
+                  value={newComment}
+                  onChange={e => setNewComment(e.target.value)}
+                  placeholder={lang === 'en' ? 'Add a comment…' : lang === 'ur' ? 'تبصرہ شامل کریں…' : 'أضف تعليقاً…'}
+                  maxLength={500}
+                />
+                <button
+                  type="submit"
+                  disabled={!newComment.trim() || submitting}
+                  className="hai-comment-input__send"
+                  aria-label={lang === 'en' ? 'Send' : 'إرسال'}
+                >
+                  <FiSend className="hai-icon-md" />
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
