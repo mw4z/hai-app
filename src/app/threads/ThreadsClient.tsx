@@ -9,7 +9,7 @@ import { fullName } from '@/lib/displayName'
 
 interface Thread {
   id: string
-  other: { id: string; name: string | null; lastName?: string | null; avatarUrl: string | null }
+  other: { id: string; name: string | null; lastName?: string | null; avatarUrl: string | null; neighborhoodId?: string | null }
   postTitle: string | null
   postCategory: string | null
   isExclusive: boolean
@@ -74,7 +74,13 @@ const CATEGORY_ICONS: Record<string, string> = {
   GENERAL: '💬',
 }
 
-export default function ThreadsClient({ threads: initialThreads }: { threads: Thread[] }) {
+export default function ThreadsClient({
+  threads: initialThreads,
+  currentUserNeighborhoodId,
+}: {
+  threads: Thread[]
+  currentUserNeighborhoodId: string | null
+}) {
   const { t, lang } = useLanguage()
   const router = useRouter()
   const [threads, setThreads] = useState(initialThreads)
@@ -164,10 +170,24 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
 
               {/* Content */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-0.5">
-                  <p className="text-[15px] font-semibold text-gray-900 dark:text-white truncate">
-                    {fullName(thread.other) || (lang === 'en' ? 'Neighbor' : 'جار')}
-                  </p>
+                <div className="flex items-center justify-between mb-0.5 gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <p className="text-[15px] font-semibold text-gray-900 dark:text-white truncate">
+                      {fullName(thread.other) || (lang === 'en' ? 'Neighbor' : 'جار')}
+                    </p>
+                    {/* Cross-neighborhood badge: only show when both
+                        sides have a neighborhoodId on file AND they
+                        differ. Missing recipient nbhd → assume own
+                        (legacy threads pre-Phase). */}
+                    {currentUserNeighborhoodId && thread.other.neighborhoodId && thread.other.neighborhoodId !== currentUserNeighborhoodId && (
+                      <span
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 flex-shrink-0"
+                        title={lang === 'en' ? 'Outside your neighborhood' : 'من خارج الحي'}
+                      >
+                        {lang === 'en' ? 'Outside' : 'خارج الحي'}
+                      </span>
+                    )}
+                  </div>
                   {thread.lastMessage && (
                     <span className="text-[11px] text-gray-400 dark:text-gray-500 flex-shrink-0 mr-1">
                       {timeAgo(thread.lastMessage.createdAt, lang)}

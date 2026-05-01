@@ -18,12 +18,12 @@ export default async function ThreadPage({ params }: { params: { id: string } })
   // Thread metadata + the first 100 messages can be fetched in
   // parallel — messages doesn't depend on the thread row, both key
   // off params.id. Saves a full DB roundtrip on every chat open.
-  const [thread, messages] = await Promise.all([
+  const [thread, messages, currentUser] = await Promise.all([
     db.thread.findUnique({
       where: { id: params.id },
       include: {
-        user1: { select: { id: true, name: true, lastName: true, avatarUrl: true, role: true } },
-        user2: { select: { id: true, name: true, lastName: true, avatarUrl: true, role: true } },
+        user1: { select: { id: true, name: true, lastName: true, avatarUrl: true, role: true, neighborhoodId: true } },
+        user2: { select: { id: true, name: true, lastName: true, avatarUrl: true, role: true, neighborhoodId: true } },
       },
     }),
     db.message.findMany({
@@ -37,6 +37,10 @@ export default async function ThreadPage({ params }: { params: { id: string } })
         replyTo: { select: { id: true, text: true, senderId: true, type: true } },
       },
       take: 100,
+    }),
+    db.user.findUnique({
+      where: { id: session.userId },
+      select: { neighborhoodId: true },
     }),
   ])
 
@@ -86,6 +90,7 @@ export default async function ThreadPage({ params }: { params: { id: string } })
     <ChatClient
       threadId={params.id}
       currentUserId={session.userId}
+      currentUserNeighborhoodId={currentUser?.neighborhoodId || null}
       other={JSON.parse(JSON.stringify(other))}
       initialMessages={JSON.parse(JSON.stringify(messages))}
       isClosed={thread.status === 'CLOSED'}

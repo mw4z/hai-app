@@ -125,6 +125,7 @@ function useLongPress(onLongPress: () => void, onDoubleTap: () => void, ms = 500
 export default function ChatClient({
   threadId,
   currentUserId,
+  currentUserNeighborhoodId,
   other,
   initialMessages,
   isClosed = false,
@@ -132,7 +133,8 @@ export default function ChatClient({
 }: {
   threadId: string
   currentUserId: string
-  other: { id: string; name: string | null; lastName?: string | null; avatarUrl: string | null; role?: string | null }
+  currentUserNeighborhoodId: string | null
+  other: { id: string; name: string | null; lastName?: string | null; avatarUrl: string | null; role?: string | null; neighborhoodId?: string | null }
   initialMessages: Msg[]
   isClosed?: boolean
   canRate?: boolean
@@ -201,6 +203,36 @@ export default function ChatClient({
   const sendLockRef = useRef(false)
   const sendLocationLockRef = useRef(false)
   const sendImagesLockRef = useRef(false)
+  // Cross-neighborhood detection. When the recipient is from a
+  // different neighborhood we render the "خارج الحي" badge in the
+  // header, and the first message attempt prompts a one-time
+  // confirmation per thread (acknowledged in localStorage).
+  const isOutsideNbhd = !!(
+    currentUserNeighborhoodId &&
+    other.neighborhoodId &&
+    currentUserNeighborhoodId !== other.neighborhoodId
+  )
+  const outsideAckKey = `hai_outside_dm_ack:${threadId}`
+  async function gateOutsideDm(): Promise<boolean> {
+    if (!isOutsideNbhd) return true
+    try {
+      if (localStorage.getItem(outsideAckKey)) return true
+    } catch {}
+    const ok = await confirmDialog({
+      message:
+        lang === 'en'
+          ? 'This user is outside your neighborhood. Do you want to continue?'
+          : lang === 'ur'
+            ? 'یہ صارف آپ کے محلے سے باہر ہے۔ کیا آپ جاری رکھنا چاہتے ہیں؟'
+            : 'هذا المستخدم من خارج حيك. هل تريد المتابعة؟',
+      confirmText:
+        lang === 'en' ? 'Continue' : lang === 'ur' ? 'جاری رکھیں' : 'متابعة',
+    })
+    if (ok) {
+      try { localStorage.setItem(outsideAckKey, '1') } catch {}
+    }
+    return ok
+  }
   const [replyingTo, setReplyingTo] = useState<Msg | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const composerRef = useRef<HTMLDivElement>(null)
@@ -540,6 +572,8 @@ export default function ChatClient({
     const body = text.trim()
     const replyId = replyingTo?.id || null
     if (isOffline) { sendLockRef.current = false; toast.error(offlineMsg()); return }
+    // Cross-nbhd confirmation — runs once per thread, then sticks.
+    if (!(await gateOutsideDm())) { sendLockRef.current = false; return }
     setText('')
     setReplyingTo(null)
     setSending(true)
@@ -603,6 +637,7 @@ export default function ChatClient({
 
   async function sendLocation() {
     if (sendLocationLockRef.current) return
+    if (!(await gateOutsideDm())) return
     sendLocationLockRef.current = true
     setSendingLocation(true)
     setShowLocationConfirm(false)
@@ -657,6 +692,7 @@ export default function ChatClient({
   // attached only to the first image — subsequent ones are plain.
   async function sendImages(files: File[]) {
     if (sendImagesLockRef.current || files.length === 0) return
+    if (!(await gateOutsideDm())) return
     sendImagesLockRef.current = true
     const valid = files.filter((f) => {
       if (!f.type.startsWith('image/')) return false
@@ -952,9 +988,19 @@ export default function ChatClient({
             </div>
           )}
           <div className="min-w-0 text-start">
-            <h1 className="text-[15px] font-semibold text-gray-900 dark:text-white truncate">
-              {fullName(other) || (lang === 'en' ? 'Neighbor' : 'جار')}
-            </h1>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h1 className="text-[15px] font-semibold text-gray-900 dark:text-white truncate">
+                {fullName(other) || (lang === 'en' ? 'Neighbor' : 'جار')}
+              </h1>
+              {isOutsideNbhd && (
+                <span
+                  className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 flex-shrink-0"
+                  title={lang === 'en' ? 'Outside your neighborhood' : 'من خارج الحي'}
+                >
+                  {lang === 'en' ? 'Outside' : 'خارج الحي'}
+                </span>
+              )}
+            </div>
             {!closed && statusLoaded && !statusHidden && (
               <p className={`text-[11px] font-medium ${otherOnline ? 'text-green-500' : 'text-gray-400'}`}>
                 {otherOnline

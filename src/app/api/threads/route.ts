@@ -20,8 +20,8 @@ export async function GET() {
         OR: [{ user1Id: session.userId }, { user2Id: session.userId }],
       },
       include: {
-        user1: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true } },
-        user2: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true } },
+        user1: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true, neighborhoodId: true } },
+        user2: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true, neighborhoodId: true } },
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -87,7 +87,7 @@ export async function GET() {
         : null
       return {
         id: t.id,
-        other: { id: other.id, name: other.name, lastName: other.lastName, avatarUrl: other.avatarUrl },
+        other: { id: other.id, name: other.name, lastName: other.lastName, avatarUrl: other.avatarUrl, neighborhoodId: other.neighborhoodId },
         postTitle: post?.title || null,
         postCategory: post?.category || null,
         isExclusive: post?.coordinationMode === 'EXCLUSIVE',
@@ -220,7 +220,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ threadId: thread!.id })
+    // Return the recipient's neighborhoodId alongside the thread id so
+    // the client can render the cross-neighborhood badge / first-
+    // message confirmation without a second round trip.
+    const recipient = await db.user.findUnique({
+      where: { id: userId },
+      select: { neighborhoodId: true },
+    })
+    return NextResponse.json({
+      threadId: thread!.id,
+      recipientNeighborhoodId: recipient?.neighborhoodId || null,
+    })
   } catch (error) {
     log.error('Handler failed', error, { route: '/api/threads POST' })
     return NextResponse.json({ error: 'خطأ في الخادم' }, { status: 500 })

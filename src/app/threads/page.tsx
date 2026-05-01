@@ -14,7 +14,7 @@ export default async function ThreadsPage() {
   // (not fire-and-forget) so the function doesn't recycle before the
   // write commits, but parallelized so the slower of the two is the
   // page's effective latency, not their sum.
-  const [, threads] = await Promise.all([
+  const [, threads, currentUser] = await Promise.all([
     db.notification.updateMany({
       where: { userId: session.userId, read: false, type: 'NEW_MESSAGE' },
       data: { read: true },
@@ -26,8 +26,8 @@ export default async function ThreadsPage() {
           OR: [{ user1Id: session.userId }, { user2Id: session.userId }],
         },
         include: {
-          user1: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true } },
-          user2: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true } },
+          user1: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true, neighborhoodId: true } },
+          user2: { select: { id: true, name: true, lastName: true, avatarUrl: true, showReadReceipts: true, neighborhoodId: true } },
           messages: {
             orderBy: { createdAt: 'desc' },
             take: 1,
@@ -40,6 +40,10 @@ export default async function ThreadsPage() {
         orderBy: { updatedAt: 'desc' },
       })
     ),
+    db.user.findUnique({
+      where: { id: session.userId },
+      select: { neighborhoodId: true },
+    }),
   ])
 
   // Look up related post titles for context
@@ -82,7 +86,7 @@ export default async function ThreadsPage() {
       : null
     return {
       id: t.id,
-      other: { id: other.id, name: other.name, lastName: other.lastName, avatarUrl: other.avatarUrl },
+      other: { id: other.id, name: other.name, lastName: other.lastName, avatarUrl: other.avatarUrl, neighborhoodId: other.neighborhoodId },
       postTitle: post?.title?.slice(0, 40) || null,
       postCategory: post?.category || null,
       isExclusive: post?.coordinationMode === 'EXCLUSIVE',
@@ -97,5 +101,10 @@ export default async function ThreadsPage() {
     }
   })
 
-  return <ThreadsClient threads={JSON.parse(JSON.stringify(formatted))} />
+  return (
+    <ThreadsClient
+      threads={JSON.parse(JSON.stringify(formatted))}
+      currentUserNeighborhoodId={currentUser?.neighborhoodId || null}
+    />
+  )
 }
