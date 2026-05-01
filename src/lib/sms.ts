@@ -173,7 +173,9 @@ export async function sendEmailOTP(email: string): Promise<boolean> {
     {
       method: 'email',
       email,
-      length: 6,
+      // 4 digits to match the SMS OTP UX — same input boxes, same
+      // muscle memory across SMS and email channels.
+      length: 4,
       template_id: EMAIL_TEMPLATE_ID,
       app_name: APP_NAME,
       sender: SENDER,
@@ -193,7 +195,7 @@ export async function sendEmailOTP(email: string): Promise<boolean> {
 /** Verify Email OTP via Authentica. */
 export async function verifyEmailOTP(email: string, code: string): Promise<boolean> {
   if (!isConfigured()) {
-    return code === '123456'
+    return code === '1234'
   }
 
   const { ok, data } = await authenticaPost(

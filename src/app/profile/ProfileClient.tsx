@@ -495,7 +495,7 @@ export default function ProfileClient({ user, postCount }: Props) {
 
   // Verify email code
   async function verifyEmail() {
-    if (verifyCode.length < 6) { toast.error('أدخل الرمز المكون من 6 أرقام'); return }
+    if (verifyCode.length < 4) { toast.error('أدخل الرمز المكون من 4 أرقام'); return }
     setSaving(true)
     const res = await fetch('/api/profile/verify-email', {
       method: 'POST',
@@ -881,9 +881,9 @@ export default function ProfileClient({ user, postCount }: Props) {
             <input
               autoFocus
               value={verifyCode}
-              onChange={e => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              onChange={e => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
               className="input-field text-sm tracking-widest text-center"
-              placeholder="000000"
+              placeholder="0000"
               inputMode="numeric"
             />
             <div className="flex gap-2">
