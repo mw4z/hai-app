@@ -23,6 +23,10 @@ prod_snapshot.dump
 # in git history. Specific path + glob defense-in-depth.
 android/app/hai-release.keystore
 *.keystore
+# Android signing credentials — loaded by android/app/build.gradle on
+# local builds. CI uses HAI_KEYSTORE_PASSWORD / HAI_KEY_PASSWORD env
+# vars instead; never commit this file.
+android/keystore.properties
 *.jks
 
 # Store-listing screenshots — regeneratable outputs of the styling

@@ -1,5 +1,18 @@
 apply plugin: 'com.android.application'
 
+// Release signing credentials are loaded from android/keystore.properties
+// (gitignored) in local builds, and from CI env vars in cloud builds
+// (Codemagic / GitHub Actions / etc). Falling back to env vars makes
+// the .properties file optional on a clean CI checkout.
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProps = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProps.load(new FileInputStream(keystorePropertiesFile))
+}
+def storePass = keystoreProps['HAI_KEYSTORE_PASSWORD'] ?: System.getenv('HAI_KEYSTORE_PASSWORD')
+def keyPass   = keystoreProps['HAI_KEY_PASSWORD']      ?: System.getenv('HAI_KEY_PASSWORD')
+def keyAlias  = keystoreProps['HAI_KEY_ALIAS']         ?: (System.getenv('HAI_KEY_ALIAS') ?: 'hai')
+
 android {
     namespace = "com.hai.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -19,9 +32,9 @@ android {
     signingConfigs {
         release {
             storeFile file('hai-release.keystore')
-            storePassword 'Hai2024App'
-            keyAlias 'hai'
-            keyPassword 'Hai2024App'
+            storePassword storePass
+            keyAlias keyAlias
+            keyPassword keyPass
         }
     }
     buildTypes {

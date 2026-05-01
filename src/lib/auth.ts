@@ -1,8 +1,13 @@
 import { SignJWT, jwtVerify } from 'jose'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'fallback-secret-change-in-production'
-)
+if (!process.env.JWT_SECRET) {
+  // Hard fail at module load. The previous fallback ('fallback-secret-
+  // change-in-production') would have signed real production tokens
+  // with a publicly-known string, making every JWT in the system
+  // forgeable. Better to crash on boot than ship that.
+  throw new Error('JWT_SECRET is required. Set it in your environment (e.g. Vercel project settings) before booting.')
+}
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 
 export interface JWTPayload {
   userId: string

@@ -8,7 +8,7 @@ import { log } from '@/lib/logger'
 import { requireVerified } from '@/lib/requireVerified'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
-const MIN_ACCOUNT_AGE_DAYS = 0 // TODO: set back to 3 for production
+const MIN_ACCOUNT_AGE_DAYS = 3
 const MAX_OFFERS_PER_HOUR = 10
 
 /** POST — Submit an offer on a ride */

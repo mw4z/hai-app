@@ -1,11 +1,14 @@
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:1999**@localhost:5432/hai_db'
-
 if (!process.env.DATABASE_URL) {
-  console.warn('[DB] ⚠️  DATABASE_URL not set — using hardcoded fallback. Set this in production!')
+  // Hard fail rather than silently connecting to a localhost DB. Was
+  // a "warn + use fallback string" before, which meant a misconfigured
+  // production deploy would happily run against an unreachable local
+  // DB and surface as cryptic ECONNREFUSED later.
+  throw new Error('DATABASE_URL is required. Set it in your environment (Vercel project settings or .env) before booting.')
 }
+const DATABASE_URL = process.env.DATABASE_URL
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined

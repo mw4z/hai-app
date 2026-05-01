@@ -51,9 +51,16 @@ const APP_NAME = process.env.AUTHENTICA_APP_NAME || 'Hai'
 // Google Play / App Store review test account — skip real OTP send.
 // Matches the same hardcoded test pair the previous Twilio impl
 // honoured so existing review accounts keep working through the swap.
-const TEST_PHONES: Record<string, string> = {
-  '+966500000000': '1234',
-}
+//
+// Gated to non-production: in prod, store reviewers should be issued a
+// real phone for review (or, if absolutely necessary, a per-environment
+// TEST_PHONE_OVERRIDE env var — not committed). Leaving a hard-coded
+// "1234 always works for +966500000000" path in the production binary
+// is a backdoor.
+const TEST_PHONES: Record<string, string> =
+  process.env.NODE_ENV !== 'production'
+    ? { '+966500000000': '1234' }
+    : {}
 
 function isConfigured(): boolean {
   return API_KEY.length > 0

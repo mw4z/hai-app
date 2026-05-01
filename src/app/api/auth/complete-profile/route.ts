@@ -85,11 +85,12 @@ export async function POST(req: NextRequest) {
         neighborhood,
       )
       if (verdict === 'rejected') {
+        // Don't log lat/lng — even on a rejection, that's the user's
+        // precise location and would end up in Vercel logs accessible
+        // to anyone with project access.
         console.warn('[COMPLETE_PROFILE] neighborhood verify rejected', {
           userId: session.userId,
           neighborhoodId,
-          lat: verifyLat,
-          lng: verifyLng,
           accuracy,
         })
         return NextResponse.json(
