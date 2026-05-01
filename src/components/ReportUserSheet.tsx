@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import toast from 'react-hot-toast'
 import { FiX, FiFlag, FiSlash } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
@@ -105,8 +106,17 @@ export default function ReportUserSheet({
   const [details, setDetails] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  // Portal the sheet to <body> so it always escapes whatever stacking
+  // context its caller sits in. Was: rendered as a child of ChatClient,
+  // whose position:fixed root creates its own stacking context — the
+  // chat header (z-10) and composer (z-20) sat ABOVE the sheet because
+  // the sheet's z-50 was scoped inside that context. Now it lives at
+  // the body root, beneath nothing.
+  const [portalReady, setPortalReady] = useState(false)
+  useEffect(() => { setPortalReady(true) }, [])
 
   if (!open) return null
+  if (!portalReady || typeof document === 'undefined') return null
 
   const dir = lang === 'en' ? 'ltr' : 'rtl'
 
@@ -165,7 +175,7 @@ export default function ReportUserSheet({
         : `الإبلاغ عن ${targetName}`
     : null
 
-  return (
+  return createPortal(
     <div
       data-overlay="true"
       className="hai-sheet-overlay"
@@ -316,6 +326,7 @@ export default function ReportUserSheet({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
