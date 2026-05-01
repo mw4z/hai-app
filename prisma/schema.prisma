@@ -1050,6 +1050,8 @@ model RideRequest {
   isImmediate        Boolean     @default(true)
   scheduledAt        DateTime?
 
+  notes              String?
+
   // RIDE vs DELIVERY. Defaults to RIDE so existing rows are unchanged.
   type               RideRequestType @default(RIDE)
   // For DELIVERY only — what the requester wants delivered. e.g.
