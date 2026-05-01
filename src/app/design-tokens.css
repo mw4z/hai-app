@@ -2091,12 +2091,21 @@ textarea.hai-input {
   gap: var(--hai-space-1);
   background: transparent;
   border: none;
-  padding: 0;
+  /* Tap target: padding pushes the button to ~36 px tall so a finger
+     lands cleanly. Negative VERTICAL margin only — the row uses
+     `gap` for horizontal spacing, so a negative inline margin would
+     overlap siblings instead of nudging the visual edge. Was:
+     padding 0 — the hit area was the icon + label string only, which
+     on a 14 px icon is ~14 px tall and missable. */
+  padding: var(--hai-space-2) var(--hai-space-1);
+  margin: calc(var(--hai-space-2) * -1) 0;
   font-size: var(--hai-fs-xs);
   font-weight: var(--hai-fw-medium);
   color: var(--hai-text-muted);
   cursor: pointer;
-  transition: color var(--hai-dur-fast) var(--hai-ease);
+  -webkit-tap-highlight-color: transparent;
+  border-radius: var(--hai-radius-sm);
+  transition: color var(--hai-dur-fast) var(--hai-ease), background-color var(--hai-dur-fast) var(--hai-ease);
 }
 .hai-comment__action:hover  { color: var(--hai-text); }
 .hai-comment__action:active { transform: scale(0.95); }
