@@ -268,7 +268,15 @@ export default function NewRidePage() {
 
         {/* ── Community note + disclaimer ─────────────────────────────────── */}
         <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 space-y-1.5">
-          <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{t('ride_community_note')}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+            {requestType === 'DELIVERY'
+              ? (lang === 'en'
+                  ? 'This request is for coordinating a delivery between neighbors — the agreement is made directly between the two parties'
+                  : lang === 'ur'
+                    ? 'یہ درخواست پڑوسیوں کے درمیان ڈیلیوری کے تعاون کیلئے ہے — معاہدہ براہ راست فریقین کے درمیان ہوتا ہے'
+                    : 'هذا الطلب لتنسيق توصيلة بين الجيران — الاتفاق يتم بين الطرفين مباشرة')
+              : t('ride_community_note')}
+          </p>
           <p className="text-[10px] text-gray-400 dark:text-gray-500">{t('ride_disclaimer')}</p>
         </div>
 

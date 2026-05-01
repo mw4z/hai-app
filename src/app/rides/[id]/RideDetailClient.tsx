@@ -845,7 +845,9 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
               <>
                 <p className="text-xl font-black text-white mb-2">{t('ride_pending_complete')}</p>
                 <p className="text-sm text-gray-400 mb-1">
-                  {lang === 'en' ? 'Says you arrived — did you?' : lang === 'ur' ? 'کہتا ہے پہنچ گئے — کیا واقعی پہنچ گئے؟' : 'يقول وصلتم — هل وصلت فعلاً؟'}
+                  {ride.type === 'DELIVERY'
+                    ? (lang === 'en' ? 'Says it was delivered — did you receive it?' : lang === 'ur' ? 'کہتا ہے پہنچا دیا — کیا آپ کو ملا؟' : 'يقول تم التسليم — هل استلمت طلبك؟')
+                    : (lang === 'en' ? 'Says you arrived — did you?' : lang === 'ur' ? 'کہتا ہے پہنچ گئے — کیا واقعی پہنچ گئے؟' : 'يقول وصلتم — هل وصلت فعلاً؟')}
                 </p>
                 {autoCloseCountdown && (
                   <p className="text-xs text-orange-600 dark:text-orange-400 mb-5">
@@ -854,7 +856,11 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                 )}
                 <button onClick={() => apiAction(`/api/rides/${rideId}/status`, { action: 'complete' })} disabled={actionLoading}
                   className="w-full bg-green-600 text-white rounded-2xl py-4 font-bold text-base shadow-lg shadow-green-600/30 active:scale-[0.97] disabled:opacity-50">
-                  {actionLoading ? <HaiSpinner /> : `✓ ${t('ride_confirm_arrival')}`}
+                  {actionLoading
+                    ? <HaiSpinner />
+                    : `✓ ${ride.type === 'DELIVERY'
+                        ? (lang === 'en' ? 'Confirm receipt' : lang === 'ur' ? 'وصول کی تصدیق' : 'تأكيد الاستلام')
+                        : t('ride_confirm_arrival')}`}
                 </button>
 
                 {!showDispute ? (
@@ -890,7 +896,9 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
             ) : (
               <>
                 <p className="text-xl font-black text-white mb-2">
-                  {lang === 'en' ? 'Waiting for requester' : lang === 'ur' ? 'مسافر کی تصدیق کا انتظار' : 'بانتظار تأكيد الراكب'}
+                  {ride.type === 'DELIVERY'
+                    ? (lang === 'en' ? 'Waiting for the customer' : lang === 'ur' ? 'گاہک کی تصدیق کا انتظار' : 'بانتظار تأكيد العميل')
+                    : (lang === 'en' ? 'Waiting for requester' : lang === 'ur' ? 'مسافر کی تصدیق کا انتظار' : 'بانتظار تأكيد الراكب')}
                 </p>
                 <p className="text-sm text-gray-400">
                   {lang === 'en' ? 'Will auto-close if no response' : lang === 'ur' ? 'جواب نہ آنے پر خودکار بند ہو جائے گا' : 'سيتم الإغلاق تلقائياً إذا لم يرد'}
@@ -965,7 +973,7 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
             <textarea value={ratingComment} onChange={e => setRatingComment(e.target.value)} placeholder={t('ride_comment')} rows={2} maxLength={200}
               className="w-full border border-gray-200 dark:border-gray-600 rounded-xl p-3 text-sm bg-transparent text-gray-900 dark:text-white resize-none mb-3" />
             {ride.trip?.completionMode === 'AUTO_CLOSED' && (
-              <p className="text-xs text-amber-500 text-center mb-3">⚠️ {lang === 'en' ? 'Auto-closed — lower rating weight' : lang === 'ur' ? 'خودکار بند — آپ کی درجہ بندی کم وزن رکھتی ہے' : 'مشوار مغلق تلقائياً — تقييمك بوزن أقل'}</p>
+              <p className="text-xs text-amber-500 text-center mb-3">⚠️ {lang === 'en' ? 'Auto-closed — lower rating weight' : lang === 'ur' ? 'خودکار بند — آپ کی درجہ بندی کم وزن رکھتی ہے' : (ride.type === 'DELIVERY' ? 'طلب مغلق تلقائياً — تقييمك بوزن أقل' : 'مشوار مغلق تلقائياً — تقييمك بوزن أقل')}</p>
             )}
             <button onClick={() => { apiAction(`/api/rides/${rideId}/rate`, { score: rating, comment: ratingComment }, lang === 'en' ? 'Thanks for rating' : lang === 'ur' ? 'آپ کی درجہ بندی کا شکریہ' : 'شكراً لتقييمك').then(ok => { if (ok) router.push('/rides') }) }}
               disabled={actionLoading || rating === 0}
@@ -979,7 +987,7 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
         {isParticipant && phase !== 'offers' && (
           <button onClick={() => setShowTimeline(!showTimeline)}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium ${isTripMode ? 'bg-gray-800 text-gray-300' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-100 dark:border-gray-700'}`}>
-            <span>{lang === 'en' ? 'Timeline' : lang === 'ur' ? 'سفر کے مراحل' : 'مراحل المشوار'}</span>
+            <span>{lang === 'en' ? 'Timeline' : lang === 'ur' ? 'سفر کے مراحل' : (ride.type === 'DELIVERY' ? 'مراحل الطلب' : 'مراحل المشوار')}</span>
             {showTimeline ? <FiChevronUp className="w-4 h-4" /> : <FiChevronDown className="w-4 h-4" />}
           </button>
         )}
