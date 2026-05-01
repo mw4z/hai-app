@@ -534,7 +534,7 @@ export const translations = {
   ride_send_rating:       { ar: 'إرسال التقييم',   en: 'Submit Rating'     , ur: 'درجہ بندی بھیجیں' },
   ride_chat:              { ar: 'محادثة',           en: 'Chat'              , ur: 'گفتگو' },
   ride_type_message:      { ar: 'اكتب رسالة...',   en: 'Type a message...' , ur: 'پیغام لکھیں...' },
-  ride_cancel_trip:       { ar: 'إلغاء المشوار',   en: 'Cancel'            , ur: 'منسوخ کریں' },
+  ride_cancel_trip:       { ar: 'إلغاء الطلب',      en: 'Cancel'            , ur: 'منسوخ کریں' },
   ride_cancel_reason:     { ar: 'سبب الإلغاء',     en: 'Cancel Reason'     , ur: 'منسوخی کی وجہ' },
   ride_driver_action_en_route: { ar: 'في الطريق', en: 'On the Way' , ur: 'راستے میں' },
   ride_driver_action_arrived:  { ar: 'وصلت',      en: 'I Arrived'  , ur: 'پہنچ گئے' },
