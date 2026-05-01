@@ -80,22 +80,42 @@ export default function CapacitorBridge() {
       //                    float in mid-screen because the inset
       //                    wasn't being fed back into CSS layout.
       try {
-        const { Keyboard, KeyboardResize } = await import('@capacitor/keyboard')
+        const { Keyboard, KeyboardResize, KeyboardStyle } = await import('@capacitor/keyboard')
         const platform = window.Capacitor?.getPlatform?.() || 'web'
         await Keyboard.setResizeMode({
           mode: platform === 'ios' ? KeyboardResize.Native : KeyboardResize.Body,
         })
+        // iOS keyboard appearance — pinned to the app's chosen theme
+        // via Capacitor's native setStyle() call. CSS color-scheme and
+        // <meta name="color-scheme"> are NOT reliably honored by
+        // WKWebView for keyboard color; only this native call is.
+        // No-op on Android.
+        if (platform === 'ios') {
+          const isDark = document.documentElement.classList.contains('dark')
+          await Keyboard.setStyle({ style: isDark ? KeyboardStyle.Dark : KeyboardStyle.Light })
+        }
       } catch {}
     }
 
     init()
 
     const observer = new MutationObserver(async () => {
+      const isDark = document.documentElement.classList.contains('dark')
       try {
         const { StatusBar, Style } = await import('@capacitor/status-bar')
-        const isDark = document.documentElement.classList.contains('dark')
         await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light })
         await StatusBar.setBackgroundColor({ color: isDark ? '#101619' : '#ffffff' })
+      } catch {}
+      // Keep the iOS keyboard color in sync with subsequent theme
+      // toggles (CapacitorBridge resume, ProfileClient picker, OS
+      // appearance change). Same Capacitor.Keyboard.setStyle call as
+      // init(), no-op on non-iOS.
+      try {
+        const platform = window.Capacitor?.getPlatform?.() || 'web'
+        if (platform === 'ios') {
+          const { Keyboard, KeyboardStyle } = await import('@capacitor/keyboard')
+          await Keyboard.setStyle({ style: isDark ? KeyboardStyle.Dark : KeyboardStyle.Light })
+        }
       } catch {}
     })
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
