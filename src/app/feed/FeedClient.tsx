@@ -238,7 +238,11 @@ export default function FeedClient({
     } catch { /* */ }
     // Also refresh rides + polls
     try {
-      const rRes = await fetch('/api/rides?neighborhood=' + (browseNeighborhood?.id || user.neighborhoodId || ''))
+      // type=RIDE so only ride-share requests land in the المشاوير
+      // strip; DELIVERY rows surface in their own delivery strip
+      // above. Without the filter the same delivery request appeared
+      // twice on the feed (once as 📦, once as 🚗).
+      const rRes = await fetch('/api/rides?type=RIDE&neighborhood=' + (browseNeighborhood?.id || user.neighborhoodId || ''))
       if (rRes.ok) { const rData = await rRes.json(); setOpenRides((rData.rides || []).slice(0, 3)) }
     } catch { /* */ }
     try {
@@ -262,7 +266,7 @@ export default function FeedClient({
 
   // Initial ride requests + polls fetch
   useEffect(() => {
-    fetch('/api/rides?neighborhood=' + (browseNeighborhood?.id || user.neighborhoodId || ''))
+    fetch('/api/rides?type=RIDE&neighborhood=' + (browseNeighborhood?.id || user.neighborhoodId || ''))
       .then(r => r.json()).then(d => setOpenRides((d.rides || []).slice(0, 3))).catch(() => {})
     fetch('/api/polls?neighborhood=' + (browseNeighborhood?.id || user.neighborhoodId || ''))
       .then(r => r.json()).then(d => setPolls(d || [])).catch(() => {})
