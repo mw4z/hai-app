@@ -94,6 +94,13 @@ export async function GET(
     isImmediate: ride.isImmediate,
     scheduledAt: ride.scheduledAt,
     notes: ride.notes,
+    // Type + itemDescription drive the UI's RIDE-vs-DELIVERY copy:
+    // status badge, big trip-mode headline, driver action button
+    // labels, timeline step labels, arrival alert. Without them the
+    // detail page silently falls back to RIDE copy regardless of
+    // what the requester chose.
+    type: ride.type,
+    itemDescription: ride.itemDescription,
     status: ride.status,
     offerCount: ride._count.offers,
     createdAt: ride.createdAt,
