@@ -9,11 +9,19 @@ import RiyalIcon from '@/components/RiyalIcon'
 import { FiPlus, FiMapPin, FiNavigation, FiClock, FiAlertTriangle, FiPackage } from 'react-icons/fi'
 
 type Tab = 'all' | 'mine' | 'offers'
+// Sub-filter on the "all" tab — RIDE rows and DELIVERY rows live in
+// the same RideRequest table but represent different surfaces, and
+// mixing them confused users (their just-created delivery showed up
+// next to people-rides). Default to RIDE so the dashboard's headline
+// surface stays the rideshare product; the user explicitly switches
+// to DELIVERY when they want that view.
+type AllFilter = 'RIDE' | 'DELIVERY'
 
 export default function RidesFeedClient({ userId }: { userId: string }) {
   const router = useRouter()
   const { t, lang } = useLanguage()
   const [tab, setTab] = useState<Tab>('all')
+  const [allFilter, setAllFilter] = useState<AllFilter>('RIDE')
   const [rides, setRides] = useState<any[]>([])
   const [myRequests, setMyRequests] = useState<any[]>([])
   const [myOffers, setMyOffers] = useState<any[]>([])
@@ -22,7 +30,7 @@ export default function RidesFeedClient({ userId }: { userId: string }) {
   useEffect(() => {
     setLoading(true)
     if (tab === 'all') {
-      fetch('/api/rides').then(r => r.json()).then(d => { setRides(d.rides || []); setLoading(false) }).catch(() => setLoading(false))
+      fetch(`/api/rides?type=${allFilter}`).then(r => r.json()).then(d => { setRides(d.rides || []); setLoading(false) }).catch(() => setLoading(false))
     } else {
       fetch('/api/rides/mine').then(r => r.json()).then(d => {
         setMyRequests(d.myRequests || [])
@@ -30,20 +38,20 @@ export default function RidesFeedClient({ userId }: { userId: string }) {
         setLoading(false)
       }).catch(() => setLoading(false))
     }
-  }, [tab])
+  }, [tab, allFilter])
 
   // Auto-refresh every 10 seconds
   useEffect(() => {
     const id = setInterval(() => {
       if (document.visibilityState !== 'visible') return
       if (tab === 'all') {
-        fetch('/api/rides').then(r => r.json()).then(d => setRides(d.rides || [])).catch(() => {})
+        fetch(`/api/rides?type=${allFilter}`).then(r => r.json()).then(d => setRides(d.rides || [])).catch(() => {})
       } else {
         fetch('/api/rides/mine').then(r => r.json()).then(d => { setMyRequests(d.myRequests || []); setMyOffers(d.myOffers || []) }).catch(() => {})
       }
     }, 10000)
     return () => clearInterval(id)
-  }, [tab])
+  }, [tab, allFilter])
 
   function timeAgo(dateStr: string): string {
     const sec = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
@@ -96,6 +104,29 @@ export default function RidesFeedClient({ userId }: { userId: string }) {
             </button>
           ))}
         </div>
+        {/* Sub-filter for the "all" tab so RIDE and DELIVERY surfaces
+            stay separated. Hidden on mine/offers (those tabs already
+            badge each row by type). */}
+        {tab === 'all' && (
+          <div className="flex px-4 pb-3 gap-2">
+            <button onClick={() => setAllFilter('RIDE')}
+              className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                allFilter === 'RIDE'
+                  ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700'
+                  : 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border border-transparent'
+              }`}>
+              🚗 {lang === 'en' ? 'Rides' : lang === 'ur' ? 'سواری' : 'مشاوير'}
+            </button>
+            <button onClick={() => setAllFilter('DELIVERY')}
+              className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                allFilter === 'DELIVERY'
+                  ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700'
+                  : 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border border-transparent'
+              }`}>
+              📦 {lang === 'en' ? 'Delivery' : lang === 'ur' ? 'ڈیلیوری' : 'توصيل'}
+            </button>
+          </div>
+        )}
       </header>
 
       <div className="px-4 pt-4 space-y-3">

@@ -215,6 +215,12 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const cursor = searchParams.get('cursor')
     const neighborhoodId = searchParams.get('neighborhood')
+    // ?type=RIDE | DELIVERY filters the listing. Anything else (or
+    // missing) returns both. Lets the rides dashboard show RIDE and
+    // DELIVERY in separate sub-tabs without mixing them.
+    const typeParam = searchParams.get('type')?.toUpperCase()
+    const typeFilter =
+      typeParam === 'RIDE' || typeParam === 'DELIVERY' ? { type: typeParam as 'RIDE' | 'DELIVERY' } : {}
 
     const now = new Date()
 
@@ -227,6 +233,7 @@ export async function GET(req: NextRequest) {
           { isImmediate: true },
           { scheduledAt: { lte: new Date(now.getTime() + 2 * 3600 * 1000) } },
         ],
+        ...typeFilter,
         ...(neighborhoodId ? { neighborhoodId } : {}),
         ...(cursor ? { createdAt: { lt: new Date(cursor) } } : {}),
       },
