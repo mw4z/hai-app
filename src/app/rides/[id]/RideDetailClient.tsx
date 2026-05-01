@@ -41,6 +41,16 @@ const TRIP_STATUS_DISPLAY: Record<string, { icon: string; ar: string; en: string
   RIDE_IN_PROGRESS: { icon: '🛣',  ar: 'المشوار جاري',     en: 'In Progress',        color: 'text-sky-600 dark:text-sky-400' },
 }
 
+// Delivery-flavoured copy for the same statuses. Driver isn't going
+// to "you" — they're going to the pickup point, then carrying the
+// item, then delivering it.
+const TRIP_STATUS_DISPLAY_DELIVERY: Record<string, { icon: string; ar: string; en: string; color: string }> = {
+  RIDE_CONFIRMED:   { icon: '✅', ar: 'تم التأكيد',                en: 'Confirmed',          color: 'text-blue-600 dark:text-blue-400' },
+  RIDE_EN_ROUTE:    { icon: '🛵', ar: 'في الطريق للاستلام',         en: 'Heading to pickup',  color: 'text-indigo-600 dark:text-indigo-400' },
+  RIDE_ARRIVED:     { icon: '🏬', ar: 'في موقع الاستلام',           en: 'At pickup',          color: 'text-purple-600 dark:text-purple-400' },
+  RIDE_IN_PROGRESS: { icon: '📦', ar: 'جاري التوصيل',               en: 'Delivering',         color: 'text-sky-600 dark:text-sky-400' },
+}
+
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function RideDetailClient({ rideId, currentUserId }: Props) {
@@ -330,12 +340,16 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
       {showArrivalAlert && (
         <div className="fixed inset-0 z-[9999] bg-black/70 flex items-center justify-center p-6" onClick={() => setShowArrivalAlert(false)}>
           <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 max-w-sm w-full text-center animate-bounce-in" onClick={e => e.stopPropagation()}>
-            <div className="text-6xl mb-4 animate-pulse">📍</div>
+            <div className="text-6xl mb-4 animate-pulse">{ride.type === 'DELIVERY' ? '📦' : '📍'}</div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              {lang === 'en' ? 'Driver Arrived!' : lang === 'ur' ? 'ڈرائیور پہنچ گیا!' : 'وصل!'}
+              {ride.type === 'DELIVERY'
+                ? (lang === 'en' ? 'Picked up!' : lang === 'ur' ? 'لے لیا!' : 'تم الاستلام!')
+                : (lang === 'en' ? 'Driver Arrived!' : lang === 'ur' ? 'ڈرائیور پہنچ گیا!' : 'وصل!')}
             </h2>
             <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
-              {lang === 'en' ? 'The person is waiting at the pickup point' : lang === 'ur' ? 'شخص پک اپ پوائنٹ پر منتظر ہے' : 'الشخص ينتظرك عند نقطة الانطلاق'}
+              {ride.type === 'DELIVERY'
+                ? (lang === 'en' ? 'Your order is on its way to you' : lang === 'ur' ? 'آپ کا آرڈر آپ کی طرف آ رہا ہے' : 'طلبك في طريقه إليك')
+                : (lang === 'en' ? 'The person is waiting at the pickup point' : lang === 'ur' ? 'شخص پک اپ پوائنٹ پر منتظر ہے' : 'الشخص ينتظرك عند نقطة الانطلاق')}
             </p>
             <button
               onClick={() => setShowArrivalAlert(false)}
@@ -724,7 +738,22 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
 
         {/* ── Phase: TRIP ACTIVE (Trip Mode) ─────────────────────────────────── */}
         {phase === 'trip_active' && (() => {
-          const display = TRIP_STATUS_DISPLAY[status]
+          const isDelivery = ride.type === 'DELIVERY'
+          const display = (isDelivery ? TRIP_STATUS_DISPLAY_DELIVERY : TRIP_STATUS_DISPLAY)[status]
+          // Delivery driver verbs differ from rideshare. The buttons
+          // perform the same state transitions; only the labels swap.
+          const labelEnRoute = isDelivery
+            ? (lang === 'en' ? 'Heading to pickup' : 'في الطريق للاستلام')
+            : t('ride_driver_action_en_route')
+          const labelArrived = isDelivery
+            ? (lang === 'en' ? 'I picked it up' : 'استلمت الطلب')
+            : t('ride_driver_action_arrived')
+          const labelStart = isDelivery
+            ? (lang === 'en' ? 'Out for delivery' : 'في الطريق للتسليم')
+            : t('ride_driver_action_start')
+          const labelDone = isDelivery
+            ? (lang === 'en' ? 'Delivered' : 'تم التسليم')
+            : t('ride_driver_action_done')
           return (
             <div className="text-center">
               {/* Big status indicator */}
@@ -745,13 +774,13 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                       if (ride.pickupLat) window.open(`https://www.google.com/maps/dir/?api=1&destination=${ride.pickupLat},${ride.pickupLng}&travelmode=driving`, '_blank')
                     }} disabled={actionLoading}
                       className="w-full bg-indigo-600 text-white rounded-2xl py-4 font-bold text-base shadow-lg shadow-indigo-600/30 active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2">
-                      <FiNavigation className="w-5 h-5" /> {t('ride_driver_action_en_route')}
+                      <FiNavigation className="w-5 h-5" /> {labelEnRoute}
                     </button>
                   )}
                   {status === 'RIDE_EN_ROUTE' && (
                     <button onClick={() => apiAction(`/api/rides/${rideId}/status`, { action: 'arrived' })} disabled={actionLoading}
                       className="w-full bg-purple-600 text-white rounded-2xl py-4 font-bold text-base shadow-lg shadow-purple-600/30 active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2">
-                      <FiMapPin className="w-5 h-5" /> {t('ride_driver_action_arrived')}
+                      <FiMapPin className="w-5 h-5" /> {labelArrived}
                     </button>
                   )}
                   {status === 'RIDE_ARRIVED' && (
@@ -761,13 +790,13 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
                       if (ride.dropoffLat) window.open(`https://www.google.com/maps/dir/?api=1&destination=${ride.dropoffLat},${ride.dropoffLng}&travelmode=driving`, '_blank')
                     }} disabled={actionLoading}
                       className="w-full bg-sky-600 text-white rounded-2xl py-4 font-bold text-base shadow-lg shadow-sky-600/30 active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2">
-                      🚗 {t('ride_driver_action_start')}
+                      {isDelivery ? '📦' : '🚗'} {labelStart}
                     </button>
                   )}
                   {status === 'RIDE_IN_PROGRESS' && (
                     <button onClick={() => apiAction(`/api/rides/${rideId}/status`, { action: 'mark_done' })} disabled={actionLoading}
                       className="w-full bg-green-600 text-white rounded-2xl py-4 font-bold text-base shadow-lg shadow-green-600/30 active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2">
-                      ✓ {t('ride_driver_action_done')}
+                      ✓ {labelDone}
                     </button>
                   )}
                 </div>
@@ -957,7 +986,19 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
         {showTimeline && (
           <div className={`px-4 py-3 rounded-xl ${isTripMode ? 'bg-gray-800' : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700'}`}>
             {(() => {
-              const steps = [
+              const isDelivery = ride.type === 'DELIVERY'
+              // Step copy is type-aware. RIDE keeps the rideshare verbs;
+              // DELIVERY swaps to package-flow language so the steps
+              // describe what's actually happening to the item.
+              const steps = isDelivery ? [
+                { label: lang !== 'en' ? 'تم الطلب' : 'Requested', ts: ride.createdAt, done: true },
+                { label: lang !== 'en' ? 'تم اختيار المندوب' : 'Courier selected', ts: ride.selectedAt, done: !!ride.selectedAt },
+                { label: lang !== 'en' ? 'تم التأكيد' : 'Confirmed', ts: ride.trip?.confirmedAt, done: !!ride.trip?.confirmedAt },
+                { label: lang !== 'en' ? 'في الطريق للاستلام' : 'Heading to pickup', ts: ride.trip?.enRouteAt || pollData?.trip?.enRouteAt, done: !!(ride.trip?.enRouteAt || pollData?.trip?.enRouteAt) },
+                { label: lang !== 'en' ? 'تم استلام الطلب' : 'Picked up', ts: ride.trip?.arrivedAt || pollData?.trip?.arrivedAt, done: !!(ride.trip?.arrivedAt || pollData?.trip?.arrivedAt) },
+                { label: lang !== 'en' ? 'في الطريق للتسليم' : 'Out for delivery', ts: ride.trip?.startedAt || pollData?.trip?.startedAt, done: !!(ride.trip?.startedAt || pollData?.trip?.startedAt) },
+                { label: lang !== 'en' ? 'تم التسليم' : 'Delivered', ts: ride.trip?.completedAt || pollData?.trip?.completedAt, done: !!(ride.trip?.completedAt || pollData?.trip?.completedAt) },
+              ] : [
                 { label: lang !== 'en' ? 'تم الطلب' : 'Requested', ts: ride.createdAt, done: true },
                 { label: lang !== 'en' ? 'تم الاختيار' : 'Selected', ts: ride.selectedAt, done: !!ride.selectedAt },
                 { label: lang !== 'en' ? 'تم التأكيد' : 'Confirmed', ts: ride.trip?.confirmedAt, done: !!ride.trip?.confirmedAt },

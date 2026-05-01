@@ -210,7 +210,7 @@ export default function RidesFeedClient({ userId }: { userId: string }) {
                   {r.type === 'DELIVERY' && (
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">📦</span>
                   )}
-                  <StatusBadge status={r.status} />
+                  <StatusBadge status={r.status} type={r.type} />
                 </div>
               </div>
               <div className="text-[11px] text-gray-400">{r.distanceKm} {t('ride_km')} · {r._count?.offers || 0} {t('rides_offers')}</div>
@@ -233,11 +233,11 @@ export default function RidesFeedClient({ userId }: { userId: string }) {
                   {o.rideRequest.type === 'DELIVERY' && (
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">📦</span>
                   )}
-                  <StatusBadge status={o.status} />
+                  <StatusBadge status={o.status} type={o.rideRequest.type} />
                 </div>
               </div>
               <div className="text-[11px] text-gray-400">
-                <StatusBadge status={o.rideRequest.status} />
+                <StatusBadge status={o.rideRequest.status} type={o.rideRequest.type} />
               </div>
             </button>
           ))
