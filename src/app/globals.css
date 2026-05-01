@@ -420,6 +420,16 @@ html[data-platform="android"] .hai-page-enter {
    viewport root, so clipping x there has no such side-effects. */
 html {
   overflow-x: hidden;
+  /* color-scheme drives the iOS WKWebView keyboard appearance. With
+     <meta name="color-scheme" content="light dark"> alone, the
+     keyboard tracks the OS (so iOS-Dark = darker-gray keyboard even
+     when the app is in light mode, the symptom users were
+     reporting). Binding color-scheme to our resolved theme here
+     keeps the keyboard matching the app, not the OS. */
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
 }
 @media (prefers-reduced-motion: reduce) {
   .hai-page-enter { animation: none; }
