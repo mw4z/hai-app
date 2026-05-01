@@ -8,6 +8,7 @@ import RouteTransition from '@/components/RouteTransition'
 import BottomNav from '@/components/BottomNav'
 import ArrivalAlert from '@/components/ArrivalAlert'
 import CapacitorBridge from '@/components/CapacitorBridge'
+import DebugOverlay from '@/components/DebugOverlay'
 import PushRegistration from '@/components/PushRegistration'
 import SwipeBack from '@/components/SwipeBack'
 import AndroidBackButton from '@/components/AndroidBackButton'
@@ -177,6 +178,7 @@ export default function RootLayout({
         `}} />
         <AppSplash />
         <CapacitorBridge />
+        <DebugOverlay />
         <PushRegistration />
         <LangProvider initialLang={lang}>
           <NetworkProvider>
