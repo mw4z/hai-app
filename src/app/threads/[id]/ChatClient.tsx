@@ -9,6 +9,7 @@ import { useNetworkStatus, isOfflineError } from '@/lib/network'
 import { useConfirm } from '@/components/ConfirmProvider'
 import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, FiTrash2, FiCheck, FiCopy, FiFlag, FiImage, FiUser, FiPaperclip } from 'react-icons/fi'
 import AttachmentMenu from '@/components/AttachmentMenu'
+import { NativeTextarea, type NativeTextareaHandle } from '@/components/NativeTextarea'
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
 import { uploadFiles } from '@/lib/upload'
@@ -207,7 +208,11 @@ export default function ChatClient({
   const messagesRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
-  const textInputRef = useRef<HTMLInputElement>(null)
+  // The ref is shared between the HTML fallback (<input>) and the
+  // NativeTextarea handle, both of which expose focus()/blur(). On
+  // web / Android it's a real HTMLInputElement; on iOS it's the
+  // NativeTextarea handle.
+  const textInputRef = useRef<HTMLInputElement | NativeTextareaHandle | null>(null)
   const blobUrlsRef = useRef<Set<string>>(new Set())
 
   // Revoke any blob URLs created for sent-photo previews when the chat
@@ -1445,10 +1450,29 @@ export default function ChatClient({
                   intrinsic width. Without this, long placeholder/value would
                   push the send button off the visible edge of the screen on
                   some Android devices (Samsung curved screens reported it). */}
-              <input ref={textInputRef} type="text" value={text} onChange={e => setText(e.target.value)}
+              {/* Native-overlay input on iOS — gives the modern white
+                  iOS keyboard (matches WhatsApp / Notes). Falls back to
+                  the plain HTML <input> on web/Android. The exposed
+                  ref still implements focus()/blur() so all the
+                  existing textInputRef.current?.focus() call sites
+                  keep working. */}
+              <NativeTextarea
+                ref={textInputRef as unknown as React.RefObject<NativeTextareaHandle>}
+                value={text}
+                onChange={setText}
+                onSubmit={() => {
+                  // Mimic form submission: send if there is text.
+                  if (text.trim() && !sending) sendText({ preventDefault: () => {} } as unknown as React.FormEvent)
+                }}
                 placeholder={t('thread_placeholder')}
+                multiline={false}
+                rtl={lang !== 'en'}
+                returnKey="send"
+                autocapitalize="sentences"
+                autocorrect={true}
+                maxLength={1000}
                 className="flex-1 min-w-0 bg-white/10 dark:bg-white/10 rounded-full px-4 py-2.5 text-[15px] text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-400/40 focus:border-primary-400/30 transition-shadow"
-                maxLength={1000} />
+              />
               <button type="submit" disabled={sending || !text.trim()}
                 className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white disabled:opacity-30 flex-shrink-0 active:scale-90 transition-all shadow-sm hover:bg-primary-700 glow-primary">
                 {/* No more onTouchEnd → requestSubmit. The previous handler
