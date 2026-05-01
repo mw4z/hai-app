@@ -44,15 +44,33 @@ export default async function ThreadsPage() {
 
   // Look up related post titles for context
   const postIds = threads.map(t => t.postId).filter(Boolean) as string[]
-  const posts = postIds.length > 0
-    ? await cached(`thread-posts:${session.userId}`, 30_000, () =>
-        db.post.findMany({
-          where: { id: { in: postIds } },
-          select: { id: true, title: true, category: true, coordinationMode: true },
+  const threadIds = threads.map(t => t.id)
+  const [posts, unreadGrouped] = await Promise.all([
+    postIds.length > 0
+      ? cached(`thread-posts:${session.userId}`, 30_000, () =>
+          db.post.findMany({
+            where: { id: { in: postIds } },
+            select: { id: true, title: true, category: true, coordinationMode: true },
+          })
+        )
+      : Promise.resolve([] as { id: string; title: string; category: string; coordinationMode: string }[]),
+    // Unread count per thread = messages where the OTHER user is the
+    // sender and readAt is still null. One groupBy keeps the cost flat
+    // regardless of how many threads / messages exist.
+    threadIds.length > 0
+      ? db.message.groupBy({
+          by: ['threadId'],
+          where: {
+            threadId: { in: threadIds },
+            senderId: { not: session.userId },
+            readAt: null,
+          },
+          _count: { _all: true },
         })
-      )
-    : []
+      : Promise.resolve([] as Array<{ threadId: string; _count: { _all: number } }>),
+  ])
   const postMap = new Map(posts.map(p => [p.id, p]))
+  const unreadByThread = new Map(unreadGrouped.map(g => [g.threadId, g._count._all]))
 
   const formatted = threads.map(t => {
     const other = t.user1Id === session.userId ? t.user2 : t.user1
@@ -68,6 +86,7 @@ export default async function ThreadsPage() {
       postTitle: post?.title?.slice(0, 40) || null,
       postCategory: post?.category || null,
       isExclusive: post?.coordinationMode === 'EXCLUSIVE',
+      unreadCount: unreadByThread.get(t.id) || 0,
       lastMessage: lastMsg ? {
         text: lastMsg.type === 'LOCATION' ? '📍' : (lastMsg.text?.slice(0, 50) || ''),
         isMe,

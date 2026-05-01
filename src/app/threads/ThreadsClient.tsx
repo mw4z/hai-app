@@ -13,6 +13,9 @@ interface Thread {
   postTitle: string | null
   postCategory: string | null
   isExclusive: boolean
+  /** Unread messages from the OTHER user in this thread. Drives the
+   *  green counter bubble next to the row. 0 = nothing unread. */
+  unreadCount?: number
   lastMessage: {
     text: string
     isMe: boolean
@@ -177,20 +180,39 @@ export default function ThreadsClient({ threads: initialThreads }: { threads: Th
                     <p className="text-xs text-primary-600 dark:text-primary-400 truncate font-medium">{thread.postTitle}</p>
                   </div>
                 )}
-                {thread.lastMessage && (
-                  <p className="text-[13px] text-gray-500 dark:text-gray-400 truncate leading-tight flex items-center gap-1">
-                    {thread.lastMessage.isMe && (
-                      <ListCheck
-                        delivered={!!thread.lastMessage.deliveredAt || !!thread.lastMessage.readAt}
-                        read={!!thread.lastMessage.readAt}
-                      />
-                    )}
-                    <span className="truncate">
-                      {thread.lastMessage.isMe ? '' : ''}
-                      {thread.lastMessage.text}
+                <div className="flex items-center gap-2">
+                  {thread.lastMessage && (
+                    <p className={`text-[13px] truncate leading-tight flex items-center gap-1 flex-1 min-w-0 ${
+                      (thread.unreadCount || 0) > 0 && !thread.lastMessage.isMe
+                        ? 'text-gray-900 dark:text-white font-semibold'
+                        : 'text-gray-500 dark:text-gray-400'
+                    }`}>
+                      {thread.lastMessage.isMe && (
+                        <ListCheck
+                          delivered={!!thread.lastMessage.deliveredAt || !!thread.lastMessage.readAt}
+                          read={!!thread.lastMessage.readAt}
+                        />
+                      )}
+                      <span className="truncate">
+                        {thread.lastMessage.isMe ? '' : ''}
+                        {thread.lastMessage.text}
+                      </span>
+                    </p>
+                  )}
+                  {/* Unread counter — primary-tinted pill with the
+                      number of unread messages from the other user.
+                      Hidden when 0. Caps display at 99+ to stay narrow. */}
+                  {(thread.unreadCount || 0) > 0 && (
+                    <span
+                      className="ms-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-primary-600 text-white text-[11px] font-bold flex-shrink-0 tabular-nums"
+                      aria-label={lang === 'en'
+                        ? `${thread.unreadCount} unread`
+                        : `${thread.unreadCount} غير مقروءة`}
+                    >
+                      {(thread.unreadCount || 0) > 99 ? '99+' : thread.unreadCount}
                     </span>
-                  </p>
-                )}
+                  )}
+                </div>
               </div>
             </Link>
           ))}

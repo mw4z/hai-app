@@ -46,15 +46,32 @@ export async function GET() {
         })
       : threads
 
-    // Get post titles for threads with posts
+    // Get post titles for threads with posts + unread counts per thread
+    // (messages from the OTHER user that still have readAt = null).
+    // Both run in parallel.
     const postIds = filtered.map(t => t.postId).filter(Boolean) as string[]
-    const posts = postIds.length > 0
-      ? await db.post.findMany({
-          where: { id: { in: postIds } },
-          select: { id: true, title: true, category: true, coordinationMode: true },
-        })
-      : []
+    const threadIds = filtered.map(t => t.id)
+    const [posts, unreadGrouped] = await Promise.all([
+      postIds.length > 0
+        ? db.post.findMany({
+            where: { id: { in: postIds } },
+            select: { id: true, title: true, category: true, coordinationMode: true },
+          })
+        : Promise.resolve([] as { id: string; title: string; category: string; coordinationMode: string }[]),
+      threadIds.length > 0
+        ? db.message.groupBy({
+            by: ['threadId'],
+            where: {
+              threadId: { in: threadIds },
+              senderId: { not: session.userId },
+              readAt: null,
+            },
+            _count: { _all: true },
+          })
+        : Promise.resolve([] as Array<{ threadId: string; _count: { _all: number } }>),
+    ])
     const postMap = new Map(posts.map(p => [p.id, p]))
+    const unreadByThread = new Map(unreadGrouped.map(g => [g.threadId, g._count._all]))
 
     const result = filtered.map(t => {
       const other = t.user1Id === session.userId ? t.user2 : t.user1
@@ -74,6 +91,7 @@ export async function GET() {
         postTitle: post?.title || null,
         postCategory: post?.category || null,
         isExclusive: post?.coordinationMode === 'EXCLUSIVE',
+        unreadCount: unreadByThread.get(t.id) || 0,
         lastMessage: lastMsg ? {
           text: lastMsg.type === 'LOCATION' ? '📍' : lastMsg.type === 'IMAGE' ? '📷' : (lastMsg.text?.slice(0, 50) || ''),
           isMe,
