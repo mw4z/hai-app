@@ -187,6 +187,11 @@ export default function PushRegistration() {
         const perm = await PushNotifications.requestPermissions()
         if (perm.receive !== 'granted') {
           console.log('[PUSH] permission not granted:', perm.receive)
+          // Reset the registered flag so a later re-attempt (after the
+          // user enables Notifications in iOS Settings and refocuses
+          // the app) can re-run init. Without this reset the flag was
+          // stuck true from attempt(), dead-locking every retry path.
+          registeredRef.current = false
           return
         }
 
@@ -283,8 +288,26 @@ export default function PushRegistration() {
     // Returning users who are already signed in
     attempt()
 
-    // New signups / fresh logins dispatch this event after OTP success
-    const onAuth = () => { void attempt() }
+    // New signups / fresh logins dispatch this event after OTP success.
+    // PROBLEM: on iOS Capacitor, the Set-Cookie response from
+    // /api/auth/verify-otp isn't always available to the next fetch in
+    // the same JS tick — the WKWebView cookie store hasn't committed
+    // yet. attempt() would see isSignedIn() = false, bail, and the
+    // user's reinstalled device never registered its new APNs token.
+    // Retry up to 5× with 250ms backoff so we tolerate that race.
+    const onAuth = async () => {
+      for (let i = 0; i < 5; i++) {
+        if (registeredRef.current) return
+        const ok = await isSignedIn()
+        if (ok) {
+          registeredRef.current = true
+          init()
+          return
+        }
+        await new Promise((r) => setTimeout(r, 250))
+      }
+      console.warn('[PUSH] auth-ready: still not signed in after 5 retries — relying on focus retry')
+    }
     window.addEventListener('hai:auth-ready', onAuth)
 
     // Safety net: retry on focus in case the event was missed
