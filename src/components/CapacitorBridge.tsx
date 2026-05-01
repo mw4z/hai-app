@@ -15,6 +15,7 @@ declare global {
 
 export default function CapacitorBridge() {
   useEffect(() => {
+    console.log('[KB] CapacitorBridge mount', { platform: window.Capacitor?.getPlatform?.() })
     // Tag the root with the platform ASAP so CSS can opt features
     // in/out per OS. Runs even on web so browsers get data-platform="web".
     // The Android WebView mis-handles the template-level transform slide
@@ -92,9 +93,13 @@ export default function CapacitorBridge() {
         // No-op on Android.
         if (platform === 'ios') {
           const isDark = document.documentElement.classList.contains('dark')
+          console.log('[KB] init setStyle call', { platform, isDark, style: isDark ? 'DARK' : 'LIGHT' })
           await Keyboard.setStyle({ style: isDark ? KeyboardStyle.Dark : KeyboardStyle.Light })
+          console.log('[KB] init setStyle resolved')
         }
-      } catch {}
+      } catch (err) {
+        console.error('[KB] init setStyle threw', err)
+      }
     }
 
     init()
@@ -114,9 +119,13 @@ export default function CapacitorBridge() {
         const platform = window.Capacitor?.getPlatform?.() || 'web'
         if (platform === 'ios') {
           const { Keyboard, KeyboardStyle } = await import('@capacitor/keyboard')
+          console.log('[KB] observer setStyle call', { isDark, style: isDark ? 'DARK' : 'LIGHT' })
           await Keyboard.setStyle({ style: isDark ? KeyboardStyle.Dark : KeyboardStyle.Light })
+          console.log('[KB] observer setStyle resolved')
         }
-      } catch {}
+      } catch (err) {
+        console.error('[KB] observer setStyle threw', err)
+      }
     })
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
 
