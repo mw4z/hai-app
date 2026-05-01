@@ -918,7 +918,26 @@ export default function ChatClient({
   let lastDate = ''
 
   return (
-    <div ref={rootRef} className="flex flex-col bg-gray-100 dark:bg-gray-950" style={{ height: 'calc(100dvh - env(safe-area-inset-top, 0px))' }}>
+    <div
+      ref={rootRef}
+      className="flex flex-col bg-gray-100 dark:bg-gray-950"
+      // Anchor the chat to the viewport via position:fixed (top below
+      // the safe area, bottom = 0). Removes the chat screen from the
+      // document scroll, so the iOS WKWebView's rubber-band bounce can
+      // ONLY happen inside the messages list (which already has
+      // overscroll-y-contain). Without this, pulling past the top or
+      // bottom of the messages dragged the entire chat — header bar
+      // and composer included — along with the document bounce.
+      style={{
+        position: 'fixed',
+        top: 'env(safe-area-inset-top, 0px)',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        overscrollBehavior: 'none',
+        touchAction: 'pan-y',
+      }}
+    >
       {/* Header */}
       <header className="glass px-4 py-2.5 flex items-center gap-3 z-10 shadow-sm flex-shrink-0">
         <Link href="/threads" className="text-gray-500 dark:text-gray-400 p-1">
