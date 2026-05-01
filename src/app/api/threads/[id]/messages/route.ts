@@ -222,26 +222,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Update thread timestamp
     await db.thread.update({ where: { id: params.id }, data: { updatedAt: new Date() } })
 
-    // Notify the recipient — bell (in-app) AND push (phone). Previously
-    // only the bell row was written, so the recipient got no phone
-    // banner when the app was closed. Now both fire together.
+    // Notify the recipient.
+    // DMs are NOT stored in the bell list anymore — the threads list
+    // is the canonical surface for unread chat (per-conversation
+    // counter bubble, sourced from Message.readAt IS NULL via the
+    // groupBy query in /api/threads). The bell list reads as
+    // "non-chat events": comments, reactions, mod actions, etc.
+    // Phone push still fires below so the user sees the banner +
+    // the BottomNav messages tab badge.
     const senderName = fullName(sender) || sender?.name || null
     const snippet = type === 'LOCATION'
       ? '📍'
       : type === 'IMAGE'
         ? '📷'
         : (text?.trim().slice(0, 120) || '')
-
-    await db.notification.create({
-      data: {
-        type: 'NEW_MESSAGE',
-        userId: recipientId,
-        actorId: session.userId,
-        actorName: senderName,
-        postTitle: snippet.slice(0, 50),
-        threadId: params.id,
-      },
-    })
 
     // Phone push — DMs are the highest-priority push class in the app,
     // so we send DIRECTLY to FCM/APNs in this request instead of
