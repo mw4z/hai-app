@@ -163,7 +163,18 @@ export default function NewRidePage() {
 
         {/* ── Pickup Location ──────────────────────────────────────────────── */}
         <div data-tour="ride-pickup">
-        <LocationPicker type="pickup" value={pickup} onChange={setPickup} mode={requestType === 'DELIVERY' ? 'delivery' : 'ride'} />
+        <LocationPicker
+          type="pickup"
+          value={pickup}
+          onChange={setPickup}
+          mode={requestType === 'DELIVERY' ? 'delivery' : 'ride'}
+          // In DELIVERY, the user's GPS lives on the dropoff field
+          // (where they want the item brought). Pass it here so the
+          // pickup search can rank results by distance from that
+          // anchor — otherwise nearby stores would never bubble up.
+          userLat={requestType === 'DELIVERY' ? dropoff?.lat : undefined}
+          userLng={requestType === 'DELIVERY' ? dropoff?.lng : undefined}
+        />
         </div>
 
         {/* ── Route line between pickup and dropoff ────────────────────────── */}
@@ -175,7 +186,18 @@ export default function NewRidePage() {
 
         {/* ── Dropoff Location ─────────────────────────────────────────────── */}
         <div data-tour="ride-dropoff">
-        <LocationPicker type="dropoff" value={dropoff} onChange={setDropoff} userLat={pickup?.lat} userLng={pickup?.lng} mode={requestType === 'DELIVERY' ? 'delivery' : 'ride'} />
+        <LocationPicker
+          type="dropoff"
+          value={dropoff}
+          onChange={setDropoff}
+          mode={requestType === 'DELIVERY' ? 'delivery' : 'ride'}
+          // RIDE: dropoff search is anchored to pickup (rank results
+          // by distance from the user's start). DELIVERY: dropoff is
+          // the user's GPS — the search panel doesn't render here, so
+          // these props are unused, but kept consistent.
+          userLat={requestType === 'DELIVERY' ? undefined : pickup?.lat}
+          userLng={requestType === 'DELIVERY' ? undefined : pickup?.lng}
+        />
         </div>
 
         {/* ── Estimate Preview ─────────────────────────────────────────────── */}

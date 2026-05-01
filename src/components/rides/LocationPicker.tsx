@@ -294,6 +294,15 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
   const borderColor = isPickup ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20' : 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20'
   const iconColor = isPickup ? 'text-green-600' : 'text-red-600'
   const isDelivery = mode === 'delivery'
+  // Which field is "where the user is right now"?
+  //   RIDE mode     → pickup  (passenger is at pickup, going to dropoff)
+  //   DELIVERY mode → dropoff (item is somewhere else; user wants it
+  //                            brought TO their location)
+  // The "Use my current location" + map-pick + permission-recovery
+  // block follows this instead of being hardwired to pickup, so in
+  // delivery the GPS shortcut lives on the drop-off field where it
+  // actually makes sense.
+  const showGpsBlock = isDelivery ? !isPickup : isPickup
   const label = isPickup
     ? (lang === 'en'
         ? (isDelivery ? 'Pickup point' : 'Pickup')
@@ -314,8 +323,10 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
         <span className={`w-2.5 h-2.5 rounded-full ${dotColor}`} /> {label}
       </label>
 
-      {/* Pickup: GPS + map fallback */}
-      {isPickup && (
+      {/* GPS + map fallback — rendered on the field that represents
+          the user's current location (pickup in RIDE, dropoff in
+          DELIVERY). */}
+      {showGpsBlock && (
         <>
           {value ? (
             <div className={`border ${borderColor} rounded-xl p-3.5 flex items-start gap-3`}>
@@ -369,8 +380,9 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
         </>
       )}
 
-      {/* Dropoff: Search + Map picker */}
-      {!isPickup && (
+      {/* Search + Map picker — rendered on the OTHER field (dropoff
+          in RIDE, pickup in DELIVERY). */}
+      {!showGpsBlock && (
         <>
           {value && !showSearch ? (
             <div className={`border ${borderColor} rounded-xl p-3.5 flex items-start gap-3`}>
