@@ -42,15 +42,27 @@ interface Opts {
   onDismiss: () => void
 }
 
-export function useDragToDismiss<T extends HTMLElement, H extends HTMLElement>({ open, onDismiss }: Opts) {
+export function useDragToDismiss<T extends HTMLElement, H extends HTMLElement, B extends HTMLElement = HTMLElement>({ open, onDismiss }: Opts) {
   const sheetRef = useRef<T | null>(null)
   const handleRef = useRef<H | null>(null)
+  // Optional scrollable body. When attached, the sheet ALSO drags when
+  // the user starts a touch inside the body AND the body is already
+  // scrolled to top AND the finger moves downward — Instagram-style
+  // pull-to-close. If the body has scrollTop > 0 or the gesture goes
+  // upward, the body scrolls normally and the sheet stays put.
+  const bodyRef = useRef<B | null>(null)
 
   const startY = useRef(0)
   const lastY = useRef(0)
   const lastT = useRef(0)
   const velocity = useRef(0)
   const dragging = useRef(false)
+  // Two-phase state for body-initiated touches: "armed" means we
+  // recorded a startY at scrollTop=0 but haven't decided yet whether
+  // the gesture is a downward pull (→ become a drag) or an upward
+  // scroll (→ cancel and let the body scroll). dragging.current
+  // remains false until the first downward movement promotes it.
+  const armedFromBody = useRef(false)
 
   const setTransform = useCallback((y: number) => {
     const el = sheetRef.current
@@ -77,10 +89,12 @@ export function useDragToDismiss<T extends HTMLElement, H extends HTMLElement>({
     const handle = handleRef.current
     const sheet = sheetRef.current
     if (!handle || !sheet) return
+    const body = bodyRef.current
 
     const onStart = (e: TouchEvent) => {
       if (e.touches.length !== 1) return
       dragging.current = true
+      armedFromBody.current = false
       startY.current = e.touches[0].clientY
       lastY.current = startY.current
       lastT.current = performance.now()
@@ -88,9 +102,49 @@ export function useDragToDismiss<T extends HTMLElement, H extends HTMLElement>({
       sheet.style.transition = ''
     }
 
+    // Body-origin touchstart: don't commit to a drag yet. Just record
+    // the start position if the body is at scrollTop=0; if it's
+    // scrolled mid-list, ignore the touch entirely so the body scrolls
+    // normally.
+    const onBodyStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return
+      if (!body || body.scrollTop > 0) return
+      armedFromBody.current = true
+      dragging.current = false
+      startY.current = e.touches[0].clientY
+      lastY.current = startY.current
+      lastT.current = performance.now()
+      velocity.current = 0
+    }
+
     const onMove = (e: TouchEvent) => {
-      if (!dragging.current) return
       const y = e.touches[0].clientY
+
+      // Body-armed but not yet a drag → decide on first meaningful
+      // movement. Down past 6px → promote to drag. Up at all → cancel
+      // and let the body scroll normally. Body scrollTop > 0 mid-
+      // gesture (user already scrolled the list) → also cancel.
+      if (armedFromBody.current && !dragging.current) {
+        const delta = y - startY.current
+        if (body && body.scrollTop > 0) {
+          armedFromBody.current = false
+          return
+        }
+        if (delta < -2) {
+          armedFromBody.current = false
+          return
+        }
+        if (delta > 6) {
+          dragging.current = true
+          armedFromBody.current = false
+          sheet.style.transition = ''
+          // fall through to normal drag handling below
+        } else {
+          return
+        }
+      }
+
+      if (!dragging.current) return
       const now = performance.now()
       const dt = Math.max(1, now - lastT.current)
       velocity.current = (y - lastY.current) / dt
@@ -109,6 +163,7 @@ export function useDragToDismiss<T extends HTMLElement, H extends HTMLElement>({
     }
 
     const onEnd = () => {
+      armedFromBody.current = false
       if (!dragging.current) return
       dragging.current = false
       const travelled = lastY.current - startY.current
@@ -129,16 +184,18 @@ export function useDragToDismiss<T extends HTMLElement, H extends HTMLElement>({
     }
 
     handle.addEventListener('touchstart', onStart, { passive: true })
+    if (body) body.addEventListener('touchstart', onBodyStart, { passive: true })
     document.addEventListener('touchmove', onMove, { passive: false })
     document.addEventListener('touchend', onEnd)
     document.addEventListener('touchcancel', onEnd)
     return () => {
       handle.removeEventListener('touchstart', onStart)
+      if (body) body.removeEventListener('touchstart', onBodyStart)
       document.removeEventListener('touchmove', onMove)
       document.removeEventListener('touchend', onEnd)
       document.removeEventListener('touchcancel', onEnd)
     }
   }, [open, onDismiss, setTransform, springBack])
 
-  return { sheetRef, handleRef }
+  return { sheetRef, handleRef, bodyRef }
 }

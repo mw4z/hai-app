@@ -379,8 +379,8 @@ export default function PostCard({
   // Drag-to-dismiss on the comments sheet. Only touches that start on
   // the handleRef (grab bar + header) trigger the drag — inner scroll
   // lists stay interactive.
-  const { sheetRef: commentsSheetRef, handleRef: commentsHandleRef } =
-    useDragToDismiss<HTMLDivElement, HTMLDivElement>({
+  const { sheetRef: commentsSheetRef, handleRef: commentsHandleRef, bodyRef: commentsBodyRef } =
+    useDragToDismiss<HTMLDivElement, HTMLDivElement, HTMLDivElement>({
       open: showComments,
       onDismiss: () => setShowComments(false),
     })
@@ -1616,7 +1616,7 @@ export default function PostCard({
               </div>
             </div>
 
-            <div className="hai-sheet__body">
+            <div ref={commentsBodyRef} className="hai-sheet__body">
               {/* Wait for the full thread to land before painting any
                   comments — otherwise the SSR preview (1 comment)
                   flashes for ~200-400ms and then the full 50 pop in

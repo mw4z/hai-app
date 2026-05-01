@@ -53,7 +53,7 @@ export default function PollCard({ poll, currentUserId, onDelete }: Props) {
   // Drag-to-dismiss + scroll lock + back-press parity with the post
   // comments sheet. Same hooks, same hai-sheet class skeleton — keeps
   // the two surfaces visually and behaviourally identical.
-  const { sheetRef, handleRef } = useDragToDismiss<HTMLDivElement, HTMLDivElement>({
+  const { sheetRef, handleRef, bodyRef } = useDragToDismiss<HTMLDivElement, HTMLDivElement, HTMLDivElement>({
     open: showComments,
     onDismiss: () => setShowComments(false),
   })
@@ -276,7 +276,7 @@ export default function PollCard({ poll, currentUserId, onDelete }: Props) {
               </div>
             </div>
 
-            <div className="hai-sheet__body">
+            <div ref={bodyRef} className="hai-sheet__body">
               {!commentsLoaded ? (
                 <p className="hai-empty-state">…</p>
               ) : comments.length === 0 ? (
