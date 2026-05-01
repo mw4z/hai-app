@@ -85,7 +85,11 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="color-scheme" content="light dark" />
+        {/* Initial value gets immediately overwritten by applyTheme()
+            below — fine; iOS only reads it when the keyboard is about
+            to come up, not at page-load. Kept here so the tag exists
+            in markup before JS runs. */}
+        <meta name="color-scheme" content="light" />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){
@@ -98,14 +102,38 @@ export default function RootLayout({
       return m ? decodeURIComponent(m[1]) : null;
     }
     var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    // Sync the <meta name="color-scheme"> content to match the
+    // app's resolved theme. iOS WKWebView reads this tag to decide
+    // the keyboard appearance; setting it to "light dark" lets iOS
+    // fall back to the OS trait collection (= dark keyboard when
+    // iOS is in Dark Mode, regardless of our app theme — the bug
+    // users were reporting). Pinning it to a single value keeps
+    // the keyboard locked to the app's theme.
+    function setMetaColorScheme(isDark) {
+      var meta = document.querySelector('meta[name="color-scheme"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'color-scheme');
+        document.head.appendChild(meta);
+      }
+      var next = isDark ? 'dark' : 'light';
+      if (meta.getAttribute('content') !== next) meta.setAttribute('content', next);
+    }
     function applyTheme() {
       var th = readCookie('hai_theme');
       if (!th) { try { th = localStorage.getItem('hai_theme'); } catch(_){} }
       if (!th) th = 'system';
       var isDark = th === 'dark' || (th === 'system' && mq.matches);
       document.documentElement.classList.toggle('dark', isDark);
+      setMetaColorScheme(isDark);
     }
     applyTheme();
+    // Whenever html.dark is toggled by anyone (CapacitorBridge
+    // resume, ProfileClient picker, system-mode mq listener), keep
+    // the meta tag synced. This is the canonical sync point.
+    new MutationObserver(function() {
+      setMetaColorScheme(document.documentElement.classList.contains('dark'));
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     // Only listen to OS changes when the user has NOT picked manually.
     // If they picked dark/light, the OS shouldn't override their choice.
     mq.addEventListener('change', function(){
