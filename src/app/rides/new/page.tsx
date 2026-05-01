@@ -225,20 +225,24 @@ export default function NewRidePage() {
           )}
         </div>
 
-        {/* ── Notes ────────────────────────────────────────────────────────── */}
-        <div>
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5 mb-2">
-            <FiFileText className="w-4 h-4" /> {t('ride_notes')}
-          </label>
-          <textarea
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder={t('ride_notes_placeholder')}
-            className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm bg-transparent text-gray-900 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-primary-500"
-            rows={2}
-            maxLength={200}
-          />
-        </div>
+        {/* ── Notes (RIDE only — for DELIVERY the itemDescription
+             textarea above already covers what the requester needs to
+             say to the driver, so we don't show two free-text fields) ── */}
+        {requestType !== 'DELIVERY' && (
+          <div>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5 mb-2">
+              <FiFileText className="w-4 h-4" /> {t('ride_notes')}
+            </label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder={t('ride_notes_placeholder')}
+              className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm bg-transparent text-gray-900 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-primary-500"
+              rows={2}
+              maxLength={200}
+            />
+          </div>
+        )}
 
         {/* ── Community note + disclaimer ─────────────────────────────────── */}
         <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 space-y-1.5">
