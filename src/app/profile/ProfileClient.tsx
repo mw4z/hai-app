@@ -1377,12 +1377,14 @@ export default function ProfileClient({ user, postCount }: Props) {
         {/* Per-category list now lives inside <NotifPresetGroup> and only
             renders when the user is on MANUAL — see above. */}
 
-        {/* ── Diagnostic: live test push — hidden for now.
-            Kept the PushTestButton component + /api/debug/push-test
-            route for future debugging; just not rendered. Re-enable
-            by uncommenting this line.
-        <PushTestButton lang={lang} />
-        */}
+        {/* ── Diagnostic: live test push (SUPER_ADMIN only) ──────────
+            Sends a real push to the current user's registered device
+            via /api/debug/push-test. Useful for verifying the FCM /
+            APNs chain end-to-end after install. Hidden from regular
+            users so it's not a footgun in production. */}
+        {user.role === 'SUPER_ADMIN' && (
+          <PushTestButton lang={lang as 'ar' | 'en' | 'ur'} />
+        )}
       </div>
 
       </AccordionSection>
