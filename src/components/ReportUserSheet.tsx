@@ -7,6 +7,7 @@ import { FiX, FiFlag, FiSlash } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { showApiError } from '@/lib/apiError'
 import { HaiSpinner } from './HaiLoader'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
 /**
  * Account-level report sheet. Reused across every surface where a
@@ -114,6 +115,11 @@ export default function ReportUserSheet({
   // the body root, beneath nothing.
   const [portalReady, setPortalReady] = useState(false)
   useEffect(() => { setPortalReady(true) }, [])
+  // Lock the page behind the sheet so a touch/scroll gesture inside
+  // the sheet doesn't drag the chat / feed underneath. Same hook used
+  // by every other sheet/modal in the app — handles iOS WKWebView's
+  // "overflow:hidden alone isn't enough" quirk.
+  useBodyScrollLock(open)
 
   if (!open) return null
   if (!portalReady || typeof document === 'undefined') return null
