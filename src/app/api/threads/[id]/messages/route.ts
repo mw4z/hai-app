@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { log } from '@/lib/logger'
 import { moderateContent } from '@/lib/moderation'
 import { requireVerified } from '@/lib/requireVerified'
+import { requireCompleteProfile } from '@/lib/requireCompleteProfile'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { kickNotifCron } from '@/lib/kickNotifCron'
 import { sendDmPushNow } from '@/app/api/cron/process-notifs/route'
@@ -145,6 +146,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    const incompleteGate = await requireCompleteProfile(session.userId)
+    if (incompleteGate) return incompleteGate
     const gate = await requireVerified(session.userId)
     if (gate) return gate
 

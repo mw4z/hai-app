@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { cacheDelete } from '@/lib/cache'
 import { verifyNeighborhoodAssignment } from '@/lib/location/verify'
+import { invalidateCompleteProfileCache } from '@/lib/requireCompleteProfile'
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,7 +33,26 @@ export async function POST(req: NextRequest) {
       verifyAccuracy?: number
     }
 
-    if (!name || !gender || !neighborhoodId) {
+    // Trim and validate the first name. Was: `if (!name || ...)` —
+    // accepted whitespace-only ("   ") because a non-empty whitespace
+    // string is truthy. That created accounts with a blank-but-truthy
+    // name that rendered as nothing in the UI. Now we trim, reject
+    // empty, AND enforce a 2-char minimum + 60-char maximum.
+    const normalizedName = typeof name === 'string' ? name.trim() : ''
+    const normalizedLastName = typeof lastName === 'string' ? lastName.trim() : ''
+    if (!normalizedName || normalizedName.length < 2 || normalizedName.length > 60) {
+      return NextResponse.json(
+        { error: 'INVALID_NAME', message: 'الاسم الأول مطلوب (حرفين على الأقل)' },
+        { status: 400 },
+      )
+    }
+    if (normalizedLastName && (normalizedLastName.length < 2 || normalizedLastName.length > 60)) {
+      return NextResponse.json(
+        { error: 'INVALID_LAST_NAME', message: 'اسم العائلة غير صالح' },
+        { status: 400 },
+      )
+    }
+    if (!gender || !neighborhoodId) {
       return NextResponse.json({ error: 'بيانات ناقصة' }, { status: 400 })
     }
 
@@ -134,8 +154,8 @@ export async function POST(req: NextRequest) {
     await db.user.update({
       where: { id: session.userId },
       data: {
-        name,
-        lastName: lastName?.trim() || null,
+        name: normalizedName,
+        lastName: normalizedLastName || null,
         gender: gender as any,
         accountType: validAccountType,
         providerStatus,
@@ -146,6 +166,7 @@ export async function POST(req: NextRequest) {
     })
 
     cacheDelete(`user:${session.userId}`)
+    invalidateCompleteProfileCache(session.userId)
 
     return NextResponse.json({ success: true, addressVerified })
   } catch (error) {

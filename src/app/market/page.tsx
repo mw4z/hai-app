@@ -61,6 +61,7 @@ export default async function MarketPage({
     where: { id: session.userId },
     select: {
       id: true,
+      name: true,
       phone: true,
       role: true,
       neighborhoodId: true,
@@ -72,7 +73,7 @@ export default async function MarketPage({
       },
     },
   })
-  if (!user?.neighborhoodId) redirect('/onboarding')
+  if (!user?.neighborhoodId || !user.name?.trim()) redirect('/onboarding')
 
   // Resolve the requested tab against the whitelist. Anything not in
   // VALID_MARKET_TABS (including the legacy 'REQUESTS' value) collapses

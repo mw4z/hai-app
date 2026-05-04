@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getValidatedSession } from '@/lib/auth-server'
 import { PostCategory } from '@prisma/client'
 import { getFeedBoost } from '@/lib/reputation-levels'
+import { requireCompleteProfile } from '@/lib/requireCompleteProfile'
 
 const V2_FILTER_VALUES: readonly string[] = [
   'HOME_BUSINESSES','MARKETPLACE','SERVICES','RIDES','REAL_ESTATE',
@@ -98,6 +99,9 @@ function balanceCommercial<T extends { category: PostCategory | null }>(posts: T
 export async function GET(req: NextRequest) {
   const session = await getValidatedSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const incompleteGate = await requireCompleteProfile(session.userId)
+  if (incompleteGate) return incompleteGate
 
   const { searchParams } = new URL(req.url)
   const neighborhoodId = searchParams.get('neighborhoodId')

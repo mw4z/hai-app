@@ -50,7 +50,10 @@ export default async function FeedPage({
     },
   })
 
-  if (!user?.neighborhoodId) redirect('/onboarding')
+  // Profile-completeness gate: a user can exist without a name when
+  // they finished OTP but bailed before onboarding. Force them back
+  // there. Mirrors the API-side requireCompleteProfile guard.
+  if (!user?.neighborhoodId || !user.name?.trim()) redirect('/onboarding')
 
   const category = searchParams.category || 'ALL'
   const browseNeighborhoodId = searchParams.neighborhood
