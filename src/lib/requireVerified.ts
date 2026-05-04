@@ -1,33 +1,26 @@
-import { NextResponse } from 'next/server'
-import { requireUserReady } from './requireUserReady'
-
 /**
- * @deprecated Use `requireUserReady` (full gate: profile + location)
- * or `requireLocationVerified` (location only) instead. This name was
- * misleading — it now ALSO enforces profile completeness, which a
- * caller couldn't infer from the function name. Existing call sites
- * keep working because this delegates to requireUserReady, but new
- * code should pick one of the two clearly-named helpers above.
+ * REMOVED. This module used to wrap location verification (and, after
+ * b44b19c, profile completeness too). The hidden coupling — a name
+ * that suggested only "verified" but silently enforced both gates —
+ * was misleading enough to be a foot-gun, so the helper was unified
+ * into requireUserReady and explicit migrations of the call sites.
  *
- * Behavior under the hood: identical to
- *   requireUserReady(userId, { requireProfile: true, requireLocation: true })
+ * Use one of:
+ *   - requireUserReady(userId)              → profile + location
+ *   - requireUserReady(userId, { requireLocation: false }) → profile only
+ *   - requireLocationVerified(userId)       → location only
  *
- * Wire response shape (unchanged from earlier patches):
- *   profile incomplete  → 403 { error: 'profile_incomplete',  next: '/onboarding' }
- *   location unverified → 403 { error: 'location_unverified', next: '/onboarding' }
+ * Throws at runtime so any forgotten import surfaces immediately
+ * rather than silently re-introducing the deprecated coupling.
  */
-export async function requireVerified(userId: string): Promise<NextResponse | null> {
-  if (process.env.NODE_ENV !== 'production') {
-    // Loud in dev / preview, silent in prod (we don't want to spam
-    // logs while we migrate every call site, but we do want any
-    // engineer touching the code to see the deprecation).
-    console.warn(
-      '[requireVerified] DEPRECATED — use requireUserReady or requireLocationVerified',
-    )
-  }
-  const result = await requireUserReady(userId, { requireProfile: true, requireLocation: true })
-  return result.ok ? null : result.response
+export function requireVerified(_userId: string): never {
+  throw new Error(
+    'requireVerified has been removed. Use requireUserReady (profile + location) or requireLocationVerified (location only).',
+  )
 }
 
-/** No-op kept for back-compat; the cache it used to invalidate is gone. */
-export function invalidateVerifiedCache(_userId: string) {}
+export function invalidateVerifiedCache(_userId: string): never {
+  throw new Error(
+    'invalidateVerifiedCache has been removed. The 30-second per-user cache it used to invalidate no longer exists; profile/location is read fresh on every gate call.',
+  )
+}

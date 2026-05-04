@@ -4,7 +4,7 @@ import { getSession } from '@/lib/auth'
 import { createNotification } from '@/lib/notifications'
 import { apiError } from '@/lib/validation'
 import { moderateContent } from '@/lib/moderation'
-import { requireVerified } from '@/lib/requireVerified'
+import { requireUserReady } from '@/lib/requireUserReady'
 import { kickNotifCron } from '@/lib/kickNotifCron'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { fullName } from '@/lib/displayName'
@@ -52,8 +52,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
 
-  const gate = await requireVerified(session.userId)
-  if (gate) return gate
+  const ready = await requireUserReady(session.userId)
+  if (!ready.ok) return ready.response
 
   const user = await db.user.findUnique({
     where: { id: session.userId },

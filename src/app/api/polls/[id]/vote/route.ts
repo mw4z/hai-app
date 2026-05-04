@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
-import { requireVerified } from '@/lib/requireVerified'
+import { requireUserReady } from '@/lib/requireUserReady'
 
 /** POST — Vote on a poll */
 export async function POST(
@@ -11,8 +11,8 @@ export async function POST(
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const gate = await requireVerified(session.userId)
-  if (gate) return gate
+  const ready = await requireUserReady(session.userId)
+  if (!ready.ok) return ready.response
 
   const poll = await db.poll.findUnique({ where: { id: params.id } })
   if (!poll) return NextResponse.json({ error: 'Not found' }, { status: 404 })

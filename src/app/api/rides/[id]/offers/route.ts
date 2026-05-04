@@ -5,7 +5,7 @@ import { validateOfferPrice } from '@/lib/rides/pricing'
 import { logRideEvent } from '@/lib/rides/events'
 import { notifyNewOffer } from '@/lib/rides/notify'
 import { log } from '@/lib/logger'
-import { requireVerified } from '@/lib/requireVerified'
+import { requireUserReady } from '@/lib/requireUserReady'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
 const MIN_ACCOUNT_AGE_DAYS = 3
@@ -20,8 +20,8 @@ export async function POST(
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const gate = await requireVerified(session.userId)
-    if (gate) return gate
+    const ready = await requireUserReady(session.userId)
+    if (!ready.ok) return ready.response
 
     log.api('POST', '/api/rides/[id]/offers', session.userId)
 

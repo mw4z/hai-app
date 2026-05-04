@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
-import { requireVerified } from '@/lib/requireVerified'
+import { requireUserReady } from '@/lib/requireUserReady'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { kickNotifCron } from '@/lib/kickNotifCron'
 
@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-  const gate = await requireVerified(session.userId)
-  if (gate) return gate
+  const ready = await requireUserReady(session.userId)
+  if (!ready.ok) return ready.response
 
   const user = await db.user.findUnique({
     where: { id: session.userId },

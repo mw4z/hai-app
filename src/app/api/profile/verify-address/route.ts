@@ -3,7 +3,9 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { verifyNeighborhoodAssignment } from '@/lib/location/verify'
 import { cacheDelete } from '@/lib/cache'
-import { invalidateVerifiedCache } from '@/lib/requireVerified'
+// (cache removed in the requireUserReady refactor — no-op left here as
+// a comment so anyone hunting for the old invalidateVerifiedCache call
+// site sees that nothing's needed.)
 
 /**
  * POST /api/profile/verify-address
@@ -63,7 +65,6 @@ export async function POST(req: NextRequest) {
   })
 
   cacheDelete(`user:${session.userId}`)
-  invalidateVerifiedCache(session.userId)
 
   return NextResponse.json({ success: true, verdict })
 }

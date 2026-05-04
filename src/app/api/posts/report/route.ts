@@ -4,7 +4,7 @@ import { getSession } from '@/lib/auth'
 import { ReportReason } from '@prisma/client'
 import { apiError } from '@/lib/validation'
 import { addReputation, REP_POINTS, getReportThreshold } from '@/lib/reputation'
-import { requireVerified } from '@/lib/requireVerified'
+import { requireUserReady } from '@/lib/requireUserReady'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
 const HIDE_THRESHOLD = 3
@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(apiError('يجب تسجيل الدخول', 401), { status: 401 })
     }
 
-    const gate = await requireVerified(session.userId)
-    if (gate) return gate
+    const ready = await requireUserReady(session.userId)
+    if (!ready.ok) return ready.response
 
     const { postId, reason } = await req.json()
 

@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { cacheDelete } from '@/lib/cache'
 import { verifyNeighborhoodAssignment } from '@/lib/location/verify'
-import { invalidateCompleteProfileCache } from '@/lib/requireCompleteProfile'
+import { isValidFirstName, isValidLastName, normalizeName } from '@/lib/nameValidation'
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,22 +33,23 @@ export async function POST(req: NextRequest) {
       verifyAccuracy?: number
     }
 
-    // Trim and validate the first name. Was: `if (!name || ...)` —
-    // accepted whitespace-only ("   ") because a non-empty whitespace
-    // string is truthy. That created accounts with a blank-but-truthy
-    // name that rendered as nothing in the UI. Now we trim, reject
-    // empty, AND enforce a 2-char minimum + 60-char maximum.
-    const normalizedName = typeof name === 'string' ? name.trim() : ''
-    const normalizedLastName = typeof lastName === 'string' ? lastName.trim() : ''
-    if (!normalizedName || normalizedName.length < 2 || normalizedName.length > 60) {
+    // Normalize Unicode (NFKC) + strip zero-width chars + trim. Pure
+    // helpers from nameValidation.ts so the same rules apply to the
+    // CHECK constraint check, the route handler, and the unit tests.
+    // Was: ad-hoc `.trim()` only — let invisible zero-width chars
+    // bypass the length floor (a "1-char" first name padded with U+200B
+    // would have read as 2 chars, persisted, then rendered as 1).
+    const normalizedName = normalizeName(name)
+    const normalizedLastName = normalizeName(lastName)
+    if (!isValidFirstName(normalizedName)) {
       return NextResponse.json(
         { error: 'INVALID_NAME', message: 'الاسم الأول مطلوب (حرفين على الأقل)' },
         { status: 400 },
       )
     }
-    // lastName is optional — single-letter initials accepted ("J." etc).
-    // Empty trims to null so the column stays clean.
-    if (normalizedLastName && normalizedLastName.length > 60) {
+    // lastName is optional — single-letter initials accepted, empty
+    // normalized strings become NULL at write time below.
+    if (!isValidLastName(normalizedLastName)) {
       return NextResponse.json(
         { error: 'INVALID_LAST_NAME', message: 'اسم العائلة غير صالح' },
         { status: 400 },
@@ -168,7 +169,6 @@ export async function POST(req: NextRequest) {
     })
 
     cacheDelete(`user:${session.userId}`)
-    invalidateCompleteProfileCache(session.userId)
 
     return NextResponse.json({ success: true, addressVerified })
   } catch (error) {

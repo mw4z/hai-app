@@ -7,7 +7,7 @@ import { logRideEvent } from '@/lib/rides/events'
 import { kickNotifCron } from '@/lib/kickNotifCron'
 import { log } from '@/lib/logger'
 import { getLimits } from '@/lib/capabilities'
-import { requireVerified } from '@/lib/requireVerified'
+import { requireUserReady } from '@/lib/requireUserReady'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
 const REQUESTS_PER_HOUR = 3
@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const gate = await requireVerified(session.userId)
-    if (gate) return gate
+    const ready = await requireUserReady(session.userId)
+    if (!ready.ok) return ready.response
 
     log.api('POST', '/api/rides', session.userId)
 

@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
-import { requireVerified } from '@/lib/requireVerified'
+import { requireUserReady } from '@/lib/requireUserReady'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string; msgId: string } }) {
   try {
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const gate = await requireVerified(session.userId)
-    if (gate) return gate
+    const ready = await requireUserReady(session.userId)
+    if (!ready.ok) return ready.response
 
     const { emoji } = await req.json()
     if (!emoji) return NextResponse.json({ error: 'Emoji required' }, { status: 400 })
