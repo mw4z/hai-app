@@ -788,6 +788,7 @@ export default function PostCard({
       const res = await fetch(`/api/posts/${postId}/comments/${commentId}`, { method: 'DELETE' })
       if (res.ok) {
         playDelete()
+        try { window.dispatchEvent(new CustomEvent('hai:content-deleted')) } catch {}
         // Remove from top-level list OR from any parent's replies array
         setComments(prev =>
           prev
@@ -945,6 +946,7 @@ export default function PostCard({
                         const res = await fetch(`/api/posts/${post.id}`, { method: 'DELETE' })
                         if (res.ok) {
                           playDelete()
+                          try { window.dispatchEvent(new CustomEvent('hai:content-deleted')) } catch {}
                           toast.success(lang === 'en' ? 'Deleted' : lang === 'ur' ? 'حذف ہو گیا' : 'تم الحذف')
                           onDelete ? onDelete(post.id) : router.refresh()
                         } else {

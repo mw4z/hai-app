@@ -255,8 +255,18 @@ export default function PushRegistration() {
         })
       } catch { /* @capacitor/app not on web */ }
     })()
+    // Re-sweep immediately whenever the user deletes content locally
+    // (DM, post, comment) — the appStateChange path doesn't fire if
+    // the app was already in foreground when the deletion happened,
+    // so the tray banner sits stale until the next background/
+    // foreground cycle. Listening for a custom event covers that gap.
+    // Fired by ChatClient on message delete, PostCard on post/comment
+    // delete, etc.
+    const onContentDeleted = () => { void sweepStaleTray() }
+    window.addEventListener('hai:content-deleted', onContentDeleted)
     const cleanupAppListener = () => {
       try { appListenerHandle?.remove() } catch {}
+      window.removeEventListener('hai:content-deleted', onContentDeleted)
     }
 
     // The hai_token cookie is HttpOnly, so we can't see it from JS.
