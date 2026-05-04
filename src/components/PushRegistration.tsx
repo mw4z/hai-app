@@ -193,6 +193,72 @@ export default function PushRegistration() {
     }
     installDeeplinkListener()
 
+    // ── Stale tray sweep ─────────────────────────────────────────────
+    // Server-side, when a post/comment/message/ride is removed (user
+    // delete, mod action, report-threshold auto-remove), we delete
+    // the corresponding Notification rows. But the OS tray (Android
+    // notification shade / iOS notification center) keeps the banner
+    // around until the user dismisses it manually. This sweep
+    // reconciles: fetch the set of resource IDs the user STILL has
+    // active notifications for, then remove tray entries whose
+    // underlying ID isn't in that set.
+    //
+    // Runs on:
+    //   - App foreground / first mount
+    //   - Capacitor App.appStateChange isActive=true
+    const sweepStaleTray = async () => {
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications')
+        const delivered = await PushNotifications.getDeliveredNotifications()
+        if (!delivered.notifications?.length) return
+        const res = await fetch('/api/notifications/active-refs', {
+          method: 'GET',
+          credentials: 'include',
+          cache: 'no-store',
+        })
+        if (!res.ok) return // not signed in / network blip — silent
+        const refs = await res.json() as {
+          postIds: string[]
+          commentIds: string[]
+          threadIds: string[]
+          rideRequestIds: string[]
+        }
+        const live = {
+          posts: new Set(refs.postIds || []),
+          comments: new Set(refs.commentIds || []),
+          threads: new Set(refs.threadIds || []),
+          rides: new Set(refs.rideRequestIds || []),
+        }
+        const stale = delivered.notifications.filter((n) => {
+          const d = (n.data || {}) as Record<string, string>
+          if (d.threadId && !live.threads.has(d.threadId)) return true
+          if (d.postId && !live.posts.has(d.postId)) return true
+          if (d.commentId && !live.comments.has(d.commentId)) return true
+          if (d.rideRequestId && !live.rides.has(d.rideRequestId)) return true
+          return false
+        })
+        if (stale.length > 0) {
+          await PushNotifications.removeDeliveredNotifications({ notifications: stale })
+          console.log('[PUSH] tray sweep cleared', stale.length, 'stale notifications')
+        }
+      } catch (err) {
+        console.error('[PUSH] tray sweep failed:', err)
+      }
+    }
+    void sweepStaleTray()
+    let appListenerHandle: { remove: () => void } | null = null
+    ;(async () => {
+      try {
+        const { App } = await import('@capacitor/app')
+        appListenerHandle = await App.addListener('appStateChange', ({ isActive }: { isActive: boolean }) => {
+          if (isActive) void sweepStaleTray()
+        })
+      } catch { /* @capacitor/app not on web */ }
+    })()
+    const cleanupAppListener = () => {
+      try { appListenerHandle?.remove() } catch {}
+    }
+
     // The hai_token cookie is HttpOnly, so we can't see it from JS.
     // Probe a real authenticated endpoint instead — /api/notifications/unread
     // already runs on every tab and is cheap. 200 = signed in.
@@ -347,6 +413,7 @@ export default function PushRegistration() {
     return () => {
       window.removeEventListener('hai:auth-ready', onAuth)
       window.removeEventListener('focus', onFocus)
+      cleanupAppListener()
     }
   }, [])
 

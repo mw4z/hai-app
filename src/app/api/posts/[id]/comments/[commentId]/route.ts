@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { moderateContent } from '@/lib/moderation'
+import { cleanupNotificationsFor } from '@/lib/notifications'
 
 const EDIT_WINDOW = 30 * 60_000 // 30 minutes
 
@@ -20,9 +21,24 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     if (comment.postId !== params.id) return NextResponse.json({ error: 'Mismatch' }, { status: 400 })
     if (comment.authorId !== session.userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    // Delete replies first, then the comment
+    // Collect reply IDs first so we can clean up notifications that
+    // referenced them too — Prisma cascades delete the rows but
+    // doesn't touch Notification.commentId.
+    const replies = await db.comment.findMany({
+      where: { parentId: params.commentId },
+      select: { id: true },
+    })
     await db.comment.deleteMany({ where: { parentId: params.commentId } })
     await db.comment.delete({ where: { id: params.commentId } })
+
+    // Clear bell rows that pointed at this comment OR any of its
+    // replies. Run as Promise.all so a slow one doesn't block the
+    // response. Errors are non-fatal — notification cleanup is
+    // best-effort, the delete itself is the user-visible action.
+    await Promise.all([
+      cleanupNotificationsFor({ commentId: params.commentId }),
+      ...replies.map(r => cleanupNotificationsFor({ commentId: r.id })),
+    ]).catch(() => { /* non-fatal */ })
 
     return NextResponse.json({ success: true })
   } catch (error) {

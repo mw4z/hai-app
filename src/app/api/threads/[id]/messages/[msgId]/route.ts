@@ -56,6 +56,17 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       where: { id: params.msgId },
       data: { type: 'DELETED', text: null, imageUrl: null, lat: null, lng: null },
     })
+    // Clear UNREAD bell notifications for this thread — they may be
+    // showing the deleted message's snippet in the body field. Read
+    // ones stay (the recipient already saw and processed them; we
+    // don't rewrite their history). Best-effort, non-fatal.
+    db.notification.deleteMany({
+      where: {
+        threadId: params.id,
+        type: 'NEW_MESSAGE',
+        read: false,
+      },
+    }).catch(() => { /* non-fatal */ })
     return NextResponse.json({ success: true, scope: 'all' })
   } catch (error) {
     console.error('delete message error:', error)

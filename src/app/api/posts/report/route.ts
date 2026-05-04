@@ -5,6 +5,7 @@ import { ReportReason } from '@prisma/client'
 import { apiError } from '@/lib/validation'
 import { addReputation, REP_POINTS, getReportThreshold } from '@/lib/reputation'
 import { requireUserReady } from '@/lib/requireUserReady'
+import { cleanupNotificationsFor } from '@/lib/notifications'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
 const HIDE_THRESHOLD = 3
@@ -107,6 +108,15 @@ export async function POST(req: NextRequest) {
       where: { id: postId },
       data: { reportCount: newCount, status: newStatus },
     })
+
+    // Post crossed into REMOVED via the report threshold — clear bell
+    // notifications referencing it so they don't tap-jump to a 404.
+    // HIDDEN posts stay reachable to mods only; we leave their bell
+    // entries alone so a mod can still trace back to the post via
+    // the notification.
+    if (newStatus === 'REMOVED') {
+      cleanupNotificationsFor({ postId }).catch(() => { /* non-fatal */ })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

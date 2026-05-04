@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { cleanupNotificationsFor } from '@/lib/notifications'
 
 /** PATCH — Edit own post (title, body, price) */
 export async function PATCH(
@@ -95,6 +96,11 @@ export async function DELETE(
     where: { id: params.id },
     data: { status: 'REMOVED' },
   })
+
+  // Clear bell notifications that point at this post (comments,
+  // reactions, replies). The push tray sync on next app foreground
+  // catches the system-tray side.
+  await cleanupNotificationsFor({ postId: params.id }).catch(() => { /* non-fatal */ })
 
   return NextResponse.json({ success: true })
 }

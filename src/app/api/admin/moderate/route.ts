@@ -7,6 +7,7 @@ import {
   invalidateHighlights,
   HIGHLIGHT_CONFIG,
 } from '@/lib/highlights'
+import { cleanupNotificationsFor } from '@/lib/notifications'
 
 const ADMIN_ROLES = ['NEIGHBORHOOD_MOD', 'PLATFORM_MOD', 'SUPER_ADMIN']
 
@@ -80,6 +81,10 @@ export async function POST(req: NextRequest) {
       if (!postId) return NextResponse.json({ error: 'postId required' }, { status: 400 })
       await db.post.update({ where: { id: postId }, data: { status: 'REMOVED' } })
       logModAction({ moderatorId: admin.id, actionType: 'remove_post', targetType: 'post', targetId: postId })
+      // Clear bell notifications referencing this post — comments,
+      // reactions, replies. Push tray sync on next foreground does
+      // the system-tray side. Best-effort, non-fatal.
+      cleanupNotificationsFor({ postId }).catch(() => { /* non-fatal */ })
       return NextResponse.json({ success: true })
     }
 
