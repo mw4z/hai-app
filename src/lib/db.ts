@@ -1,25 +1,27 @@
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
 
-// Hard fail rather than silently connecting to a localhost DB. Was
-// a "warn + use fallback string" before, which meant a misconfigured
-// production deploy would happily run against an unreachable local
-// DB and surface as cryptic ECONNREFUSED later.
+// Warn if DATABASE_URL is unset. Was a hard throw, but Codemagic's
+// page-data collection step (which loads every route module to
+// enumerate exports — but never queries the DB) doesn't have the
+// env var and was failing the build. NEXT_PHASE / NEXT_RUNTIME both
+// proved unreliable signals for "we're in the build phase".
 //
-// Runtime-only check: NEXT_RUNTIME is set by Next.js to 'nodejs' (or
-// 'edge') only when the module is loaded inside a request handler.
-// During `next build`'s page-data collection step (which loads every
-// route module to enumerate exports — but never queries the DB),
-// NEXT_RUNTIME is unset, so we skip the throw. Any genuine
-// runtime-with-no-DATABASE_URL still trips the guard on first request.
+// Safety net: if a deploy is genuinely missing DATABASE_URL at
+// runtime, Prisma's adapter-pg throws a clear error on the first
+// query ("no connection string"), so the misconfiguration doesn't go
+// silent — it just surfaces on first request rather than at boot.
+// That's a tiny regression in error-locality vs the previous throw,
+// but it's the only way to keep CI builds green without injecting
+// fake env vars into the build pipeline.
 //
-// We also skip if NODE_ENV is 'test' to allow the Vitest / node:test
-// suites to import this module for snapshots without a live DB.
-const isRuntime = !!process.env.NEXT_RUNTIME
-const isTest = process.env.NODE_ENV === 'test'
-
-if (!process.env.DATABASE_URL && isRuntime && !isTest) {
-  throw new Error('DATABASE_URL is required. Set it in your environment (Vercel project settings or .env) before booting.')
+// The localhost-fallback footgun (the original reason this guard
+// exists) is closed by NOT supplying a fallback: empty string +
+// adapter-pg = explicit failure, no silent connection to a wrong DB.
+if (!process.env.DATABASE_URL) {
+  console.warn(
+    '[DB] ⚠️  DATABASE_URL is unset. Module is loading anyway (likely a build-time scan). Any runtime query will fail.',
+  )
 }
 const DATABASE_URL = process.env.DATABASE_URL || ''
 
