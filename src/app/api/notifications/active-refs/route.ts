@@ -54,10 +54,13 @@ export async function GET() {
     if (r.rideRequestId) rideRequestIds.add(r.rideRequestId)
   }
 
+  // Array.from instead of spread — repo's tsconfig target predates the
+  // downlevelIteration flag, and `[...set]` fails to compile on Vercel
+  // even though it works in dev (Next's build uses stricter settings).
   return NextResponse.json({
-    postIds: [...postIds],
-    commentIds: [...commentIds],
-    threadIds: [...threadIds],
-    rideRequestIds: [...rideRequestIds],
+    postIds: Array.from(postIds),
+    commentIds: Array.from(commentIds),
+    threadIds: Array.from(threadIds),
+    rideRequestIds: Array.from(rideRequestIds),
   })
 }
