@@ -1,13 +1,21 @@
 import { SignJWT, jwtVerify } from 'jose'
 
+// Was a hard throw at module load — broke Codemagic's page-data
+// collection step (loads every route module to enumerate exports
+// without ever signing/verifying a token). Same pattern as db.ts:
+// log a warning, supply NO fallback so any actual signToken /
+// verifyToken call with an empty secret fails loudly at request time
+// rather than silently signing tokens with a publicly-known string.
+//
+// `jose` throws "secret must be provided" on the first sign/verify
+// when given an empty Uint8Array, so a misconfigured deploy still
+// surfaces — just at first-request time, not at boot.
 if (!process.env.JWT_SECRET) {
-  // Hard fail at module load. The previous fallback ('fallback-secret-
-  // change-in-production') would have signed real production tokens
-  // with a publicly-known string, making every JWT in the system
-  // forgeable. Better to crash on boot than ship that.
-  throw new Error('JWT_SECRET is required. Set it in your environment (e.g. Vercel project settings) before booting.')
+  console.warn(
+    '[AUTH] ⚠️  JWT_SECRET is unset. Module is loading anyway (likely a build-time scan). Any sign/verify will fail at request time.',
+  )
 }
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || '')
 
 export interface JWTPayload {
   userId: string
