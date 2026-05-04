@@ -81,7 +81,37 @@ export default function PushRegistration() {
               // an unnecessary reload if the app was already on the page.
               const currentPath = window.location.pathname + window.location.search
               if (currentPath === target) return
-              window.location.href = target
+              // Cold-start path: on iOS, the launch notification can fire
+              // milliseconds after the WebView starts loading, sometimes
+              // before window/document are fully wired. window.location =
+              // ... at that moment is silently dropped by WKWebView, which
+              // is the "tap notification, app opens to /feed instead of
+              // the conversation" symptom users were reporting.
+              //
+              // Fix: defer the navigation until the document is ready,
+              // and retry once on the next tick if the URL didn't move.
+              // assign() is more reliable than href= on Capacitor (forces
+              // a navigation even when the WebView is mid-load).
+              const navigate = () => {
+                try {
+                  window.location.assign(target)
+                  // Retry once if the navigation got swallowed (rare iOS
+                  // cold-start race). Same target, idempotent.
+                  setTimeout(() => {
+                    const cur = window.location.pathname + window.location.search
+                    if (cur !== target) {
+                      try { window.location.assign(target) } catch {}
+                    }
+                  }, 400)
+                } catch (err) {
+                  console.error('[PUSH] navigation failed:', err)
+                }
+              }
+              if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', navigate, { once: true })
+              } else {
+                navigate()
+              }
             } catch (err) {
               console.error('[PUSH] navigation failed:', err)
             }
