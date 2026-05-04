@@ -1107,7 +1107,21 @@ export default function ChatClient({
               t={t}
               currentUserId={currentUserId}
               otherName={fullName(other) || (lang === 'en' ? 'Neighbor' : 'جار')}
-              onPendingImageLoad={() => bottomRef.current?.scrollIntoView({ block: 'end' })}
+              onPendingImageLoad={() => {
+                // Auto-stick to the bottom when an image finishes
+                // loading IF the user is already near the bottom.
+                // Without this, opening a chat with image messages
+                // scrolled to the pre-load bottom (text height only),
+                // then each image grew the container by up to 208 px
+                // leaving the user above the actual current bottom.
+                // Uses a 240 px threshold so the auto-stick survives
+                // 1 unread image height; past that, the user is
+                // intentionally scrolling history and we leave them.
+                const ms = messagesRef.current
+                if (!ms) return
+                const nearBottom = ms.scrollHeight - ms.scrollTop - ms.clientHeight < 240
+                if (nearBottom) bottomRef.current?.scrollIntoView({ block: 'end' })
+              }}
             />
           )
         })}
@@ -1782,9 +1796,14 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
                 src={(msg as any).localPreview || msg.imageUrl || ''}
                 alt=""
                 onLoad={() => {
-                  // Delegate to parent so the scroll lands on the real
-                  // bottom sentinel (past any padding/composer offset).
-                  if ((msg as any).pending) onPendingImageLoad?.()
+                  // Fire on EVERY image load (server + pending). The
+                  // parent handler decides whether to actually scroll
+                  // (only when near bottom). Was previously gated to
+                  // pending images only — that meant a chat with
+                  // server image messages opened scrolled above the
+                  // bottom because the initial scroll fired before
+                  // images had loaded their final height.
+                  onPendingImageLoad?.()
                 }}
                 className={`rounded-2xl max-h-52 object-cover shadow-sm ${(msg as any).pending ? 'opacity-60' : ''} ${isLastInGroup ? (isMe ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : 'ltr:rounded-bl-sm rtl:rounded-br-sm') : ''}`}
               />
