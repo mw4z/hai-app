@@ -6,15 +6,19 @@ import { PrismaClient } from '@prisma/client'
 // production deploy would happily run against an unreachable local
 // DB and surface as cryptic ECONNREFUSED later.
 //
-// Build-phase exception: Next.js's static page-data collection step
-// loads every route module at build time even though the DB never
-// gets queried. NEXT_PHASE === 'phase-production-build' identifies
-// that pass; CI environments (like Codemagic) don't expose
-// DATABASE_URL during the web-app build, so we let the import
-// succeed there and defer the throw until an actual route runs.
-const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build'
+// Runtime-only check: NEXT_RUNTIME is set by Next.js to 'nodejs' (or
+// 'edge') only when the module is loaded inside a request handler.
+// During `next build`'s page-data collection step (which loads every
+// route module to enumerate exports — but never queries the DB),
+// NEXT_RUNTIME is unset, so we skip the throw. Any genuine
+// runtime-with-no-DATABASE_URL still trips the guard on first request.
+//
+// We also skip if NODE_ENV is 'test' to allow the Vitest / node:test
+// suites to import this module for snapshots without a live DB.
+const isRuntime = !!process.env.NEXT_RUNTIME
+const isTest = process.env.NODE_ENV === 'test'
 
-if (!process.env.DATABASE_URL && !isBuildPhase) {
+if (!process.env.DATABASE_URL && isRuntime && !isTest) {
   throw new Error('DATABASE_URL is required. Set it in your environment (Vercel project settings or .env) before booting.')
 }
 const DATABASE_URL = process.env.DATABASE_URL || ''
