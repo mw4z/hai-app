@@ -2,70 +2,107 @@ import { NextResponse } from 'next/server'
 import { db } from './db'
 
 /**
- * Single entry point for "can this authenticated user perform a
- * neighborhood-affecting action?" checks. Replaces scattered calls to
- * requireCompleteProfile + requireVerified at API call sites.
+ * ═══════════════════════════════════════════════════════════════════
+ * Authenticated endpoint gate — single source of truth.
+ * ═══════════════════════════════════════════════════════════════════
  *
- * Why one helper:
- *   - Order matters. Completeness must run BEFORE verified, so an
- *     incomplete user gets "go finish onboarding" rather than the
- *     misleading "verify your location" — they haven't even reached
- *     the screen that asks for location yet.
- *   - One DB read covers both checks. The previous shape did two
- *     separate findUnique calls (one per helper) and two cache
- *     lookups. This is cheaper AND removes the cache invariant
- *     entirely (see below).
- *   - Error shape is consistent: every caller can branch on
- *     `error: 'profile_incomplete' | 'location_unverified'` and
- *     redirect using `next`.
+ * One helper, one DB read, two checks:
+ *   1. Profile completeness (User.name has >= 2 chars after trim)
+ *   2. Location verification (User.addressVerified === true)
  *
- * Why no cache:
- *   - The fields being read (User.name, User.addressVerified,
- *     User.role) are tiny and indexed by primary key. The DB roundtrip
- *     is sub-millisecond on Supabase pooler.
- *   - The cache was creating its own invariant: a user could update
- *     their profile, get a stale 403 for up to 30 seconds, and not
- *     understand why. Removing it makes "I just submitted onboarding,
- *     why am I still locked out?" impossible.
- *   - Profile completeness is identity-integrity, not a perf gate.
- *     Worth a query.
+ * Order matters. Completeness runs first so a user who finished OTP
+ * but bailed before onboarding gets `next: '/onboarding'` rather than
+ * the misleading `location_unverified` (they haven't even seen the
+ * verify-location screen yet).
+ *
+ * SUPER_ADMIN bypasses LOCATION verification (legitimate cross-
+ * neighborhood moderation), but NEVER bypasses profile completeness —
+ * a blank-named admin would render as nothing in the UI, which is an
+ * identity-integrity bug, not a permission gate. Bypass attempts are
+ * logged for audit.
+ *
+ * ───────────────────────────────────────────────────────────────────
+ * Endpoint policy table — keep updated when adding routes.
+ * ───────────────────────────────────────────────────────────────────
+ *
+ * Profile + location required (requireUserReady() with defaults):
+ *   POST   /api/posts
+ *   POST   /api/posts/[id]/comments
+ *   POST   /api/posts/[id]/react
+ *   POST   /api/posts/report
+ *   POST   /api/threads
+ *   POST   /api/threads/[id]/messages
+ *   POST   /api/threads/[id]/messages/[msgId]/react
+ *   POST   /api/comments/[id]/like
+ *   POST   /api/polls
+ *   POST   /api/polls/[id]/comments
+ *   POST   /api/polls/[id]/vote
+ *   POST   /api/polls/[id]/react
+ *   POST   /api/rides
+ *   POST   /api/rides/[id]/offers
+ *   POST   /api/emergency/request
+ *   GET    /api/feed                  ← requires both as of this commit
+ *
+ * Profile required, location NOT required:
+ *   POST   /api/posts/[id]/bookmark   (private, doesn't expose name)
+ *   POST   /api/posts/[id]/subscribe  (private, doesn't expose name)
+ *   POST   /api/profile/verify-address (the user is verifying NOW —
+ *                                       requiring it would deadlock)
+ *
+ * Read-only — incomplete users allowed:
+ *   GET    /api/notifications
+ *   GET    /api/users/[id]
+ *   GET    /api/posts/[id]
+ *   GET    /api/feed (deliberately scoped to user's neighborhoodId
+ *                     server-side — no cross-nbhd leak path)
+ *   GET    /api/search/*
+ *
+ * Admin / system / cron — own auth checks, do NOT use this helper:
+ *   /api/admin/*       (role check)
+ *   /api/cron/*        (CRON_SECRET header)
+ *   /api/auth/send-otp / verify-otp / complete-profile (pre-onboarding)
+ *
+ * ───────────────────────────────────────────────────────────────────
  */
+
+export type UserReadyErrorCode =
+  | 'PROFILE_INCOMPLETE'
+  | 'LOCATION_UNVERIFIED'
+  | 'UNAUTHORIZED'
+
+export interface UserReadyUser {
+  id: string
+  name: string | null
+  role: string
+  addressVerified: boolean
+}
+
+export type UserReadyResult =
+  | { ok: true; user: UserReadyUser }
+  | { ok: false; code: UserReadyErrorCode; response: NextResponse }
 
 interface Opts {
   requireProfile?: boolean
   requireLocation?: boolean
 }
 
-interface ReadyResult {
-  ok: true
-  user: {
-    id: string
-    name: string | null
-    role: string
-    addressVerified: boolean
-  }
-}
-
-interface ReadyError {
-  ok: false
-  response: NextResponse
-}
-
 /**
- * Run the configured gates against `userId`. Returns `{ ok: true, user }`
- * when all gates pass, or `{ ok: false, response }` carrying a 403
- * NextResponse the route handler should `return` directly.
+ * Run the configured gates against `userId`. Returns a discriminated
+ * union — narrow on `result.ok` and either consume `result.user` or
+ * `return result.response` directly.
  *
- * SUPER_ADMIN bypasses LOCATION verification (their account is platform-
- * owner and can act in any neighborhood for moderation), but NOT profile
- * completeness — completeness is identity, not a permission. A blank
- * super-admin would still render as nothing in the UI and is a real data-
- * integrity concern. The bypass attempt is logged for audit.
+ * The `code` field on the error branch is the canonical error key the
+ * route handler can use to log / branch / instrument; the `response`
+ * field carries the wire-format JSON the client expects, kept in sync
+ * with the public contract:
+ *
+ *   { error: 'profile_incomplete' | 'location_unverified' | 'unauthorized',
+ *     next:  '/onboarding'        | '/onboarding'         | '/login' }
  */
 export async function requireUserReady(
   userId: string,
   opts: Opts = { requireProfile: true, requireLocation: true },
-): Promise<ReadyResult | ReadyError> {
+): Promise<UserReadyResult> {
   const user = await db.user.findUnique({
     where: { id: userId },
     select: { id: true, name: true, role: true, addressVerified: true },
@@ -74,6 +111,7 @@ export async function requireUserReady(
   if (!user) {
     return {
       ok: false,
+      code: 'UNAUTHORIZED',
       response: NextResponse.json(
         { error: 'unauthorized', next: '/login' },
         { status: 401 },
@@ -83,22 +121,22 @@ export async function requireUserReady(
 
   const isSuperAdmin = user.role === 'SUPER_ADMIN'
 
-  // 1. Profile completeness. Runs FIRST so an OTP-only / pre-onboarding
-  //    user gets the right next-step. Trim-checked to mirror the
-  //    /api/auth/complete-profile validation exactly. NO super-admin
-  //    bypass here — see the helper-level comment.
+  // 1. Profile completeness — runs FIRST. No SUPER_ADMIN bypass:
+  //    completeness is identity, not a permission. A blank-named
+  //    admin renders as nothing in the UI; that's a real integrity
+  //    bug we'd rather catch in dev/staging than ignore in prod.
   if (opts.requireProfile !== false) {
     const trimmed = user.name?.trim() ?? ''
     if (trimmed.length < 2) {
       if (isSuperAdmin) {
-        // A super-admin without a name is a real anomaly. Log loudly
-        // and still block — they should be the FIRST to have a clean
-        // profile, and an automated tool should not be silently
-        // succeeding past identity checks.
-        console.warn('[requireUserReady] SUPER_ADMIN with incomplete profile blocked', { userId })
+        console.warn(
+          '[requireUserReady] SUPER_ADMIN with incomplete profile blocked',
+          { userId },
+        )
       }
       return {
         ok: false,
+        code: 'PROFILE_INCOMPLETE',
         response: NextResponse.json(
           { error: 'profile_incomplete', next: '/onboarding' },
           { status: 403 },
@@ -107,13 +145,13 @@ export async function requireUserReady(
     }
   }
 
-  // 2. Location verification. SUPER_ADMIN bypasses this one — they may
-  //    legitimately moderate any neighborhood without being physically
-  //    present.
+  // 2. Location verification — SUPER_ADMIN bypasses (legitimate
+  //    cross-neighborhood moderation need).
   if (opts.requireLocation !== false && !isSuperAdmin) {
     if (!user.addressVerified) {
       return {
         ok: false,
+        code: 'LOCATION_UNVERIFIED',
         response: NextResponse.json(
           { error: 'location_unverified', next: '/onboarding' },
           { status: 403 },
@@ -132,3 +170,8 @@ export async function requireUserReady(
     },
   }
 }
+
+// Pure validators live in nameValidation.ts so they're testable
+// without dragging in the Prisma client. Re-exported here for callers
+// who already import from this module.
+export { isValidFirstName, isValidLastName, NAME_LIMITS } from './nameValidation'

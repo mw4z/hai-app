@@ -100,10 +100,20 @@ export async function GET(req: NextRequest) {
   const session = await getValidatedSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Feed is a read endpoint — completeness required (it would render
-  // their name in their own posts), but location verification is NOT
-  // required (browsing without verifying is the "limited access" path).
-  const ready = await requireUserReady(session.userId, { requireProfile: true, requireLocation: false })
+  // Feed requires BOTH profile completeness AND location verification.
+  // Was profile-only earlier — flipped to full gate because:
+  //   1. The feed query already pins to user.neighborhoodId, but
+  //      neighborhoodId can be set without verification (user picked
+  //      a hood manually, never let GPS confirm). Without the
+  //      location gate a user could pick any neighborhood, browse it
+  //      as if they lived there, and DM/comment after escalating
+  //      through other gates.
+  //   2. SUPER_ADMIN still bypasses the location half (so platform
+  //      mods can read any neighborhood for moderation).
+  //   3. Read endpoints that surface other neighbors' content should
+  //      have the same trust bar as endpoints that produce content —
+  //      the asymmetry was a leak vector, not a feature.
+  const ready = await requireUserReady(session.userId)
   if (!ready.ok) return ready.response
 
   const { searchParams } = new URL(req.url)

@@ -46,7 +46,9 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       )
     }
-    if (normalizedLastName && (normalizedLastName.length < 2 || normalizedLastName.length > 60)) {
+    // lastName is optional — single-letter initials accepted ("J." etc).
+    // Empty trims to null so the column stays clean.
+    if (normalizedLastName && normalizedLastName.length > 60) {
       return NextResponse.json(
         { error: 'INVALID_LAST_NAME', message: 'اسم العائلة غير صالح' },
         { status: 400 },
