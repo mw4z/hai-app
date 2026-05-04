@@ -422,8 +422,44 @@ export default function ChatClient({
       const el = document.getElementById('unread-divider')
       if (el) { el.scrollIntoView({ block: 'center' }); return }
     }
-    bottomRef.current?.scrollIntoView()
+    bottomRef.current?.scrollIntoView({ block: 'end' })
   }, [messages.length])
+
+  // Stick to bottom while content settles after first paint.
+  //
+  // The single scrollIntoView above lands on whatever the bottom is
+  // at THAT moment, but for the first ~1.5 seconds the messages
+  // container keeps growing as fonts swap, avatars decode, replied-
+  // to previews paint, and (for chats with images) image bubbles
+  // resolve their intrinsic dimensions. Without this, the user lands
+  // above the eventual bottom and has to scroll manually — exactly
+  // the symptom users reported on first chat open.
+  //
+  // ResizeObserver fires on every height change to the messages
+  // container. We re-pin to the bottom for the first 1500 ms and
+  // ONLY when the user is currently near the bottom (so scrolling up
+  // mid-load to read history isn't fought by the observer). After
+  // 1500 ms the observer disconnects — past that, content growth is
+  // "new messages while reading" territory and the message-arrival
+  // useEffect above handles it.
+  useEffect(() => {
+    if (unreadDividerId) return // user landed on the unread divider, leave them there
+    const ms = messagesRef.current
+    if (!ms) return
+    const startedAt = Date.now()
+    const obs = new ResizeObserver(() => {
+      if (Date.now() - startedAt > 1500) { obs.disconnect(); return }
+      const distanceFromBottom = ms.scrollHeight - ms.scrollTop - ms.clientHeight
+      // 600 px ≈ ~3 image bubbles of slack — enough that the chain
+      // of "image grows → re-pin → next image grows → re-pin" stays
+      // sticky, but small enough that an active history scroll wins.
+      if (distanceFromBottom < 600) {
+        ms.scrollTop = ms.scrollHeight
+      }
+    })
+    obs.observe(ms)
+    return () => obs.disconnect()
+  }, [unreadDividerId])
 
   // Tap on a reply quote → scroll the original into view and flash a
   // full-width horizontal highlight across its row that fades out.
