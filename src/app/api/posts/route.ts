@@ -11,8 +11,7 @@ import { getLimits } from '@/lib/capabilities'
 import { cacheDeletePrefix } from '@/lib/cache'
 import { moderateContent } from '@/lib/moderation'
 import { kickNotifCron } from '@/lib/kickNotifCron'
-import { requireVerified } from '@/lib/requireVerified'
-import { requireCompleteProfile } from '@/lib/requireCompleteProfile'
+import { requireUserReady } from '@/lib/requireUserReady'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { fullName } from '@/lib/displayName'
 
@@ -38,13 +37,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(apiError('يجب تسجيل الدخول', 401), { status: 401 })
     }
 
-    // Profile-completeness gate runs BEFORE the verified gate so a
-    // post-OTP / pre-onboarding user gets redirected to onboarding
-    // instead of seeing a confusing "verify your location" error.
-    const incompleteGate = await requireCompleteProfile(session.userId)
-    if (incompleteGate) return incompleteGate
-    const gate = await requireVerified(session.userId)
-    if (gate) return gate
+    // Single gate: profile completeness AND location verification.
+    // requireUserReady runs them in the right order (completeness
+    // first, so OTP-only users see "go to onboarding" rather than
+    // the misleading location error) and returns a structured
+    // { error, next } body the client can branch on.
+    const ready = await requireUserReady(session.userId)
+    if (!ready.ok) return ready.response
 
     const user = await db.user.findUnique({
       where: { id: session.userId },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { requireUserReady } from '@/lib/requireUserReady'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +22,10 @@ export const dynamic = 'force-dynamic'
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  // Profile-only — subscriptions don't surface name; location not needed.
+  const ready = await requireUserReady(session.userId, { requireProfile: true, requireLocation: false })
+  if (!ready.ok) return ready.response
 
   const post = await db.post.findUnique({
     where: { id: params.id },

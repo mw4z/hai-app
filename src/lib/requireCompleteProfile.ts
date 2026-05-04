@@ -1,60 +1,22 @@
 import { NextResponse } from 'next/server'
-import { db } from './db'
-import { cacheGet, cacheSet, cacheDelete } from './cache'
+import { requireUserReady } from './requireUserReady'
 
 /**
- * Server-side guard for actions that require a fully-onboarded user.
+ * Back-compat thin shim. New code should use `requireUserReady` directly
+ * — it does both completeness and location checks in one DB read with
+ * structured `{ error, next }` errors.
  *
- * A user is "complete" when `User.name` is non-null AND, after trim,
- * has at least 2 characters. The OTP flow creates User rows BEFORE
- * onboarding (so we have somewhere to attach the JWT), and a user can
- * close the app between OTP verify and onboarding submission — those
- * accounts must not access feed / posting / DM / etc.
- *
- * Usage:
- *   const gate = await requireCompleteProfile(session.userId)
- *   if (gate) return gate  // returns a 403 NextResponse
- *
- * Returns null when the profile is complete — continue normally.
- * Returns a 403 NextResponse with error='profile_incomplete' otherwise.
- *
- * Mirrors requireVerified.ts in shape so call sites can stack both
- * gates (incomplete → complete → verified) consistently.
+ * The previous version of this helper had a 30-second per-user cache.
+ * Removed: profile completeness is a sub-millisecond query on the
+ * primary key, the cache was creating its own invariant (a freshly
+ * onboarded user could see stale 403s), and the SUPER_ADMIN bypass
+ * was wrong — completeness is identity, not a permission. The new
+ * unified helper logs and blocks instead.
  */
 export async function requireCompleteProfile(userId: string): Promise<NextResponse | null> {
-  const cacheKey = `complete:${userId}`
-  const cached = cacheGet<{ complete: boolean; isSuperAdmin: boolean }>(cacheKey)
-  let complete: boolean
-  let isSuperAdmin: boolean
-  if (cached === null) {
-    const user = await db.user.findUnique({
-      where: { id: userId },
-      select: { name: true, role: true },
-    })
-    complete = !!user?.name && user.name.trim().length >= 2
-    isSuperAdmin = user?.role === 'SUPER_ADMIN'
-    cacheSet(cacheKey, { complete, isSuperAdmin }, 30_000)
-  } else {
-    complete = cached.complete
-    isSuperAdmin = cached.isSuperAdmin
-  }
-
-  // SUPER_ADMIN bypasses — same exemption pattern as requireVerified.
-  if (isSuperAdmin) return null
-
-  if (!complete) {
-    return NextResponse.json(
-      {
-        error: 'profile_incomplete',
-        message: 'يجب إكمال البيانات الشخصية أولاً',
-      },
-      { status: 403 },
-    )
-  }
-  return null
+  const result = await requireUserReady(userId, { requireProfile: true, requireLocation: false })
+  return result.ok ? null : result.response
 }
 
-/** Invalidate the complete-profile cache for a user (call after onboarding submit). */
-export function invalidateCompleteProfileCache(userId: string) {
-  cacheDelete(`complete:${userId}`)
-}
+/** No-op kept for back-compat. The cache it used to invalidate is gone. */
+export function invalidateCompleteProfileCache(_userId: string) {}
