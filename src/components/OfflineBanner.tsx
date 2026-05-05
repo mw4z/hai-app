@@ -24,6 +24,13 @@ export default function OfflineBanner() {
   const { status, lastReconnectAt } = useNetworkStatus()
   const { lang } = useLanguage()
   const [showReconnect, setShowReconnect] = useState(false)
+  // Delay before the offline banner actually renders. Catches
+  // transient blips — radio still negotiating on cold-start, brief
+  // tunnel between cell towers, etc. The status flip already debounces
+  // at the NetworkProvider layer, but THIS layer guarantees the banner
+  // never flashes for sub-second outages.
+  const [confirmedOffline, setConfirmedOffline] = useState(false)
+  const OFFLINE_DEBOUNCE_MS = 1500
 
   useEffect(() => {
     if (!lastReconnectAt) return
@@ -32,9 +39,18 @@ export default function OfflineBanner() {
     return () => clearTimeout(t)
   }, [lastReconnectAt])
 
-  const isOffline = status === 'offline'
+  // Banner: only show after the status has been 'offline' continuously
+  // for OFFLINE_DEBOUNCE_MS. Snap back instantly when status changes.
+  useEffect(() => {
+    if (status !== 'offline') {
+      setConfirmedOffline(false)
+      return
+    }
+    const t = setTimeout(() => setConfirmedOffline(true), OFFLINE_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [status])
 
-  if (!isOffline && !showReconnect) return null
+  if (!confirmedOffline && !showReconnect) return null
 
   // Pinned just under the status bar. z-index above app chrome but
   // below modals/sheets so it never covers actionable UI.
@@ -47,7 +63,7 @@ export default function OfflineBanner() {
     pointerEvents: 'none', // banner is informational only
   }
 
-  if (isOffline) {
+  if (confirmedOffline) {
     return (
       <div style={baseStyle} aria-live="assertive" role="status">
         <div className="mx-auto max-w-[480px] px-3 pt-2">

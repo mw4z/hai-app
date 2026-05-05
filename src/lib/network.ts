@@ -107,10 +107,27 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
   }, [runProbe])
 
   useEffect(() => {
-    // Browser online/offline events are quick wins — trust them as
-    // the initial signal, then verify with a probe.
+    // Cold-start grace period. On iOS especially when the app is
+    // launched from a tapped notification, the radio is still spinning
+    // up and `navigator.onLine` briefly reports false — which fires
+    // the `offline` event, flips status to 'offline', and shows the
+    // banner for ~2 seconds before the next probe corrects it. The
+    // grace window short-circuits that: for the first 3 seconds, an
+    // `offline` browser event triggers a probe instead of an instant
+    // status flip, so we only believe we're offline when an actual
+    // network call fails.
+    const mountedAt = Date.now()
+    const COLD_START_GRACE_MS = 3000
+
     const onOnline = () => { void runProbe() }
     const onOffline = () => {
+      if (Date.now() - mountedAt < COLD_START_GRACE_MS) {
+        // Don't trust the navigator yet; verify with a real probe.
+        // If the radio actually IS down, the probe will fail and the
+        // failure counter logic below promotes us to offline normally.
+        void runProbe()
+        return
+      }
       failuresRef.current = 2
       updateStatus('offline')
     }
