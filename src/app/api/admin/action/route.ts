@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
       if (!isSuper) return NextResponse.json({ error: 'الحذف الدائم متاح فقط للمدير العام' }, { status: 403 })
       await db.post.update({ where: { id: targetId }, data: { status: 'REMOVED' } })
       await logAction(session.userId, admin.name, 'remove_post', 'post', targetId, reason)
-      cleanupNotificationsFor({ postId: targetId }).catch(() => { /* non-fatal */ })
+      try { await cleanupNotificationsFor({ postId: targetId }) } catch { /* non-fatal */ }
       return NextResponse.json({ success: true })
     }
 

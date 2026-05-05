@@ -42,6 +42,21 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
           data: { hiddenBy: { push: session.userId } },
         })
       }
+      // Clear THIS user's NEW_MESSAGE bell rows for this thread —
+      // they hide-for-me'd, the bell entry referencing it should
+      // disappear from their side. Other party's notifications are
+      // untouched (they still see the message). Awaited so the API
+      // response only resolves after the delete commits, otherwise
+      // the client's tray-sweep races and misses the clear.
+      try {
+        await db.notification.deleteMany({
+          where: {
+            threadId: params.id,
+            userId: session.userId,
+            type: 'NEW_MESSAGE',
+          },
+        })
+      } catch { /* non-fatal */ }
       return NextResponse.json({ success: true, scope: 'me' })
     }
 
@@ -56,17 +71,22 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       where: { id: params.msgId },
       data: { type: 'DELETED', text: null, imageUrl: null, lat: null, lng: null },
     })
-    // Clear UNREAD bell notifications for this thread — they may be
-    // showing the deleted message's snippet in the body field. Read
-    // ones stay (the recipient already saw and processed them; we
-    // don't rewrite their history). Best-effort, non-fatal.
-    db.notification.deleteMany({
-      where: {
-        threadId: params.id,
-        type: 'NEW_MESSAGE',
-        read: false,
-      },
-    }).catch(() => { /* non-fatal */ })
+    // Clear bell notifications for this thread that point at the
+    // tombstoned message. Was filtered to `read: false` only and
+    // fire-and-forget — wrong on both counts:
+    //  - Read filter left stale notifications around when the
+    //    recipient had already opened/seen them.
+    //  - Fire-and-forget meant the API response came back BEFORE
+    //    the DB delete committed, so the client's tray-sweep
+    //    fetched /api/notifications/active-refs and got the
+    //    pre-delete view → threadId still in active-refs →
+    //    tray entry not cleared. Awaited now so the response
+    //    only resolves after notifications are gone.
+    try {
+      await db.notification.deleteMany({
+        where: { threadId: params.id, type: 'NEW_MESSAGE' },
+      })
+    } catch { /* non-fatal */ }
     return NextResponse.json({ success: true, scope: 'all' })
   } catch (error) {
     console.error('delete message error:', error)

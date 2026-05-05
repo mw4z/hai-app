@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
     // entries alone so a mod can still trace back to the post via
     // the notification.
     if (newStatus === 'REMOVED') {
-      cleanupNotificationsFor({ postId }).catch(() => { /* non-fatal */ })
+      try { await cleanupNotificationsFor({ postId }) } catch { /* non-fatal */ }
     }
 
     return NextResponse.json({ success: true })

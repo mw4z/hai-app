@@ -81,10 +81,10 @@ export async function POST(req: NextRequest) {
       if (!postId) return NextResponse.json({ error: 'postId required' }, { status: 400 })
       await db.post.update({ where: { id: postId }, data: { status: 'REMOVED' } })
       logModAction({ moderatorId: admin.id, actionType: 'remove_post', targetType: 'post', targetId: postId })
-      // Clear bell notifications referencing this post — comments,
-      // reactions, replies. Push tray sync on next foreground does
-      // the system-tray side. Best-effort, non-fatal.
-      cleanupNotificationsFor({ postId }).catch(() => { /* non-fatal */ })
+      // Awaited (was fire-and-forget) — the response must only return
+      // after notifications are cleared, otherwise the client's tray-
+      // sweep races and reads stale active-refs.
+      try { await cleanupNotificationsFor({ postId }) } catch { /* non-fatal */ }
       return NextResponse.json({ success: true })
     }
 
