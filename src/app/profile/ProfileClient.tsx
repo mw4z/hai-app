@@ -313,7 +313,15 @@ export default function ProfileClient({ user, postCount }: Props) {
   // Avatar upload / picker
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
   // Delete account modal: null = closed, 'confirm' = first stage, 'typed' = typed verification
-  const [deleteStage, setDeleteStage] = useState<null | 'confirm' | 'typed'>(null)
+  // Account-deletion flow stages:
+  //   confirm → soft "are you sure" prompt
+  //   typed   → user types DELETE / حذف to acknowledge irreversibility
+  //   otp     → user receives an SMS OTP and enters it to actually delete
+  // Server requires the OTP (audit C-2); the typed stage is UX only.
+  const [deleteStage, setDeleteStage] = useState<null | 'confirm' | 'typed' | 'otp'>(null)
+  const [deleteOtp, setDeleteOtp] = useState('')
+  const [deleteOtpSending, setDeleteOtpSending] = useState(false)
+  const [deleteOtpError, setDeleteOtpError] = useState<string | null>(null)
   const [deleteInput, setDeleteInput] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [emergencyRequestOpen, setEmergencyRequestOpen] = useState(false)
@@ -1865,6 +1873,8 @@ export default function ProfileClient({ user, postCount }: Props) {
             e.preventDefault()
             consumeNextClick()
             setDeleteStage(null)
+            setDeleteOtp('')
+            setDeleteOtpError(null)
           }}
         >
           <div
@@ -1893,7 +1903,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setDeleteStage(null)}
+                    onClick={() => { setDeleteStage(null); setDeleteOtp(''); setDeleteOtpError(null) }}
                     disabled={deleting}
                     className="py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold text-sm rounded-xl active:scale-95 transition-transform disabled:opacity-50"
                   >
@@ -1909,7 +1919,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                   </button>
                 </div>
               </>
-            ) : (
+            ) : deleteStage === 'typed' ? (
               <>
                 <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-2">
                   {lang === 'en'
@@ -1931,8 +1941,8 @@ export default function ProfileClient({ user, postCount }: Props) {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setDeleteStage(null)}
-                    disabled={deleting}
+                    onClick={() => { setDeleteStage(null); setDeleteOtp(''); setDeleteOtpError(null) }}
+                    disabled={deleting || deleteOtpSending}
                     className="py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold text-sm rounded-xl active:scale-95 transition-transform disabled:opacity-50"
                   >
                     {lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء'}
@@ -1941,13 +1951,119 @@ export default function ProfileClient({ user, postCount }: Props) {
                     type="button"
                     disabled={
                       deleting ||
+                      deleteOtpSending ||
                       (deleteInput.trim() !== 'DELETE' && deleteInput.trim() !== 'حذف')
                     }
                     onClick={async () => {
+                      // Don't delete yet — request the SMS OTP first.
+                      // Server requires it (audit C-2). On send failure
+                      // stay on this screen so the user can retry.
+                      if (deleting || deleteOtpSending) return
+                      setDeleteOtpSending(true)
+                      setDeleteOtpError(null)
+                      try {
+                        const res = await fetch('/api/account/delete/send-otp', { method: 'POST' })
+                        if (res.ok) {
+                          setDeleteOtp('')
+                          setDeleteStage('otp')
+                        } else {
+                          const d = await res.json().catch(() => ({}))
+                          toast.error(d.error === 'no_phone_on_file'
+                            ? (lang === 'en' ? 'No phone on file' : 'لا يوجد رقم هاتف مسجل')
+                            : (lang === 'en' ? 'Could not send code' : 'تعذر إرسال الرمز'))
+                        }
+                      } catch {
+                        toast.error(lang === 'en' ? 'Connection failed' : 'فشل الاتصال')
+                      } finally {
+                        setDeleteOtpSending(false)
+                      }
+                    }}
+                    className="py-3 bg-red-600 text-white font-bold text-sm rounded-xl active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {deleteOtpSending
+                      ? (lang === 'en' ? 'Sending code…' : 'جاري الإرسال…')
+                      : (lang === 'en' ? 'Send code' : lang === 'ur' ? 'کوڈ بھیجیں' : 'إرسال الرمز')}
+                  </button>
+                </div>
+              </>
+            ) : (
+              // deleteStage === 'otp'
+              <>
+                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed mb-2">
+                  {lang === 'en'
+                    ? 'We sent a 4-digit code by SMS. Enter it to permanently delete your account.'
+                    : lang === 'ur'
+                      ? 'ہم نے 4 ہندسوں کا کوڈ ایس ایم ایس کے ذریعے بھیجا ہے۔ مستقل طور پر اکاؤنٹ حذف کرنے کے لیے درج کریں۔'
+                      : 'أرسلنا رمزاً مكوناً من 4 أرقام عبر رسالة نصية. أدخله لحذف حسابك نهائياً.'}
+                </p>
+                <input
+                  type="text"
+                  value={deleteOtp}
+                  onChange={(e) => {
+                    // Numeric-only, max 4 digits — matches the SMS code
+                    // length used by the auth flow.
+                    setDeleteOtp(e.target.value.replace(/\D/g, '').slice(0, 4))
+                    if (deleteOtpError) setDeleteOtpError(null)
+                  }}
+                  placeholder="0000"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  className="input-field text-center text-lg tracking-widest mb-2"
+                  maxLength={4}
+                  dir="ltr"
+                  autoFocus
+                />
+                {deleteOtpError && (
+                  <p className="text-xs text-red-500 mb-3">{deleteOtpError}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (deleting || deleteOtpSending) return
+                    setDeleteOtpSending(true)
+                    try {
+                      const res = await fetch('/api/account/delete/send-otp', { method: 'POST' })
+                      if (!res.ok) {
+                        const d = await res.json().catch(() => ({}))
+                        toast.error(d.error || (lang === 'en' ? 'Could not resend' : 'تعذر إعادة الإرسال'))
+                      } else {
+                        toast.success(lang === 'en' ? 'Code sent again' : 'تم إعادة إرسال الرمز')
+                      }
+                    } catch {
+                      toast.error(lang === 'en' ? 'Connection failed' : 'فشل الاتصال')
+                    } finally {
+                      setDeleteOtpSending(false)
+                    }
+                  }}
+                  disabled={deleting || deleteOtpSending}
+                  className="text-xs text-primary-600 dark:text-primary-400 mb-3 active:scale-95 disabled:opacity-50"
+                >
+                  {deleteOtpSending
+                    ? (lang === 'en' ? 'Sending…' : 'جاري الإرسال…')
+                    : (lang === 'en' ? 'Resend code' : lang === 'ur' ? 'کوڈ دوبارہ بھیجیں' : 'إعادة إرسال الرمز')}
+                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setDeleteStage('typed'); setDeleteOtp(''); setDeleteOtpError(null) }}
+                    disabled={deleting}
+                    className="py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold text-sm rounded-xl active:scale-95 transition-transform disabled:opacity-50"
+                  >
+                    {lang === 'en' ? 'Back' : lang === 'ur' ? 'واپس' : 'رجوع'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={deleting || deleteOtp.length < 4}
+                    onClick={async () => {
                       if (deleting) return
                       setDeleting(true)
+                      setDeleteOtpError(null)
                       try {
-                        const res = await fetch('/api/account/delete', { method: 'DELETE' })
+                        const res = await fetch('/api/account/delete', {
+                          method: 'DELETE',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ otpCode: deleteOtp }),
+                        })
                         if (res.ok) {
                           await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
                           try {
@@ -1957,11 +2073,23 @@ export default function ProfileClient({ user, postCount }: Props) {
                           try { localStorage.clear() } catch {}
                           try { sessionStorage.clear() } catch {}
                           window.location.href = '/'
-                        } else {
-                          const d = await res.json().catch(() => ({}))
-                          toast.error(d.error || (lang === 'en' ? 'Delete failed' : 'فشل الحذف'))
-                          setDeleting(false)
+                          return
                         }
+                        const d = await res.json().catch(() => ({}))
+                        if (d.error === 'otp_invalid') {
+                          // Stay on the OTP screen, surface inline so
+                          // the user can retry without re-typing DELETE.
+                          setDeleteOtpError(
+                            lang === 'en'
+                              ? 'Wrong or expired code'
+                              : lang === 'ur'
+                                ? 'غلط یا میعاد ختم شدہ کوڈ'
+                                : 'الرمز غير صحيح أو منتهي الصلاحية',
+                          )
+                        } else {
+                          toast.error(d.error || (lang === 'en' ? 'Delete failed' : 'فشل الحذف'))
+                        }
+                        setDeleting(false)
                       } catch {
                         toast.error(lang === 'en' ? 'Connection failed' : 'فشل الاتصال')
                         setDeleting(false)
@@ -1970,7 +2098,7 @@ export default function ProfileClient({ user, postCount }: Props) {
                     className="py-3 bg-red-600 text-white font-bold text-sm rounded-xl active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {deleting
-                      ? (lang === 'en' ? 'Deleting...' : 'جاري الحذف...')
+                      ? (lang === 'en' ? 'Deleting…' : 'جاري الحذف…')
                       : (lang === 'en' ? 'Delete Account' : lang === 'ur' ? 'حذف کریں' : 'احذف الحساب')}
                   </button>
                 </div>
