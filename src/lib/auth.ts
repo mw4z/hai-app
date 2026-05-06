@@ -24,10 +24,14 @@ export interface JWTPayload {
 }
 
 export async function signToken(payload: JWTPayload): Promise<string> {
+  // 7 days (was 30). Audit H-4: a stolen token previously stayed
+  // valid for a month — long enough to delete the account, change
+  // phone, abuse mod actions before the user noticed. 7d is the
+  // industry default for SMS-OTP-secured sessions.
   return await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('30d')
+    .setExpirationTime('7d')
     .sign(JWT_SECRET)
 }
 

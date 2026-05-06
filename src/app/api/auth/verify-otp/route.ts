@@ -84,13 +84,13 @@ export async function POST(req: NextRequest) {
       role: user.role,
     })
 
-    // Set cookie (30 days)
+    // Set cookie (7 days — was 30, see audit H-4 + signToken comment)
     const { cookies } = await import('next/headers')
     cookies().set('hai_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30,
+      maxAge: 60 * 60 * 24 * 7,
       path: '/',
     })
 

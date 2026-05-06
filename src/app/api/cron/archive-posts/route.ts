@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { shouldArchivePost } from '@/lib/postExpiry'
 import { del } from '@vercel/blob'
@@ -11,10 +11,18 @@ import { invalidateHighlights } from '@/lib/highlights'
  * Exposes both GET and POST so Vercel Cron (which calls with GET) can
  * trigger it alongside manual invocations.
  */
-export async function GET() {
+function authorize(req: NextRequest): boolean {
+  const auth = req.headers.get('authorization') || ''
+  const expected = process.env.CRON_SECRET
+  return !!expected && auth === `Bearer ${expected}`
+}
+
+export async function GET(req: NextRequest) {
+  if (!authorize(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   return runArchive()
 }
-export async function POST() {
+export async function POST(req: NextRequest) {
+  if (!authorize(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   return runArchive()
 }
 

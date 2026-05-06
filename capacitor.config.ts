@@ -6,7 +6,12 @@ const config: CapacitorConfig = {
   webDir: 'out',
   server: {
     url: 'https://app.hai-app.net',
-    cleartext: true,
+    // No cleartext — production server is HTTPS, and allowing HTTP
+    // would let a MITM on public WiFi serve a fake response on cold-
+    // start (audit M-6). Capacitor's offline fallback below is loaded
+    // from the local file system (webDir), not over HTTP, so this
+    // doesn't affect the offline path.
+    cleartext: false,
     // Bundled offline fallback — when the remote app fails to load
     // on cold-start (no internet, captive portal, server outage),
     // Capacitor serves this local file from the webDir instead of
@@ -16,7 +21,11 @@ const config: CapacitorConfig = {
   },
   appendUserAgent: 'HaiNativeApp',
   android: {
-    allowMixedContent: true,
+    // Refuse HTTP resources from an HTTPS origin (audit M-6). All blob
+    // URLs and image CDNs we use are HTTPS, so this doesn't break
+    // anything; without it, a MITM on public WiFi could inject scripts
+    // or images by intercepting the HTTP fallback path.
+    allowMixedContent: false,
     // Matches --hai-bg in dark mode (src/app/design-tokens.css) —
     // true black so the native Android window behind the webview is
     // the same as the app body (no seam in the safe-area / notch).

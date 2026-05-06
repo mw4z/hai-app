@@ -5,7 +5,11 @@ import { notifyConfirmTimeout, notifyTripCompleted, notifyRequesterStatus } from
 import { addReputation } from '@/lib/reputation'
 import { getCompletionRewards, getStaleInProgressTimeout } from '@/lib/rides/state-machine'
 
-const CRON_SECRET = process.env.CRON_SECRET || 'hai-cron-dev-key'
+// No fallback — was 'hai-cron-dev-key' which would have shipped as a
+// hard-coded backdoor (audit C-4). If CRON_SECRET is missing, the
+// route refuses every request, which is the correct fail-closed
+// behavior for an unconfigured deploy.
+const CRON_SECRET = process.env.CRON_SECRET || ''
 
 /**
  * GET /api/cron/rides?key=SECRET
@@ -20,11 +24,14 @@ const CRON_SECRET = process.env.CRON_SECRET || 'hai-cron-dev-key'
  * 7. OPEN expiry (2hr immediate / scheduledAt+15min scheduled)
  */
 export async function GET(req: NextRequest) {
-  // Vercel Cron sends this header; accept it as auth so the scheduled
-  // job runs without having to leak CRON_SECRET into vercel.json.
-  const isVercelCron = req.headers.get('x-vercel-cron') != null
+  // Always require either bearer header OR ?key= param matching
+  // CRON_SECRET. Was: x-vercel-cron header was sufficient on its
+  // own — trivially spoofable from any origin (audit C-4).
+  const auth = req.headers.get('authorization') || ''
   const { searchParams } = new URL(req.url)
-  if (!isVercelCron && searchParams.get('key') !== CRON_SECRET) {
+  const bearerOk = !!CRON_SECRET && auth === `Bearer ${CRON_SECRET}`
+  const queryOk = !!CRON_SECRET && searchParams.get('key') === CRON_SECRET
+  if (!bearerOk && !queryOk) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

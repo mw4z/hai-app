@@ -286,6 +286,14 @@ export async function POST(req: NextRequest) {
     }
 
     case 'approve_verification': {
+      // Restricted to SUPER_ADMIN + PLATFORM_MOD (audit H-3). A
+      // NEIGHBORHOOD_MOD has no business issuing the platform-wide
+      // VERIFIED_PROVIDER badge — that role is scoped to a single
+      // hood and a compromised local mod could otherwise manufacture
+      // verified providers.
+      if (admin.role !== 'SUPER_ADMIN' && admin.role !== 'PLATFORM_MOD') {
+        return NextResponse.json({ error: 'forbidden_role_for_verification' }, { status: 403 })
+      }
       const vr = await db.verificationRequest.findUnique({ where: { id: targetId } })
       if (!vr || vr.status !== 'pending') return NextResponse.json({ error: 'Not found' }, { status: 404 })
       await db.user.update({ where: { id: vr.userId }, data: { accountType: 'VERIFIED_PROVIDER', providerStatus: 'VERIFIED', providerStatusChangedAt: new Date() } })
@@ -295,6 +303,12 @@ export async function POST(req: NextRequest) {
     }
 
     case 'reject_verification': {
+      // Symmetric with approve_verification — same role restriction
+      // so a NEIGHBORHOOD_MOD also can't game the queue by bulk-
+      // rejecting legitimate applicants.
+      if (admin.role !== 'SUPER_ADMIN' && admin.role !== 'PLATFORM_MOD') {
+        return NextResponse.json({ error: 'forbidden_role_for_verification' }, { status: 403 })
+      }
       const vr2 = await db.verificationRequest.findUnique({ where: { id: targetId } })
       if (!vr2 || vr2.status !== 'pending') return NextResponse.json({ error: 'Not found' }, { status: 404 })
       await db.verificationRequest.update({ where: { id: targetId }, data: { status: 'rejected', reviewedBy: session.userId, reviewedAt: new Date() } })

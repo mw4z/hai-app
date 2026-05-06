@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { cleanupNotificationsFor } from '@/lib/notifications'
+import { normalizeName } from '@/lib/nameValidation'
 
 /** PATCH — Edit own post (title, body, price) */
 export async function PATCH(
@@ -27,21 +28,44 @@ export async function PATCH(
   const updates: Record<string, unknown> = {}
 
   if (body.title !== undefined) {
-    if (!body.title?.trim() || body.title.trim().length < 3) {
+    // normalizeName: NFKC + zero-width strip + trim. Closes the
+    // bypass where a 1-char title padded with U+200B counted as
+    // 3 chars at .length time and slipped past the floor.
+    const t = normalizeName(body.title)
+    if (t.length < 3) {
       return NextResponse.json({ error: 'العنوان قصير جداً' }, { status: 400 })
     }
-    updates.title = body.title.trim()
+    if (t.length > 200) {
+      return NextResponse.json({ error: 'العنوان طويل جداً' }, { status: 400 })
+    }
+    updates.title = t
   }
 
   if (body.body !== undefined) {
-    if (!body.body?.trim() || body.body.trim().length < 10) {
+    const b = normalizeName(body.body)
+    if (b.length < 10) {
       return NextResponse.json({ error: 'المحتوى قصير جداً' }, { status: 400 })
     }
-    updates.body = body.body.trim()
+    if (b.length > 5000) {
+      return NextResponse.json({ error: 'المحتوى طويل جداً' }, { status: 400 })
+    }
+    updates.body = b
   }
 
   if (body.price !== undefined) {
-    updates.price = body.price === null ? null : parseFloat(body.price)
+    if (body.price === null) {
+      updates.price = null
+    } else {
+      // Strict validation: number type, finite, > 0, capped. Was
+      // `parseFloat(body.price)` only — accepted negative values, NaN,
+      // and Infinity. Negative price was the marketplace "sell for
+      // negative SAR" foot-gun (audit C-1).
+      const n = typeof body.price === 'number' ? body.price : parseFloat(String(body.price))
+      if (!Number.isFinite(n) || n <= 0 || n > 1_000_000) {
+        return NextResponse.json({ error: 'السعر غير صالح' }, { status: 400 })
+      }
+      updates.price = n
+    }
   }
 
   // Image edit — the author can add/remove/reorder photos on an

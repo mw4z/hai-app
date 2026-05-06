@@ -28,13 +28,12 @@ export async function GET(req: NextRequest) { return handle(req) }
 export async function POST(req: NextRequest) { return handle(req) }
 
 async function handle(req: NextRequest) {
-  const isVercelCron = req.headers.get('x-vercel-cron') != null
+  // Always require bearer CRON_SECRET (audit C-4) — x-vercel-cron
+  // header alone is spoofable.
   const auth = req.headers.get('authorization') || ''
   const expected = process.env.CRON_SECRET
-  if (!isVercelCron) {
-    if (!expected || auth !== `Bearer ${expected}`) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-    }
+  if (!expected || auth !== `Bearer ${expected}`) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 
   const now = Date.now()

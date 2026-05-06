@@ -57,12 +57,57 @@ const nextConfig = {
     const brandIconHeaders = [
       { key: 'Cache-Control', value: 'public, max-age=300, s-maxage=300, must-revalidate' },
     ]
+    // Security headers (audit C-3). CSP shipped in Report-Only first
+    // so we can watch for legitimate violations on Vercel logs before
+    // promoting to enforced. Other headers are safe to enforce
+    // immediately — they don't break anything.
+    //
+    // Sources allow-listed:
+    //   - 'self', https: blob: data: for image flexibility
+    //   - Google Fonts (already used)
+    //   - MapTiler + OpenStreetMap (used by LocationPicker)
+    //   - Vercel Blob domain pattern for uploaded images
+    //   - DiceBear for fallback avatars (if used)
+    //   - 'unsafe-inline' on script/style is unfortunately required
+    //     today: Next.js's runtime bootstrap injects inline scripts,
+    //     and many Tailwind utility classes ship inline styles. Both
+    //     are mitigatable later via nonces, but doing it now would
+    //     break the build. Document the gap and revisit.
+    const ContentSecurityPolicy = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.vercel-insights.com https://va.vercel-scripts.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com https://*.tile.openstreetmap.org https://api.maptiler.com https://api.dicebear.com https:",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      "connect-src 'self' https: wss:",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "upgrade-insecure-requests",
+    ].join('; ')
+
+    const securityHeaders = [
+      // Report-Only CSP first — observe violations in Vercel logs for
+      // ~24-48h, then flip the key to 'Content-Security-Policy' to
+      // enforce. Until then this is informational, never blocks.
+      { key: 'Content-Security-Policy-Report-Only', value: ContentSecurityPolicy },
+      { key: 'X-Frame-Options', value: 'DENY' },
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(self), interest-cohort=()' },
+      { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+      { key: 'X-DNS-Prefetch-Control', value: 'on' },
+    ]
     return [
       { source: '/icon-:size.png', headers: brandIconHeaders },
       { source: '/icon-:size.svg', headers: brandIconHeaders },
       { source: '/icon-foreground-:size.svg', headers: brandIconHeaders },
       { source: '/favicon.ico', headers: brandIconHeaders },
       { source: '/favicon.svg', headers: brandIconHeaders },
+      // Security headers apply to everything — last so the brand-icon
+      // rules above can layer Cache-Control on top.
+      { source: '/(.*)', headers: securityHeaders },
     ]
   },
 }

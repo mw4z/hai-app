@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { log } from '@/lib/logger'
 import { cookies } from 'next/headers'
+import { verifyOTP } from '@/lib/sms'
 
 /**
  * DELETE /api/account/delete — Self-service account deletion
@@ -26,12 +27,38 @@ export async function DELETE(req: NextRequest) {
 
     log.api('DELETE', '/api/account/delete', session.userId)
 
+    // Require fresh OTP confirmation. Was previously protected by the
+    // session cookie alone — a stolen token could nuke the account in
+    // one call (audit C-2). Client must first POST to
+    // /api/account/delete/send-otp, user enters the SMS code, then
+    // DELETE here with `{ otpCode }`.
+    const body = (await req.json().catch(() => null)) as { otpCode?: unknown } | null
+    const otpCode =
+      typeof body?.otpCode === 'string' ? body.otpCode.trim() : null
+    if (!otpCode) {
+      return NextResponse.json(
+        { error: 'otp_required', message: 'Confirm via SMS code' },
+        { status: 400 },
+      )
+    }
+
     const user = await db.user.findUnique({
       where: { id: session.userId },
       select: { id: true, phone: true, name: true, lastName: true, deletedAt: true },
     })
     if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (user.deletedAt) return NextResponse.json({ error: 'Account already deleted' }, { status: 400 })
+    if (!user.phone || user.phone.startsWith('deleted_')) {
+      return NextResponse.json({ error: 'no_phone_on_file' }, { status: 400 })
+    }
+
+    const otpOk = await verifyOTP(user.phone, otpCode)
+    if (!otpOk) {
+      return NextResponse.json(
+        { error: 'otp_invalid', message: 'Wrong or expired code' },
+        { status: 401 },
+      )
+    }
 
     // 1. Anonymize personal data
     await db.user.update({

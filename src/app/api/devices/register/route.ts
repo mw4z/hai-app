@@ -30,6 +30,20 @@ export async function POST(req: NextRequest) {
       : 'android'
 
   try {
+    // Refuse to re-alias a token that already belongs to a different
+    // user (audit H-1). Without this guard, an attacker who somehow
+    // obtained a victim's APNs/FCM token could re-register it under
+    // their own session and start receiving the victim's pushes —
+    // including DM notifications and OTP codes if any are pushed.
+    const existing = await db.deviceToken.findUnique({
+      where: { token },
+      select: { userId: true },
+    })
+    if (existing && existing.userId !== session.userId) {
+      // Don't reveal whether the token exists; treat as a bad request.
+      return NextResponse.json({ error: 'invalid_token' }, { status: 400 })
+    }
+
     const saved = await db.deviceToken.upsert({
       where: { token },
       create: {
@@ -40,7 +54,8 @@ export async function POST(req: NextRequest) {
         appVersion: raw.appVersion || null,
       },
       update: {
-        userId: session.userId,
+        // userId intentionally not overwritten — the existence check
+        // above already proved this token is owned by session.userId.
         platform,
         deviceId: raw.deviceId || null,
         appVersion: raw.appVersion || null,

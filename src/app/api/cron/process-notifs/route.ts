@@ -1467,14 +1467,17 @@ export async function POST(req: NextRequest) {
 }
 
 async function handle(req: NextRequest) {
-  // Cron auth: accept Vercel's x-vercel-cron header OR explicit bearer token
-  const isVercelCron = req.headers.get('x-vercel-cron') != null
+  // Cron auth: ALWAYS require a matching bearer CRON_SECRET. The old
+  // path accepted Vercel's `x-vercel-cron` header alone, which is
+  // trivially spoofable from any non-Vercel origin and would let an
+  // attacker trigger neighborhood-wide push fan-out (audit C-4).
+  // Vercel's scheduled invocations include both headers when
+  // CRON_SECRET is configured in vercel.json, so requiring the bearer
+  // here doesn't break the legitimate path.
   const auth = req.headers.get('authorization') || ''
   const expected = process.env.CRON_SECRET
-  if (!isVercelCron) {
-    if (!expected || auth !== `Bearer ${expected}`) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-    }
+  if (!expected || auth !== `Bearer ${expected}`) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 
   const summary = {
