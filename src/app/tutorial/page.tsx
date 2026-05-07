@@ -6,28 +6,28 @@ import { useLanguage } from '@/hooks/useLanguage'
 
 const slides = [
   {
-    image: '/screenshot-1-feed.png',
+    image: '/tutorial/feed.png',
     titleAr: 'تنبيهات الحي',
     titleEn: 'Neighborhood Feed',
     descAr: 'تابع آخر الأخبار والتنبيهات • اضغط + للنشر • اسحب لأسفل للتحديث',
     descEn: 'Follow latest news & alerts • Tap + to post • Pull down to refresh',
   },
   {
-    image: '/screenshot-2-market.png',
-    titleAr: 'سوق الحي',
-    titleEn: 'Local Market',
-    descAr: 'تصفح المنتجات القريبة • اضغط للتفاصيل والتواصل • أضف منتجك للبيع',
-    descEn: 'Browse nearby products • Tap for details & chat • List your items to sell',
+    image: '/tutorial/ride.png',
+    titleAr: 'مشاوير وتوصيل',
+    titleEn: 'Rides & Delivery',
+    descAr: 'اطلب مشوار أو توصيل من جارك • قارن العروض • تتبّع طلبك خطوة بخطوة',
+    descEn: 'Request a ride or delivery • Compare offers • Track your order step by step',
   },
   {
-    image: '/screenshot-3-chat.png',
+    image: '/tutorial/chat.png',
     titleAr: 'المحادثات',
     titleEn: 'Chat',
     descAr: 'تواصل مع جيرانك مباشرة • أرسل صور ورسائل • محادثات خاصة وآمنة',
     descEn: 'Chat directly with neighbors • Send photos & text • Private & secure',
   },
   {
-    image: '/screenshot-4-profile.png',
+    image: '/tutorial/profile.png',
     titleAr: 'ملفك الشخصي',
     titleEn: 'Your Profile',
     descAr: 'عدّل صورتك وإعداداتك • تابع نقاط سمعتك • غيّر اللغة والوضع الليلي',
