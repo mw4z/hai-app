@@ -82,28 +82,57 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     // ── Silent / background pushes (apns-push-type: background) ─────────
     // Without this forwarder, iOS receives our silent cleanup pushes
-    // (content-available: 1) but never wakes the JS layer — Capacitor's
-    // PushNotifications plugin listens on `capacitorDidReceiveRemoteNotification`
-    // and only fires `pushNotificationReceived` when this AppDelegate
-    // method posts that notification. Alert pushes go through
-    // UNUserNotificationCenterDelegate (which Capacitor also wires),
-    // so they work without this hook — that's why message banners
-    // arrived but cleanup pushes never reached the JS handler in the
-    // diagnostic. See:
-    // https://capacitorjs.com/docs/apis/push-notifications#ios
+    // (content-available: 1) but never wakes the JS layer.
     //
-    // We always finish with `.newData` so iOS doesn't deprioritize
-    // future silent pushes for this app — `.noData` over time tells
-    // the OS the push was wasted and it throttles harder.
+    // First attempt forwarded `capacitorDidReceiveRemoteNotification`
+    // via NotificationCenter, but the @capacitor/push-notifications
+    // plugin only listens for the registration callbacks — there's
+    // no observer for didReceive. So we bridge directly: grab the
+    // PushNotifications plugin instance off the Capacitor bridge and
+    // call `notifyListeners` on it ourselves. That fires the same
+    // `pushNotificationReceived` event the plugin uses for foreground
+    // alerts, so our existing JS handler (the silent-push branch in
+    // PushRegistration.tsx) just works.
+    //
+    // Always finish with `.newData` so iOS doesn't deprioritize
+    // future silent pushes for this app.
     func application(_ application: UIApplication,
                      didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
-        NotificationCenter.default.post(
-            name: Notification.Name(rawValue: "capacitorDidReceiveRemoteNotification"),
-            object: nil,
-            userInfo: userInfo as? [String: Any]
-        )
+        forwardSilentPushToCapacitor(userInfo: userInfo)
         completionHandler(.newData)
+    }
+
+    private func forwardSilentPushToCapacitor(userInfo: [AnyHashable: Any]) {
+        // Walk the active scenes / windows to find the CAPBridgeViewController.
+        // We don't store a reference at launch because Capacitor instantiates
+        // the bridge lazily and the rootViewController may not be set in
+        // didFinishLaunchingWithOptions yet on a cold-start silent-push wake.
+        var rootVC: UIViewController? = window?.rootViewController
+        if rootVC == nil {
+            for scene in UIApplication.shared.connectedScenes {
+                if let ws = scene as? UIWindowScene,
+                   let win = ws.windows.first(where: { $0.isKeyWindow }) ?? ws.windows.first {
+                    rootVC = win.rootViewController
+                    if rootVC != nil { break }
+                }
+            }
+        }
+        guard let bridgeVC = rootVC as? CAPBridgeViewController,
+              let bridge = bridgeVC.bridge,
+              let plugin = bridge.plugin(withName: "PushNotificationsPlugin")
+                ?? bridge.plugin(withName: "PushNotifications") else {
+            // Bridge not ready yet (rare cold-start case). Best we can do
+            // is store the userInfo and hand it to the plugin once the
+            // app finishes launching — but that's complex for a marginal
+            // win. The next sweepStaleTray() pass will catch it on resume.
+            return
+        }
+        plugin.notifyListeners(
+            "pushNotificationReceived",
+            data: userInfo as? [String: Any] ?? [:],
+            retainUntilConsumed: true
+        )
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {

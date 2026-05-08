@@ -3691,13 +3691,11 @@ function RevokeNotifTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
     return () => { try { removeListener?.() } catch {} }
   }, [])
 
-  const lastTestRef = (() => {
-    let stored: { contentType: string; contentId: string } | null = null
-    return {
-      get: () => stored,
-      set: (r: { contentType: string; contentId: string } | null) => { stored = r },
-    }
-  })()
+  // useRef so the value survives across renders. The IIFE-closure I had
+  // before was recreated on every render, which is why "Send cleanup"
+  // kept falling back to the TEST_NO_PRIOR_ALERT default even after
+  // a successful "Send alert".
+  const lastTestRef = useRef<{ contentType: string; contentId: string } | null>(null)
 
   async function listDelivered() {
     setBusy('list')
@@ -3731,7 +3729,7 @@ function RevokeNotifTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
         body: JSON.stringify({ action: 'alert' }),
       })
       const json = await res.json()
-      if (json.ref) lastTestRef.set(json.ref)
+      if (json.ref) lastTestRef.current = json.ref
       log(`POST alert → ${res.status}: ${json.summary || JSON.stringify(json).slice(0, 300)}`)
       if (json.result) log(`  ${JSON.stringify(json.result)}`)
     } catch (err: any) {
@@ -3742,7 +3740,7 @@ function RevokeNotifTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
   async function sendCleanup() {
     setBusy('cleanup')
     try {
-      const ref = lastTestRef.get() || { contentType: 'thread', contentId: 'TEST_NO_PRIOR_ALERT' }
+      const ref = lastTestRef.current || { contentType: 'thread', contentId: 'TEST_NO_PRIOR_ALERT' }
       const res = await fetch('/api/debug/revoke-notifs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3778,6 +3776,10 @@ function RevokeNotifTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
       }
       const stale = list.filter((n) => {
         const d = (n.data || {}) as Record<string, string>
+        // Skip diagnostic test refs so the sweep button doesn't nuke
+        // the test push before the user can finish the flow.
+        if (d.contentId && d.contentId.startsWith('TEST_')) return false
+        if (d.threadId && d.threadId.startsWith('TEST_')) return false
         if (d.threadId && !live.threads.has(d.threadId)) return true
         if (d.postId && !live.posts.has(d.postId)) return true
         if (d.commentId && !live.comments.has(d.commentId)) return true
@@ -3803,7 +3805,7 @@ function RevokeNotifTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
         body: JSON.stringify({ action: 'self-test' }),
       })
       const json = await res.json()
-      if (json.ref) lastTestRef.set(json.ref)
+      if (json.ref) lastTestRef.current = json.ref
       log(`POST self-test → ${res.status}: ${json.summary || JSON.stringify(json).slice(0, 300)}`)
       if (json.alertResult) log(`  alert: ${JSON.stringify(json.alertResult)}`)
     } catch (err: any) {
