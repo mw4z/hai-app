@@ -238,11 +238,10 @@ async function sendApnsCleanupAlert(
 
   const payload = {
     aps: {
-      // Minimal alert content. The user may briefly see "🗑️" before
-      // the AppDelegate handler clears it.
+      // Minimal alert content — replaces the existing banner via
+      // apns-collapse-id. No `sound` field => no beep / vibration,
+      // just a silent visual update.
       alert: { title: '🗑️', body: ' ' },
-      'content-available': 1,
-      'mutable-content': 1,
     },
     ...data,
   }
@@ -265,7 +264,12 @@ async function sendApnsCleanupAlert(
       authorization: `bearer ${jwt}`,
       'apns-topic': creds.bundleId,
       'apns-push-type': 'alert',
-      'apns-priority': '5', // Low — no beep, still reliably delivered.
+      // Priority 10 (immediate). Priority 5 caused iOS to coalesce
+      // the cleanup push with later pushes — banners only updated
+      // to "🗑️" when the next regular message arrived. With 10
+      // iOS processes the replacement on receipt. No `sound` in
+      // the payload so the user doesn't get a beep / vibration.
+      'apns-priority': '10',
       'apns-collapse-id': collapseId, // Replaces the matching original banner.
       'content-type': 'application/json',
       'content-length': String(Buffer.byteLength(jsonBody)),
