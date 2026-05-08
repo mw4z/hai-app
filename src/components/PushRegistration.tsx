@@ -128,6 +128,18 @@ export default function PushRegistration() {
             const type = data.type
             console.log('[PUSH] foreground received:', type)
 
+            // OS-level cleanup push (data-only). Server fires this when
+            // a post / comment / thread / ride is deleted — we need to
+            // remove the matching delivered notification from the OS
+            // notification center without showing UI of our own.
+            if (data.cleanup === 'true' && data.contentType && data.contentId) {
+              void removeDeliveredByRef({
+                contentType: data.contentType,
+                contentId: data.contentId,
+              })
+              return
+            }
+
             // Bridge push → DOM events FIRST so chat / list screens
             // refresh immediately even if the toast is suppressed.
             try {
@@ -193,6 +205,37 @@ export default function PushRegistration() {
     }
     installDeeplinkListener()
 
+    // ── Targeted delivered-notification removal ──────────────────────
+    // Called when we get a silent cleanup push (data.cleanup === 'true')
+    // OR when the local app deletes content and dispatches
+    // hai:content-deleted with a specific ref. Walks the OS-level
+    // delivered notifications and removes the ones whose data field
+    // matches `ref` (preferring contentType+contentId, falling back
+    // to the legacy postId/commentId/threadId/rideRequestId fields
+    // that older app builds may have shipped).
+    const removeDeliveredByRef = async (ref: { contentType: string; contentId: string }) => {
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications')
+        const delivered = await PushNotifications.getDeliveredNotifications()
+        if (!delivered.notifications?.length) return
+        const matches = delivered.notifications.filter((n) => {
+          const d = (n.data || {}) as Record<string, string>
+          if (d.contentType === ref.contentType && d.contentId === ref.contentId) return true
+          if (ref.contentType === 'post'        && d.postId        === ref.contentId) return true
+          if (ref.contentType === 'comment'     && d.commentId     === ref.contentId) return true
+          if (ref.contentType === 'thread'      && d.threadId      === ref.contentId) return true
+          if (ref.contentType === 'rideRequest' && d.rideRequestId === ref.contentId) return true
+          return false
+        })
+        if (matches.length > 0) {
+          await PushNotifications.removeDeliveredNotifications({ notifications: matches })
+          console.log('[PUSH] removed', matches.length, 'delivered notifs for', ref.contentType, ref.contentId)
+        }
+      } catch (err) {
+        console.error('[PUSH] removeDeliveredByRef failed:', err)
+      }
+    }
+
     // ── Stale tray sweep ─────────────────────────────────────────────
     // Server-side, when a post/comment/message/ride is removed (user
     // delete, mod action, report-threshold auto-remove), we delete
@@ -206,6 +249,9 @@ export default function PushRegistration() {
     // Runs on:
     //   - App foreground / first mount
     //   - Capacitor App.appStateChange isActive=true
+    //   - Foreground delete via hai:content-deleted (covers the gap
+    //     where appStateChange doesn't fire because the user never
+    //     left the app)
     const sweepStaleTray = async () => {
       try {
         const { PushNotifications } = await import('@capacitor/push-notifications')
@@ -262,7 +308,23 @@ export default function PushRegistration() {
     // foreground cycle. Listening for a custom event covers that gap.
     // Fired by ChatClient on message delete, PostCard on post/comment
     // delete, etc.
-    const onContentDeleted = () => { void sweepStaleTray() }
+    // hai:content-deleted may carry a specific ref in event.detail —
+    // if it does, we can target that one delivered notification
+    // without the full active-refs roundtrip. Either way, fall back
+    // to the full sweep so any related notifs (e.g. ride request
+    // notifs after the ride was deleted) also get cleared.
+    const onContentDeleted = (e: Event) => {
+      const detail = (e as CustomEvent).detail as
+        | { contentType?: string; contentId?: string }
+        | undefined
+      if (detail?.contentType && detail?.contentId) {
+        void removeDeliveredByRef({
+          contentType: detail.contentType,
+          contentId: detail.contentId,
+        })
+      }
+      void sweepStaleTray()
+    }
     window.addEventListener('hai:content-deleted', onContentDeleted)
     const cleanupAppListener = () => {
       try { appListenerHandle?.remove() } catch {}

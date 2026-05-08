@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { sendCleanupPush } from '@/lib/notifications'
 
 // DELETE /api/threads/[id]/messages/[msgId]?scope=me|all
 //
@@ -56,6 +57,12 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
             type: 'NEW_MESSAGE',
           },
         })
+        // OS-level cleanup push to this user's other devices so the
+        // delivered DM banner disappears from Notification Center
+        // immediately. Best effort — silent push, may be throttled.
+        void sendCleanupPush([session.userId], {
+          contentType: 'thread', contentId: params.id,
+        }).catch(() => { /* best effort */ })
       } catch { /* non-fatal */ }
       return NextResponse.json({ success: true, scope: 'me' })
     }
@@ -83,9 +90,23 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     //    tray entry not cleared. Awaited now so the response
     //    only resolves after notifications are gone.
     try {
+      // Snapshot recipients BEFORE deleting so we know whose phones
+      // need an OS-level cleanup nudge. Distinct so we don't push the
+      // same user twice for two-device installs.
+      const recipients = await db.notification.findMany({
+        where: { threadId: params.id, type: 'NEW_MESSAGE' },
+        select: { userId: true },
+        distinct: ['userId'],
+      })
       await db.notification.deleteMany({
         where: { threadId: params.id, type: 'NEW_MESSAGE' },
       })
+      const recipientIds = recipients.map((r) => r.userId)
+      if (recipientIds.length > 0) {
+        void sendCleanupPush(recipientIds, {
+          contentType: 'thread', contentId: params.id,
+        }).catch(() => { /* best effort */ })
+      }
     } catch { /* non-fatal */ }
     return NextResponse.json({ success: true, scope: 'all' })
   } catch (error) {

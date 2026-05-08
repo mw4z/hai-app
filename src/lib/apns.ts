@@ -111,10 +111,17 @@ export interface ApnsSendOptions {
   priority?: 'high' | 'normal'
   /** APNs topic override (defaults to APNS_BUNDLE_ID). */
   topic?: string
-  /** Optional collapse ID for dedupe. */
+  /** Optional collapse ID for dedupe + OS-level cleanup targeting. */
   collapseId?: string
   /** Relevance score 0..1 for iOS notification summary. */
   relevanceScore?: number
+  /**
+   * Silent/background push — no alert shown, just `content-available: 1`.
+   * Used by the cleanup-push path so a recipient can remove a stale
+   * delivered notification from Notification Center without showing a
+   * new banner. Apple throttles these heavily, so treat as best-effort.
+   */
+  silent?: boolean
 }
 
 export interface ApnsSendResult {
@@ -152,20 +159,31 @@ export async function sendApnsBatch(
   const host =
     creds.env === 'development' ? 'api.sandbox.push.apple.com' : 'api.push.apple.com'
   const topic = opts.topic || creds.bundleId
-  const apnsPriority = opts.priority === 'high' ? 10 : 5
-  const apnsPushType = 'alert'
+  // Silent pushes go out at low priority to comply with Apple's
+  // background-push contract; alert pushes honor the caller's choice.
+  const apnsPriority = opts.silent
+    ? 5
+    : opts.priority === 'high' ? 10 : 5
+  const apnsPushType = opts.silent ? 'background' : 'alert'
 
-  const payload: Record<string, any> = {
-    aps: {
-      alert: { title: opts.title, body: opts.body },
-      sound: 'default',
-      'mutable-content': 1,
-      ...(typeof opts.relevanceScore === 'number'
-        ? { 'relevance-score': opts.relevanceScore }
-        : {}),
-    },
-    ...(opts.data || {}),
-  }
+  const payload: Record<string, any> = opts.silent
+    ? {
+        // background-only: no alert/sound, just `content-available: 1`
+        // so the OS hands the payload to the app without showing UI.
+        aps: { 'content-available': 1 },
+        ...(opts.data || {}),
+      }
+    : {
+        aps: {
+          alert: { title: opts.title, body: opts.body },
+          sound: 'default',
+          'mutable-content': 1,
+          ...(typeof opts.relevanceScore === 'number'
+            ? { 'relevance-score': opts.relevanceScore }
+            : {}),
+        },
+        ...(opts.data || {}),
+      }
   const jsonBody = JSON.stringify(payload)
 
   // Open one HTTP/2 session and multiplex every token request over it.

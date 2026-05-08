@@ -1,5 +1,9 @@
 import { db } from '@/lib/db'
 import { NotificationType } from '@prisma/client'
+import crypto from 'crypto'
+import { loadApnsCredentials, sendApnsBatch } from '@/lib/apns'
+import { loadFcmCredentials } from '@/lib/fcm'
+import { notifIdFor, type ContentRef } from '@/lib/pushMeta'
 
 const PREF_MAP: Partial<Record<NotificationType, 'notifyComments' | 'notifyReactions' | 'notifyReplies' | 'notifyLookingFor'>> = {
   COMMENT_ON_POST: 'notifyComments',
@@ -69,10 +73,197 @@ export async function cleanupNotificationsFor(refs: {
   if (refs.rideRequestId) orClauses.push({ rideRequestId: refs.rideRequestId })
   if (orClauses.length === 0) return 0
 
+  // Snapshot which users had a bell row for this content BEFORE we
+  // delete them, so the OS-level cleanup push (next step) knows which
+  // devices to nudge. Done in the same await chain so by the time we
+  // fire pushes the DB rows are gone — receivers that hit
+  // /api/notifications/active-refs after the push will see the ref as
+  // already-stale.
+  const recipients = await db.notification.findMany({
+    where: { OR: orClauses },
+    select: { userId: true },
+    distinct: ['userId'],
+  })
+
   const result = await db.notification.deleteMany({
     where: { OR: orClauses },
   })
+
+  // Fire OS-level cleanup pushes (best effort — silent / data-only
+  // payloads, throttled by the OS). Don't await: the caller's API
+  // response shouldn't block on push delivery.
+  const userIds = recipients.map((r) => r.userId)
+  for (const ref of contentRefsFromQuery(refs)) {
+    if (userIds.length > 0) {
+      void sendCleanupPush(userIds, ref).catch((err) => {
+        console.warn('[NOTIF] cleanup push failed:', (err as Error)?.message)
+      })
+    }
+  }
+
   return result.count
+}
+
+function contentRefsFromQuery(refs: {
+  postId?: string
+  commentId?: string
+  threadId?: string
+  rideRequestId?: string
+}): ContentRef[] {
+  const out: ContentRef[] = []
+  if (refs.postId) out.push({ contentType: 'post', contentId: refs.postId })
+  if (refs.commentId) out.push({ contentType: 'comment', contentId: refs.commentId })
+  if (refs.threadId) out.push({ contentType: 'thread', contentId: refs.threadId })
+  if (refs.rideRequestId) out.push({ contentType: 'rideRequest', contentId: refs.rideRequestId })
+  return out
+}
+
+/**
+ * OS-level notification cleanup. Sends a silent / data-only push to
+ * each recipient's devices asking the app to remove the delivered
+ * notification for `ref` from the OS notification center.
+ *
+ *   iOS:     `aps: { content-available: 1 }` + `apns-collapse-id` +
+ *            `data.cleanup = 'true'`. Apple throttles silent pushes,
+ *            so this is best-effort. The app's foreground-receive
+ *            handler in PushRegistration removes the matching
+ *            delivered notification when it processes the payload.
+ *   Android: data-only FCM message. Capacitor's
+ *            `pushNotificationReceived` event fires when the app is
+ *            running; for fully-killed apps the OS notification
+ *            stays until the next sweep on app open.
+ *
+ * Reliable cleanup still depends on `sweepStaleTray()` running on
+ * app foreground — this push just makes the cleanup faster for
+ * recipients whose app is currently active or in background.
+ */
+export async function sendCleanupPush(
+  userIds: string[],
+  ref: ContentRef,
+): Promise<void> {
+  if (userIds.length === 0) return
+
+  const tokens = await db.deviceToken.findMany({
+    where: { userId: { in: userIds } },
+    select: { token: true, platform: true },
+  })
+  if (tokens.length === 0) return
+
+  const apnsCreds = loadApnsCredentials()
+  const iosTokens = apnsCreds
+    ? tokens.filter((t) => t.platform === 'ios').map((t) => t.token)
+    : []
+  const otherTokens = apnsCreds
+    ? tokens.filter((t) => t.platform !== 'ios').map((t) => t.token)
+    : tokens.map((t) => t.token)
+
+  const notifId = notifIdFor(ref)
+  const data = {
+    cleanup: 'true',
+    contentType: ref.contentType,
+    contentId: ref.contentId,
+    notificationId: notifId,
+  }
+
+  const sends: Promise<unknown>[] = []
+  if (iosTokens.length > 0 && apnsCreds) {
+    sends.push(
+      sendApnsBatch(
+        iosTokens,
+        { title: '', body: '', silent: true, collapseId: notifId, data },
+        apnsCreds,
+      ),
+    )
+  }
+  if (otherTokens.length > 0) {
+    sends.push(sendFcmCleanup(otherTokens, notifId, data))
+  }
+  await Promise.all(sends).catch(() => { /* best effort */ })
+}
+
+// ── Minimal FCM v1 sender for data-only cleanup pushes ───────────────────
+// Doesn't share code with the full sender in process-notifs/route.ts
+// because that one ships from a route handler; importing it from a
+// library module is awkward. The cleanup payload is small enough that
+// duplicating the auth + send loop here costs less than the refactor.
+let cachedFcmToken: { token: string; expiresAt: number } | null = null
+async function getFcmAccessTokenLib(): Promise<string> {
+  if (cachedFcmToken && cachedFcmToken.expiresAt > Date.now() + 60_000) {
+    return cachedFcmToken.token
+  }
+  const creds = loadFcmCredentials()
+  if (!creds) throw new Error('FCM credentials not configured')
+  const nowSec = Math.floor(Date.now() / 1000)
+  const header = { alg: 'RS256', typ: 'JWT' }
+  const claim = {
+    iss: creds.clientEmail,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: nowSec,
+    exp: nowSec + 3600,
+  }
+  const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url')
+  const toSign = `${enc(header)}.${enc(claim)}`
+  const signer = crypto.createSign('RSA-SHA256')
+  signer.update(toSign)
+  const signature = signer.sign(creds.privateKey).toString('base64url')
+  const jwt = `${toSign}.${signature}`
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
+  })
+  if (!res.ok) throw new Error(`FCM OAuth failed: ${res.status}`)
+  const data = (await res.json()) as { access_token: string; expires_in: number }
+  cachedFcmToken = {
+    token: data.access_token,
+    expiresAt: Date.now() + data.expires_in * 1000,
+  }
+  return data.access_token
+}
+
+async function sendFcmCleanup(
+  tokens: string[],
+  notifId: string,
+  data: Record<string, string>,
+): Promise<void> {
+  const creds = loadFcmCredentials()
+  if (!creds) return
+  const accessToken = await getFcmAccessTokenLib()
+  const url = `https://fcm.googleapis.com/v1/projects/${creds.projectId}/messages:send`
+  const sendOne = async (token: string) => {
+    const body = {
+      message: {
+        token,
+        // No `notification` block — data-only so receivers process it
+        // silently in the pushNotificationReceived handler.
+        data,
+        android: { priority: 'NORMAL' },
+        apns: {
+          headers: {
+            'apns-priority': '5',
+            'apns-collapse-id': notifId,
+            'apns-push-type': 'background',
+          },
+          payload: { aps: { 'content-available': 1 } },
+        },
+      },
+    }
+    try {
+      await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      })
+    } catch { /* best effort */ }
+  }
+  await Promise.all(tokens.map(sendOne))
 }
 
 export async function notifyNeighborhood(params: {

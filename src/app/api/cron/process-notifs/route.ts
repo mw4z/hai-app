@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import crypto from 'crypto'
 import { loadFcmCredentials } from '@/lib/fcm'
 import { loadApnsCredentials, sendApnsBatch } from '@/lib/apns'
+import { notifIdFor, type ContentRef } from '@/lib/pushMeta'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -89,14 +90,33 @@ interface NotificationContent {
   data: Record<string, string>
   priority?: 'high' | 'normal'
   androidChannel?: string
+  /**
+   * Stable content reference. When set we forward a derived id as:
+   *   - Android FCM notification `tag`
+   *   - iOS APNs `apns-collapse-id`
+   *   - data.notificationId / data.contentType / data.contentId
+   * so OS-level cleanup can target this push by content rather than
+   * by the system's auto-generated request id.
+   */
+  refs?: ContentRef
+  /**
+   * Silent / data-only payload. Used by the cleanup-push path to ask
+   * recipient devices to clear an OS notification without showing a
+   * new banner. Does NOT include alert/title/body in the APS dict.
+   */
+  silent?: boolean
 }
 
 /**
  * Cross-platform send. Pass tokens tagged with their platform so iOS
  * ('ios') goes to Apple's APNs HTTP/2 directly (no Firebase iOS SDK
  * required) and everything else goes through FCM v1.
+ *
+ * If `content.refs` is set we attach the canonical notification id
+ * (`${contentType}:${contentId}`) to both transports so OS-level
+ * cleanup can find the right entry later.
  */
-async function sendPushBatch(
+export async function sendPushBatch(
   tokens: Array<{ token: string; platform: string }>,
   content: NotificationContent,
 ): Promise<FcmSendResult> {
@@ -112,6 +132,22 @@ async function sendPushBatch(
     ? tokens.filter((t) => t.platform !== 'ios').map((t) => t.token)
     : tokens.map((t) => t.token)
 
+  // Stable id used as Android tag + iOS apns-collapse-id + data field.
+  const notifId = content.refs ? notifIdFor(content.refs) : undefined
+  // Mirror refs into data so JS-side sweep can match by content even
+  // when the OS-level identifier was auto-generated (e.g. older builds
+  // that delivered before this change shipped).
+  const enrichedData: Record<string, string> = { ...(content.data || {}) }
+  if (content.refs) {
+    enrichedData.contentType = content.refs.contentType
+    enrichedData.contentId = content.refs.contentId
+    enrichedData.notificationId = notifId!
+  }
+  if (content.silent) {
+    enrichedData.cleanup = 'true'
+  }
+  const enrichedContent: NotificationContent = { ...content, data: enrichedData }
+
   const combined: FcmSendResult = { success: 0, failed: 0, invalidTokens: [] }
 
   if (iosTokens.length > 0 && apnsCreds) {
@@ -119,7 +155,9 @@ async function sendPushBatch(
       title: content.title,
       body: content.body,
       priority: content.priority === 'high' ? 'high' : 'normal',
-      data: content.data,
+      data: enrichedData,
+      collapseId: notifId,
+      silent: content.silent,
     }, apnsCreds)
     combined.success += apns.success
     combined.failed += apns.failed
@@ -128,7 +166,7 @@ async function sendPushBatch(
   }
 
   if (otherTokens.length > 0) {
-    const fcm = await sendFcmBatch(otherTokens, content)
+    const fcm = await sendFcmBatch(otherTokens, enrichedContent, notifId)
     combined.success += fcm.success
     combined.failed += fcm.failed
     combined.invalidTokens.push(...fcm.invalidTokens)
@@ -141,6 +179,7 @@ async function sendPushBatch(
 async function sendFcmBatch(
   tokens: string[],
   content: NotificationContent,
+  notifId?: string,
 ): Promise<FcmSendResult> {
   const result: FcmSendResult = { success: 0, failed: 0, invalidTokens: [] }
   if (tokens.length === 0) return result
@@ -155,37 +194,43 @@ async function sendFcmBatch(
   const androidPriority = content.priority === 'high' ? 'HIGH' : 'NORMAL'
 
   const sendOne = async (token: string) => {
-    const body = {
+    // Silent / cleanup pushes: data-only on Android, content-available
+    // on iOS, no alert/title/body. Receivers handle them in the JS
+    // pushNotificationReceived listener and call removeDeliveredNotifications.
+    const isSilent = content.silent === true
+
+    const androidNotif: Record<string, string> = isSilent ? {} : (
+      content.androidChannel === 'emergency'
+        ? { channel_id: 'emergency', sound: 'default' }
+        : { sound: 'hai_chime' }
+    )
+    if (notifId && !isSilent) androidNotif.tag = notifId
+
+    const apnsHeaders: Record<string, string> = { 'apns-priority': apnsPriority }
+    if (notifId) apnsHeaders['apns-collapse-id'] = notifId
+    if (isSilent) apnsHeaders['apns-push-type'] = 'background'
+
+    const body: Record<string, any> = {
       message: {
         token,
-        notification: { title: content.title, body: content.body },
+        ...(isSilent
+          ? {} // no notification block — data-only
+          : { notification: { title: content.title, body: content.body } }
+        ),
         data: content.data,
         android: {
-          priority: androidPriority,
-          // Branded notification sound — 'hai_chime' resource name
-          // (extension stripped: Android looks up res/raw/hai_chime.wav).
-          // 'emergency' channel keeps the system default so it stays
-          // loud / distinct from regular activity. channel_id is only
-          // forwarded for emergency for now; everything else uses
-          // FCM's auto-fallback channel which exists on every
-          // installed app — once the Android rebuild ships with the
-          // 'hai_default' channel, restore the channel_id wiring.
-          notification: content.androidChannel === 'emergency'
-            ? { channel_id: 'emergency', sound: 'default' }
-            : { sound: 'hai_chime' },
+          priority: isSilent ? 'NORMAL' : androidPriority,
+          ...(isSilent ? {} : { notification: androidNotif }),
         },
         apns: {
-          headers: { 'apns-priority': apnsPriority },
-          // iOS APS sound field takes the bundled file name WITH
-          // extension. The file is shipped under ios/App/App/sounds/
-          // and registered in the Xcode project as a Resource. The
-          // 'emergency' content channel keeps system default for max
-          // urgency.
+          headers: apnsHeaders,
           payload: {
-            aps: {
-              sound: content.androidChannel === 'emergency' ? 'default' : 'hai_chime.wav',
-              'mutable-content': 1,
-            },
+            aps: isSilent
+              ? { 'content-available': 1 }
+              : {
+                  sound: content.androidChannel === 'emergency' ? 'default' : 'hai_chime.wav',
+                  'mutable-content': 1,
+                },
           },
         },
       },
@@ -464,6 +509,7 @@ async function processNewPost(job: JobRow): Promise<JobOutcome> {
     // HIGH — real-time neighborhood activity needs immediate delivery.
     // NORMAL priority lets FCM + Android Doze mode defer for minutes.
     priority: 'high',
+    refs: { contentType: 'post', contentId: postId },
     data: {
       type: 'new_post',
       postId,
@@ -534,6 +580,7 @@ async function processCommentOnPost(job: JobRow): Promise<JobOutcome> {
     title: pushTitle,
     body: pushBody,
     priority: 'high',
+    refs: { contentType: 'comment', contentId: commentId },
     data: {
       type: 'comment_on_post',
       postId,
@@ -604,6 +651,7 @@ async function processFollowPostComment(job: JobRow): Promise<JobOutcome> {
     title: pushTitle,
     body,
     priority: 'normal',
+    refs: { contentType: 'comment', contentId: commentId },
     data: {
       type: 'follow_post_comment',
       postId,
@@ -678,6 +726,7 @@ async function processReplyToComment(job: JobRow): Promise<JobOutcome> {
     title: pushTitle,
     body: pushBody,
     priority: 'high',
+    refs: { contentType: 'comment', contentId: commentId },
     data: {
       type: 'reply_to_comment',
       postId,
@@ -749,6 +798,7 @@ async function processReactionOnPost(job: JobRow): Promise<JobOutcome> {
     title: pushTitle,
     body: pushBody,
     priority: 'high',
+    refs: { contentType: 'post', contentId: postId },
     data: {
       type: 'reaction_on_post',
       postId,
@@ -1232,6 +1282,7 @@ async function processRideStatus(job: JobRow): Promise<JobOutcome> {
     title: pushTitle,
     body: pushBody,
     priority: 'high',
+    refs: { contentType: 'rideRequest', contentId: rideRequestId },
     data: {
       type: 'ride_status',
       notifType: notifType || '',
@@ -1314,6 +1365,7 @@ async function processNewRideRequest(job: JobRow): Promise<JobOutcome> {
     title: pushTitle,
     body: pushBody.slice(0, 180),
     priority: 'high',
+    refs: { contentType: 'rideRequest', contentId: rideRequestId },
     data: {
       type: 'new_ride_request',
       rideRequestId,
@@ -1376,6 +1428,7 @@ async function processNewMessage(job: JobRow): Promise<JobOutcome> {
     title: pushTitle,
     body,
     priority: 'high',
+    refs: { contentType: 'thread', contentId: threadId },
     data: {
       type: 'new_message',
       threadId,
@@ -1440,6 +1493,7 @@ export async function sendDmPushNow(args: {
       title: pushTitle,
       body,
       priority: 'high',
+      refs: { contentType: 'thread', contentId: threadId },
       data: {
         type: 'new_message',
         threadId,
