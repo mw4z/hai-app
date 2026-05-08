@@ -169,13 +169,21 @@ export async function sendCleanupPush(
    */
   collapseId?: string,
 ): Promise<void> {
-  if (userIds.length === 0) return
+  if (userIds.length === 0) {
+    console.log('[CLEANUP_PUSH] no userIds — skipped', { ref, collapseId })
+    return
+  }
 
   const tokens = await db.deviceToken.findMany({
     where: { userId: { in: userIds } },
     select: { token: true, platform: true },
   })
-  if (tokens.length === 0) return
+  if (tokens.length === 0) {
+    console.log('[CLEANUP_PUSH] no device tokens — skipped', {
+      ref, collapseId, userIds: userIds.length,
+    })
+    return
+  }
 
   const apnsCreds = loadApnsCredentials()
   const iosTokens = apnsCreds
@@ -194,6 +202,14 @@ export async function sendCleanupPush(
     notificationId: refsNotifId,
   }
 
+  console.log('[CLEANUP_PUSH] sending', {
+    ref,
+    collapseId: effectiveCollapseId,
+    iosTokenCount: iosTokens.length,
+    fcmTokenCount: otherTokens.length,
+    apnsConfigured: !!apnsCreds,
+  })
+
   const sends: Promise<unknown>[] = []
   if (iosTokens.length > 0 && apnsCreds) {
     sends.push(
@@ -203,7 +219,9 @@ export async function sendCleanupPush(
   if (otherTokens.length > 0) {
     sends.push(sendFcmCleanup(otherTokens, effectiveCollapseId, data))
   }
-  await Promise.all(sends).catch(() => { /* best effort */ })
+  await Promise.all(sends).catch((err) => {
+    console.warn('[CLEANUP_PUSH] send chain rejected', err?.message || err)
+  })
 }
 
 // Minimal APNs alert push for the cleanup path. Lives here instead of
@@ -264,20 +282,46 @@ async function sendApnsCleanupAlert(
       authorization: `bearer ${jwt}`,
       'apns-topic': creds.bundleId,
       'apns-push-type': 'alert',
-      // Priority 10 (immediate). Priority 5 caused iOS to coalesce
-      // the cleanup push with later pushes — banners only updated
-      // to "🗑️" when the next regular message arrived. With 10
-      // iOS processes the replacement on receipt. No `sound` in
-      // the payload so the user doesn't get a beep / vibration.
       'apns-priority': '10',
-      'apns-collapse-id': collapseId, // Replaces the matching original banner.
+      'apns-collapse-id': collapseId,
       'content-type': 'application/json',
       'content-length': String(Buffer.byteLength(jsonBody)),
     }
     const req = session.request(headers)
-    req.on('response', () => { /* ignore status — best effort */ })
-    req.on('end', resolve)
-    req.on('error', () => resolve())
+    let status = 0
+    let body = ''
+    req.setEncoding('utf8')
+    req.on('response', (h) => { status = Number(h[':status']) || 0 })
+    req.on('data', (chunk: string) => { body += chunk })
+    req.on('end', () => {
+      if (status === 200) {
+        console.log('[CLEANUP_PUSH] ok', {
+          collapseId,
+          tokenTail: token.slice(-8),
+        })
+      } else {
+        let reason = `HTTP ${status}`
+        try {
+          const parsed = body ? JSON.parse(body) : null
+          reason = parsed?.reason || reason
+        } catch {}
+        console.warn('[CLEANUP_PUSH] failed', {
+          collapseId,
+          tokenTail: token.slice(-8),
+          status,
+          reason,
+        })
+      }
+      resolve()
+    })
+    req.on('error', (err: Error) => {
+      console.warn('[CLEANUP_PUSH] error', {
+        collapseId,
+        tokenTail: token.slice(-8),
+        error: err?.message || String(err),
+      })
+      resolve()
+    })
     req.end(jsonBody)
   })
 
