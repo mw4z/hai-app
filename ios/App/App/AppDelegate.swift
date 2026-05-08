@@ -128,9 +128,36 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             // win. The next sweepStaleTray() pass will catch it on resume.
             return
         }
+
+        // Build the same event shape Capacitor uses for foreground alerts:
+        //   { id, title, subtitle, body, data: {...payload minus aps} }
+        // The JS listener reads `notification.data.cleanup` etc., so if
+        // we just hand userInfo through verbatim there's no `data` field
+        // and the cleanup branch never runs (build 48 hit this — the
+        // ◀ pushNotificationReceived line showed up, but title/body
+        // were empty and no data: line followed).
+        var dataPayload: [String: Any] = [:]
+        for (k, v) in userInfo {
+            guard let key = k as? String, key != "aps" else { continue }
+            dataPayload[key] = v
+        }
+        let aps = userInfo["aps"] as? [String: Any]
+        let alert = aps?["alert"] as? [String: Any]
+        let title  = alert?["title"]    as? String ?? aps?["alert"] as? String ?? ""
+        let subtitle = alert?["subtitle"] as? String ?? ""
+        let body   = alert?["body"]     as? String ?? ""
+        let id = (dataPayload["notificationId"] as? String) ?? UUID().uuidString
+
+        let event: [String: Any] = [
+            "id":       id,
+            "title":    title,
+            "subtitle": subtitle,
+            "body":     body,
+            "data":     dataPayload,
+        ]
         plugin.notifyListeners(
             "pushNotificationReceived",
-            data: userInfo as? [String: Any] ?? [:],
+            data: event,
             retainUntilConsumed: true
         )
     }
