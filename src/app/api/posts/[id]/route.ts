@@ -121,10 +121,20 @@ export async function DELETE(
     data: { status: 'REMOVED' },
   })
 
+  // Look up author name to surface on the OS replacement banner
+  // ("حذف جواد المنشور"). Non-fatal if the lookup fails.
+  const actor = await db.user.findUnique({
+    where: { id: session.userId },
+    select: { name: true },
+  }).catch(() => null)
+
   // Clear bell notifications that point at this post (comments,
   // reactions, replies). The push tray sync on next app foreground
   // catches the system-tray side.
-  await cleanupNotificationsFor({ postId: params.id }).catch(() => { /* non-fatal */ })
+  await cleanupNotificationsFor(
+    { postId: params.id },
+    actor?.name?.trim() || undefined,
+  ).catch(() => { /* non-fatal */ })
 
   return NextResponse.json({ success: true })
 }

@@ -31,13 +31,20 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     await db.comment.deleteMany({ where: { parentId: params.commentId } })
     await db.comment.delete({ where: { id: params.commentId } })
 
+    // Look up actor name for the OS replacement banner copy.
+    const actor = await db.user.findUnique({
+      where: { id: session.userId },
+      select: { name: true },
+    }).catch(() => null)
+    const actorName = actor?.name?.trim() || undefined
+
     // Clear bell rows that pointed at this comment OR any of its
     // replies. Run as Promise.all so a slow one doesn't block the
     // response. Errors are non-fatal — notification cleanup is
     // best-effort, the delete itself is the user-visible action.
     await Promise.all([
-      cleanupNotificationsFor({ commentId: params.commentId }),
-      ...replies.map(r => cleanupNotificationsFor({ commentId: r.id })),
+      cleanupNotificationsFor({ commentId: params.commentId }, actorName),
+      ...replies.map(r => cleanupNotificationsFor({ commentId: r.id }, actorName)),
     ]).catch(() => { /* non-fatal */ })
 
     return NextResponse.json({ success: true })

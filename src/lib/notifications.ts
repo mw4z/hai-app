@@ -54,12 +54,17 @@ export async function createNotification(params: {
  *
  * Returns the number of rows removed so callers can log / surface.
  */
-export async function cleanupNotificationsFor(refs: {
-  postId?: string
-  commentId?: string
-  threadId?: string
-  rideRequestId?: string
-}): Promise<number> {
+export async function cleanupNotificationsFor(
+  refs: {
+    postId?: string
+    commentId?: string
+    threadId?: string
+    rideRequestId?: string
+  },
+  /** Optional display name of the user / mod who triggered cleanup —
+   *  surfaced on the OS replacement banner so recipients see who acted. */
+  actorName?: string,
+): Promise<number> {
   // Notification.messageId doesn't exist — DM notifications carry
   // only threadId (one notification per thread, coalesced). When a
   // single message is "deleted for everyone", we leave the
@@ -96,7 +101,7 @@ export async function cleanupNotificationsFor(refs: {
   const userIds = recipients.map((r) => r.userId)
   for (const ref of contentRefsFromQuery(refs)) {
     if (userIds.length > 0) {
-      await sendCleanupPush(userIds, ref).catch((err) => {
+      await sendCleanupPush(userIds, ref, undefined, actorName).catch((err) => {
         console.warn('[NOTIF] cleanup push failed:', (err as Error)?.message)
       })
     }
@@ -169,6 +174,14 @@ export async function sendCleanupPush(
    * `message:MSGID`.
    */
   collapseId?: string,
+  /**
+   * Optional display name of the user who triggered the deletion.
+   * When present, the replacement banner reads e.g. "حذف جواد
+   * الرسالة" instead of the generic "تم حذف الرسالة" — recipients
+   * see who acted, useful for multi-thread / multi-chat contexts
+   * where "Message deleted" alone isn't enough signal.
+   */
+  actorName?: string,
 ): Promise<void> {
   if (userIds.length === 0) {
     console.log('[CLEANUP_PUSH] no userIds — skipped', { ref, collapseId })
@@ -212,7 +225,7 @@ export async function sendCleanupPush(
     apnsConfigured: !!apnsCreds,
   })
 
-  const copy = cleanupCopyFor(ref.contentType)
+  const copy = cleanupCopyFor(ref.contentType, actorName)
 
   const sends: Promise<unknown>[] = []
   if (iosTokens.length > 0 && apnsCreds) {
@@ -232,29 +245,38 @@ export async function sendCleanupPush(
   })
 }
 
-// Localized "this content was deleted" copy per content type. Title
-// stays terse so the lock-screen banner doesn't wrap awkwardly; body
-// is empty (a single space) — iOS shows just the title and the app
-// name, which is the right signal for "the original message is gone".
-//
-// Arabic primary (most users), English subtitle so non-Arabic readers
-// also understand. iOS doesn't localize automatically from APNs, so
-// we're picking the broadest compromise that's still unambiguous.
-function cleanupCopyFor(contentType: ContentRef['contentType']): {
-  title: string
-  body: string
-} {
+// Localized "this content was deleted" copy per content type. When
+// `actor` is provided we use the actor-led phrasing ("حذف جواد
+// الرسالة") so the recipient sees who triggered the deletion;
+// otherwise the impersonal "تم حذف …" form. Body carries the
+// English subtitle for non-Arabic readers (iOS doesn't localize
+// automatically from APNs).
+function cleanupCopyFor(
+  contentType: ContentRef['contentType'],
+  actor?: string,
+): { title: string; body: string } {
+  const a = actor?.trim()
   switch (contentType) {
     case 'thread':
-      return { title: 'تم حذف الرسالة', body: 'Message was deleted' }
+      return a
+        ? { title: `حذف ${a} الرسالة`, body: `${a} deleted a message` }
+        : { title: 'تم حذف الرسالة',     body: 'Message was deleted' }
     case 'post':
-      return { title: 'تم حذف المنشور', body: 'Post was removed' }
+      return a
+        ? { title: `حذف ${a} المنشور`, body: `${a} removed a post` }
+        : { title: 'تم حذف المنشور',    body: 'Post was removed' }
     case 'comment':
-      return { title: 'تم حذف التعليق', body: 'Comment was removed' }
+      return a
+        ? { title: `حذف ${a} التعليق`, body: `${a} removed a comment` }
+        : { title: 'تم حذف التعليق',    body: 'Comment was removed' }
     case 'rideRequest':
-      return { title: 'تم إلغاء المشوار', body: 'Ride was cancelled' }
+      return a
+        ? { title: `ألغى ${a} المشوار`, body: `${a} cancelled the ride` }
+        : { title: 'تم إلغاء المشوار',  body: 'Ride was cancelled' }
     default:
-      return { title: 'تم الحذف', body: 'Removed' }
+      return a
+        ? { title: `حذف ${a}`, body: `${a} removed it` }
+        : { title: 'تم الحذف',  body: 'Removed' }
   }
 }
 

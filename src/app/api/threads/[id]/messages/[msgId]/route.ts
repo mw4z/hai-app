@@ -35,6 +35,16 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    // Surface the deleter's first name on the OS replacement banner
+    // so recipients see "حذف جواد الرسالة" instead of just
+    // "تم حذف الرسالة". Failure to look up name is non-fatal — the
+    // generic copy still goes out.
+    const actor = await db.user.findUnique({
+      where: { id: session.userId },
+      select: { name: true },
+    }).catch(() => null)
+    const actorName = actor?.name?.trim() || undefined
+
     if (scope === 'me') {
       // Idempotent — if the user already hid it, do nothing.
       if (!message.hiddenBy.includes(session.userId)) {
@@ -68,6 +78,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
           [session.userId],
           { contentType: 'thread', contentId: params.id },
           `message:${params.msgId}`,
+          actorName,
         ).catch((err) => {
           console.warn('[DM_DELETE] cleanup push (me) failed:', err?.message || err)
         })
@@ -110,6 +121,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
         [thread.user1Id, thread.user2Id],
         { contentType: 'thread', contentId: params.id },
         `message:${params.msgId}`,
+        actorName,
       ).catch((err) => {
         console.warn('[DM_DELETE] cleanup push (all) failed:', err?.message || err)
       })

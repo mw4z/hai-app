@@ -50,7 +50,7 @@ export async function POST(
 
     const user = await db.user.findUnique({
       where: { id: session.userId },
-      select: { role: true },
+      select: { role: true, name: true },
     })
 
     const currentStatus = ride.status as RideStatus
@@ -188,21 +188,26 @@ export async function POST(
         )
       }
 
+      const cancellerName = user?.name?.trim() || undefined
+
       // Clear in-ride notifications (RIDE_MESSAGE bell rows + OS-level
       // banners) for both parties — the ride is dead, those entries
       // tap-jump nowhere useful. Awaited so the API response only
       // resolves after cleanup commits and the client's tray-sweep
       // sees the post-cancel state.
-      await cleanupNotificationsFor({ rideRequestId: ride.id })
+      await cleanupNotificationsFor({ rideRequestId: ride.id }, cancellerName)
         .catch(() => { /* non-fatal */ })
 
       // AWAITED — see notifications.ts for the rationale (Vercel
       // tears down function instances after the response goes out,
       // dropping fire-and-forget pushes before APNs accepts them).
       const explicitRecipients = [ride.requesterId, ...(driverId ? [driverId] : [])]
-      await sendCleanupPush(explicitRecipients, {
-        contentType: 'rideRequest', contentId: ride.id,
-      }).catch((err) => {
+      await sendCleanupPush(
+        explicitRecipients,
+        { contentType: 'rideRequest', contentId: ride.id },
+        undefined,
+        cancellerName,
+      ).catch((err) => {
         console.warn('[RIDE_CANCEL] cleanup push failed:', err?.message || err)
       })
 
