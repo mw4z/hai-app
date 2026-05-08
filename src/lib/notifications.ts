@@ -212,10 +212,12 @@ export async function sendCleanupPush(
     apnsConfigured: !!apnsCreds,
   })
 
+  const copy = cleanupCopyFor(ref.contentType)
+
   const sends: Promise<unknown>[] = []
   if (iosTokens.length > 0 && apnsCreds) {
     sends.push(
-      sendApnsCleanupAlert(iosTokens, effectiveCollapseId, data, apnsCreds),
+      sendApnsCleanupAlert(iosTokens, effectiveCollapseId, data, copy, apnsCreds),
     )
   }
   if (otherTokens.length > 0) {
@@ -228,6 +230,32 @@ export async function sendCleanupPush(
     collapseId: effectiveCollapseId,
     elapsedMs: Date.now() - t0,
   })
+}
+
+// Localized "this content was deleted" copy per content type. Title
+// stays terse so the lock-screen banner doesn't wrap awkwardly; body
+// is empty (a single space) — iOS shows just the title and the app
+// name, which is the right signal for "the original message is gone".
+//
+// Arabic primary (most users), English subtitle so non-Arabic readers
+// also understand. iOS doesn't localize automatically from APNs, so
+// we're picking the broadest compromise that's still unambiguous.
+function cleanupCopyFor(contentType: ContentRef['contentType']): {
+  title: string
+  body: string
+} {
+  switch (contentType) {
+    case 'thread':
+      return { title: 'تم حذف الرسالة', body: 'Message was deleted' }
+    case 'post':
+      return { title: 'تم حذف المنشور', body: 'Post was removed' }
+    case 'comment':
+      return { title: 'تم حذف التعليق', body: 'Comment was removed' }
+    case 'rideRequest':
+      return { title: 'تم إلغاء المشوار', body: 'Ride was cancelled' }
+    default:
+      return { title: 'تم الحذف', body: 'Removed' }
+  }
 }
 
 // Minimal APNs alert push for the cleanup path. Lives here instead of
@@ -251,6 +279,7 @@ async function sendApnsCleanupAlert(
   tokens: string[],
   collapseId: string,
   data: Record<string, string>,
+  copy: { title: string; body: string },
   creds: ReturnType<typeof loadApnsCredentials>,
 ): Promise<void> {
   if (!creds || tokens.length === 0) return
@@ -262,10 +291,10 @@ async function sendApnsCleanupAlert(
 
   const payload = {
     aps: {
-      // Minimal alert content — replaces the existing banner via
+      // Localized "deleted" copy — replaces the existing banner via
       // apns-collapse-id. No `sound` field => no beep / vibration,
       // just a silent visual update.
-      alert: { title: '🗑️', body: ' ' },
+      alert: { title: copy.title, body: copy.body },
     },
     ...data,
   }
