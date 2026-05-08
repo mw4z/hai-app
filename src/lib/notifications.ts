@@ -197,9 +197,23 @@ export async function sendCleanupPush(
 // Minimal APNs alert push for the cleanup path. Lives here instead of
 // in sendApnsBatch so we don't have to fork that function's payload
 // assembly to support hybrid alert + content-available + low priority.
+//
+// Why an alert push (not silent): silent pushes (apns-push-type:
+// background) are throttled aggressively and don't deliver
+// reliably when the app is backgrounded. Alert pushes always
+// deliver. The trade-off is a brief banner flash — handled by the
+// AppDelegate native handler which removes all matching delivered
+// notifications (including this replacement) within ~1s.
+//
+// No apns-collapse-id: each new message also has no collapse-id
+// (so multiple messages stack instead of replacing each other).
+// The cleanup mechanism therefore can't rely on collapse to remove
+// the originals — instead, AppDelegate's
+// removeDeliveredNotificationsNatively iterates ALL delivered
+// banners matching contentType + contentId and clears them.
 async function sendApnsCleanupAlert(
   tokens: string[],
-  notifId: string,
+  _notifId: string, // unused now — kept for signature stability
   data: Record<string, string>,
   creds: ReturnType<typeof loadApnsCredentials>,
 ): Promise<void> {
@@ -212,12 +226,9 @@ async function sendApnsCleanupAlert(
 
   const payload = {
     aps: {
-      // Minimal alert content. Empty body = iOS may show just the
-      // app name + "🗑️" emoji; that's the unavoidable cost of
-      // reliable banner replacement on iOS.
+      // Minimal alert content. The user may briefly see "🗑️" before
+      // the AppDelegate handler clears it.
       alert: { title: '🗑️', body: ' ' },
-      // No sound/vibration — this is a stealth replacement.
-      // Badge: -1 leaves badge unchanged; 0 would clear other badges.
       'content-available': 1,
       'mutable-content': 1,
     },
@@ -242,8 +253,7 @@ async function sendApnsCleanupAlert(
       authorization: `bearer ${jwt}`,
       'apns-topic': creds.bundleId,
       'apns-push-type': 'alert',
-      'apns-priority': '5', // Low — no immediate beep, but reliably delivered.
-      'apns-collapse-id': notifId, // <-- the magic: replaces existing banner
+      'apns-priority': '5', // Low — no beep, still reliably delivered.
       'content-type': 'application/json',
       'content-length': String(Buffer.byteLength(jsonBody)),
     }

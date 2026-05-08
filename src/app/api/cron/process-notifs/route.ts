@@ -132,11 +132,15 @@ export async function sendPushBatch(
     ? tokens.filter((t) => t.platform !== 'ios').map((t) => t.token)
     : tokens.map((t) => t.token)
 
-  // Stable id used as Android tag + iOS apns-collapse-id + data field.
+  // refs become data fields used by both the JS-side sweep and the
+  // native iOS cleanup handler to match delivered notifications by
+  // contentType + contentId. We deliberately DO NOT derive an
+  // apns-collapse-id / FCM tag from refs — using `thread:XYZ` as the
+  // collapse-id meant every new DM in a thread replaced the previous
+  // banner, so multi-message conversations only ever showed the last
+  // one. Cleanup matches by data fields, not by OS-level identifier,
+  // so collapse isn't required for the cleanup path either.
   const notifId = content.refs ? notifIdFor(content.refs) : undefined
-  // Mirror refs into data so JS-side sweep can match by content even
-  // when the OS-level identifier was auto-generated (e.g. older builds
-  // that delivered before this change shipped).
   const enrichedData: Record<string, string> = { ...(content.data || {}) }
   if (content.refs) {
     enrichedData.contentType = content.refs.contentType
@@ -156,7 +160,7 @@ export async function sendPushBatch(
       body: content.body,
       priority: content.priority === 'high' ? 'high' : 'normal',
       data: enrichedData,
-      collapseId: notifId,
+      // No collapseId — see comment above. Each push is its own banner.
       silent: content.silent,
     }, apnsCreds)
     combined.success += apns.success
@@ -166,7 +170,10 @@ export async function sendPushBatch(
   }
 
   if (otherTokens.length > 0) {
-    const fcm = await sendFcmBatch(otherTokens, enrichedContent, notifId)
+    // Same reasoning as iOS: don't pass notifId as the FCM `tag`,
+    // otherwise multiple messages in the same thread replace each
+    // other in the Android notification shade.
+    const fcm = await sendFcmBatch(otherTokens, enrichedContent, undefined)
     combined.success += fcm.success
     combined.failed += fcm.failed
     combined.invalidTokens.push(...fcm.invalidTokens)
