@@ -80,6 +80,32 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         )
     }
 
+    // ── Silent / background pushes (apns-push-type: background) ─────────
+    // Without this forwarder, iOS receives our silent cleanup pushes
+    // (content-available: 1) but never wakes the JS layer — Capacitor's
+    // PushNotifications plugin listens on `capacitorDidReceiveRemoteNotification`
+    // and only fires `pushNotificationReceived` when this AppDelegate
+    // method posts that notification. Alert pushes go through
+    // UNUserNotificationCenterDelegate (which Capacitor also wires),
+    // so they work without this hook — that's why message banners
+    // arrived but cleanup pushes never reached the JS handler in the
+    // diagnostic. See:
+    // https://capacitorjs.com/docs/apis/push-notifications#ios
+    //
+    // We always finish with `.newData` so iOS doesn't deprioritize
+    // future silent pushes for this app — `.noData` over time tells
+    // the OS the push was wasted and it throttles harder.
+    func application(_ application: UIApplication,
+                     didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+                     fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        NotificationCenter.default.post(
+            name: Notification.Name(rawValue: "capacitorDidReceiveRemoteNotification"),
+            object: nil,
+            userInfo: userInfo as? [String: Any]
+        )
+        completionHandler(.newData)
+    }
+
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
         // Called when the app was launched with a url. Feel free to add additional processing here,
         // but if you want the App API to support tracking app url opens, make sure to keep this call
