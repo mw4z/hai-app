@@ -89,13 +89,14 @@ export async function cleanupNotificationsFor(refs: {
     where: { OR: orClauses },
   })
 
-  // Fire OS-level cleanup pushes (best effort — silent / data-only
-  // payloads, throttled by the OS). Don't await: the caller's API
-  // response shouldn't block on push delivery.
+  // AWAITED — Vercel can terminate the function instance after the
+  // route response goes out, killing fire-and-forget background work
+  // before APNs accepts it. The added latency on the API call (~200-
+  // 500ms per APNs roundtrip) is the cost of guaranteed delivery.
   const userIds = recipients.map((r) => r.userId)
   for (const ref of contentRefsFromQuery(refs)) {
     if (userIds.length > 0) {
-      void sendCleanupPush(userIds, ref).catch((err) => {
+      await sendCleanupPush(userIds, ref).catch((err) => {
         console.warn('[NOTIF] cleanup push failed:', (err as Error)?.message)
       })
     }
@@ -202,6 +203,7 @@ export async function sendCleanupPush(
     notificationId: refsNotifId,
   }
 
+  const t0 = Date.now()
   console.log('[CLEANUP_PUSH] sending', {
     ref,
     collapseId: effectiveCollapseId,
@@ -221,6 +223,10 @@ export async function sendCleanupPush(
   }
   await Promise.all(sends).catch((err) => {
     console.warn('[CLEANUP_PUSH] send chain rejected', err?.message || err)
+  })
+  console.log('[CLEANUP_PUSH] done', {
+    collapseId: effectiveCollapseId,
+    elapsedMs: Date.now() - t0,
   })
 }
 

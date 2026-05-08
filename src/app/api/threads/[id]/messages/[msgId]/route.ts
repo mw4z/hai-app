@@ -57,18 +57,20 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
             type: 'NEW_MESSAGE',
           },
         })
-        // OS-level cleanup push to this user's other devices so the
-        // delivered DM banner disappears from Notification Center
-        // immediately. The explicit collapseId `message:MSGID` matches
-        // the per-message id the original push used, so iOS replaces
-        // that specific banner with the "🗑️" content. Without this
-        // override the cleanup would target `thread:THREADID` (from
-        // the ref), which doesn't match anything on iOS.
-        void sendCleanupPush(
+        // AWAITED, not fire-and-forget. On Vercel, once the route
+        // response goes out the function instance may be torn down
+        // before a `void`'d background promise resolves, causing
+        // the cleanup push to silently never reach APNs. Awaiting
+        // costs ~200-500ms on the delete response but guarantees
+        // delivery. Per-message collapseId so iOS replaces the
+        // specific banner the original push produced.
+        await sendCleanupPush(
           [session.userId],
           { contentType: 'thread', contentId: params.id },
           `message:${params.msgId}`,
-        ).catch(() => { /* best effort */ })
+        ).catch((err) => {
+          console.warn('[DM_DELETE] cleanup push (me) failed:', err?.message || err)
+        })
       } catch { /* non-fatal */ }
       return NextResponse.json({ success: true, scope: 'me' })
     }
@@ -99,19 +101,18 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       await db.notification.deleteMany({
         where: { threadId: params.id, type: 'NEW_MESSAGE' },
       })
-      // DMs don't create Notification bell rows (commit 62ebe6c), so
-      // we can't snapshot recipients from the Notification table.
-      // Both thread participants need the cleanup push regardless —
-      // their phones may still have an OS-level banner from the APNs
-      // delivery even though no bell row ever existed. Per-message
-      // collapseId so iOS replaces the specific banner this message
-      // produced (every new DM uses `message:MSGID` as its collapse
-      // identifier, see processNewMessage / sendDmPushNow).
-      void sendCleanupPush(
+      // AWAITED so the function instance doesn't terminate before
+      // APNs accepts the push. Per-message collapseId so iOS
+      // replaces the specific banner this message produced (every
+      // new DM uses `message:MSGID` as its collapse identifier,
+      // see processNewMessage / sendDmPushNow).
+      await sendCleanupPush(
         [thread.user1Id, thread.user2Id],
         { contentType: 'thread', contentId: params.id },
         `message:${params.msgId}`,
-      ).catch(() => { /* best effort */ })
+      ).catch((err) => {
+        console.warn('[DM_DELETE] cleanup push (all) failed:', err?.message || err)
+      })
     } catch { /* non-fatal */ }
     return NextResponse.json({ success: true, scope: 'all' })
   } catch (error) {

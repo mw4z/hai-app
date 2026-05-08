@@ -196,15 +196,15 @@ export async function POST(
       await cleanupNotificationsFor({ rideRequestId: ride.id })
         .catch(() => { /* non-fatal */ })
 
-      // cleanupNotificationsFor only fires the silent push for users
-      // who had a Notification bell row — rides without any in-trip
-      // chat have none, but the requester/driver may still have an
-      // OS banner from new_ride_request or ride_status pushes. Nudge
-      // them explicitly so those banners clear too.
+      // AWAITED — see notifications.ts for the rationale (Vercel
+      // tears down function instances after the response goes out,
+      // dropping fire-and-forget pushes before APNs accepts them).
       const explicitRecipients = [ride.requesterId, ...(driverId ? [driverId] : [])]
-      void sendCleanupPush(explicitRecipients, {
+      await sendCleanupPush(explicitRecipients, {
         contentType: 'rideRequest', contentId: ride.id,
-      }).catch(() => { /* best effort */ })
+      }).catch((err) => {
+        console.warn('[RIDE_CANCEL] cleanup push failed:', err?.message || err)
+      })
 
       return NextResponse.json({ status: 'RIDE_CANCELLED' })
     }
