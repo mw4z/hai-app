@@ -277,6 +277,12 @@ export default function PushRegistration() {
         }
         const stale = delivered.notifications.filter((n) => {
           const d = (n.data || {}) as Record<string, string>
+          // Skip diagnostic test notifications (TEST_<ts> contentIds
+          // never have a real Notification row, so the auto-sweep
+          // would otherwise nuke them before the user can run the
+          // next step in the revoke-notifications tester).
+          if (d.contentId && d.contentId.startsWith('TEST_')) return false
+          if (d.threadId && d.threadId.startsWith('TEST_')) return false
           if (d.threadId && !live.threads.has(d.threadId)) return true
           if (d.postId && !live.posts.has(d.postId)) return true
           if (d.commentId && !live.comments.has(d.commentId)) return true

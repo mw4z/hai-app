@@ -3654,10 +3654,42 @@ function RevokeNotifTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [output, setOutput] = useState<string>('')
 
+  const logRef = useRef<(msg: string) => void>(() => {})
   const log = (msg: string) => {
     const ts = new Date().toISOString().slice(11, 19)
     setOutput((prev) => `[${ts}] ${msg}\n${prev}`.slice(0, 8000))
   }
+  logRef.current = log
+
+  // Mirror every pushNotificationReceived event into the diagnostic
+  // log so the user can see EXACTLY what arrives (alert + cleanup) —
+  // including silent pushes that don't show any UI banner.
+  useEffect(() => {
+    let removeListener: (() => void) | null = null
+    ;(async () => {
+      try {
+        const isNative = (window as any)?.Capacitor?.isNativePlatform?.() === true
+        if (!isNative) return
+        const { PushNotifications } = await import('@capacitor/push-notifications')
+        const handle = await PushNotifications.addListener(
+          'pushNotificationReceived',
+          (n) => {
+            const d = (n?.data || {}) as Record<string, string>
+            const fields = ['type','threadId','postId','commentId','rideRequestId','contentType','contentId','notificationId','cleanup']
+              .filter((k) => d[k])
+              .map((k) => `${k}=${d[k]}`)
+              .join(' ')
+            logRef.current(`◀ pushNotificationReceived title=${n?.title ?? '—'} body=${n?.body ?? '—'}`)
+            if (fields) logRef.current(`  data: ${fields}`)
+          },
+        )
+        removeListener = () => { try { handle.remove() } catch {} }
+      } catch (err: any) {
+        logRef.current(`addListener failed: ${err?.message || String(err)}`)
+      }
+    })()
+    return () => { try { removeListener?.() } catch {} }
+  }, [])
 
   const lastTestRef = (() => {
     let stored: { contentType: string; contentId: string } | null = null
