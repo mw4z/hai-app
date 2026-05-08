@@ -1398,6 +1398,15 @@ export default function ProfileClient({ user, postCount }: Props) {
         {user.role === 'SUPER_ADMIN' && (
           <DebugKbToggle lang={lang as 'ar' | 'en' | 'ur'} />
         )}
+
+        {/* ── Diagnostic: OS-notification cleanup tester (SUPER_ADMIN) ──
+            Lists what Capacitor sees in the OS notification tray, sends
+            test alert + cleanup pushes to the user's own devices, and
+            runs the cleanup mechanisms directly so we can pinpoint
+            which step (delivery / tracking / removal) is failing. */}
+        {user.role === 'SUPER_ADMIN' && (
+          <RevokeNotifTestButton lang={lang as 'ar' | 'en' | 'ur'} />
+        )}
       </div>
 
       </AccordionSection>
@@ -3613,6 +3622,194 @@ function InviteCard({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
             : 'احصل على 50 نقطة عند انضمام جار عبر كودك'}
         </p>
       </div>
+    </div>
+  )
+}
+
+// ─── OS-notification cleanup diagnostic ─────────────────────────────────
+// Five buttons:
+//   1. List delivered    — calls Capacitor getDeliveredNotifications()
+//      and shows what the plugin reports (id, title, data fields).
+//      If this returns [] when there ARE banners on the lock screen,
+//      Capacitor isn't tracking them and removeDeliveredNotifications
+//      can't clear them — that's the Android-FCM-auto-display issue.
+//   2. Send test alert   — POSTs /api/debug/revoke-notifs { action:
+//      'alert' } so a real APNs/FCM push lands on this device with a
+//      known TEST_<ts> contentId. Wait, then "List delivered" again
+//      to confirm it appears with `data.contentType` and
+//      `data.contentId` set.
+//   3. Send cleanup push — fires a silent /  data-only push for the
+//      same TEST contentId. The client's pushNotificationReceived
+//      handler should detect data.cleanup === 'true' and remove the
+//      delivered notification. List again to confirm.
+//   4. Sweep now         — runs the same /api/notifications/active-refs
+//      + removeDeliveredNotifications round-trip that PushRegistration
+//      runs on app foreground. Use to test the resume-sweep path
+//      without backgrounding the app.
+//   5. Self-test (combo) — sends an alert, waits 2s, sends a cleanup.
+//      The banner should appear and disappear automatically. Use as
+//      the end-to-end check after a build with UIBackgroundModes.
+
+function RevokeNotifTestButton({ lang }: { lang: 'ar' | 'en' | 'ur' }) {
+  const [busy, setBusy] = useState<string | null>(null)
+  const [output, setOutput] = useState<string>('')
+
+  const log = (msg: string) => {
+    const ts = new Date().toISOString().slice(11, 19)
+    setOutput((prev) => `[${ts}] ${msg}\n${prev}`.slice(0, 8000))
+  }
+
+  const lastTestRef = (() => {
+    let stored: { contentType: string; contentId: string } | null = null
+    return {
+      get: () => stored,
+      set: (r: { contentType: string; contentId: string } | null) => { stored = r },
+    }
+  })()
+
+  async function listDelivered() {
+    setBusy('list')
+    try {
+      const isNative = (window as any)?.Capacitor?.isNativePlatform?.() === true
+      if (!isNative) { log('not native — getDeliveredNotifications is iOS/Android-only'); return }
+      const { PushNotifications } = await import('@capacitor/push-notifications')
+      const res = await PushNotifications.getDeliveredNotifications()
+      const list = res.notifications || []
+      log(`getDeliveredNotifications → ${list.length} item(s)`)
+      list.forEach((n, i) => {
+        const d = (n.data || {}) as Record<string, string>
+        const dataPreview = ['type','threadId','postId','commentId','rideRequestId','contentType','contentId','notificationId','cleanup']
+          .filter((k) => d[k])
+          .map((k) => `${k}=${d[k]}`)
+          .join(' ')
+        log(`  [${i}] id=${(n as any).id ?? '—'} title=${n.title ?? '—'}`)
+        if (dataPreview) log(`      data: ${dataPreview}`)
+      })
+    } catch (err: any) {
+      log(`ERROR listDelivered: ${err?.message || String(err)}`)
+    } finally { setBusy(null) }
+  }
+
+  async function sendAlert() {
+    setBusy('alert')
+    try {
+      const res = await fetch('/api/debug/revoke-notifs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'alert' }),
+      })
+      const json = await res.json()
+      if (json.ref) lastTestRef.set(json.ref)
+      log(`POST alert → ${res.status}: ${json.summary || JSON.stringify(json).slice(0, 300)}`)
+      if (json.result) log(`  ${JSON.stringify(json.result)}`)
+    } catch (err: any) {
+      log(`ERROR sendAlert: ${err?.message || String(err)}`)
+    } finally { setBusy(null) }
+  }
+
+  async function sendCleanup() {
+    setBusy('cleanup')
+    try {
+      const ref = lastTestRef.get() || { contentType: 'thread', contentId: 'TEST_NO_PRIOR_ALERT' }
+      const res = await fetch('/api/debug/revoke-notifs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cleanup', ref }),
+      })
+      const json = await res.json()
+      log(`POST cleanup ref=${ref.contentType}:${ref.contentId} → ${res.status}: ${json.summary || JSON.stringify(json).slice(0, 300)}`)
+    } catch (err: any) {
+      log(`ERROR sendCleanup: ${err?.message || String(err)}`)
+    } finally { setBusy(null) }
+  }
+
+  async function sweepNow() {
+    setBusy('sweep')
+    try {
+      const isNative = (window as any)?.Capacitor?.isNativePlatform?.() === true
+      if (!isNative) { log('not native — sweep is iOS/Android-only'); return }
+      const { PushNotifications } = await import('@capacitor/push-notifications')
+      const delivered = await PushNotifications.getDeliveredNotifications()
+      const list = delivered.notifications || []
+      log(`sweep: starting with ${list.length} delivered notif(s)`)
+      const refsRes = await fetch('/api/notifications/active-refs', {
+        method: 'GET', credentials: 'include', cache: 'no-store',
+      })
+      if (!refsRes.ok) { log(`active-refs HTTP ${refsRes.status}`); return }
+      const refs = await refsRes.json() as {
+        postIds: string[]; commentIds: string[]; threadIds: string[]; rideRequestIds: string[]
+      }
+      log(`active-refs: posts=${refs.postIds.length} comments=${refs.commentIds.length} threads=${refs.threadIds.length} rides=${refs.rideRequestIds.length}`)
+      const live = {
+        posts: new Set(refs.postIds), comments: new Set(refs.commentIds),
+        threads: new Set(refs.threadIds), rides: new Set(refs.rideRequestIds),
+      }
+      const stale = list.filter((n) => {
+        const d = (n.data || {}) as Record<string, string>
+        if (d.threadId && !live.threads.has(d.threadId)) return true
+        if (d.postId && !live.posts.has(d.postId)) return true
+        if (d.commentId && !live.comments.has(d.commentId)) return true
+        if (d.rideRequestId && !live.rides.has(d.rideRequestId)) return true
+        return false
+      })
+      log(`sweep: ${stale.length} stale of ${list.length}`)
+      if (stale.length > 0) {
+        await PushNotifications.removeDeliveredNotifications({ notifications: stale })
+        log(`removeDeliveredNotifications: called for ${stale.length} item(s)`)
+      }
+    } catch (err: any) {
+      log(`ERROR sweep: ${err?.message || String(err)}`)
+    } finally { setBusy(null) }
+  }
+
+  async function selfTest() {
+    setBusy('self-test')
+    try {
+      const res = await fetch('/api/debug/revoke-notifs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'self-test' }),
+      })
+      const json = await res.json()
+      if (json.ref) lastTestRef.set(json.ref)
+      log(`POST self-test → ${res.status}: ${json.summary || JSON.stringify(json).slice(0, 300)}`)
+      if (json.alertResult) log(`  alert: ${JSON.stringify(json.alertResult)}`)
+    } catch (err: any) {
+      log(`ERROR selfTest: ${err?.message || String(err)}`)
+    } finally { setBusy(null) }
+  }
+
+  const Btn = ({ id, label, onClick }: { id: string; label: string; onClick: () => void }) => (
+    <button
+      onClick={onClick}
+      disabled={busy !== null}
+      className="px-3 py-2 rounded-xl text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 active:scale-[0.98] disabled:opacity-50"
+    >
+      {busy === id ? '…' : label}
+    </button>
+  )
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-3">
+      <div className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">
+        {lang === 'en' ? 'Revoke notifications · diagnostic' : 'تشخيص إلغاء الإشعارات'}
+      </div>
+      <div className="text-[11px] text-gray-500 dark:text-gray-400 mb-3 leading-snug">
+        {lang === 'en'
+          ? '1) Send alert → wait for the banner. 2) List to confirm Capacitor sees it. 3) Send cleanup → list again to confirm it disappeared.'
+          : '١) أرسل إشعارًا تجريبيًا، انتظر ظهوره. ٢) عرض القائمة للتأكد من تسجيله. ٣) أرسل إشعار التنظيف، ثم اعرض القائمة مرة أخرى.'}
+      </div>
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <Btn id="alert"     label={lang === 'en' ? '1. Send alert'    : '١. إرسال إشعار'}      onClick={sendAlert} />
+        <Btn id="list"      label={lang === 'en' ? '2. List delivered' : '٢. عرض الإشعارات'}    onClick={listDelivered} />
+        <Btn id="cleanup"   label={lang === 'en' ? '3. Send cleanup'  : '٣. إرسال التنظيف'}     onClick={sendCleanup} />
+        <Btn id="sweep"     label={lang === 'en' ? 'Sweep now'        : 'كنس الآن'}             onClick={sweepNow} />
+        <Btn id="self-test" label={lang === 'en' ? 'Self-test (combo)' : 'اختبار ذاتي'}          onClick={selfTest} />
+        <Btn id="clear"     label={lang === 'en' ? 'Clear log'        : 'مسح السجل'}            onClick={() => setOutput('')} />
+      </div>
+      <pre className="text-[10px] leading-tight text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 rounded-lg p-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono">
+        {output || (lang === 'en' ? '(no output)' : '(لا يوجد ناتج)')}
+      </pre>
     </div>
   )
 }
