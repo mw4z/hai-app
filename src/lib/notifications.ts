@@ -245,38 +245,46 @@ export async function sendCleanupPush(
   })
 }
 
-// Localized "this content was deleted" copy per content type. When
-// `actor` is provided we use the actor-led phrasing ("حذف جواد
-// الرسالة") so the recipient sees who triggered the deletion;
-// otherwise the impersonal "تم حذف …" form. Body carries the
-// English subtitle for non-Arabic readers (iOS doesn't localize
-// automatically from APNs).
+// Replacement-banner copy. Single-language (Arabic — primary audience)
+// so the lock-screen line stays short and readable on a small banner.
+// Per-type emoji prefix gives an at-a-glance signal of what was
+// removed without the user having to read the whole title.
+//
+// Body is a single space — iOS hides empty-string bodies but always
+// shows non-empty ones, and a space with no glyphs renders as a
+// near-invisible second line so the title stays the focal point.
 function cleanupCopyFor(
   contentType: ContentRef['contentType'],
   actor?: string,
 ): { title: string; body: string } {
   const a = actor?.trim()
+  const body = ' '
   switch (contentType) {
     case 'thread':
-      return a
-        ? { title: `حذف ${a} الرسالة`, body: `${a} deleted a message` }
-        : { title: 'تم حذف الرسالة',     body: 'Message was deleted' }
+      return {
+        title: a ? `🗑️ حذف ${a} الرسالة` : '🗑️ تم حذف الرسالة',
+        body,
+      }
     case 'post':
-      return a
-        ? { title: `حذف ${a} المنشور`, body: `${a} removed a post` }
-        : { title: 'تم حذف المنشور',    body: 'Post was removed' }
+      return {
+        title: a ? `🗑️ حذف ${a} المنشور` : '🗑️ تم حذف المنشور',
+        body,
+      }
     case 'comment':
-      return a
-        ? { title: `حذف ${a} التعليق`, body: `${a} removed a comment` }
-        : { title: 'تم حذف التعليق',    body: 'Comment was removed' }
+      return {
+        title: a ? `🗑️ حذف ${a} التعليق` : '🗑️ تم حذف التعليق',
+        body,
+      }
     case 'rideRequest':
-      return a
-        ? { title: `ألغى ${a} المشوار`, body: `${a} cancelled the ride` }
-        : { title: 'تم إلغاء المشوار',  body: 'Ride was cancelled' }
+      return {
+        title: a ? `🚫 ألغى ${a} المشوار` : '🚫 تم إلغاء المشوار',
+        body,
+      }
     default:
-      return a
-        ? { title: `حذف ${a}`, body: `${a} removed it` }
-        : { title: 'تم الحذف',  body: 'Removed' }
+      return {
+        title: a ? `🗑️ حذف ${a}` : '🗑️ تم الحذف',
+        body,
+      }
   }
 }
 
