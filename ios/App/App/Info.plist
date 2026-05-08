@@ -45,6 +45,18 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- Silent / background pushes (apns-push-type: background +
+	     content-available: 1) are used by the OS notification cleanup
+	     path: when content is deleted on another device, the server
+	     sends a data-only push so this device can clear the matching
+	     entry from Notification Center via removeDeliveredNotifications.
+	     iOS drops these pushes at the OS level if the app doesn't
+	     declare 'remote-notification' here, even though the payload
+	     and apns-push-type header are correct. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We need your location to find your neighborhood and connect you with nearby neighbors and services</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
