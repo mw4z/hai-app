@@ -9,9 +9,13 @@ def keystoreProps = new Properties()
 if (keystorePropertiesFile.exists()) {
     keystoreProps.load(new FileInputStream(keystorePropertiesFile))
 }
-def storePass = keystoreProps['HAI_KEYSTORE_PASSWORD'] ?: System.getenv('HAI_KEYSTORE_PASSWORD')
-def keyPass   = keystoreProps['HAI_KEY_PASSWORD']      ?: System.getenv('HAI_KEY_PASSWORD')
-def keyAlias  = keystoreProps['HAI_KEY_ALIAS']         ?: (System.getenv('HAI_KEY_ALIAS') ?: 'hai')
+def storePass    = keystoreProps['HAI_KEYSTORE_PASSWORD'] ?: System.getenv('HAI_KEYSTORE_PASSWORD')
+def keyPass      = keystoreProps['HAI_KEY_PASSWORD']      ?: System.getenv('HAI_KEY_PASSWORD')
+// Local variable name MUST differ from the `keyAlias` DSL setter
+// in signingConfigs — Groovy resolves the closure-side `keyAlias`
+// to the outer variable (a String) and then tries to invoke it,
+// failing with "No signature of method: java.lang.String.call()".
+def haiKeyAlias  = keystoreProps['HAI_KEY_ALIAS']         ?: (System.getenv('HAI_KEY_ALIAS') ?: 'hai')
 
 android {
     namespace = "com.hai.app"
@@ -33,7 +37,7 @@ android {
         release {
             storeFile file('hai-release.keystore')
             storePassword storePass
-            keyAlias keyAlias
+            keyAlias haiKeyAlias
             keyPassword keyPass
         }
     }
