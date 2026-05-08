@@ -268,6 +268,13 @@ export default function ProfileClient({ user, postCount }: Props) {
     document.documentElement.setAttribute('lang', l)
     document.documentElement.setAttribute('dir', l === 'en' ? 'ltr' : 'rtl')
     window.dispatchEvent(new Event(LANGUAGE_CHANGE_EVENT))
+    // Mirror to the server so push payloads (esp. cleanup banner copy)
+    // can be localized per recipient. Best effort — non-fatal on failure.
+    fetch('/api/profile/language', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ language: l }),
+    }).catch(() => { /* offline / network blip — server keeps prior pref */ })
   }
 
   async function toggleNotifPref(field: string, value: boolean) {

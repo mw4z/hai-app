@@ -47,6 +47,10 @@ model User {
   showLastSeen     Boolean       @default(true)  // privacy: show online/last seen
   showReadReceipts Boolean       @default(true)  // privacy: send read receipts
   showGender       Boolean       @default(true)  // privacy: show gender in profile popup
+  // UI language preference, mirrored from the client so push payloads
+  // (especially OS cleanup-banner copy) can be localized per recipient.
+  // Updated via PATCH /api/profile/language on language toggle.
+  language         String        @default("ar") // "ar" | "en" | "ur"
   isSeed           Boolean       @default(false) // generated seed user — admin-controlled
   name             String?       // first name
   lastName         String?       // last name / family name

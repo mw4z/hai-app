@@ -188,10 +188,22 @@ export async function sendCleanupPush(
     return
   }
 
+  // Pull tokens with the owning user's language so we can produce
+  // per-recipient localized copy. Joining keeps it to one query
+  // instead of N+1.
+  type TokenRow = {
+    token: string
+    platform: string
+    user: { language: string }
+  }
   const tokens = await db.deviceToken.findMany({
     where: { userId: { in: userIds } },
-    select: { token: true, platform: true },
-  })
+    select: {
+      token: true,
+      platform: true,
+      user: { select: { language: true } },
+    },
+  }) as TokenRow[]
   if (tokens.length === 0) {
     console.log('[CLEANUP_PUSH] no device tokens — skipped', {
       ref, collapseId, userIds: userIds.length,
@@ -200,13 +212,6 @@ export async function sendCleanupPush(
   }
 
   const apnsCreds = loadApnsCredentials()
-  const iosTokens = apnsCreds
-    ? tokens.filter((t) => t.platform === 'ios').map((t) => t.token)
-    : []
-  const otherTokens = apnsCreds
-    ? tokens.filter((t) => t.platform !== 'ios').map((t) => t.token)
-    : tokens.map((t) => t.token)
-
   const refsNotifId = notifIdFor(ref)
   const effectiveCollapseId = collapseId || refsNotifId
   const data = {
@@ -216,25 +221,41 @@ export async function sendCleanupPush(
     notificationId: refsNotifId,
   }
 
+  // Group tokens by (platform, language) so we can fan out one
+  // batch per copy variant.
+  type Lang = 'ar' | 'en' | 'ur'
+  const groups: Record<string, { iosTokens: string[]; fcmTokens: string[] }> = {}
+  for (const t of tokens) {
+    const lang = ((t.user?.language as Lang) || 'ar')
+    const isIos = !!apnsCreds && t.platform === 'ios'
+    const g = (groups[lang] ||= { iosTokens: [], fcmTokens: [] })
+    if (isIos) g.iosTokens.push(t.token)
+    else g.fcmTokens.push(t.token)
+  }
+
   const t0 = Date.now()
   console.log('[CLEANUP_PUSH] sending', {
     ref,
     collapseId: effectiveCollapseId,
-    iosTokenCount: iosTokens.length,
-    fcmTokenCount: otherTokens.length,
+    perLang: Object.fromEntries(
+      Object.entries(groups).map(([k, v]) => [k, {
+        ios: v.iosTokens.length, fcm: v.fcmTokens.length,
+      }]),
+    ),
     apnsConfigured: !!apnsCreds,
   })
 
-  const copy = cleanupCopyFor(ref.contentType, actorName)
-
   const sends: Promise<unknown>[] = []
-  if (iosTokens.length > 0 && apnsCreds) {
-    sends.push(
-      sendApnsCleanupAlert(iosTokens, effectiveCollapseId, data, copy, apnsCreds),
-    )
-  }
-  if (otherTokens.length > 0) {
-    sends.push(sendFcmCleanup(otherTokens, effectiveCollapseId, data))
+  for (const [lang, g] of Object.entries(groups)) {
+    const copy = cleanupCopyFor(ref.contentType, lang as Lang, actorName)
+    if (g.iosTokens.length > 0 && apnsCreds) {
+      sends.push(
+        sendApnsCleanupAlert(g.iosTokens, effectiveCollapseId, data, copy, apnsCreds),
+      )
+    }
+    if (g.fcmTokens.length > 0) {
+      sends.push(sendFcmCleanup(g.fcmTokens, effectiveCollapseId, data))
+    }
   }
   await Promise.all(sends).catch((err) => {
     console.warn('[CLEANUP_PUSH] send chain rejected', err?.message || err)
@@ -245,46 +266,64 @@ export async function sendCleanupPush(
   })
 }
 
-// Replacement-banner copy. Single-language (Arabic — primary audience)
-// so the lock-screen line stays short and readable on a small banner.
-// Per-type emoji prefix gives an at-a-glance signal of what was
-// removed without the user having to read the whole title.
+// Replacement-banner copy, localized per recipient language.
+// User.language is mirrored from the client and joined into the
+// device-token lookup, so each recipient gets the variant they can
+// actually read instead of a fixed Arabic line everyone has to
+// translate in their head.
 //
-// Body is a single space — iOS hides empty-string bodies but always
-// shows non-empty ones, and a space with no glyphs renders as a
-// near-invisible second line so the title stays the focal point.
+// Body is a single space so iOS keeps the layout consistent without
+// adding a visible second line under the title. Per-type emoji
+// prefix gives at-a-glance recognition.
 function cleanupCopyFor(
   contentType: ContentRef['contentType'],
+  language: 'ar' | 'en' | 'ur',
   actor?: string,
 ): { title: string; body: string } {
   const a = actor?.trim()
   const body = ' '
+  const ar = (withActor: string, generic: string) => a ? withActor : generic
   switch (contentType) {
     case 'thread':
-      return {
-        title: a ? `🗑️ حذف ${a} الرسالة` : '🗑️ تم حذف الرسالة',
-        body,
+      if (language === 'en') {
+        return { title: a ? `🗑️ ${a} deleted a message` : '🗑️ Message was deleted', body }
       }
+      if (language === 'ur') {
+        return { title: a ? `🗑️ ${a} نے پیغام حذف کیا` : '🗑️ پیغام حذف ہو گیا', body }
+      }
+      return { title: ar(`🗑️ حذف ${a} الرسالة`, '🗑️ تم حذف الرسالة'), body }
+
     case 'post':
-      return {
-        title: a ? `🗑️ حذف ${a} المنشور` : '🗑️ تم حذف المنشور',
-        body,
+      if (language === 'en') {
+        return { title: a ? `🗑️ ${a} removed a post` : '🗑️ Post was removed', body }
       }
+      if (language === 'ur') {
+        return { title: a ? `🗑️ ${a} نے پوسٹ ہٹا دی` : '🗑️ پوسٹ ہٹا دی گئی', body }
+      }
+      return { title: ar(`🗑️ حذف ${a} المنشور`, '🗑️ تم حذف المنشور'), body }
+
     case 'comment':
-      return {
-        title: a ? `🗑️ حذف ${a} التعليق` : '🗑️ تم حذف التعليق',
-        body,
+      if (language === 'en') {
+        return { title: a ? `🗑️ ${a} removed a comment` : '🗑️ Comment was removed', body }
       }
+      if (language === 'ur') {
+        return { title: a ? `🗑️ ${a} نے تبصرہ ہٹا دیا` : '🗑️ تبصرہ ہٹا دیا گیا', body }
+      }
+      return { title: ar(`🗑️ حذف ${a} التعليق`, '🗑️ تم حذف التعليق'), body }
+
     case 'rideRequest':
-      return {
-        title: a ? `🚫 ألغى ${a} المشوار` : '🚫 تم إلغاء المشوار',
-        body,
+      if (language === 'en') {
+        return { title: a ? `🚫 ${a} cancelled the ride` : '🚫 Ride was cancelled', body }
       }
+      if (language === 'ur') {
+        return { title: a ? `🚫 ${a} نے رائڈ منسوخ کر دی` : '🚫 رائڈ منسوخ ہو گئی', body }
+      }
+      return { title: ar(`🚫 ألغى ${a} المشوار`, '🚫 تم إلغاء المشوار'), body }
+
     default:
-      return {
-        title: a ? `🗑️ حذف ${a}` : '🗑️ تم الحذف',
-        body,
-      }
+      if (language === 'en') return { title: a ? `🗑️ ${a} removed it` : '🗑️ Removed', body }
+      if (language === 'ur') return { title: a ? `🗑️ ${a} نے ہٹا دیا` : '🗑️ ہٹا دیا گیا', body }
+      return { title: ar(`🗑️ حذف ${a}`, '🗑️ تم الحذف'), body }
   }
 }
 
