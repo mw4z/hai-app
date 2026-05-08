@@ -153,6 +153,21 @@ function contentRefsFromQuery(refs: {
 export async function sendCleanupPush(
   userIds: string[],
   ref: ContentRef,
+  /**
+   * Optional override for the OS-level collapse identifier. When the
+   * original push was emitted with a stable per-instance id (e.g.
+   * `message:MSGID` for DMs, `post:POSTID` for posts), pass the
+   * matching value here so iOS REPLACES that specific banner with
+   * the cleanup payload. Without it, the cleanup push appears as a
+   * new banner instead of replacing the original.
+   *
+   * Defaults to `notifIdFor(ref)` (e.g. `post:POSTID`) which works
+   * for posts/comments/rides where contentId IS the per-instance id.
+   * DMs need an explicit override because contentId is the threadId
+   * (used for cleanup match) but the original push collapse id was
+   * `message:MSGID`.
+   */
+  collapseId?: string,
 ): Promise<void> {
   if (userIds.length === 0) return
 
@@ -170,26 +185,23 @@ export async function sendCleanupPush(
     ? tokens.filter((t) => t.platform !== 'ios').map((t) => t.token)
     : tokens.map((t) => t.token)
 
-  const notifId = notifIdFor(ref)
+  const refsNotifId = notifIdFor(ref)
+  const effectiveCollapseId = collapseId || refsNotifId
   const data = {
     cleanup: 'true',
     contentType: ref.contentType,
     contentId: ref.contentId,
-    notificationId: notifId,
+    notificationId: refsNotifId,
   }
 
   const sends: Promise<unknown>[] = []
   if (iosTokens.length > 0 && apnsCreds) {
-    // Alert-replacement push, NOT silent. Same apns-collapse-id =>
-    // replaces the original banner. Low priority so iOS doesn't
-    // beep/vibrate. content-available: 1 => AppDelegate's native
-    // cleanup runs to remove the replacement banner too.
     sends.push(
-      sendApnsCleanupAlert(iosTokens, notifId, data, apnsCreds),
+      sendApnsCleanupAlert(iosTokens, effectiveCollapseId, data, apnsCreds),
     )
   }
   if (otherTokens.length > 0) {
-    sends.push(sendFcmCleanup(otherTokens, notifId, data))
+    sends.push(sendFcmCleanup(otherTokens, effectiveCollapseId, data))
   }
   await Promise.all(sends).catch(() => { /* best effort */ })
 }
@@ -213,7 +225,7 @@ export async function sendCleanupPush(
 // banners matching contentType + contentId and clears them.
 async function sendApnsCleanupAlert(
   tokens: string[],
-  _notifId: string, // unused now — kept for signature stability
+  collapseId: string,
   data: Record<string, string>,
   creds: ReturnType<typeof loadApnsCredentials>,
 ): Promise<void> {
@@ -254,6 +266,7 @@ async function sendApnsCleanupAlert(
       'apns-topic': creds.bundleId,
       'apns-push-type': 'alert',
       'apns-priority': '5', // Low — no beep, still reliably delivered.
+      'apns-collapse-id': collapseId, // Replaces the matching original banner.
       'content-type': 'application/json',
       'content-length': String(Buffer.byteLength(jsonBody)),
     }

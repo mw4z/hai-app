@@ -251,6 +251,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const inlineSent = await sendDmPushNow({
       recipientId,
       threadId: params.id,
+      messageId: message.id,
       senderName,
       snippet,
       messageType: type || 'TEXT',
@@ -265,6 +266,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             targetRef: recipientId,
             payload: {
               threadId: params.id,
+              messageId: message.id,
               senderId: session.userId,
               senderName,
               snippet,

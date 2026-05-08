@@ -91,14 +91,22 @@ interface NotificationContent {
   priority?: 'high' | 'normal'
   androidChannel?: string
   /**
-   * Stable content reference. When set we forward a derived id as:
-   *   - Android FCM notification `tag`
-   *   - iOS APNs `apns-collapse-id`
-   *   - data.notificationId / data.contentType / data.contentId
-   * so OS-level cleanup can target this push by content rather than
-   * by the system's auto-generated request id.
+   * Stable content reference, mirrored into data fields so the
+   * client-side sweep + native cleanup handler can match delivered
+   * notifications by contentType + contentId. NOT used as the OS-level
+   * collapse identifier — see `collapseId` for that.
    */
   refs?: ContentRef
+  /**
+   * Per-push OS-level identifier used as both `apns-collapse-id`
+   * (iOS) and FCM notification `tag` (Android). Each instance of
+   * content (a specific message, post, comment, ride) should have a
+   * unique value here so they stack as independent banners. Cleanup
+   * pushes for a specific instance reuse the same collapseId so iOS
+   * REPLACES the existing banner reliably (alert pushes aren't
+   * throttled like silent pushes are).
+   */
+  collapseId?: string
   /**
    * Silent / data-only payload. Used by the cleanup-push path to ask
    * recipient devices to clear an OS notification without showing a
@@ -132,20 +140,17 @@ export async function sendPushBatch(
     ? tokens.filter((t) => t.platform !== 'ios').map((t) => t.token)
     : tokens.map((t) => t.token)
 
-  // refs become data fields used by both the JS-side sweep and the
-  // native iOS cleanup handler to match delivered notifications by
-  // contentType + contentId. We deliberately DO NOT derive an
-  // apns-collapse-id / FCM tag from refs — using `thread:XYZ` as the
-  // collapse-id meant every new DM in a thread replaced the previous
-  // banner, so multi-message conversations only ever showed the last
-  // one. Cleanup matches by data fields, not by OS-level identifier,
-  // so collapse isn't required for the cleanup path either.
-  const notifId = content.refs ? notifIdFor(content.refs) : undefined
+  // refs become data fields for cleanup matching. The OS-level
+  // collapse identifier comes from content.collapseId, which callers
+  // set to a per-instance value (e.g. `message:MSGID`) so each push
+  // stands alone in the notification tray. Cleanup pushes reuse the
+  // same collapseId to reliably replace the matching banner.
+  const refsNotifId = content.refs ? notifIdFor(content.refs) : undefined
   const enrichedData: Record<string, string> = { ...(content.data || {}) }
   if (content.refs) {
     enrichedData.contentType = content.refs.contentType
     enrichedData.contentId = content.refs.contentId
-    enrichedData.notificationId = notifId!
+    enrichedData.notificationId = refsNotifId!
   }
   if (content.silent) {
     enrichedData.cleanup = 'true'
@@ -160,7 +165,7 @@ export async function sendPushBatch(
       body: content.body,
       priority: content.priority === 'high' ? 'high' : 'normal',
       data: enrichedData,
-      // No collapseId — see comment above. Each push is its own banner.
+      collapseId: content.collapseId,
       silent: content.silent,
     }, apnsCreds)
     combined.success += apns.success
@@ -170,10 +175,7 @@ export async function sendPushBatch(
   }
 
   if (otherTokens.length > 0) {
-    // Same reasoning as iOS: don't pass notifId as the FCM `tag`,
-    // otherwise multiple messages in the same thread replace each
-    // other in the Android notification shade.
-    const fcm = await sendFcmBatch(otherTokens, enrichedContent, undefined)
+    const fcm = await sendFcmBatch(otherTokens, enrichedContent, content.collapseId)
     combined.success += fcm.success
     combined.failed += fcm.failed
     combined.invalidTokens.push(...fcm.invalidTokens)
@@ -517,6 +519,7 @@ async function processNewPost(job: JobRow): Promise<JobOutcome> {
     // NORMAL priority lets FCM + Android Doze mode defer for minutes.
     priority: 'high',
     refs: { contentType: 'post', contentId: postId },
+    collapseId: `post:${postId}`,
     data: {
       type: 'new_post',
       postId,
@@ -588,6 +591,7 @@ async function processCommentOnPost(job: JobRow): Promise<JobOutcome> {
     body: pushBody,
     priority: 'high',
     refs: { contentType: 'comment', contentId: commentId },
+    collapseId: `comment:${commentId}`,
     data: {
       type: 'comment_on_post',
       postId,
@@ -659,6 +663,7 @@ async function processFollowPostComment(job: JobRow): Promise<JobOutcome> {
     body,
     priority: 'normal',
     refs: { contentType: 'comment', contentId: commentId },
+    collapseId: `comment:${commentId}`,
     data: {
       type: 'follow_post_comment',
       postId,
@@ -734,6 +739,7 @@ async function processReplyToComment(job: JobRow): Promise<JobOutcome> {
     body: pushBody,
     priority: 'high',
     refs: { contentType: 'comment', contentId: commentId },
+    collapseId: `comment:${commentId}`,
     data: {
       type: 'reply_to_comment',
       postId,
@@ -806,6 +812,7 @@ async function processReactionOnPost(job: JobRow): Promise<JobOutcome> {
     body: pushBody,
     priority: 'high',
     refs: { contentType: 'post', contentId: postId },
+    collapseId: `post:${postId}`,
     data: {
       type: 'reaction_on_post',
       postId,
@@ -1290,6 +1297,7 @@ async function processRideStatus(job: JobRow): Promise<JobOutcome> {
     body: pushBody,
     priority: 'high',
     refs: { contentType: 'rideRequest', contentId: rideRequestId },
+    collapseId: `rideRequest:${rideRequestId}`,
     data: {
       type: 'ride_status',
       notifType: notifType || '',
@@ -1373,6 +1381,7 @@ async function processNewRideRequest(job: JobRow): Promise<JobOutcome> {
     body: pushBody.slice(0, 180),
     priority: 'high',
     refs: { contentType: 'rideRequest', contentId: rideRequestId },
+    collapseId: `rideRequest:${rideRequestId}`,
     data: {
       type: 'new_ride_request',
       rideRequestId,
@@ -1408,12 +1417,13 @@ async function processNewRideRequest(job: JobRow): Promise<JobOutcome> {
 async function processNewMessage(job: JobRow): Promise<JobOutcome> {
   const p = (job.payload || {}) as {
     threadId?: string
+    messageId?: string
     senderId?: string
     senderName?: string | null
     snippet?: string
     messageType?: string
   }
-  const { threadId, senderName, snippet, messageType } = p
+  const { threadId, messageId, senderName, snippet, messageType } = p
   if (!threadId) return 'dropped'
 
   const { tokens, userExists } = await resolveUserTokens(
@@ -1436,9 +1446,15 @@ async function processNewMessage(job: JobRow): Promise<JobOutcome> {
     body,
     priority: 'high',
     refs: { contentType: 'thread', contentId: threadId },
+    // Per-message collapse id so multiple messages in the same thread
+    // STACK as separate banners. If we used `thread:${threadId}` here
+    // every new DM in the thread would replace the previous one and
+    // the lock screen would only ever show the latest message.
+    collapseId: messageId ? `message:${messageId}` : undefined,
     data: {
       type: 'new_message',
       threadId,
+      ...(messageId ? { messageId } : {}),
       deeplink: `hai://threads/${threadId}`,
     },
   })
@@ -1475,12 +1491,13 @@ async function processNewMessage(job: JobRow): Promise<JobOutcome> {
 export async function sendDmPushNow(args: {
   recipientId: string
   threadId: string
+  messageId: string
   senderName: string | null | undefined
   snippet: string
   messageType: string | null | undefined
 }): Promise<boolean> {
   try {
-    const { recipientId, threadId, senderName, snippet, messageType } = args
+    const { recipientId, threadId, messageId, senderName, snippet, messageType } = args
 
     const { tokens, userExists } = await resolveUserTokens(
       recipientId,
@@ -1501,9 +1518,11 @@ export async function sendDmPushNow(args: {
       body,
       priority: 'high',
       refs: { contentType: 'thread', contentId: threadId },
+      collapseId: `message:${messageId}`,
       data: {
         type: 'new_message',
         threadId,
+        messageId,
         deeplink: `hai://threads/${threadId}`,
       },
     })

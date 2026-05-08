@@ -59,10 +59,16 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
         })
         // OS-level cleanup push to this user's other devices so the
         // delivered DM banner disappears from Notification Center
-        // immediately. Best effort — silent push, may be throttled.
-        void sendCleanupPush([session.userId], {
-          contentType: 'thread', contentId: params.id,
-        }).catch(() => { /* best effort */ })
+        // immediately. The explicit collapseId `message:MSGID` matches
+        // the per-message id the original push used, so iOS replaces
+        // that specific banner with the "🗑️" content. Without this
+        // override the cleanup would target `thread:THREADID` (from
+        // the ref), which doesn't match anything on iOS.
+        void sendCleanupPush(
+          [session.userId],
+          { contentType: 'thread', contentId: params.id },
+          `message:${params.msgId}`,
+        ).catch(() => { /* best effort */ })
       } catch { /* non-fatal */ }
       return NextResponse.json({ success: true, scope: 'me' })
     }
@@ -97,10 +103,15 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       // we can't snapshot recipients from the Notification table.
       // Both thread participants need the cleanup push regardless —
       // their phones may still have an OS-level banner from the APNs
-      // delivery even though no bell row ever existed.
-      void sendCleanupPush([thread.user1Id, thread.user2Id], {
-        contentType: 'thread', contentId: params.id,
-      }).catch(() => { /* best effort */ })
+      // delivery even though no bell row ever existed. Per-message
+      // collapseId so iOS replaces the specific banner this message
+      // produced (every new DM uses `message:MSGID` as its collapse
+      // identifier, see processNewMessage / sendDmPushNow).
+      void sendCleanupPush(
+        [thread.user1Id, thread.user2Id],
+        { contentType: 'thread', contentId: params.id },
+        `message:${params.msgId}`,
+      ).catch(() => { /* best effort */ })
     } catch { /* non-fatal */ }
     return NextResponse.json({ success: true, scope: 'all' })
   } catch (error) {
