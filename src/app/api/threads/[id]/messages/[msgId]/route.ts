@@ -90,23 +90,17 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     //    tray entry not cleared. Awaited now so the response
     //    only resolves after notifications are gone.
     try {
-      // Snapshot recipients BEFORE deleting so we know whose phones
-      // need an OS-level cleanup nudge. Distinct so we don't push the
-      // same user twice for two-device installs.
-      const recipients = await db.notification.findMany({
-        where: { threadId: params.id, type: 'NEW_MESSAGE' },
-        select: { userId: true },
-        distinct: ['userId'],
-      })
       await db.notification.deleteMany({
         where: { threadId: params.id, type: 'NEW_MESSAGE' },
       })
-      const recipientIds = recipients.map((r) => r.userId)
-      if (recipientIds.length > 0) {
-        void sendCleanupPush(recipientIds, {
-          contentType: 'thread', contentId: params.id,
-        }).catch(() => { /* best effort */ })
-      }
+      // DMs don't create Notification bell rows (commit 62ebe6c), so
+      // we can't snapshot recipients from the Notification table.
+      // Both thread participants need the cleanup push regardless —
+      // their phones may still have an OS-level banner from the APNs
+      // delivery even though no bell row ever existed.
+      void sendCleanupPush([thread.user1Id, thread.user2Id], {
+        contentType: 'thread', contentId: params.id,
+      }).catch(() => { /* best effort */ })
     } catch { /* non-fatal */ }
     return NextResponse.json({ success: true, scope: 'all' })
   } catch (error) {

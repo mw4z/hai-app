@@ -864,8 +864,15 @@ export default function ChatClient({
         // Tell PushRegistration to re-sweep the OS tray now — the
         // appStateChange listener won't fire if the user was already
         // in-app when they deleted, so without this nudge the banner
-        // sits stale until next background/foreground cycle.
-        try { window.dispatchEvent(new CustomEvent('hai:content-deleted')) } catch {}
+        // sits stale until next background/foreground cycle. Detail
+        // tells the listener exactly which content to clear so it
+        // can call UNUserNotificationCenter.removeDeliveredNotifications
+        // immediately without waiting on the active-refs roundtrip.
+        try {
+          window.dispatchEvent(new CustomEvent('hai:content-deleted', {
+            detail: { contentType: 'thread', contentId: threadId },
+          }))
+        } catch {}
         toast.success(lang === 'en' ? 'Deleted' : 'تم الحذف')
       } else {
         const d = await res.json().catch(() => ({}))
