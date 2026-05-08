@@ -5,6 +5,7 @@ import { canTransition, getActorRole, getCancelPenalty, getCompletionRewards } f
 import type { RideStatus } from '@/lib/rides/state-machine'
 import { logRideEvent, logInvalidTransition } from '@/lib/rides/events'
 import { notifyRequesterStatus, notifyTripCompleted } from '@/lib/rides/notify'
+import { cleanupNotificationsFor, sendCleanupPush } from '@/lib/notifications'
 import { addReputation } from '@/lib/reputation'
 import { log } from '@/lib/logger'
 
@@ -186,6 +187,24 @@ export async function POST(
           reason || 'تم الإلغاء', reason || 'Cancelled',
         )
       }
+
+      // Clear in-ride notifications (RIDE_MESSAGE bell rows + OS-level
+      // banners) for both parties — the ride is dead, those entries
+      // tap-jump nowhere useful. Awaited so the API response only
+      // resolves after cleanup commits and the client's tray-sweep
+      // sees the post-cancel state.
+      await cleanupNotificationsFor({ rideRequestId: ride.id })
+        .catch(() => { /* non-fatal */ })
+
+      // cleanupNotificationsFor only fires the silent push for users
+      // who had a Notification bell row — rides without any in-trip
+      // chat have none, but the requester/driver may still have an
+      // OS banner from new_ride_request or ride_status pushes. Nudge
+      // them explicitly so those banners clear too.
+      const explicitRecipients = [ride.requesterId, ...(driverId ? [driverId] : [])]
+      void sendCleanupPush(explicitRecipients, {
+        contentType: 'rideRequest', contentId: ride.id,
+      }).catch(() => { /* best effort */ })
 
       return NextResponse.json({ status: 'RIDE_CANCELLED' })
     }

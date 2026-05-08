@@ -201,6 +201,17 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
       }
       hapticSuccess()
       if (successMsg) toast.success(successMsg)
+      // For status transitions that make the ride dead (cancel /
+      // expire / complete), nudge PushRegistration to clear any
+      // delivered ride banners on this device immediately, without
+      // waiting on the server's silent push to round-trip.
+      if (body?.action === 'cancel' || body?.action === 'complete') {
+        try {
+          window.dispatchEvent(new CustomEvent('hai:content-deleted', {
+            detail: { contentType: 'rideRequest', contentId: rideId },
+          }))
+        } catch {}
+      }
       await fetchRide()
       return true
     } catch { hapticError(); toast.error(lang === 'en' ? 'Connection error' : lang === 'ur' ? 'رابطہ ناکام' : 'تعذر الاتصال'); return false }

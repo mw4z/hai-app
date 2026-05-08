@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { logRideEvent } from '@/lib/rides/events'
 import { notifyConfirmTimeout, notifyTripCompleted, notifyRequesterStatus } from '@/lib/rides/notify'
+import { cleanupNotificationsFor } from '@/lib/notifications'
 import { addReputation } from '@/lib/reputation'
 import { getCompletionRewards, getStaleInProgressTimeout } from '@/lib/rides/state-machine'
 
@@ -74,6 +75,7 @@ export async function GET(req: NextRequest) {
 
   for (const trip of staleConfirmed) {
     await db.rideRequest.update({ where: { id: trip.rideRequestId }, data: { status: 'RIDE_CANCELLED' } })
+    await cleanupNotificationsFor({ rideRequestId: trip.rideRequestId }).catch(() => {})
     await db.trip.update({ where: { id: trip.id }, data: { cancelledAt: now, cancelledBy: 'system', cancelReason: 'driver stale at CONFIRMED (20min)' } })
     await addReputation({ userId: trip.driverId, action: 'ride_cancel', points: -5 })
     await db.user.update({ where: { id: trip.driverId }, data: { driverCancelCount: { increment: 1 } } })
@@ -102,6 +104,7 @@ export async function GET(req: NextRequest) {
 
   for (const trip of staleEnRoute) {
     await db.rideRequest.update({ where: { id: trip.rideRequestId }, data: { status: 'RIDE_CANCELLED' } })
+    await cleanupNotificationsFor({ rideRequestId: trip.rideRequestId }).catch(() => {})
     await db.trip.update({ where: { id: trip.id }, data: { cancelledAt: now, cancelledBy: 'system', cancelReason: 'driver stale at EN_ROUTE (45min), flagged suspicious' } })
     await addReputation({ userId: trip.driverId, action: 'ride_cancel', points: -10 })
     await db.user.update({ where: { id: trip.driverId }, data: { driverCancelCount: { increment: 1 } } })
@@ -130,6 +133,7 @@ export async function GET(req: NextRequest) {
 
   for (const trip of noshowTrips) {
     await db.rideRequest.update({ where: { id: trip.rideRequestId }, data: { status: 'RIDE_CANCELLED' } })
+    await cleanupNotificationsFor({ rideRequestId: trip.rideRequestId }).catch(() => {})
     await db.trip.update({ where: { id: trip.id }, data: { cancelledAt: now, cancelledBy: 'system', cancelReason: 'requester no-show (10min)' } })
     await addReputation({ userId: trip.requesterId, action: 'ride_noshow', points: -5 })
     await logRideEvent({
@@ -233,6 +237,7 @@ export async function GET(req: NextRequest) {
     const isLateExpiry = !ride.isImmediate && ride.scheduledAt && ride.scheduledAt < now
 
     await db.rideRequest.update({ where: { id: ride.id }, data: { status: 'RIDE_EXPIRED' } })
+    await cleanupNotificationsFor({ rideRequestId: ride.id }).catch(() => {})
     await db.rideOffer.updateMany({
       where: { rideRequestId: ride.id, status: 'OFFER_PENDING' },
       data: { status: 'OFFER_PASSED' },
