@@ -1,5 +1,6 @@
 import UIKit
 import AVFoundation
+import UserNotifications
 import Capacitor
 
 @UIApplicationMain
@@ -99,8 +100,65 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        // Cleanup pushes carry { cleanup: "true", contentType, contentId }
+        // and need to remove a delivered notification from Notification
+        // Center. We handle them NATIVELY here instead of bouncing
+        // through the JS bridge because the bridge is suspended when
+        // the app is backgrounded — JS-side removeDeliveredByRef would
+        // never fire, leaving the banner stale until the user opens
+        // the app and sweepStaleTray runs. iOS gives us a ~30s window
+        // in background mode to do native work, which is plenty.
+        if let cleanupFlag = userInfo["cleanup"] as? String, cleanupFlag == "true",
+           let contentType = userInfo["contentType"] as? String,
+           let contentId = userInfo["contentId"] as? String {
+            removeDeliveredNotificationsNatively(contentType: contentType, contentId: contentId) {
+                completionHandler(.newData)
+            }
+            return
+        }
+
+        // Non-cleanup pushes (silent or otherwise) still get forwarded
+        // to JS so any future foreground listener can react.
         forwardSilentPushToCapacitor(userInfo: userInfo)
         completionHandler(.newData)
+    }
+
+    /// Remove delivered notifications matching `contentType` + `contentId`
+    /// without touching the JS layer. Called from the silent-push handler
+    /// so cleanup works while the app is backgrounded.
+    private func removeDeliveredNotificationsNatively(
+        contentType: String,
+        contentId: String,
+        completion: @escaping () -> Void
+    ) {
+        UNUserNotificationCenter.current().getDeliveredNotifications { delivered in
+            let toRemoveIds: [String] = delivered.compactMap { notif in
+                let d = notif.request.content.userInfo
+                let dContentType = d["contentType"] as? String
+                let dContentId = d["contentId"] as? String
+                if dContentType == contentType && dContentId == contentId {
+                    return notif.request.identifier
+                }
+                // Legacy fallback: older payloads only had threadId /
+                // postId / commentId / rideRequestId, no contentType/Id.
+                let legacyKey: String?
+                switch contentType {
+                case "post":        legacyKey = d["postId"]        as? String
+                case "comment":     legacyKey = d["commentId"]     as? String
+                case "thread":      legacyKey = d["threadId"]      as? String
+                case "rideRequest": legacyKey = d["rideRequestId"] as? String
+                default:            legacyKey = nil
+                }
+                if legacyKey == contentId {
+                    return notif.request.identifier
+                }
+                return nil
+            }
+            if !toRemoveIds.isEmpty {
+                UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: toRemoveIds)
+            }
+            completion()
+        }
     }
 
     private func forwardSilentPushToCapacitor(userInfo: [AnyHashable: Any]) {
