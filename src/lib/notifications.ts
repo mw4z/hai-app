@@ -119,23 +119,36 @@ function contentRefsFromQuery(refs: {
 }
 
 /**
- * OS-level notification cleanup. Sends a silent / data-only push to
- * each recipient's devices asking the app to remove the delivered
- * notification for `ref` from the OS notification center.
+ * OS-level notification cleanup.
  *
- *   iOS:     `aps: { content-available: 1 }` + `apns-collapse-id` +
- *            `data.cleanup = 'true'`. Apple throttles silent pushes,
- *            so this is best-effort. The app's foreground-receive
- *            handler in PushRegistration removes the matching
- *            delivered notification when it processes the payload.
- *   Android: data-only FCM message. Capacitor's
- *            `pushNotificationReceived` event fires when the app is
- *            running; for fully-killed apps the OS notification
- *            stays until the next sweep on app open.
+ * iOS path — replacement banner via apns-collapse-id:
+ *   The previous "send a silent push and clear from JS" approach
+ *   failed in production because Apple throttles silent pushes
+ *   (apns-push-type: background) so aggressively that they're
+ *   typically held in a queue until the app foregrounds. The
+ *   user's diagnostic confirmed: cleanup pushes fired in foreground
+ *   tests but never arrived when the app was backgrounded — the
+ *   notification only cleared on next app open via sweepStaleTray.
  *
- * Reliable cleanup still depends on `sweepStaleTray()` running on
- * app foreground — this push just makes the cleanup faster for
- * recipients whose app is currently active or in background.
+ *   Switched to the same approach WhatsApp/Telegram/iMessage use:
+ *   send a regular ALERT push with the SAME apns-collapse-id as
+ *   the original notification. iOS replaces the existing banner
+ *   in Notification Center / lock screen with this new minimal
+ *   one (title "🗑️", empty body). The replacement is reliable
+ *   because alert pushes are not throttled. Combined with
+ *   `content-available: 1` so iOS also wakes the app, our
+ *   AppDelegate's native cleanup handler removes the replacement
+ *   banner too, leaving Notification Center clean (best case)
+ *   or showing a brief "🗑️" placeholder (worst case for killed
+ *   apps until next open).
+ *
+ * Android path — data-only FCM message:
+ *   Capacitor's FirebaseMessagingService fires
+ *   `pushNotificationReceived` for data-only messages even when
+ *   the app process is suspended (re-spawning briefly). The JS
+ *   handler in PushRegistration runs removeDeliveredByRef. If
+ *   the process is fully killed, sweepStaleTray on next open
+ *   covers the case.
  */
 export async function sendCleanupPush(
   userIds: string[],
@@ -167,18 +180,85 @@ export async function sendCleanupPush(
 
   const sends: Promise<unknown>[] = []
   if (iosTokens.length > 0 && apnsCreds) {
+    // Alert-replacement push, NOT silent. Same apns-collapse-id =>
+    // replaces the original banner. Low priority so iOS doesn't
+    // beep/vibrate. content-available: 1 => AppDelegate's native
+    // cleanup runs to remove the replacement banner too.
     sends.push(
-      sendApnsBatch(
-        iosTokens,
-        { title: '', body: '', silent: true, collapseId: notifId, data },
-        apnsCreds,
-      ),
+      sendApnsCleanupAlert(iosTokens, notifId, data, apnsCreds),
     )
   }
   if (otherTokens.length > 0) {
     sends.push(sendFcmCleanup(otherTokens, notifId, data))
   }
   await Promise.all(sends).catch(() => { /* best effort */ })
+}
+
+// Minimal APNs alert push for the cleanup path. Lives here instead of
+// in sendApnsBatch so we don't have to fork that function's payload
+// assembly to support hybrid alert + content-available + low priority.
+async function sendApnsCleanupAlert(
+  tokens: string[],
+  notifId: string,
+  data: Record<string, string>,
+  creds: ReturnType<typeof loadApnsCredentials>,
+): Promise<void> {
+  if (!creds || tokens.length === 0) return
+  const { mintApnsJwt } = await import('@/lib/apns')
+  const jwt = mintApnsJwt(creds)
+  const host = creds.env === 'development'
+    ? 'api.sandbox.push.apple.com'
+    : 'api.push.apple.com'
+
+  const payload = {
+    aps: {
+      // Minimal alert content. Empty body = iOS may show just the
+      // app name + "🗑️" emoji; that's the unavoidable cost of
+      // reliable banner replacement on iOS.
+      alert: { title: '🗑️', body: ' ' },
+      // No sound/vibration — this is a stealth replacement.
+      // Badge: -1 leaves badge unchanged; 0 would clear other badges.
+      'content-available': 1,
+      'mutable-content': 1,
+    },
+    ...data,
+  }
+  const jsonBody = JSON.stringify(payload)
+
+  const http2 = await import('http2')
+  const session = http2.connect(`https://${host}`)
+  try {
+    await new Promise<void>((resolve) => {
+      session.once('connect', () => resolve())
+      session.once('error', () => resolve())
+      setTimeout(resolve, 8000)
+    })
+  } catch { /* ignore */ }
+
+  const sendOne = (token: string) => new Promise<void>((resolve) => {
+    const headers: Record<string, string> = {
+      ':method': 'POST',
+      ':path': `/3/device/${token}`,
+      authorization: `bearer ${jwt}`,
+      'apns-topic': creds.bundleId,
+      'apns-push-type': 'alert',
+      'apns-priority': '5', // Low — no immediate beep, but reliably delivered.
+      'apns-collapse-id': notifId, // <-- the magic: replaces existing banner
+      'content-type': 'application/json',
+      'content-length': String(Buffer.byteLength(jsonBody)),
+    }
+    const req = session.request(headers)
+    req.on('response', () => { /* ignore status — best effort */ })
+    req.on('end', resolve)
+    req.on('error', () => resolve())
+    req.end(jsonBody)
+  })
+
+  try {
+    await Promise.all(tokens.map(sendOne))
+  } finally {
+    try { session.close() } catch {}
+  }
 }
 
 // ── Minimal FCM v1 sender for data-only cleanup pushes ───────────────────
