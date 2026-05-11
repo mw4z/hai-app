@@ -85,7 +85,8 @@ export default async function FeedPage({
   // Run all DB queries in parallel — including highlights, which used
   // to run sequentially after the batch and added a full DB roundtrip
   // (~150ms) to every feed render.
-  const [posts, unreadNotifCount, browseNeighborhood, bookmarkedIds, followedIds, highlightsBundle] = await Promise.all([
+  const ridesNow = new Date()
+  const [posts, unreadNotifCount, browseNeighborhood, bookmarkedIds, followedIds, highlightsBundle, openRidesRaw, pollsRaw] = await Promise.all([
     // Posts — cache 60s per neighborhood+category combo (was 30s).
     // Doubling the TTL halves the per-feed DB load with no user-visible
     // change in freshness for posts (PostCard's poll catches edits).
@@ -175,7 +176,49 @@ export default async function FeedPage({
     // moved in so the whole page does ONE fan-out instead of two.
     getHighlights(activeNeighborhoodId, user.gender as 'MALE' | 'FEMALE' | 'UNSPECIFIED' | null)
       .catch(() => ({ items: [], generatedAt: new Date().toISOString() })),
+    // Open RIDE requests for the "المشاوير" strip — SSR'd so the strip
+    // is on screen with the feed instead of popping in ~1s later.
+    // Mirrors GET /api/rides?type=RIDE&neighborhood=…, take 3 (strip cap).
+    db.rideRequest.findMany({
+      where: {
+        status: 'RIDE_OPEN',
+        expiresAt: { gt: ridesNow },
+        OR: [
+          { isImmediate: true },
+          { scheduledAt: { lte: new Date(ridesNow.getTime() + 2 * 3600 * 1000) } },
+        ],
+        type: 'RIDE',
+        neighborhoodId: activeNeighborhoodId,
+      },
+      select: {
+        id: true, pickupArea: true, dropoffArea: true, distanceKm: true, durationMin: true,
+        estimatedMinPrice: true, estimatedMaxPrice: true, isImmediate: true, scheduledAt: true,
+        notes: true, type: true, itemDescription: true, status: true, createdAt: true,
+        requester: { select: { id: true, name: true, lastName: true, avatarUrl: true, reputation: true } },
+        _count: { select: { offers: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+    }).catch(() => []),
+    // Active polls — SSR'd for the same reason. Mirrors GET /api/polls.
+    db.poll.findMany({
+      where: { neighborhoodId: activeNeighborhoodId, status: 'active' },
+      include: {
+        author: { select: { id: true, name: true, lastName: true, avatarUrl: true, role: true } },
+        votes: { select: { userId: true, optionIndex: true } },
+        reactions: { select: { userId: true, emoji: true } },
+        _count: { select: { votes: true, comments: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    }).catch(() => []),
   ])
+
+  const initialOpenRides = (openRidesRaw as any[]).map(r => {
+    const isLate = !r.isImmediate && r.scheduledAt && new Date(r.scheduledAt) < ridesNow
+    const { _count, ...rest } = r
+    return { ...rest, offerCount: _count.offers, isLate: isLate || false }
+  })
 
   if (isReadOnly && !browseNeighborhood) redirect('/feed')
 
@@ -388,6 +431,8 @@ export default async function FeedPage({
       requestsRecentDot={requestsRecentDot}
       highlights={highlightsBundle.items}
       deliveryRequests={JSON.parse(JSON.stringify(deliveryRequests))}
+      initialRides={JSON.parse(JSON.stringify(initialOpenRides))}
+      initialPolls={JSON.parse(JSON.stringify(pollsRaw))}
     />
   )
 }

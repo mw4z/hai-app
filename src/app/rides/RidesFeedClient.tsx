@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useLanguage } from '@/hooks/useLanguage'
@@ -17,17 +17,40 @@ type Tab = 'all' | 'mine' | 'offers'
 // to DELIVERY when they want that view.
 type AllFilter = 'RIDE' | 'DELIVERY'
 
-export default function RidesFeedClient({ userId }: { userId: string }) {
+export default function RidesFeedClient({
+  userId,
+  initialRides = [],
+}: {
+  userId: string
+  /** SSR'd "all" tab / RIDE sub-filter list. Lets the page paint with
+   *  the rides already on screen instead of a spinner. */
+  initialRides?: any[]
+}) {
   const router = useRouter()
   const { t, lang } = useLanguage()
   const [tab, setTab] = useState<Tab>('all')
   const [allFilter, setAllFilter] = useState<AllFilter>('RIDE')
-  const [rides, setRides] = useState<any[]>([])
+  const [rides, setRides] = useState<any[]>(initialRides)
   const [myRequests, setMyRequests] = useState<any[]>([])
   const [myOffers, setMyOffers] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  // Starts false: the default view (all/RIDE) is server-rendered. Only
+  // a tab/sub-filter switch to a not-yet-loaded combo flips it on.
+  const [loading, setLoading] = useState(false)
 
+  // True until the user changes tab/sub-filter away from the SSR'd
+  // combo. On that first run we skip the fetch (we already have the
+  // data) but still kick a silent refresh so a ride created between
+  // server render and hydration shows up without a spinner.
+  const onInitialView = useRef(true)
   useEffect(() => {
+    const isInitialCombo = tab === 'all' && allFilter === 'RIDE'
+    if (onInitialView.current && isInitialCombo) {
+      onInitialView.current = false
+      // Silent catch-up — no spinner, just replace if there's newer data.
+      fetch(`/api/rides?type=RIDE`).then(r => r.json()).then(d => { if (Array.isArray(d.rides)) setRides(d.rides) }).catch(() => {})
+      return
+    }
+    onInitialView.current = false
     setLoading(true)
     if (tab === 'all') {
       fetch(`/api/rides?type=${allFilter}`).then(r => r.json()).then(d => { setRides(d.rides || []); setLoading(false) }).catch(() => setLoading(false))

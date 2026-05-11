@@ -39,12 +39,22 @@ const ACTION_LABELS: Record<string, { ar: string; en: string }> = {
 
 type Tab = 'overview' | 'posts' | 'reports' | 'requests' | 'verify' | 'mod_requests' | 'users' | 'nbhd_reports' | 'support' | 'logs' | 'seeds'
 
-export default function AdminClient({ role, adminName }: { role: string; adminName: string }) {
+export default function AdminClient({
+  role,
+  adminName,
+  initialDashboard = null,
+}: {
+  role: string
+  adminName: string
+  /** SSR'd overview payload (stats + recent logs). Lets the dashboard's
+   *  first screen paint populated instead of fetching on mount. */
+  initialDashboard?: { stats: any; recentLogs: any[] } | null
+}) {
   const { t, lang } = useLanguage()
   const confirmDialog = useConfirm()
   const promptDialog = usePrompt()
   const [tab, setTab] = useState<Tab>('overview')
-  const [stats, setStats] = useState<any>(null)
+  const [stats, setStats] = useState<any>(initialDashboard?.stats ?? null)
   const [reports, setReports] = useState<any[]>([])
   const [allPosts, setAllPosts] = useState<any[]>([])
   const [postSearch, setPostSearch] = useState('')
@@ -57,7 +67,7 @@ export default function AdminClient({ role, adminName }: { role: string; adminNa
   const [reportReply, setReportReply] = useState('')
   const [ticketReply, setTicketReply] = useState('')
   const [users, setUsers] = useState<any[]>([])
-  const [logs, setLogs] = useState<any[]>([])
+  const [logs, setLogs] = useState<any[]>(initialDashboard?.recentLogs ?? [])
   const [userSearch, setUserSearch] = useState('')
 
   // Seed control (SUPER_ADMIN only)

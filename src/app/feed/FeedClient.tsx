@@ -119,6 +119,11 @@ interface Props {
     createdAt: string
     requester: { id: string; name: string | null; lastName: string | null; avatarUrl: string | null }
   }>
+  /** SSR'd open RIDE requests for the "المشاوير" strip (top 3) and
+   *  active polls — passed so both render with the feed on first paint
+   *  instead of fetching on mount. The 30s refresh keeps them current. */
+  initialRides?: any[]
+  initialPolls?: any[]
 }
 
 export default function FeedClient({
@@ -137,6 +142,8 @@ export default function FeedClient({
   requestsRecentDot = false,
   highlights = [],
   deliveryRequests = [],
+  initialRides = [],
+  initialPolls = [],
 }: Props) {
   const router = useRouter()
   const { t, lang } = useLanguage()
@@ -172,8 +179,8 @@ export default function FeedClient({
   // will raise the keyboard. Android Chrome WebView is lenient about
   // this; iOS isn't.
   const askTextareaRef = useRef<HTMLTextAreaElement>(null)
-  const [openRides, setOpenRides] = useState<any[]>([])
-  const [polls, setPolls] = useState<any[]>([])
+  const [openRides, setOpenRides] = useState<any[]>(initialRides)
+  const [polls, setPolls] = useState<any[]>(initialPolls)
   const [showFilter, setShowFilter] = useState(false)
   const [showPollForm, setShowPollForm] = useState(false)
   const [pollQuestion, setPollQuestion] = useState('')
@@ -203,10 +210,16 @@ export default function FeedClient({
     return 'newest'
   })
 
-  // Sync posts when server re-renders with new category/neighborhood
+  // Sync posts + the SSR'd rides strip / polls when the server
+  // re-renders with a new category/neighborhood. Replaces what the old
+  // mount-fetch useEffect did on neighborhood change — but with
+  // server-fresh data and no spinner.
   useEffect(() => {
     setPosts(initialPosts)
     setHasMore(initialPosts.length >= 20)
+    setOpenRides(initialRides)
+    setPolls(initialPolls)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, isReadOnly, browseNeighborhood?.id])
 
   // Guard: prevent overlapping refresh/pagination fetches
@@ -264,13 +277,9 @@ export default function FeedClient({
     } catch {}
   }, [])
 
-  // Initial ride requests + polls fetch
-  useEffect(() => {
-    fetch('/api/rides?type=RIDE&neighborhood=' + (browseNeighborhood?.id || user.neighborhoodId || ''))
-      .then(r => r.json()).then(d => setOpenRides((d.rides || []).slice(0, 3))).catch(() => {})
-    fetch('/api/polls?neighborhood=' + (browseNeighborhood?.id || user.neighborhoodId || ''))
-      .then(r => r.json()).then(d => setPolls(d || [])).catch(() => {})
-  }, [browseNeighborhood?.id])
+  // (Initial ride requests + polls now come in as SSR props — see
+  // initialRides / initialPolls — and are kept current by refreshFeed's
+  // 30s tick. No mount fetch, so the strip/polls don't pop in late.)
 
   async function loadMore() {
     if (loadingMore || !hasMore || posts.length === 0 || fetchingRef.current) return
