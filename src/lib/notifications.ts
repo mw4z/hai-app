@@ -191,19 +191,35 @@ export async function sendCleanupPush(
   // Pull tokens with the owning user's language so we can produce
   // per-recipient localized copy. Joining keeps it to one query
   // instead of N+1.
+  //
+  // Defensive fallback: if the deployed DB doesn't yet have the
+  // `User.language` column (migration not applied), the join throws
+  // P2022. Cleanup pushes are best-effort and awaited inside delete
+  // routes — a throw here would 500 the delete. So on failure we
+  // re-query without the join and default everyone to Arabic.
   type TokenRow = {
     token: string
     platform: string
-    user: { language: string }
+    user?: { language?: string | null } | null
   }
-  const tokens = await db.deviceToken.findMany({
-    where: { userId: { in: userIds } },
-    select: {
-      token: true,
-      platform: true,
-      user: { select: { language: true } },
-    },
-  }) as TokenRow[]
+  let tokens: TokenRow[]
+  try {
+    tokens = await db.deviceToken.findMany({
+      where: { userId: { in: userIds } },
+      select: {
+        token: true,
+        platform: true,
+        user: { select: { language: true } },
+      },
+    }) as TokenRow[]
+  } catch (err) {
+    console.warn('[CLEANUP_PUSH] language join failed — falling back to ar',
+      (err as { message?: string })?.message || err)
+    tokens = await db.deviceToken.findMany({
+      where: { userId: { in: userIds } },
+      select: { token: true, platform: true },
+    }) as TokenRow[]
+  }
   if (tokens.length === 0) {
     console.log('[CLEANUP_PUSH] no device tokens — skipped', {
       ref, collapseId, userIds: userIds.length,

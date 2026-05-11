@@ -12,9 +12,47 @@ export default async function ProfilePage() {
   // postCount keys off session.userId so it doesn't need user to
   // resolve first. Saves one DB roundtrip per profile open.
   const [user, postCount] = await Promise.all([
+    // Explicit `select` (not `include`) so we don't pull every scalar on
+    // User. `include` selects ALL columns — which 500s the page whenever
+    // schema.prisma is ahead of the deployed DB (e.g. the `language`
+    // column before its migration lands). List exactly what the client
+    // needs and nothing more.
     db.user.findUnique({
       where: { id: session.userId },
-      include: { neighborhood: { include: { city: true } } },
+      select: {
+        id: true,
+        name: true,
+        lastName: true,
+        phone: true,
+        gender: true,
+        reputation: true,
+        role: true,
+        createdAt: true,
+        avatarUrl: true,
+        coverUrl: true,
+        email: true,
+        emailVerified: true,
+        notifyComments: true,
+        notifyReactions: true,
+        notifyReplies: true,
+        notifyLookingFor: true,
+        accountType: true,
+        providerStatus: true,
+        bio: true,
+        serviceDescription: true,
+        serviceLat: true,
+        serviceLng: true,
+        serviceAddress: true,
+        socialLinks: true,
+        modStatus: true,
+        neighborhood: {
+          select: {
+            name: true,
+            nameEn: true,
+            city: { select: { name: true, nameEn: true } },
+          },
+        },
+      },
     }),
     cached(`postcount:${session.userId}`, 60_000, () =>
       db.post.count({
@@ -36,8 +74,8 @@ export default async function ProfilePage() {
         role: user.role,
         neighborhood: user.neighborhood?.name,
         neighborhoodEn: user.neighborhood?.nameEn,
-        city: user.neighborhood?.city.name,
-        cityEn: user.neighborhood?.city.nameEn,
+        city: user.neighborhood?.city?.name,
+        cityEn: user.neighborhood?.city?.nameEn,
         createdAt: user.createdAt,
         avatarUrl: user.avatarUrl,
         coverUrl: user.coverUrl,
