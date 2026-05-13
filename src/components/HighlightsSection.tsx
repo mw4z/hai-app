@@ -6,6 +6,7 @@ import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { useConfirm } from '@/components/ConfirmProvider'
 import { FiX, FiStar, FiHeart, FiMessageSquare, FiClock } from 'react-icons/fi'
 import type { TranslationKey } from '@/lib/i18n'
+import { buildDisplayTitle } from '@/lib/posts/displayTitle'
 
 export interface HighlightItemPayload {
   id: string
@@ -258,7 +259,7 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
                           {/* Title + badge */}
                           <div className="flex items-start gap-2 mb-0.5">
                             <p className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-2 flex-1">
-                              {it.title}
+                              {buildDisplayTitle({ title: it.title, body: it.body, category: it.category as any }, lang as 'ar' | 'en' | 'ur')}
                             </p>
                             {bk && (
                               <span

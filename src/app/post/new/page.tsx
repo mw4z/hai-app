@@ -13,6 +13,8 @@ import { uploadFiles, uploadPdf } from '@/lib/upload'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
 import PdfTile from '@/components/PdfTile'
+import { isTitleRequired } from '@/lib/posts/titleRequired'
+import type { PostCategory, PostIntent, MarketplaceType } from '@prisma/client'
 import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { playSuccess, playError } from '@/lib/sound'
 import { FiX } from 'react-icons/fi'
@@ -376,6 +378,12 @@ export default function NewPostPage() {
       .catch(() => {})
   }, [isSuperAdmin, allNeighborhoods.length, initialNeighborhoodParam])
   const [title, setTitle] = useState('')
+  // Collapsed title-input state — shown only after the user taps
+  // "Add a title (optional)" on conversational categories. When a
+  // category requires a title, this flag is ignored (the input is
+  // always rendered). A draft restore that includes a non-empty
+  // title also flips this true so the input is visible on remount.
+  const [showOptionalTitle, setShowOptionalTitle] = useState(false)
   const [body, setBody] = useState('')
   const [price, setPrice] = useState('')
   const [images, setImages] = useState<{ file: File; preview: string; url?: string }[]>([])
@@ -424,6 +432,9 @@ export default function NewPostPage() {
   function restoreDraft(d: PostDraft) {
     setCategory(d.category || '')
     setTitle(d.title || '')
+    // If the saved draft had a title, expand the optional-title
+    // input on restore so the user can see / edit it again.
+    if ((d.title || '').trim()) setShowOptionalTitle(true)
     setBody(d.body || '')
     setPrice(d.price || '')
     setLocation(d.location || null)
@@ -494,6 +505,18 @@ export default function NewPostPage() {
 
   const selected = CATEGORIES.find(i => i.key === category)
   const showPrice = PRICE_CATEGORIES.has(category)
+  // Title is required for commercial / structured categories; the
+  // composer either renders the input always (required) or hides it
+  // behind a collapsed link (optional). Intent here mirrors what the
+  // submit payload uses — Ask flow lives on /ask, so this composer
+  // is treated as the OFFER side unless we explicitly set intent.
+  // Marketplace's subtype affects nothing in the title-required call,
+  // but we pass it for completeness in case the policy evolves.
+  const titleRequired = !!selected && isTitleRequired(
+    selected.key as PostCategory,
+    'NORMAL' as PostIntent,
+    marketplaceType as MarketplaceType,
+  )
 
   const imageInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -624,11 +647,22 @@ export default function NewPostPage() {
 
   async function handleSubmit() {
     if (loading || uploading) return
-    if (!title.trim() || !body.trim()) {
+    // Body is always required. Title is required only for commercial
+    // / structured categories (see lib/posts/titleRequired). When
+    // titleRequired is false and the user skipped the title, we let
+    // the post submit body-only — the server stores '' and
+    // buildDisplayTitle synthesizes a body-excerpt headline at render
+    // time. This matches the new "lightweight post" UX.
+    const hasBody = body.trim().length > 0
+    const hasTitle = title.trim().length > 0
+    const titleMissing = titleRequired && !hasTitle
+    if (!hasBody || titleMissing) {
       const missing =
-        !title.trim() && !body.trim() ? 'both'
-          : !title.trim() ? 'title'
-          : 'body'
+        !hasBody && titleMissing
+          ? 'both'
+          : titleMissing
+            ? 'title'
+            : 'body'
       toast.error(
         lang === 'en'
           ? missing === 'title'
@@ -1046,15 +1080,63 @@ export default function NewPostPage() {
               </div>
             )}
 
-            <input
-              type="text"
-              placeholder={lang === 'en' ? 'Title' : lang === 'ur' ? 'عنوان' : 'العنوان'}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="input-field font-semibold"
-              autoFocus
-              maxLength={100}
-            />
+            {/* Title input. For commercial / structured categories
+                (MARKETPLACE, OFFER-side services, EVENTS, COMPETITIONS)
+                the title is part of the listing's value, so it stays
+                always-visible and auto-focused. For conversational
+                categories (GENERAL, NEIGHBORHOOD_REPORTS, LOST_FOUND,
+                REQUEST-side) the title is collapsed behind an
+                "Add a title (optional)" link so the body becomes the
+                primary input — neighbors typing a short report don't
+                have to think about a headline. */}
+            {titleRequired ? (
+              <input
+                type="text"
+                placeholder={lang === 'en' ? 'Title' : lang === 'ur' ? 'عنوان' : 'العنوان'}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="input-field font-semibold"
+                autoFocus
+                maxLength={100}
+              />
+            ) : showOptionalTitle || title.trim().length > 0 ? (
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder={
+                    lang === 'en'
+                      ? 'Title (optional)'
+                      : lang === 'ur'
+                        ? 'عنوان (اختیاری)'
+                        : 'العنوان (اختياري)'
+                  }
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="input-field font-semibold pe-9"
+                  autoFocus
+                  maxLength={100}
+                />
+                <button
+                  type="button"
+                  onClick={() => { setTitle(''); setShowOptionalTitle(false) }}
+                  aria-label={lang === 'en' ? 'Remove title' : 'إزالة العنوان'}
+                  className="absolute top-1/2 -translate-y-1/2 end-2 w-7 h-7 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 active:scale-95 transition-transform flex items-center justify-center"
+                >
+                  <FiX className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowOptionalTitle(true)}
+                className="self-start flex items-center gap-1.5 text-[13px] font-medium text-primary-600 dark:text-primary-400 active:scale-95 transition-transform py-1 px-1"
+              >
+                <span>+</span>
+                <span>
+                  {lang === 'en' ? 'Add a title (optional)' : lang === 'ur' ? 'عنوان شامل کریں (اختیاری)' : 'إضافة عنوان (اختياري)'}
+                </span>
+              </button>
+            )}
             <textarea
               placeholder={placeholderOf(selected)}
               value={body}
@@ -1062,6 +1144,7 @@ export default function NewPostPage() {
               className="input-field resize-none"
               rows={5}
               maxLength={1000}
+              autoFocus={!titleRequired}
             />
 
             {/* Contextual hint */}

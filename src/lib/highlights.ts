@@ -101,6 +101,10 @@ function toItem(p: RawPost, badge: HighlightItem['badge']): HighlightItem {
   const authorName = [first, last].filter(Boolean).join(' ') || null
   return {
     id: p.id,
+    // p.title may be empty for lightweight posts. Highlight consumers
+    // (HighlightsSection card) need SOMETHING to render — they apply
+    // their own fallback via buildDisplayTitle. Passing through as-is
+    // keeps the contract honest: empty title means "use body excerpt".
     title: p.title,
     body: p.body,
     category: p.category,

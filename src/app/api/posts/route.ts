@@ -14,6 +14,8 @@ import { kickNotifCron } from '@/lib/kickNotifCron'
 import { requireUserReady } from '@/lib/requireUserReady'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { fullName } from '@/lib/displayName'
+import { isTitleRequired } from '@/lib/posts/titleRequired'
+import { buildNotifTitle } from '@/lib/posts/displayTitle'
 
 const DEFAULT_POST_LIMIT = 5
 const POST_COOLDOWN_SECONDS = 60
@@ -182,13 +184,32 @@ export async function POST(req: NextRequest) {
       ? (audienceInput as PostAudience)
       : undefined
 
-    if (!title?.trim() || !body?.trim()) {
+    // Body is ALWAYS required. Title's requiredness is category-aware:
+    // commercial / structured posts (MARKETPLACE, OFFER-side services,
+    // EVENTS, COMPETITIONS, ...) still need a headline; conversational
+    // posts (GENERAL, NEIGHBORHOOD_REPORTS, LOST_FOUND, REQUEST-side)
+    // can ship body-only and the headline is computed at render time
+    // by buildDisplayTitle.
+    if (!body?.trim()) {
+      return NextResponse.json(apiError('بيانات ناقصة', 400), { status: 400 })
+    }
+    const titleProvided = typeof title === 'string' && title.trim().length > 0
+    const titleRequired = isTitleRequired(
+      category as PostCategory,
+      (intentInput as PostIntent) || 'NORMAL',
+      marketplaceType,
+    )
+    if (!titleProvided && titleRequired) {
       return NextResponse.json(apiError('بيانات ناقصة', 400), { status: 400 })
     }
 
-    // Content quality validation
-    const titleErr = validateContent(title, 'title')
-    if (titleErr) return NextResponse.json(apiError(titleErr, 400), { status: 400 })
+    // Content quality validation. Title runs through validateContent
+    // only when one was actually provided — empty title for an
+    // optional category is fine and we never store synthetic copy.
+    if (titleProvided) {
+      const titleErr = validateContent(title, 'title')
+      if (titleErr) return NextResponse.json(apiError(titleErr, 400), { status: 400 })
+    }
     const bodyErr = validateContent(body, 'body')
     if (bodyErr) return NextResponse.json(apiError(bodyErr, 400), { status: 400 })
 
@@ -328,14 +349,20 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(apiError('وصلت الحد الأقصى للمنشورات اليوم', 429), { status: 429 })
       }
 
-      // Duplicate/similarity detection: check last 3 hours
+      // Duplicate/similarity detection: check last 3 hours.
+      // When the current post has no title (optional-title category),
+      // skip the title-similarity arm — an empty string is trivially
+      // "similar" to nothing and would also match any past post that
+      // happened to have an empty title, creating false positives.
+      // The body-similarity arm still catches the real duplicate case.
       const threeHoursAgo = new Date(Date.now() - 3 * 3600_000)
       const recentUserPosts = await db.post.findMany({
         where: { authorId: user.id, createdAt: { gte: threeHoursAgo } },
         select: { title: true, body: true },
       })
       for (const p of recentUserPosts) {
-        if (isSimilar(title.trim(), p.title) || isSimilar(body.trim(), p.body)) {
+        const titleMatch = titleProvided && isSimilar(title.trim(), p.title)
+        if (titleMatch || isSimilar(body.trim(), p.body)) {
           console.log(`[SPAM] duplicate detected: user=${user.id}`)
           return NextResponse.json(
             { error: 'DUPLICATE_POST' },
@@ -346,7 +373,12 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Profanity / abuse check ──────────────────────────────────────────
-    const titleMod = moderateContent(title.trim())
+    // moderateContent('') is safe (returns action='allow' / censored=''),
+    // so calling it unconditionally keeps the type uniform with
+    // ModerationAction. The downstream "log flagged content" branch
+    // already gates on `action !== 'allow'`, so an empty title can't
+    // trip the audit log.
+    const titleMod = moderateContent(titleProvided ? title.trim() : '')
     const bodyMod = moderateContent(body.trim())
 
     // Block if either title or body is flagged. SUPER_ADMIN bypasses
@@ -367,8 +399,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Apply censoring if needed. SUPER_ADMIN posts raw content; everyone
-    // else gets the moderator's censored version.
-    const finalTitle = bypass ? title.trim() : titleMod.censored
+    // else gets the moderator's censored version. When the user didn't
+    // provide a title (optional-title category), finalTitle stores as
+    // empty string — that's the sentinel buildDisplayTitle looks at to
+    // decide whether to fall back to a body excerpt.
+    const finalTitle = titleProvided
+      ? (bypass ? title.trim() : titleMod.censored)
+      : ''
     const finalBody = bypass ? body.trim() : bodyMod.censored
 
     // Apply reputation penalty + notify user (skipped for SUPER_ADMIN)
@@ -510,7 +547,10 @@ export async function POST(req: NextRequest) {
             postId: post.id,
             authorId: user.id,
             authorName: fullName(user) || user.name || null,
-            title: finalTitle.slice(0, 140),
+            // Synthesize a body-excerpt headline when the post is
+            // title-optional and the author skipped it — the push
+            // banner needs SOMETHING for the subject row.
+            title: buildNotifTitle({ title: finalTitle, body: finalBody, category: c.category }).slice(0, 140),
             category: c.category,
           },
         },
@@ -522,6 +562,9 @@ export async function POST(req: NextRequest) {
 
     // Ask flow — fan out a dedicated notification when the post is a
     // REQUEST so neighbors see it as an explicit help-needed signal.
+    // When the post has no real title (Ask flow on optional categories),
+    // buildNotifTitle synthesizes a body-excerpt headline so the
+    // notification still has a meaningful subject.
     if (c.intent === 'REQUEST') {
       notifyNeighborhood({
         type: 'LOOKING_FOR_POST',
@@ -529,7 +572,7 @@ export async function POST(req: NextRequest) {
         actorName: fullName(user) || user.name || undefined,
         neighborhoodId: targetNeighborhoodId,
         postId: post.id,
-        postTitle: title.trim().slice(0, 80),
+        postTitle: buildNotifTitle({ title: finalTitle, body: finalBody, category: c.category }),
       })
     }
 

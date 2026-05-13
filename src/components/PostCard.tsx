@@ -17,6 +17,7 @@ import { useConfirm } from './ConfirmProvider'
 import { pickImageOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
 import PdfTile from '@/components/PdfTile'
+import { buildDisplayTitle } from '@/lib/posts/displayTitle'
 import { useAttachContact } from '@/hooks/useAttachContact'
 import ImageLightbox from './ImageLightbox'
 import SmartText from './SmartText'
@@ -340,7 +341,19 @@ export default function PostCard({
       setTranslating(false)
     }
   }
-  const displayTitle = showTranslated && translated ? translated.title : postData.title
+  // Author-provided title takes precedence; translation overrides it
+  // when active. For posts without a real title (lightweight neighborhood
+  // posts), this falls back to a body-excerpt headline via
+  // buildDisplayTitle so the share sheet / OS notification still has
+  // a meaningful subject row. The heading itself only renders when
+  // the AUTHOR explicitly provided a title — see the {hasAuthorTitle
+  // && <h3>...} gate below.
+  const hasAuthorTitle = postData.title.trim().length > 0
+  const displayTitle = showTranslated && translated
+    ? translated.title
+    : (hasAuthorTitle
+        ? postData.title
+        : buildDisplayTitle({ title: '', body: postData.body, category: post.category as any }, lang as 'ar' | 'en' | 'ur'))
   const displayBody  = showTranslated && translated ? translated.body  : postData.body
 
   // Detect whether the clamped body actually overflows, so we only
@@ -1324,7 +1337,15 @@ export default function PostCard({
         </div>
       ) : (
         <>
-          <h3 className="hai-body-strong hai-mb-1 selectable-text">{displayTitle}</h3>
+          {/* Title heading only renders when the author actually wrote
+              one. Lightweight posts (GENERAL / REPORTS / LOST_FOUND /
+              REQUEST-side services) ship body-only and let the body
+              text carry the message — no synthesized "headline" in
+              the card. displayTitle (with body-excerpt fallback) is
+              still used for share / clipboard / push subject paths. */}
+          {hasAuthorTitle && (
+            <h3 className="hai-body-strong hai-mb-1 selectable-text">{displayTitle}</h3>
+          )}
           {/* Body — clamped to 5 lines by default. The toggle reveals
               the full text inline (no navigation). dir="auto" keeps
               Arabic / English / mixed text rendering correctly per
@@ -1570,11 +1591,17 @@ export default function PostCard({
           <button
             onClick={async () => {
               const url = `${window.location.origin}/feed`
-              const text = `${post.title}\n${post.body.slice(0, 100)}${post.body.length > 100 ? '...' : ''}`
+              // For titleless posts use the body-excerpt headline so
+              // the share sheet / clipboard preview isn't blank.
+              const shareTitle = buildDisplayTitle(
+                { title: post.title, body: post.body, category: post.category as any },
+                lang as 'ar' | 'en' | 'ur',
+              )
+              const text = `${shareTitle}\n${post.body.slice(0, 100)}${post.body.length > 100 ? '...' : ''}`
               if (navigator.share) {
-                try { await navigator.share({ title: post.title, text, url }) } catch { /* cancelled */ }
+                try { await navigator.share({ title: shareTitle, text, url }) } catch { /* cancelled */ }
               } else {
-                await navigator.clipboard.writeText(`${post.title}\n${url}`)
+                await navigator.clipboard.writeText(`${shareTitle}\n${url}`)
                 toast.success(lang !== 'en' ? 'تم نسخ الرابط' : 'Link copied')
               }
             }}

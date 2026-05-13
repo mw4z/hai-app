@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { cleanupNotificationsFor } from '@/lib/notifications'
 import { normalizeName } from '@/lib/nameValidation'
+import { isTitleRequired } from '@/lib/posts/titleRequired'
 
 /** PATCH — Edit own post (title, body, price) */
 export async function PATCH(
@@ -14,7 +15,17 @@ export async function PATCH(
 
   const post = await db.post.findUnique({
     where: { id: params.id },
-    select: { authorId: true, status: true },
+    // category / intent / marketplaceType pulled so we can apply the
+    // same title-required policy as the POST route — author can
+    // remove the title on a GENERAL post, but not on a MARKETPLACE
+    // listing where the headline is the listing.
+    select: {
+      authorId: true,
+      status: true,
+      category: true,
+      intent: true,
+      marketplaceType: true,
+    },
   })
   if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (post.authorId !== session.userId) {
@@ -32,13 +43,24 @@ export async function PATCH(
     // bypass where a 1-char title padded with U+200B counted as
     // 3 chars at .length time and slipped past the floor.
     const t = normalizeName(body.title)
-    if (t.length < 3) {
-      return NextResponse.json({ error: 'العنوان قصير جداً' }, { status: 400 })
+    if (t.length === 0) {
+      // Allow clearing the title only when the post's category
+      // doesn't require one. MARKETPLACE / EVENTS / OFFER-side
+      // SERVICES etc. keep their original title — the author
+      // can't accidentally strip the listing's headline.
+      if (isTitleRequired(post.category, post.intent, post.marketplaceType)) {
+        return NextResponse.json({ error: 'هذا القسم يحتاج عنواناً' }, { status: 400 })
+      }
+      updates.title = ''
+    } else {
+      if (t.length < 3) {
+        return NextResponse.json({ error: 'العنوان قصير جداً' }, { status: 400 })
+      }
+      if (t.length > 200) {
+        return NextResponse.json({ error: 'العنوان طويل جداً' }, { status: 400 })
+      }
+      updates.title = t
     }
-    if (t.length > 200) {
-      return NextResponse.json({ error: 'العنوان طويل جداً' }, { status: 400 })
-    }
-    updates.title = t
   }
 
   if (body.body !== undefined) {
