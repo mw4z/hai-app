@@ -310,6 +310,16 @@ model Post {
   // Subtype for category=MARKETPLACE only. Ignored otherwise. SELL is
   // the default so every existing Marketplace row keeps its meaning.
   marketplaceType MarketplaceType @default(SELL)
+  // Phase 1 structured-metadata subtypes — all nullable, additive only.
+  // Server-side classifier fills them when confidenceScore >= 0.85;
+  // composer never asks for them. UI chips gated by
+  // NEXT_PUBLIC_STRUCTURED_POST_METADATA. Cross-category writes are
+  // dropped server-side (realEstateType only with REAL_ESTATE, etc.).
+  realEstateType RealEstateType?
+  civicType      CivicType?
+  eventStartAt   DateTime?
+  eventEndAt     DateTime?
+  eventLocation  String?
   // Mod / admin manual category override audit. Null until a privileged
   // user has used PATCH /api/posts/:id/category. Surfaces a small
   // "edited by mod" signal in the PostCard for transparency.
@@ -389,6 +399,34 @@ enum MarketplaceType {
   SELL  // default — selling an item / property
   BUY   // looking to buy
   JOB   // job opportunity (employer posting; not a job-seeker request)
+}
+
+// Real-estate subtype. Only meaningful when category=REAL_ESTATE.
+// Inferred by the classifier from rent/sale modifiers × property type.
+// WANTED is the catch-all when the user is asking ("أبحث عن / مطلوب")
+// without naming a concrete buy vs rent intent.
+enum RealEstateType {
+  APARTMENT_RENT
+  APARTMENT_SALE
+  VILLA_RENT
+  VILLA_SALE
+  LAND_SALE
+  COMMERCIAL_SHOP
+  WAREHOUSE
+  WANTED
+}
+
+// Civic-issue subtype. Only meaningful when category=NEIGHBORHOOD_REPORTS.
+// Drives the small chip on PostCard ("مرور وسلامة" / "بنية تحتية" / etc.)
+// when the classifier is confident enough. Mods can leave it null
+// without losing the post.
+enum CivicType {
+  TRAFFIC_SAFETY
+  INFRASTRUCTURE
+  PUBLIC_SERVICES
+  ENVIRONMENT
+  PROPOSAL
+  COMPLAINT
 }
 
 enum CoordinationMode {

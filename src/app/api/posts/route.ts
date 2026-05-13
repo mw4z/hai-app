@@ -22,6 +22,14 @@ const VALID_INTENTS = ['OFFER', 'REQUEST', 'NORMAL'] as const
 const VALID_PRIORITIES = ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'] as const
 const VALID_AUDIENCES = ['ALL', 'WOMEN', 'MEN'] as const
 const VALID_MARKETPLACE_TYPES = ['SELL', 'BUY', 'JOB'] as const
+const VALID_REAL_ESTATE_TYPES = [
+  'APARTMENT_RENT','APARTMENT_SALE','VILLA_RENT','VILLA_SALE',
+  'LAND_SALE','COMMERCIAL_SHOP','WAREHOUSE','WANTED',
+] as const
+const VALID_CIVIC_TYPES = [
+  'TRAFFIC_SAFETY','INFRASTRUCTURE','PUBLIC_SERVICES',
+  'ENVIRONMENT','PROPOSAL','COMPLAINT',
+] as const
 
 // Anti-spam knobs for JOB subtype
 const JOB_MIN_BODY_CHARS = 50
@@ -78,6 +86,14 @@ export async function POST(req: NextRequest) {
     const intentInput = typeof reqBody.intent === 'string' ? reqBody.intent : undefined
     const priorityInput = typeof reqBody.priority === 'string' ? reqBody.priority : undefined
     const audienceInput = typeof reqBody.audience === 'string' ? reqBody.audience : undefined
+    // Phase 1 optional metadata — caller may pre-fill if they want to
+    // override the classifier (composer never does today, but the API
+    // accepts it for future composer enhancements). Strings or null.
+    const realEstateTypeInput = typeof reqBody.realEstateType === 'string' ? reqBody.realEstateType : undefined
+    const civicTypeInput      = typeof reqBody.civicType === 'string'      ? reqBody.civicType      : undefined
+    const eventStartAtInput   = typeof reqBody.eventStartAt === 'string'   ? reqBody.eventStartAt   : undefined
+    const eventEndAtInput     = typeof reqBody.eventEndAt === 'string'     ? reqBody.eventEndAt     : undefined
+    const eventLocationInput  = typeof reqBody.eventLocation === 'string'  ? reqBody.eventLocation  : undefined
 
     // SUPER_ADMIN can target any neighborhood by passing neighborhoodId in
     // the body. Regular users (and all other roles) are always pinned to
@@ -165,48 +181,46 @@ export async function POST(req: NextRequest) {
     const bodyErr = validateContent(body, 'body')
     if (bodyErr) return NextResponse.json(apiError(bodyErr, 400), { status: 400 })
 
-    // ── Server-side category normalization ────────────────────────────
+    // ── Server-side category normalization + Phase 1 metadata ──────────
     // Trust nothing the client sent for category routing — analyze
     // title+body and either ALLOW, AUTO_CORRECT (silently move),
     // or REJECT_WITH_SUGGESTION (ask the user to confirm).
-    // SUPER_ADMIN bypasses (they often post broadcasts that don't fit
-    // any keyword shape).
-    let classifyAction: 'ALLOW' | 'AUTO_CORRECT' | 'REJECT_WITH_SUGGESTION' = 'ALLOW'
-    let classifyReason = ''
-    if (!bypass) {
-      const cls = classifyPostCategory({
-        title: title.trim(),
-        body: body.trim(),
-        selectedCategory: category as PostCategory,
-        selectedIntent: intent,
-        selectedMarketplaceType: marketplaceType,
-      })
-      classifyAction = cls.action
-      classifyReason = cls.reason
+    // SUPER_ADMIN bypasses category corrections (broadcast posts that
+    // don't fit any keyword shape), but metadata inference still runs
+    // so we keep the realEstateType / civicType / eventHints fields
+    // populated for SUPER_ADMIN posts too.
+    const cls = classifyPostCategory({
+      title: title.trim(),
+      body: body.trim(),
+      selectedCategory: category as PostCategory,
+      selectedIntent: intent,
+      selectedMarketplaceType: marketplaceType,
+    })
+    let classifyAction: 'ALLOW' | 'AUTO_CORRECT' | 'REJECT_WITH_SUGGESTION' = bypass ? 'ALLOW' : cls.action
+    let classifyReason = cls.reason
 
-      if (cls.action === 'REJECT_WITH_SUGGESTION') {
-        return NextResponse.json(
-          {
-            error: 'category_mismatch',
-            suggestedCategory: cls.suggestedCategory ?? cls.finalCategory,
-            suggestedIntent: cls.finalIntent,
-            suggestedMarketplaceType: cls.finalMarketplaceType,
-            confidence: cls.confidence,
-            message: 'يبدو أن المنشور أنسب لقسم آخر. أكّد القسم المقترح للمتابعة.',
-          },
-          { status: 400 },
-        )
-      }
+    if (!bypass && cls.action === 'REJECT_WITH_SUGGESTION') {
+      return NextResponse.json(
+        {
+          error: 'category_mismatch',
+          suggestedCategory: cls.suggestedCategory ?? cls.finalCategory,
+          suggestedIntent: cls.finalIntent,
+          suggestedMarketplaceType: cls.finalMarketplaceType,
+          confidence: cls.confidence,
+          message: 'يبدو أن المنشور أنسب لقسم آخر. أكّد القسم المقترح للمتابعة.',
+        },
+        { status: 400 },
+      )
+    }
 
-      if (cls.action === 'AUTO_CORRECT') {
-        // Replace the user-selected category + marketplaceType with
-        // the classifier's call. The downstream code reads from these
-        // same variable names — so the rest of the handler is unaware
-        // of the swap. classifyPost(...) below picks up `category` and
-        // resolves intent/priority from there.
-        category = cls.finalCategory
-        marketplaceType = cls.finalMarketplaceType
-      }
+    if (!bypass && cls.action === 'AUTO_CORRECT') {
+      // Replace the user-selected category + marketplaceType with
+      // the classifier's call. The downstream code reads from these
+      // same variable names — so the rest of the handler is unaware
+      // of the swap. classifyPost(...) below picks up `category` and
+      // resolves intent/priority from there.
+      category = cls.finalCategory
+      marketplaceType = cls.finalMarketplaceType
     }
 
     // ── Anti-spam guards specific to JOB subtype ──────────────────────
@@ -394,6 +408,47 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── Phase 1 metadata resolution ────────────────────────────────────
+    // Cross-field rule: each subtype field is only stored when it
+    // matches the final category. Caller-provided values win over the
+    // classifier's inference. The classifier's value is only stored
+    // when its confidenceScore was ≥ SUBTYPE_WRITE_THRESHOLD (handled
+    // inside classify.ts — the field is null otherwise).
+    type RT = (typeof VALID_REAL_ESTATE_TYPES)[number]
+    type CT = (typeof VALID_CIVIC_TYPES)[number]
+    const finalRealEstateType: RT | null =
+      c.category === 'REAL_ESTATE'
+        ? (realEstateTypeInput && (VALID_REAL_ESTATE_TYPES as readonly string[]).includes(realEstateTypeInput)
+            ? (realEstateTypeInput as RT)
+            : ((cls.realEstateType ?? null) as RT | null))
+        : null
+    const finalCivicType: CT | null =
+      c.category === 'NEIGHBORHOOD_REPORTS'
+        ? (civicTypeInput && (VALID_CIVIC_TYPES as readonly string[]).includes(civicTypeInput)
+            ? (civicTypeInput as CT)
+            : ((cls.civicType ?? null) as CT | null))
+        : null
+
+    // Event fields: parse ISO from caller; fall back to classifier
+    // hints. Only honored when category=EVENTS.
+    const parseIso = (s: string | undefined): Date | null => {
+      if (!s) return null
+      const d = new Date(s)
+      return isNaN(d.getTime()) ? null : d
+    }
+    const finalEventStartAt: Date | null =
+      c.category === 'EVENTS'
+        ? (parseIso(eventStartAtInput) ?? cls.eventHints?.startAt ?? null)
+        : null
+    const finalEventEndAt: Date | null =
+      c.category === 'EVENTS'
+        ? (parseIso(eventEndAtInput) ?? cls.eventHints?.endAt ?? null)
+        : null
+    const finalEventLocation: string | null =
+      c.category === 'EVENTS'
+        ? ((eventLocationInput?.trim() || cls.eventHints?.location || null))
+        : null
+
     const post = await db.post.create({
       data: {
         title: finalTitle,
@@ -412,6 +467,15 @@ export async function POST(req: NextRequest) {
         authorId: user.id,
         neighborhoodId: targetNeighborhoodId,
         status: 'ACTIVE',
+        // Phase 1 subtype metadata. Cross-category writes already
+        // filtered above — each field is null unless its category
+        // matches AND either the caller provided a valid value OR the
+        // classifier's confidenceScore cleared the write threshold.
+        realEstateType: finalRealEstateType,
+        civicType: finalCivicType,
+        eventStartAt: finalEventStartAt,
+        eventEndAt: finalEventEndAt,
+        eventLocation: finalEventLocation,
       },
     })
 

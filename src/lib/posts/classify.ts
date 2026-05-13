@@ -20,7 +20,15 @@
  * No external AI. No DB calls. Pure function. Auditable.
  */
 
-import type { PostCategory, PostIntent, MarketplaceType } from '@prisma/client'
+import type { PostCategory, PostIntent, MarketplaceType, RealEstateType, CivicType } from '@prisma/client'
+import {
+  normalizeArabicForMatch,
+  scoreRules as scoreDictRules,
+  RECOMMENDATION_RULES,
+  REAL_ESTATE_COMMERCIAL_SHOP_RULES,
+  RIDES_RULES as RIDES_DICT_RULES,
+} from './classifyDictionaries'
+import { inferPostMetadata, SUBTYPE_WRITE_THRESHOLD } from './classifyMetadata'
 
 export type ClassifyAction = 'ALLOW' | 'AUTO_CORRECT' | 'REJECT_WITH_SUGGESTION'
 
@@ -33,6 +41,22 @@ export interface ClassifyResult {
   reason: string
   /** When action ≠ ALLOW, this is the category we suggest. */
   suggestedCategory?: PostCategory
+  // ── Phase 1 additive fields (all optional — existing callers ignore safely)
+  /** Real-estate subtype, only populated when finalCategory='REAL_ESTATE'
+   *  AND confidenceScore ≥ SUBTYPE_WRITE_THRESHOLD. */
+  realEstateType?: RealEstateType | null
+  /** Civic subtype, only populated when finalCategory='NEIGHBORHOOD_REPORTS'
+   *  AND confidenceScore ≥ SUBTYPE_WRITE_THRESHOLD. */
+  civicType?: CivicType | null
+  /** Best-effort event date/location hints, only populated when
+   *  finalCategory='EVENTS'. Always optional — never blocks publish. */
+  eventHints?: { startAt: Date | null; endAt: Date | null; location: string | null }
+  /** 0..1 normalized confidence over the inferred subtype path. The
+   *  per-field write decision lives in the API; the classifier is just
+   *  honest about how sure it is. */
+  confidenceScore?: number
+  /** Matched rule labels — debug visibility. Trimmed to first 16. */
+  signals?: string[]
 }
 
 export interface ClassifyInput {
@@ -114,9 +138,18 @@ const MARKETPLACE_RULES: Rule[] = [
 
 const JOB_RULES: Rule[] = [
   // Arabic — employer posting
-  { pattern: /(?:فرصة\s*عمل|وظيفة|وظائف|مطلوب\s*موظف|مطلوب\s*موظفة|مطلوب\s*عامل|مطلوب\s*عمالة|مطلوب\s*سائق|مطلوب\s*محاسب)/i, weight: 3 },
-  { pattern: /(?:توظيف|تعيين|تقديم|راتب|الراتب|دوام|دوام\s*كامل|دوام\s*جزئي|دوام\s*صباحي|دوام\s*مسائي)/i, weight: 3 },
+  { pattern: /(?:فرصة\s*عمل|وظيفة|وظائف|مطلوب\s*موظف|مطلوب\s*موظفة|مطلوب\s*موظفات|مطلوب\s*عامل|مطلوب\s*عمالة|مطلوب\s*سائق|مطلوب\s*محاسب)/i, weight: 3 },
+  // "تقديم" alone was too generic — collides with government-paperwork
+  // offices ("تقديم جامعات / تقديم وظائف") which are SERVICES, not JOB
+  // postings. The JOB-specific phrases are caught by the seasonal rule
+  // ("للتقديم / رابط التقديم") below.
+  { pattern: /(?:توظيف|تعيين|راتب|الراتب|دوام|دوام\s*كامل|دوام\s*جزئي|دوام\s*صباحي|دوام\s*مسائي)/i, weight: 3 },
   { pattern: /(?:شفت|شفتات|عقد|عقد\s*عمل|مؤقت|سيرة\s*ذاتية|السيرة\s*الذاتية|cv|سي\s*في)/i, weight: 3 },
+  // Seasonal / KSA-specific job context — Hajj season is the biggest
+  // job spike of the year; "وظيفة بالحج / موسم الحج / تصريح / إقامة"
+  // co-occur in these listings.
+  { pattern: /(?:موسمي|موسمية|الحج|بالحج|موسم\s*الحج|تصريح|إقامة|اقامة|الجنسيات|للتقديم|رابط\s*التقديم|ارسال\s*السيرة)/i, weight: 3 },
+  { pattern: /(?:خبرة|الخبرة|خبرات|بخبرة)/i, weight: 2 },
   // English
   { pattern: /(?:job|jobs|hiring|hire|employment|vacancy|position|career|salary|shift|recruit(?:ing|ment)?)/i, weight: 3 },
   { pattern: /(?:full[-\s]*time|part[-\s]*time|contract|cv|resume)/i, weight: 3 },
@@ -132,7 +165,7 @@ const SERVICES_RULES: Rule[] = [
   // Maintenance / appliances
   { pattern: /(?:مكيف|تكييف|صيانة|اصلاح|إصلاح|تركيب|فك|نقل)/i, weight: 3 },
   // Cleaning / household help
-  { pattern: /(?:تنظيف|نظافة|عاملة|عاملة\s*منزلية|عامل\s*نظافة|خادمة|شركة\s*تنظيف|مكافحة\s*حشرات)/i, weight: 3 },
+  { pattern: /(?:تنظيف|نظافة|عاملة|عاملات|عاملة\s*منزلية|عامل\s*نظافة|عاملات\s*بالساعة|خادمة|شغالة|شركة\s*تنظيف|مكافحة\s*حشرات)/i, weight: 3 },
   // Moving / driving services (when offered as a service business).
   // Includes WhatsApp colloquial "سواق" alongside formal "سائق".
   { pattern: /(?:نقل\s*عفش|سائق|سواق|مشاوير|مشوار|شحن|توصيل)/i, weight: 2 },
@@ -176,7 +209,10 @@ const LOST_FOUND_RULES: Rule[] = [
 ]
 
 const EVENTS_RULES: Rule[] = [
-  { pattern: /(?:فعالية|فعاليات|حدث|مهرجان|نشاط|تجمع|لقاء|اجتماع|حفل|حفلة|احتفال|مناسبة)/i, weight: 3 },
+  // "مناسبة" intentionally removed — collides with "مناسبة" meaning
+  // "appropriate" (e.g. "أسعار مناسبة"). "مناسبات" (plural) is keep —
+  // it always means occasions.
+  { pattern: /(?:فعالية|فعاليات|حدث|مهرجان|نشاط|تجمع|لقاء|اجتماع|حفل|حفلة|احتفال|مناسبات)/i, weight: 3 },
   { pattern: /(?:دعوة|حضور|تسجيل|حجز|انضم|شارك|سجل|احجز)/i, weight: 2 },
   { pattern: /(?:يوم\s*مفتوح|بازار|معرض|سوق\s*خيري)/i, weight: 3 },
   { pattern: /(?:دورة|ورشة|تدريب|محاضرة|ندوة|جلسة|نادي|مدرسة)/i, weight: 2 },
@@ -234,9 +270,14 @@ const RIDES_RULES: Rule[] = [
 ]
 
 const REAL_ESTATE_RULES: Rule[] = [
-  // Property types — adds مستودع / محل (commercial unit & shop), both
-  // recurring in the زايدي WhatsApp data alongside the housing terms.
-  { pattern: /(?:شقة|شقه|غرفة|دور|فيلا|فلة|استراحة|عمارة|مستودع|مستودعات|محل|محلات)/i, weight: 3 },
+  // Property types. NOTE: "محل" / "محلات" intentionally NOT here —
+  // bare "محل" matches store-recommendation questions ("وين محل
+  // نظارات") which would falsely promote to REAL_ESTATE. The
+  // COMMERCIAL_SHOP path lives in classifyDictionaries.ts where it
+  // requires محل + a rent/sale modifier (للإيجار / فاضي / على الشارع
+  // / تجاري). The tenure modifier rule below ("ايجار / للايجار / ...")
+  // still puts "محل للإيجار" cleanly in REAL_ESTATE because rent fires.
+  { pattern: /(?:شقة|شقه|غرفة|دور|فيلا|فلة|استراحة|عمارة|مستودع|مستودعات)/i, weight: 3 },
   // Rent / sale framing
   { pattern: /(?:ايجار|إيجار|للايجار|للإيجار|تمليك|عقار|أرض|قطعة\s*أرض|قطعة\s*ارض|للبيع\s*أرض|للبيع\s*ارض|أرض\s*للبيع|ارض\s*للبيع)/i, weight: 3 },
   // Lease structure
@@ -338,10 +379,109 @@ const COMMERCIAL: ReadonlySet<PostCategory> = new Set<PostCategory>([
 
 /* ── Public API ────────────────────────────────────────────────────── */
 
+/**
+ * Public entry point. Runs the existing decision logic (`classifyPostCore`)
+ * then enriches the result with Phase 1 subtype metadata. Existing
+ * call sites that read only the original fields continue to work
+ * unchanged — the new fields are optional.
+ */
 export function classifyPostCategory(input: ClassifyInput): ClassifyResult {
+  const base = classifyPostCore(input)
+  const meta = inferPostMetadata({
+    title: input.title,
+    body: input.body,
+    category: base.finalCategory,
+  })
+  const strong = (meta.confidenceScore ?? 0) >= SUBTYPE_WRITE_THRESHOLD
+  return {
+    ...base,
+    realEstateType:
+      base.finalCategory === 'REAL_ESTATE' && strong
+        ? meta.realEstateType
+        : null,
+    civicType:
+      base.finalCategory === 'NEIGHBORHOOD_REPORTS' && strong
+        ? meta.civicType
+        : null,
+    eventHints:
+      base.finalCategory === 'EVENTS'
+        ? meta.eventHints
+        : { startAt: null, endAt: null, location: null },
+    confidenceScore: meta.confidenceScore,
+    signals: [
+      ...(base.signals ?? []),
+      ...meta.signals,
+    ].slice(0, 16),
+  }
+}
+
+/** Internal: the original decision pipeline. Returns category +
+ *  intent + marketplaceType + action without the Phase 1 subtype
+ *  enrichment. Public callers should use classifyPostCategory. */
+function classifyPostCore(input: ClassifyInput): ClassifyResult {
   const text = `${input.title || ''} \n ${input.body || ''}`
   const scores = computeScores(text)
   const top = topCategory(scores)
+
+  // Phase 1 short-circuit guards run AGAINST the normalized text from
+  // classifyDictionaries so they see canonical forms (شقّة, شقه, شقة all
+  // collapse to شقه). They never *invent* a category — they only
+  // SUPPRESS REAL_ESTATE / MARKETPLACE when the post is clearly a
+  // recommendation question, and only PROMOTE COMMERCIAL_SHOP into the
+  // REAL_ESTATE bucket when محل is paired with a rent/sale modifier.
+  const normalizedForGuards = normalizeArabicForMatch(text)
+  const recScore = scoreDictRules(normalizedForGuards, RECOMMENDATION_RULES).score
+  // Guard threshold is MEDIUM (not STRONG) so a clear recommendation
+  // question ("وين محل نظارات قريب؟" = wen(3) + place(1) = 4) trips
+  // the short-circuit. The category-dominance gates below still keep
+  // genuinely commercial / real-estate posts in their own buckets.
+  const recIsStrong = recScore >= MEDIUM
+  const ridesScore = scoreDictRules(normalizedForGuards, RIDES_DICT_RULES).score
+  const commercialShopPaired = scoreDictRules(normalizedForGuards, REAL_ESTATE_COMMERCIAL_SHOP_RULES).score > 0
+
+  // Guard A — GENERAL recommendation question:
+  // "أفضل مطعم بخاري" / "وين محل نظارات قريب" / "ترشحون كافيه".
+  // Strong recommendation phrasing + no DOMINANT sell/buy/service
+  // signal → GENERAL+REQUEST.
+  //
+  // Threshold split:
+  //   - HOME_BUSINESSES uses MEDIUM (4) — keeps "كيك مناسبات + توصية"
+  //     (HOME_BUSINESSES ≈ 5) in HOME_BUSINESSES.
+  //   - SERVICES / MARKETPLACE / REAL_ESTATE use STRONG (7) — a single
+  //     incidental noun ("نظارات" → MARKETPLACE 4, "عقاري" → REAL_ESTATE
+  //     6) shouldn't block the guard. Genuine listings hit STRONG
+  //     because they pair noun + verb ("للبيع آيفون", "شقة للإيجار").
+  //   - commercialShopPaired (محل + rent modifier) explicitly defers
+  //     to REAL_ESTATE.COMMERCIAL_SHOP — never fires the guard.
+  if (recIsStrong &&
+      scores.HOME_BUSINESSES < MEDIUM &&
+      scores.SERVICES < STRONG &&
+      scores.MARKETPLACE < STRONG &&
+      scores.REAL_ESTATE < STRONG &&
+      !commercialShopPaired) {
+    return {
+      finalCategory: 'GENERAL',
+      finalIntent: 'REQUEST',
+      finalMarketplaceType: 'SELL',
+      action: 'ALLOW',
+      confidence: 'high',
+      reason: 'Recommendation question — routed to GENERAL+REQUEST so the REQUESTS chip surfaces it.',
+      confidenceScore: 0.90,
+      signals: ['guard:recommendation'],
+    }
+  }
+
+  // Guard B — Delivery-as-RideRequest: strong ride/delivery signal
+  // belongs on /rides/new, never as a Post. If the user managed to
+  // submit it as a Post anyway, refuse to misclassify it as
+  // MARKETPLACE/SERVICES — fall through to whichever non-commercial
+  // category scores highest (usually RIDES). The composer flow already
+  // routes ride/delivery taps to /rides/new (Phase 0).
+  // Implementation: we just trust the existing scoring — RIDES_RULES
+  // (legacy) + our dict-level signal — but mark this in `signals` for
+  // debugging. No actual override needed; existing behaviour is fine.
+  // Left as a placeholder for visibility.
+  void ridesScore
 
   // JOB sub-detection — only matters when the WINNER is MARKETPLACE
   // OR when the user already selected MARKETPLACE.

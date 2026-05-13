@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiBell, FiBellOff, FiImage, FiUser, FiPaperclip } from 'react-icons/fi'
 import AttachmentMenu from './AttachmentMenu'
+import SubtypeChip from './posts/SubtypeChip'
 import { uploadFiles } from '@/lib/upload'
 import { playSend, playReaction, playDelete } from '@/lib/sound'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
@@ -86,6 +87,14 @@ interface Post {
    *  Optional for back-compat with older API responses. */
   marketplaceType?: 'SELL' | 'BUY' | 'JOB' | null
   intent?: 'OFFER' | 'REQUEST' | 'NORMAL' | null
+  // Phase 1 inferred subtypes — all optional, all server-filled,
+  // all null on older posts. Each field is only meaningful when its
+  // category matches; SubtypeChip enforces the cross-field rule.
+  realEstateType?: 'APARTMENT_RENT' | 'APARTMENT_SALE' | 'VILLA_RENT' | 'VILLA_SALE' | 'LAND_SALE' | 'COMMERCIAL_SHOP' | 'WAREHOUSE' | 'WANTED' | null
+  civicType?: 'TRAFFIC_SAFETY' | 'INFRASTRUCTURE' | 'PUBLIC_SERVICES' | 'ENVIRONMENT' | 'PROPOSAL' | 'COMPLAINT' | null
+  eventStartAt?: string | null     // ISO from JSON
+  eventEndAt?: string | null
+  eventLocation?: string | null
   /** Moderator pin into Neighborhood Highlights. ISO string when pinned,
    *  null/undefined otherwise. Drives the mod menu's Pin/Unpin label. */
   highlightPinnedAt?: string | null
@@ -920,6 +929,18 @@ export default function PostCard({
               {t('post_intent_request')}
             </span>
           )}
+          {/* Phase 1 inferred-subtype chip. Self-gated by
+              NEXT_PUBLIC_STRUCTURED_POST_METADATA — when the flag is
+              off, returns null and renders nothing. Stays read-only;
+              Phase 1.5 may add a tap-to-change picker. */}
+          <SubtypeChip
+            category={post.category}
+            realEstateType={post.realEstateType ?? null}
+            civicType={post.civicType ?? null}
+            eventStartAt={post.eventStartAt ?? null}
+            eventLocation={post.eventLocation ?? null}
+          />
+
           <div className="hai-menu-anchor" ref={menuRef}>
             <button
               onClick={() => { setShowMenu(!showMenu); hapticLight() }}
