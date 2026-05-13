@@ -12,6 +12,10 @@ interface Props {
   onPickImage: () => void
   onPickContact: () => void
   onPickLocation: () => void
+  /** Optional — when provided, a "Document" (PDF) row is rendered as
+   *  the fourth menu option. Surfaces that don't yet handle PDFs
+   *  (legacy callers) omit this prop and the row simply doesn't render. */
+  onPickDocument?: () => void
   /**
    * Visual variant. 'chat' renders on a dark/translucent input area
    * (the ChatClient composer) so the menu uses a brighter elevated
@@ -42,6 +46,7 @@ export default function AttachmentMenu({
   onPickImage,
   onPickContact,
   onPickLocation,
+  onPickDocument,
   variant = 'chat',
 }: Props) {
   const { lang } = useLanguage()
@@ -107,6 +112,25 @@ export default function AttachmentMenu({
       subtitle: tr('Pick a point on the map', 'اختر من الخريطة', 'نقشے سے منتخب کریں'),
       tint: 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300',
     },
+    // Document row only renders when the caller wired up a handler.
+    // Surfaces that don't yet support PDF (or never will, e.g. ride
+    // messages) omit onPickDocument and the row disappears.
+    ...(onPickDocument
+      ? [
+          {
+            key: 'document',
+            onClick: wrap(onPickDocument),
+            icon: '📄',
+            title: tr('Document', 'مستند PDF', 'PDF دستاویز'),
+            subtitle: tr(
+              'Attach a PDF (max 25MB)',
+              'إرفاق ملف PDF (أقصى 25 ميقا)',
+              'PDF منسلک کریں (زیادہ سے زیادہ 25MB)',
+            ),
+            tint: 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300',
+          },
+        ]
+      : []),
   ]
 
   const cardClass =

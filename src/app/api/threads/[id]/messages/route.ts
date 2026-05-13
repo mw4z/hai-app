@@ -37,7 +37,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       orderBy: { createdAt: 'asc' },
       select: {
         id: true, type: true, text: true, lat: true, lng: true,
-        imageUrl: true, senderId: true, createdAt: true,
+        imageUrl: true, pdfUrl: true, pdfName: true,
+        senderId: true, createdAt: true,
         deliveredAt: true, readAt: true, edited: true, reactions: true,
       },
       take: 100,
@@ -106,7 +107,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       orderBy: { createdAt: 'asc' },
       select: {
         id: true, type: true, text: true, lat: true, lng: true,
-        imageUrl: true, senderId: true, createdAt: true,
+        imageUrl: true, pdfUrl: true, pdfName: true,
+        senderId: true, createdAt: true,
         deliveredAt: true, readAt: true, edited: true, reactions: true,
         replyToId: true,
         replyTo: { select: { id: true, text: true, senderId: true, type: true } },
@@ -199,6 +201,30 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           type: 'IMAGE',
           text: '📷',
           imageUrl,
+          ...replyData,
+        },
+        include: { replyTo: { select: { id: true, text: true, senderId: true, type: true } } },
+      })
+    } else if (type === 'PDF') {
+      // PDF attachment in chat. Same validation pattern as Post / Comment:
+      // require an https URL under 500 chars (Vercel Blob URLs are well
+      // under that), cap the filename. The Message.text gets a "📄"
+      // placeholder so any code path that displays a fallback string for
+      // unknown types still renders something sensible.
+      const pdfUrlRaw = typeof body.pdfUrl === 'string' ? body.pdfUrl.trim() : ''
+      const pdfNameRaw = typeof body.pdfName === 'string' ? body.pdfName.trim() : ''
+      if (!pdfUrlRaw.startsWith('https://') || pdfUrlRaw.length >= 500) {
+        return NextResponse.json({ error: 'PDF URL required' }, { status: 400 })
+      }
+      const pdfName = pdfNameRaw.slice(0, 200) || 'document.pdf'
+      message = await db.message.create({
+        data: {
+          threadId: params.id,
+          senderId: session.userId,
+          type: 'PDF',
+          text: '📄',
+          pdfUrl: pdfUrlRaw,
+          pdfName,
           ...replyData,
         },
         include: { replyTo: { select: { id: true, text: true, senderId: true, type: true } } },

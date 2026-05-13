@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
 import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiBell, FiBellOff, FiImage, FiUser, FiPaperclip } from 'react-icons/fi'
 import AttachmentMenu from './AttachmentMenu'
 import SubtypeChip from './posts/SubtypeChip'
-import { uploadFiles } from '@/lib/upload'
+import { uploadFiles, uploadPdf } from '@/lib/upload'
 import { playSend, playReaction, playDelete } from '@/lib/sound'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
 import EmojiPicker from './EmojiPickerWrapper'
@@ -416,6 +416,22 @@ export default function PostCard({
   const [commentImagePreview, setCommentImagePreview] = useState<string | null>(null)
   const [replyImage, setReplyImage] = useState<File | null>(null)
   const [replyImagePreview, setReplyImagePreview] = useState<string | null>(null)
+  // PDF attachment on the top-level comment composer + the reply
+  // composer. Same shape as the post composer's `pdf` state.
+  const [commentPdf, setCommentPdf] = useState<{
+    localFile: File | null
+    url: string | null
+    name: string
+    size: number
+  } | null>(null)
+  const [replyPdf, setReplyPdf] = useState<{
+    localFile: File | null
+    url: string | null
+    name: string
+    size: number
+  } | null>(null)
+  const commentPdfInputRef = useRef<HTMLInputElement>(null)
+  const replyPdfInputRef = useRef<HTMLInputElement>(null)
   const commentImgRef = useRef<HTMLInputElement>(null)
   const replyImgRef = useRef<HTMLInputElement>(null)
   const [commentsLoaded, setCommentsLoaded] = useState(false)
@@ -603,7 +619,7 @@ export default function PostCard({
 
   async function handleComment(e: React.FormEvent) {
     e.preventDefault()
-    if (!commentText.trim() && !commentImage) return
+    if (!commentText.trim() && !commentImage && !commentPdf) return
     if (blockIfOffline()) return
     setSubmitting(true)
     try {
@@ -613,10 +629,28 @@ export default function PostCard({
         if (!urls[0]) { toast.error(t('common_error')); return }
         imageUrl = urls[0]
       }
+      // PDF upload via client-direct path (bypasses Next.js function
+      // body cap so 25MB documents work). Cache the resulting URL on
+      // the state in case of a retry — and bail with a toast if the
+      // upload itself fails so we don't post a comment with a missing
+      // attachment.
+      let pdfUrl: string | null = commentPdf?.url ?? null
+      let pdfName: string | null = commentPdf?.name ?? null
+      if (commentPdf && commentPdf.localFile && !commentPdf.url) {
+        try {
+          const result = await uploadPdf(commentPdf.localFile)
+          pdfUrl = result.url
+          pdfName = result.name
+          setCommentPdf({ localFile: null, url: result.url, name: result.name, size: result.size })
+        } catch (err: any) {
+          toast.error(err?.message || t('common_error'))
+          return
+        }
+      }
       const res = await fetch(`/api/posts/${post.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: commentText, imageUrl }),
+        body: JSON.stringify({ body: commentText, imageUrl, pdfUrl, pdfName }),
       })
       if (!res.ok) { await showApiError(res, lang); return }
       const comment = await res.json()
@@ -625,6 +659,7 @@ export default function PostCard({
       setCommentText('')
       setCommentImage(null)
       setCommentImagePreview(null)
+      setCommentPdf(null)
     } catch (err) {
       toast.error(isOfflineError(err) || (err instanceof TypeError) ? offlineMessage() : t('common_error'))
     } finally {
@@ -634,7 +669,7 @@ export default function PostCard({
 
   async function handleReply(e: React.FormEvent) {
     e.preventDefault()
-    if ((!replyText.trim() && !replyImage) || !replyingTo) return
+    if ((!replyText.trim() && !replyImage && !replyPdf) || !replyingTo) return
     if (blockIfOffline()) return
     setSubmittingReply(true)
     try {
@@ -644,10 +679,24 @@ export default function PostCard({
         if (!urls[0]) { toast.error(t('common_error')); return }
         imageUrl = urls[0]
       }
+      // PDF on a reply — same flow as handleComment, with reply state.
+      let pdfUrl: string | null = replyPdf?.url ?? null
+      let pdfName: string | null = replyPdf?.name ?? null
+      if (replyPdf && replyPdf.localFile && !replyPdf.url) {
+        try {
+          const result = await uploadPdf(replyPdf.localFile)
+          pdfUrl = result.url
+          pdfName = result.name
+          setReplyPdf({ localFile: null, url: result.url, name: result.name, size: result.size })
+        } catch (err: any) {
+          toast.error(err?.message || t('common_error'))
+          return
+        }
+      }
       const res = await fetch(`/api/posts/${post.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: replyText, parentId: replyingTo.id, imageUrl }),
+        body: JSON.stringify({ body: replyText, parentId: replyingTo.id, imageUrl, pdfUrl, pdfName }),
       })
       if (!res.ok) { await showApiError(res, lang); return }
       const reply = await res.json()
@@ -662,6 +711,7 @@ export default function PostCard({
       setReplyText('')
       setReplyImage(null)
       setReplyImagePreview(null)
+      setReplyPdf(null)
       setReplyingTo(null)
     } catch (err) {
       toast.error(isOfflineError(err) || (err instanceof TypeError) ? offlineMessage() : t('common_error'))
@@ -1638,7 +1688,46 @@ export default function PostCard({
         onPickLocation={() => {
           if (showAttachMenu) attachLocationToComposer(showAttachMenu)
         }}
+        onPickDocument={() => {
+          // Open the hidden file input for whichever composer is
+          // currently showing the menu — the input's onChange seeds
+          // commentPdf / replyPdf with the picked File. Upload itself
+          // is deferred until submit (same pattern as commentImage).
+          if (showAttachMenu === 'comment') commentPdfInputRef.current?.click()
+          else if (showAttachMenu === 'reply') replyPdfInputRef.current?.click()
+        }}
         variant="comment"
+      />
+      {/* Hidden file inputs that back the AttachmentMenu "Document"
+          row. Two separate inputs because the top-level comment
+          composer and the reply composer hold independent state. */}
+      <input
+        ref={commentPdfInputRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          e.currentTarget.value = ''
+          if (!file) return
+          if (file.type !== 'application/pdf') { toast.error(lang === 'en' ? 'Only PDF files' : 'فقط ملفات PDF'); return }
+          if (file.size > 25 * 1024 * 1024) { toast.error(lang === 'en' ? 'PDF too large (max 25MB)' : 'حجم الملف كبير'); return }
+          setCommentPdf({ localFile: file, url: null, name: file.name, size: file.size })
+        }}
+      />
+      <input
+        ref={replyPdfInputRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          e.currentTarget.value = ''
+          if (!file) return
+          if (file.type !== 'application/pdf') { toast.error(lang === 'en' ? 'Only PDF files' : 'فقط ملفات PDF'); return }
+          if (file.size > 25 * 1024 * 1024) { toast.error(lang === 'en' ? 'PDF too large (max 25MB)' : 'حجم الملف كبير'); return }
+          setReplyPdf({ localFile: file, url: null, name: file.name, size: file.size })
+        }}
       />
       {showComments && (
         <div
@@ -1753,6 +1842,11 @@ export default function PostCard({
                                 onClick={() => setCommentLightbox(c.imageUrl!)}
                               />
                             )}
+                            {c.pdfUrl && (
+                              <div className="mt-1.5">
+                                <PdfTile url={c.pdfUrl} name={c.pdfName} variant="comment" />
+                              </div>
+                            )}
                           </>
                         )}
                         <div className="hai-comment__actions">
@@ -1851,6 +1945,11 @@ export default function PostCard({
                                   onClick={() => setCommentLightbox(reply.imageUrl!)}
                                 />
                               )}
+                              {reply.pdfUrl && (
+                                <div className="mt-1.5">
+                                  <PdfTile url={reply.pdfUrl} name={reply.pdfName} variant="comment" />
+                                </div>
+                              )}
                               <div className="hai-comment__actions">
                                 <button
                                   onClick={() => handleCommentLike(reply.id)}
@@ -1911,6 +2010,21 @@ export default function PostCard({
                             </button>
                           </div>
                         )}
+                        {replyPdf && (
+                          <div className="flex items-stretch gap-2 pb-2">
+                            <div className="flex-1 min-w-0">
+                              <PdfTile url={replyPdf.url || '#'} name={replyPdf.name} size={replyPdf.size} variant="preview" />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setReplyPdf(null)}
+                              aria-label={lang === 'en' ? 'Remove PDF' : 'إزالة الملف'}
+                              className="flex-shrink-0 w-9 self-stretch rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 active:scale-95 transition-transform flex items-center justify-center"
+                            >
+                              <FiX className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                         <form onSubmit={handleReply} className="hai-comment-input hai-comment-input--compact">
                           <input
                             type="text"
@@ -1957,6 +2071,21 @@ export default function PostCard({
                     className="hai-comment-input__attach-remove"
                   >
                     <FiX className="hai-icon-xs" />
+                  </button>
+                </div>
+              )}
+              {commentPdf && (
+                <div className="flex items-stretch gap-2 px-3 pb-2">
+                  <div className="flex-1 min-w-0">
+                    <PdfTile url={commentPdf.url || '#'} name={commentPdf.name} size={commentPdf.size} variant="preview" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCommentPdf(null)}
+                    aria-label={lang === 'en' ? 'Remove PDF' : 'إزالة الملف'}
+                    className="flex-shrink-0 w-9 self-stretch rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 active:scale-95 transition-transform flex items-center justify-center"
+                  >
+                    <FiX className="w-4 h-4" />
                   </button>
                 </div>
               )}

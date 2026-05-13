@@ -87,11 +87,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
   }
 
-  const { body, parentId, imageUrl } = await req.json()
+  const { body, parentId, imageUrl, pdfUrl: pdfUrlRaw, pdfName: pdfNameRaw } = await req.json()
   const hasText = !!body?.trim() && body.trim().length >= 2
   const hasImage = typeof imageUrl === 'string' && imageUrl.startsWith('https://') && imageUrl.length < 500
+  // PDF attachment validation matches the post-route pattern: trust
+  // the composer's MIME / size gate, but cap URL + filename lengths
+  // server-side so a malicious caller can't write huge strings into
+  // the Comment row.
+  const hasPdf =
+    typeof pdfUrlRaw === 'string' &&
+    pdfUrlRaw.startsWith('https://') &&
+    pdfUrlRaw.length < 500
+  const pdfUrl: string | null = hasPdf ? pdfUrlRaw.trim() : null
+  const pdfName: string | null = hasPdf
+    ? (typeof pdfNameRaw === 'string' ? pdfNameRaw.trim().slice(0, 200) : '') || 'document.pdf'
+    : null
 
-  if (!hasText && !hasImage) {
+  if (!hasText && !hasImage && !hasPdf) {
     return NextResponse.json({ error: 'التعليق فارغ' }, { status: 400 })
   }
   if (body && body.length > 500) return NextResponse.json({ error: 'التعليق طويل جداً' }, { status: 400 })
@@ -144,6 +156,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       authorId: session.userId,
       body: censoredBody,
       imageUrl: hasImage ? imageUrl : null,
+      pdfUrl,
+      pdfName,
       parentId: parentId || null,
     },
     include: {

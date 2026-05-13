@@ -11,7 +11,8 @@ import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, Fi
 import AttachmentMenu from '@/components/AttachmentMenu'
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
-import { uploadFiles } from '@/lib/upload'
+import { uploadFiles, uploadPdf } from '@/lib/upload'
+import PdfTile from '@/components/PdfTile'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
@@ -37,6 +38,8 @@ interface Msg {
   lat: number | null
   lng: number | null
   imageUrl?: string | null
+  pdfUrl?: string | null
+  pdfName?: string | null
   senderId: string
   createdAt: string
   deliveredAt?: string | null
@@ -371,6 +374,7 @@ export default function ChatClient({
   const [profileData, setProfileData] = useState<any>(null)
   const [loadingProfile, setLoadingProfile] = useState(false)
   const imgInputRef = useRef<HTMLInputElement>(null)
+  const pdfInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
   const [showImageSheet, setShowImageSheet] = useState(false)
@@ -720,6 +724,41 @@ export default function ChatClient({
       else { await showApiError(res, lang as 'ar' | 'en' | 'ur') }
     } catch { toast.error(t('common_error')) }
     finally { setSendingImage(false); if (imgInputRef.current) imgInputRef.current.value = '' }
+  }
+
+  /**
+   * PDF attachment in chat. Same shape as sendImage but uploads via
+   * the client-direct path (Vercel Blob token + browser → blob),
+   * which is necessary because messages allow up to 25MB documents
+   * — well past the 4.5MB function body cap.
+   */
+  async function sendPdf(file: File) {
+    if (sendingImage) return // reuse the existing "uploading" lock
+    if (file.type !== 'application/pdf') { toast.error(lang === 'en' ? 'PDF only' : 'PDF فقط'); return }
+    if (file.size > 25 * 1024 * 1024) { toast.error(lang === 'en' ? 'Max 25MB' : 'الحد الأقصى 25 ميقا'); return }
+    const replyId = replyingTo?.id || null
+    setReplyingTo(null)
+    setSendingImage(true)
+    try {
+      const result = await uploadPdf(file)
+      const res = await fetch(`/api/threads/${threadId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'PDF',
+          pdfUrl: result.url,
+          pdfName: result.name,
+          replyToId: replyId,
+        }),
+      })
+      if (res.ok) { const msg = await res.json(); setMessages(prev => [...prev, msg]) }
+      else { await showApiError(res, lang as 'ar' | 'en' | 'ur') }
+    } catch (err: any) {
+      toast.error(err?.message || t('common_error'))
+    } finally {
+      setSendingImage(false)
+      if (pdfInputRef.current) pdfInputRef.current.value = ''
+    }
   }
 
   // Send multiple images in order. Each one becomes its own IMAGE
@@ -1438,7 +1477,22 @@ export default function ChatClient({
           setText((prev) => (prev ? `${prev.trimEnd()}\n${snippet}` : snippet))
         }}
         onPickLocation={() => setShowLocationConfirm(true)}
+        onPickDocument={() => pdfInputRef.current?.click()}
         variant="chat"
+      />
+      {/* Hidden PDF input — opened by the AttachmentMenu's
+          "Document" row. onChange uploads + sends in one go via
+          sendPdf, mirroring the existing image-attach flow. */}
+      <input
+        ref={pdfInputRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) sendPdf(file)
+          // value reset is handled inside sendPdf's finally block
+        }}
       />
       {showLocationConfirm && (
         <>
@@ -1519,7 +1573,7 @@ export default function ChatClient({
                     : (fullName(other) || (lang === 'en' ? 'Neighbor' : 'جار'))}
                 </p>
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-                  {replyingTo.type === 'IMAGE' ? '📷' : replyingTo.type === 'LOCATION' ? '📍' : (replyingTo.text || '').slice(0, 80)}
+                  {replyingTo.type === 'IMAGE' ? '📷' : replyingTo.type === 'PDF' ? '📄 PDF' : replyingTo.type === 'LOCATION' ? '📍' : (replyingTo.text || '').slice(0, 80)}
                 </p>
               </div>
               <button onClick={() => setReplyingTo(null)} className="p-1 text-gray-400 active:scale-90">
@@ -1798,7 +1852,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
           : otherName}
       </p>
       <p className={`text-[11px] truncate ${isMe ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'}`}>
-        {msg.replyTo.type === 'IMAGE' ? '📷' : msg.replyTo.type === 'LOCATION' ? '📍' : (msg.replyTo.text || '').slice(0, 60)}
+        {msg.replyTo.type === 'IMAGE' ? '📷' : msg.replyTo.type === 'PDF' ? '📄 PDF' : msg.replyTo.type === 'LOCATION' ? '📍' : (msg.replyTo.text || '').slice(0, 60)}
       </p>
     </button>
   ) : null
@@ -1833,7 +1887,24 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
         // Android tablet users were reporting).
         className={`flex flex-col ${isMe ? 'ltr:items-end rtl:items-start' : 'ltr:items-start rtl:items-end'} ${isLastInGroup ? 'mb-2' : 'mb-[3px]'} ${isFirstInGroup && !showDate ? 'mt-3' : ''}`}
       >
-        {msg.type === 'IMAGE' && (msg.imageUrl || (msg as any).localPreview) ? (
+        {msg.type === 'PDF' && msg.pdfUrl ? (
+          // PDF bubble — same width budget as image messages so it
+          // doesn't visually balloon. Renders the shared PdfTile in
+          // 'message' variant which uses a translucent overlay so it
+          // looks at home inside the bubble's chat background.
+          <div className={`max-w-[85%]`} data-msg-id={msg.id} {...longPress}>
+            {replyQuote && <div className="mb-1">{replyQuote}</div>}
+            <div className={`rounded-2xl px-2.5 py-2 shadow-sm ${
+              isMe ? `bg-primary-600 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white dark:bg-[#242625] ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
+            }`}>
+              <PdfTile url={msg.pdfUrl} name={msg.pdfName} variant="message" />
+            </div>
+            <p className={`text-[10px] mt-1 px-1 flex items-center gap-0.5 ${isMe ? 'text-gray-400 justify-start' : 'text-gray-400 justify-end'}`}>
+              {timeStr}
+              <MsgStatus msg={msg} isMe={isMe} />
+            </p>
+          </div>
+        ) : msg.type === 'IMAGE' && (msg.imageUrl || (msg as any).localPreview) ? (
           <div className={`max-w-[85%]`} data-msg-id={msg.id} {...longPress}>
             {replyQuote && <div className="mb-1">{replyQuote}</div>}
             <div onClick={() => msg.imageUrl && onImageTap(msg.imageUrl)} className={`relative ${msg.imageUrl ? 'cursor-pointer' : ''}`}>
