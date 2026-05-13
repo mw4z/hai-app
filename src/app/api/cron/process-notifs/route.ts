@@ -1254,6 +1254,90 @@ async function processEmergencyAlertRequest(job: JobRow): Promise<JobOutcome> {
 }
 
 /**
+ * Poll-request lifecycle pushes — three event types share one
+ * processor because the payload + delivery shape are identical;
+ * only the copy + deep-link differ. Targeted at a single user
+ * (mod on submit, requester on approve/reject) via `targetRef`.
+ */
+async function processPollRequestEvent(job: JobRow): Promise<JobOutcome> {
+  const p = (job.payload || {}) as {
+    requestId?: string
+    pollId?: string
+    title?: string
+    reason?: string
+    requesterName?: string | null
+  }
+  const { requestId, pollId, title, reason, requesterName } = p
+  if (!requestId) return 'dropped'
+
+  const recipient = await db.user.findUnique({
+    where: { id: job.targetRef },
+    select: {
+      id: true,
+      status: true,
+      deviceTokens: { select: { token: true, platform: true } },
+    },
+  })
+  if (!recipient) return 'dropped'
+  if (recipient.status === 'BANNED_TEMP' || recipient.status === 'BANNED_PERM') return 'dropped'
+  if (recipient.deviceTokens.length === 0) return 'dropped'
+
+  const tokens: TokenWithPlatform[] = recipient.deviceTokens.map((t) => ({
+    token: t.token,
+    platform: t.platform,
+  }))
+
+  let pushTitle = ''
+  let pushBody = ''
+  let deeplink = 'hai://feed'
+  if (job.type === 'poll_request_submitted') {
+    const who = requesterName?.trim() || 'جار'
+    pushTitle = `🗳️ اقتراح استفتاء — ${who}`
+    pushBody = (title || '').trim().slice(0, 180) || 'راجع قائمة الانتظار'
+    deeplink = 'hai://mod?tab=poll_requests'
+  } else if (job.type === 'poll_request_approved') {
+    pushTitle = '✅ تم قبول اقتراح الاستفتاء'
+    pushBody = (title || '').trim().slice(0, 180) || 'الاستفتاء صار متاحاً للجيران'
+    deeplink = pollId ? `hai://feed?poll=${pollId}` : 'hai://feed'
+  } else if (job.type === 'poll_request_rejected') {
+    pushTitle = '❌ لم يتم قبول اقتراح الاستفتاء'
+    pushBody = (reason || '').trim().slice(0, 180) || (title || '').trim().slice(0, 180) || ''
+    deeplink = 'hai://feed'
+  } else {
+    return 'dropped'
+  }
+
+  const result = await sendPushBatch(tokens, {
+    title: pushTitle,
+    body: pushBody,
+    priority: 'normal',
+    data: {
+      type: job.type,
+      requestId,
+      ...(pollId ? { pollId } : {}),
+      deeplink,
+    },
+  })
+
+  await cleanupInvalidTokens(result.invalidTokens, job.id, job.type)
+
+  console.log('[NOTIF_CRON] job delivered', {
+    jobId: job.id,
+    type: job.type,
+    targetRef: job.targetRef,
+    attempts: job.attempts,
+    tokensSent: tokens.length,
+    success: result.success,
+    failed: result.failed,
+  })
+
+  if (result.success === 0 && result.failed > 0) {
+    throw new Error(result.firstError || 'all push sends failed')
+  }
+  return 'done'
+}
+
+/**
  * Ride status push → a single party of the ride (requester OR
  * driver, whichever the caller passed as targetRef). All ride
  * events are time-critical, so priority is always high.
@@ -1641,6 +1725,11 @@ async function handle(req: NextRequest) {
           break
         case 'emergency_alert_request':
           outcome = await processEmergencyAlertRequest(job)
+          break
+        case 'poll_request_submitted':
+        case 'poll_request_approved':
+        case 'poll_request_rejected':
+          outcome = await processPollRequestEvent(job)
           break
         case 'ride_status':
           outcome = await processRideStatus(job)

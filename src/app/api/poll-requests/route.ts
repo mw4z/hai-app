@@ -5,6 +5,7 @@ import {
   validatePollRequest,
   pollRequestLimitFor,
 } from '@/lib/pollRequest'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 import { log } from '@/lib/logger'
 
 /**
@@ -91,17 +92,39 @@ export async function POST(req: NextRequest) {
       select: { id: true },
     })
     if (admins.length > 0) {
+      const requesterName = (user.name || '').trim() || 'جار'
       await db.notification.createMany({
         data: admins.map(a => ({
           userId: a.id,
           type: 'SYSTEM' as const,
           actorId: user.id,
+          actorName: requesterName,
           title: '🗳️ اقتراح استفتاء جديد',
           titleEn: '🗳️ New poll suggestion',
           body: result.value.title.slice(0, 120),
           bodyEn: result.value.title.slice(0, 120),
         })),
       })
+      // Enqueue push fan-out and kick the cron — without this step, the
+      // bell row exists but no banner reaches the mod's phone (the
+      // symptom that surfaced this gap). Mirrors the emergency-request
+      // pattern in /api/emergency/request.
+      await db.notifJob.createMany({
+        data: admins.map(a => ({
+          type: 'poll_request_submitted',
+          priority: 'normal',
+          targetType: 'user',
+          targetRef: a.id,
+          payload: {
+            requestId: pr.id,
+            title: result.value.title,
+            requesterName,
+            requesterId: user.id,
+            neighborhoodId: user.neighborhoodId,
+          },
+        })),
+      })
+      kickNotifCron()
     }
 
     return NextResponse.json({ id: pr.id, status: pr.status }, { status: 201 })

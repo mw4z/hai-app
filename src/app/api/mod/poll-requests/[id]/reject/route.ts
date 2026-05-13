@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { POLL_REQUEST_LIMITS } from '@/lib/pollRequest'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 import { log } from '@/lib/logger'
 
 const MOD_ROLES = new Set(['NEIGHBORHOOD_MOD', 'PLATFORM_MOD', 'SUPER_ADMIN'])
@@ -66,7 +67,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       select: { id: true, status: true },
     })
 
-    // Notify the requester (SYSTEM type — same as approve path).
+    // Notify the requester — bell row + push job. SYSTEM type, same
+    // pattern as the approve path.
     await db.notification.create({
       data: {
         userId: pr.userId,
@@ -78,6 +80,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         bodyEn: reason.slice(0, 200),
       },
     }).catch(() => { /* notification best-effort */ })
+
+    await db.notifJob.create({
+      data: {
+        type: 'poll_request_rejected',
+        priority: 'normal',
+        targetType: 'user',
+        targetRef: pr.userId,
+        payload: {
+          requestId: pr.id,
+          title: pr.title,
+          reason,
+        },
+      },
+    }).catch(() => { /* push best-effort */ })
+    kickNotifCron()
 
     return NextResponse.json({ requestId: updated.id, status: updated.status })
   } catch (error) {

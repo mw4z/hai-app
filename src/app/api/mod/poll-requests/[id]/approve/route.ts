@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { validatePollRequest } from '@/lib/pollRequest'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 import { log } from '@/lib/logger'
 
 const MOD_ROLES = new Set(['NEIGHBORHOOD_MOD', 'PLATFORM_MOD', 'SUPER_ADMIN'])
@@ -125,7 +126,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }).catch(() => { /* audit best-effort */ })
     }
 
-    // Notify the requester (SYSTEM type; no new enum value needed).
+    // Notify the requester — both the in-app bell row AND a push job
+    // so they get a banner on their phone. SYSTEM type; no new enum
+    // value needed.
     await db.notification.create({
       data: {
         userId: pr.userId,
@@ -137,6 +140,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         bodyEn: finalTitle.slice(0, 120),
       },
     }).catch(() => { /* notification best-effort */ })
+
+    await db.notifJob.create({
+      data: {
+        type: 'poll_request_approved',
+        priority: 'normal',
+        targetType: 'user',
+        targetRef: pr.userId,
+        payload: {
+          requestId: pr.id,
+          pollId: poll.id,
+          title: finalTitle,
+        },
+      },
+    }).catch(() => { /* push best-effort */ })
+    kickNotifCron()
 
     return NextResponse.json({
       pollId: poll.id,
