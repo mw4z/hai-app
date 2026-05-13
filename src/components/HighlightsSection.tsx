@@ -56,6 +56,31 @@ function timeAgo(dateStr: string, lang: string): string {
 
 const SEEN_KEY = 'hai_highlights_seen_v1'
 
+// Bar-level "hide for a while" affordance. One × on the trigger bar
+// (NOT per item) hides the entire HighlightsSection for 7 days.
+// Server content is unchanged — this is purely a per-device, per-user
+// preference. Stored as a single timestamp so a future re-show happens
+// automatically without a stale-ID cleanup pass.
+const BAR_HIDDEN_KEY = 'hai:highlights-bar-hidden-at'
+const BAR_HIDDEN_TTL_MS = 7 * 24 * 3600_000
+
+function readBarHiddenAt(): number | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(BAR_HIDDEN_KEY)
+    if (!raw) return null
+    const at = Number(raw)
+    if (!Number.isFinite(at)) return null
+    if (Date.now() - at >= BAR_HIDDEN_TTL_MS) return null
+    return at
+  } catch { return null }
+}
+
+function writeBarHiddenAt(at: number) {
+  if (typeof window === 'undefined') return
+  try { localStorage.setItem(BAR_HIDDEN_KEY, String(at)) } catch { /* */ }
+}
+
 interface Props {
   items: HighlightItemPayload[]
   /** When true, the section auto-opens the modal once per device. */
@@ -65,6 +90,11 @@ interface Props {
 export default function HighlightsSection({ items, autoOpenForFirstTime = true }: Props) {
   const { t, lang } = useLanguage()
   const [open, setOpen] = useState(false)
+  // Hydrate after mount — SSR can't read localStorage, and starting
+  // null keeps server/first-client markup identical (no hydration
+  // mismatch).
+  const [barHiddenAt, setBarHiddenAt] = useState<number | null>(null)
+  useEffect(() => { setBarHiddenAt(readBarHiddenAt()) }, [])
 
   // Lock feed scroll while the modal is open — same hook every other
   // sheet uses so the backdrop never bleeds touch into the page below.
@@ -73,6 +103,7 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
   useEffect(() => {
     if (!autoOpenForFirstTime) return
     if (items.length === 0) return
+    if (barHiddenAt !== null) return
     try {
       const seen = localStorage.getItem(SEEN_KEY)
       if (!seen) {
@@ -80,9 +111,17 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
         localStorage.setItem(SEEN_KEY, '1')
       }
     } catch { /* ignore */ }
-  }, [autoOpenForFirstTime, items.length])
+  }, [autoOpenForFirstTime, items.length, barHiddenAt])
 
   if (items.length === 0) return null
+  if (barHiddenAt !== null) return null
+
+  function hideBar() {
+    const now = Date.now()
+    writeBarHiddenAt(now)
+    setBarHiddenAt(now)
+    setOpen(false)
+  }
 
   function go(postId: string) {
     setOpen(false)
@@ -102,19 +141,34 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="w-full mx-auto flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-y border-amber-100 dark:border-amber-900/40 active:opacity-80"
-      >
-        <FiStar className="w-4 h-4 text-amber-500 flex-shrink-0" />
-        <span className="text-sm font-semibold text-amber-900 dark:text-amber-200 truncate flex-1 text-start">
-          📌 {t('highlights_title')}
-        </span>
-        <span className="text-xs text-amber-700 dark:text-amber-300 flex-shrink-0">
-          {items.length}
-        </span>
-      </button>
+      {/* Bar = row-button (opens modal) + dismiss × (hides the whole
+          surface for 7 days). Siblings, not nested, so the × can't
+          bubble into the open handler. Flex direction puts the × on
+          the trailing edge — visual right in LTR, visual left in RTL,
+          no manual direction logic. */}
+      <div className="w-full mx-auto flex items-stretch bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-y border-amber-100 dark:border-amber-900/40">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex-1 min-w-0 flex items-center gap-2 px-4 py-2.5 active:opacity-80 text-start"
+        >
+          <FiStar className="w-4 h-4 text-amber-500 flex-shrink-0" />
+          <span className="text-sm font-semibold text-amber-900 dark:text-amber-200 truncate flex-1 text-start">
+            📌 {t('highlights_title')}
+          </span>
+          <span className="text-xs text-amber-700 dark:text-amber-300 flex-shrink-0">
+            {items.length}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={hideBar}
+          aria-label={lang === 'en' ? 'Hide highlights' : lang === 'ur' ? 'ہائی لائٹس چھپائیں' : 'إخفاء المهم'}
+          className="flex-shrink-0 self-stretch px-3 flex items-center justify-center text-amber-700/70 hover:text-amber-900 dark:text-amber-300/70 dark:hover:text-amber-100 active:opacity-60"
+        >
+          <FiX className="w-4 h-4" />
+        </button>
+      </div>
 
       {open && (
         <div
