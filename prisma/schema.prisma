@@ -35,6 +35,7 @@ model Neighborhood {
   compounds Compound[]
   emergencyAlerts        EmergencyAlert[]
   emergencyAlertRequests EmergencyAlertRequest[]
+  pollRequests           PollRequest[]
   createdAt DateTime @default(now())
 }
 
@@ -163,6 +164,12 @@ model User {
 
   // ── Weekly digest log back-relation ──
   digestLogs        DigestLog[]
+
+  // ── Resident-submitted poll requests (Phase 1 of opening polls
+  // ── beyond admin-only creation). Residents propose; mods review.
+  // ── Direct Poll creation stays restricted to admin roles.
+  submittedPollRequests PollRequest[] @relation("PollRequestSubmitter")
+  reviewedPollRequests  PollRequest[] @relation("PollRequestReviewer")
 
   deletedAt        DateTime?     // soft delete — null = active, set = deleted
   createdAt        DateTime      @default(now())
@@ -860,6 +867,55 @@ model PollReaction {
 
   @@unique([pollId, userId])
   @@index([pollId])
+}
+
+// ─── Poll Requests (resident-suggested polls, mod-reviewed) ─────────────────
+// Residents can suggest a poll; a neighborhood mod must approve before a
+// real Poll is created. Direct Poll creation stays admin-only. The
+// approved-with-edits path stores the final (possibly edited) title +
+// options back on this row so the audit trail is complete without
+// touching ModerationLog. `approvedPollId` is a plain string column (no
+// FK relation) so deleting a Poll later doesn't cascade-rewrite the
+// request history.
+
+enum PollRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model PollRequest {
+  id              String             @id @default(cuid())
+  userId          String
+  user            User               @relation("PollRequestSubmitter", fields: [userId], references: [id])
+  neighborhoodId  String
+  neighborhood    Neighborhood       @relation(fields: [neighborhoodId], references: [id])
+  title           String
+  description     String?
+  // Match Poll.options shape exactly so approve can pass the array
+  // straight through without coercion.
+  options         String[]
+  reason          String?
+  status          PollRequestStatus  @default(PENDING)
+  reviewedById    String?
+  reviewedBy      User?              @relation("PollRequestReviewer", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  rejectionReason String?
+  // If the mod edits before approving, the FINAL (post-edit) title and
+  // options are stored back on `title` / `options` so the audit trail
+  // for what actually became a Poll lives here. The pre-edit values
+  // are kept in these *Original columns. Null = mod approved without
+  // editing.
+  titleOriginal   String?
+  optionsOriginal String[]
+  // Pointer to the created Poll for audit. Plain field, no FK so a
+  // future Poll delete doesn't cascade-rewrite history.
+  approvedPollId  String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([neighborhoodId, status, createdAt])
+  @@index([userId, createdAt])
 }
 
 // ─── Neighborhood Reports (to admin) ────────────────────────────────────────

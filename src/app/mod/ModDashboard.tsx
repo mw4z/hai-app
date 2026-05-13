@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 import { useLanguage } from '@/hooks/useLanguage'
 import { FiArrowRight, FiArrowLeft, FiAlertTriangle, FiEyeOff, FiUserX, FiActivity, FiFileText } from 'react-icons/fi'
+import { useConfirm, usePrompt } from '@/components/ConfirmProvider'
 import EmergencyCreator from '@/components/EmergencyCreator'
 
 const ACTION_LABELS: Record<string, { ar: string; en: string }> = {
@@ -35,7 +36,19 @@ const ACTION_LABELS: Record<string, { ar: string; en: string }> = {
   CONFLICT_BLOCKED: { ar: 'تم حظر الإجراء (تعارض)', en: 'Action blocked (conflict)' },
 }
 
-type Tab = 'reports' | 'user_reports' | 'hidden' | 'banned' | 'activity'
+type Tab = 'reports' | 'user_reports' | 'poll_requests' | 'hidden' | 'banned' | 'activity'
+
+interface PollRequestRow {
+  id: string
+  title: string
+  description: string | null
+  options: string[]
+  reason: string | null
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  createdAt: string
+  user: { id: string; name: string | null; lastName: string | null; reputation: number; avatarUrl: string | null } | null
+  neighborhood: { name: string; nameEn: string } | null
+}
 
 interface Props {
   data: {
@@ -70,9 +83,88 @@ const USER_REPORT_SOURCE_LABELS: Record<string, { ar: string; en: string }> = {
 export default function ModDashboard({ data }: Props) {
   const { t, lang } = useLanguage()
   const router = useRouter()
+  const confirmDialog = useConfirm()
+  const promptDialog = usePrompt()
   const [tab, setTab] = useState<Tab>('reports')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const dn = (ar: string, en: string) => lang === 'en' ? en : ar
+
+  // Poll-request queue. Fetched lazily when the user opens the tab so
+  // the SSR payload stays small. Polled every 30s while the tab is
+  // visible — same cadence as the rest of the dashboard.
+  const [pollRequests, setPollRequests] = useState<PollRequestRow[] | null>(null)
+  const [pollRequestBusy, setPollRequestBusy] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (tab !== 'poll_requests') return
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch('/api/mod/poll-requests?status=PENDING', { cache: 'no-store' })
+        if (!res.ok) return
+        const rows = await res.json()
+        if (!cancelled && Array.isArray(rows)) setPollRequests(rows)
+      } catch { /* */ }
+    }
+    load()
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') load()
+    }, 30_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [tab])
+
+  async function approvePollRequest(reqId: string) {
+    if (pollRequestBusy) return
+    setPollRequestBusy('approve-' + reqId)
+    try {
+      const res = await fetch(`/api/mod/poll-requests/${reqId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (res.ok) {
+        toast.success(dn('تم القبول وإنشاء الاستفتاء', 'Approved — poll created'))
+        setPollRequests(prev => prev?.filter(r => r.id !== reqId) ?? null)
+      } else {
+        const d = await res.json().catch(() => ({}))
+        toast.error(d?.error || 'Error')
+      }
+    } catch { toast.error('Error') }
+    finally { setPollRequestBusy(null) }
+  }
+
+  async function rejectPollRequest(reqId: string) {
+    if (pollRequestBusy) return
+    const reason = await promptDialog({
+      title: dn('سبب الرفض', 'Reason for rejection'),
+      message: dn('سيُعرض السبب لمُقترح الاستفتاء (الحد 300 حرف).', 'The requester will see this reason (max 300 chars).'),
+      placeholder: dn('اكتب السبب...', 'Type the reason...'),
+      confirmText: dn('رفض', 'Reject'),
+      cancelText: dn('إلغاء', 'Cancel'),
+      multiline: true,
+    })
+    if (!reason || !reason.trim()) return
+    if (reason.length > 300) {
+      toast.error(dn('السبب طويل جداً (الحد 300)', 'Reason too long (max 300)'))
+      return
+    }
+    setPollRequestBusy('reject-' + reqId)
+    try {
+      const res = await fetch(`/api/mod/poll-requests/${reqId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rejectionReason: reason.trim() }),
+      })
+      if (res.ok) {
+        toast.success(dn('تم الرفض', 'Rejected'))
+        setPollRequests(prev => prev?.filter(r => r.id !== reqId) ?? null)
+      } else {
+        const d = await res.json().catch(() => ({}))
+        toast.error(d?.error || 'Error')
+      }
+    } catch { toast.error('Error') }
+    finally { setPollRequestBusy(null) }
+  }
 
   async function modAction(action: string, payload: Record<string, any>) {
     if (actionLoading) return
@@ -120,6 +212,10 @@ export default function ModDashboard({ data }: Props) {
   const tabs: { key: Tab; icon: React.ReactNode; ar: string; en: string; count?: number }[] = [
     { key: 'reports', icon: <FiAlertTriangle className="w-4 h-4" />, ar: 'بلاغات المنشورات', en: 'Post reports', count: data.reportedPosts.length },
     { key: 'user_reports', icon: <FiUserX className="w-4 h-4" />, ar: 'بلاغات المستخدمين', en: 'User reports', count: data.userReports.length },
+    // Poll-request queue. Count badge surfaces only after the tab has
+    // been opened once (lazy-fetched); a Phase 1.5 pass can fold the
+    // count into the SSR payload if it becomes load-bearing.
+    { key: 'poll_requests', icon: <FiFileText className="w-4 h-4" />, ar: 'اقتراحات استفتاء', en: 'Poll requests', count: pollRequests?.length },
     { key: 'hidden', icon: <FiEyeOff className="w-4 h-4" />, ar: 'المخفية', en: 'Hidden', count: data.hiddenPosts.length },
     { key: 'banned', icon: <FiUserX className="w-4 h-4" />, ar: 'المحظورين', en: 'Banned', count: data.bannedUsers.length },
     { key: 'activity', icon: <FiActivity className="w-4 h-4" />, ar: 'نشاطي', en: 'My Activity' },
@@ -317,6 +413,79 @@ export default function ModDashboard({ data }: Props) {
                 </div>
               )
             })
+          )
+        )}
+
+        {/* Poll Requests Tab — resident-submitted poll suggestions
+            awaiting review. Approve creates the real Poll; reject
+            requires a reason (stored on the row, sent to the requester
+            via Notification). Requester identity is shown to the mod
+            for context but never reaches the resulting PollCard. */}
+        {tab === 'poll_requests' && (
+          pollRequests === null ? (
+            <EmptyState icon="⏳" text={dn('جاري التحميل…', 'Loading…')} />
+          ) : pollRequests.length === 0 ? (
+            <EmptyState icon="🗳️" text={dn('لا يوجد اقتراحات استفتاء', 'No pending poll suggestions')} />
+          ) : (
+            pollRequests.map(pr => (
+              <div key={pr.id} className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white" dir="auto">
+                      {pr.title}
+                    </p>
+                    {pr.description && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-3" dir="auto">
+                        {pr.description}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-gray-400 flex-shrink-0">
+                    {new Date(pr.createdAt).toLocaleDateString(lang !== 'en' ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+
+                <ul className="space-y-1 ps-4 list-disc text-xs text-gray-700 dark:text-gray-200">
+                  {pr.options.map((o, i) => (
+                    <li key={i} dir="auto">{o}</li>
+                  ))}
+                </ul>
+
+                {pr.reason && (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-lg p-2">
+                    <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 mb-0.5">{dn('سبب الاقتراح', 'Reason')}</p>
+                    <p className="text-xs text-gray-700 dark:text-gray-300" dir="auto">{pr.reason}</p>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[10px] text-gray-400 truncate">
+                    {pr.user
+                      ? `${pr.user.name || ''} ${pr.user.lastName || ''}`.trim() || dn('جار', 'Neighbor')
+                      : dn('جار', 'Neighbor')}
+                    {pr.user && (
+                      <span className="ms-2">⭐ {pr.user.reputation}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => rejectPollRequest(pr.id)}
+                      disabled={!!pollRequestBusy}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 active:scale-95 disabled:opacity-50"
+                    >
+                      {dn('رفض', 'Reject')}
+                    </button>
+                    <button
+                      onClick={() => approvePollRequest(pr.id)}
+                      disabled={!!pollRequestBusy}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary-600 text-white active:scale-95 disabled:opacity-50"
+                    >
+                      {dn('قبول', 'Approve')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
           )
         )}
 

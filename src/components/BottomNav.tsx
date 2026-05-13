@@ -358,9 +358,21 @@ export default function BottomNav({
               </button>
             </div>
 
+            {/* Tertiary entry — small link, not a tile. Routes to the
+                resident poll-suggestion form; the form posts to
+                /api/poll-requests, which lands in the mod's review
+                queue. Direct Poll creation stays restricted to admins. */}
+            <button
+              type="button"
+              onClick={() => { setShowEntrySheet(false); router.push('/polls/request') }}
+              className="w-full mt-3 py-2 text-xs font-semibold text-primary-600 dark:text-primary-400 active:opacity-70 transition-opacity"
+            >
+              💡 {lang === 'en' ? 'Suggest a poll to the mod' : lang === 'ur' ? 'منتظم کو پول تجویز کریں' : 'اقترح استفتاء للمشرف'}
+            </button>
+
             <button
               onClick={() => setShowEntrySheet(false)}
-              className="w-full mt-4 py-2.5 text-sm font-medium text-gray-500 dark:text-gray-400 active:scale-[0.98] transition-transform"
+              className="w-full mt-1 py-2.5 text-sm font-medium text-gray-500 dark:text-gray-400 active:scale-[0.98] transition-transform"
             >
               {t('post_or_ask_cancel')}
             </button>
