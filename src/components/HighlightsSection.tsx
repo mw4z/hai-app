@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { FiX, FiStar, FiHeart, FiMessageSquare, FiClock } from 'react-icons/fi'
@@ -56,6 +56,36 @@ function timeAgo(dateStr: string, lang: string): string {
 
 const SEEN_KEY = 'hai_highlights_seen_v1'
 
+// Per-user, per-device dismiss list. A small × on each highlight card
+// hides that specific item locally for 7 days; the entry is server-
+// authoritative content, so dismissing must never call the API or
+// mutate the post. Entries past TTL get filtered on read so stale IDs
+// don't accumulate.
+const DISMISS_KEY = 'hai:dismissed-highlights'
+const DISMISS_TTL_MS = 7 * 24 * 3600_000
+
+interface DismissEntry { id: string; at: number }
+
+function readDismissed(): DismissEntry[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(DISMISS_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    const now = Date.now()
+    return parsed
+      .filter((e): e is DismissEntry =>
+        e && typeof e === 'object' && typeof e.id === 'string' && typeof e.at === 'number')
+      .filter(e => now - e.at < DISMISS_TTL_MS)
+  } catch { return [] }
+}
+
+function writeDismissed(entries: DismissEntry[]) {
+  if (typeof window === 'undefined') return
+  try { localStorage.setItem(DISMISS_KEY, JSON.stringify(entries)) } catch { /* */ }
+}
+
 interface Props {
   items: HighlightItemPayload[]
   /** When true, the section auto-opens the modal once per device. */
@@ -65,6 +95,19 @@ interface Props {
 export default function HighlightsSection({ items, autoOpenForFirstTime = true }: Props) {
   const { t, lang } = useLanguage()
   const [open, setOpen] = useState(false)
+  // Hydrate dismissed-IDs from localStorage AFTER mount. SSR starts
+  // empty so the server-rendered markup matches the first client
+  // render (no hydration mismatch). The post-mount effect then trims
+  // the visible set. Brief flicker is invisible: the modal isn't open
+  // by default, and the trigger bar only shows a count.
+  const [dismissed, setDismissed] = useState<DismissEntry[]>([])
+  useEffect(() => { setDismissed(readDismissed()) }, [])
+
+  const visible = useMemo(() => {
+    if (dismissed.length === 0) return items
+    const dropped = new Set(dismissed.map(e => e.id))
+    return items.filter(it => !dropped.has(it.id))
+  }, [items, dismissed])
 
   // Lock feed scroll while the modal is open — same hook every other
   // sheet uses so the backdrop never bleeds touch into the page below.
@@ -72,7 +115,7 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
 
   useEffect(() => {
     if (!autoOpenForFirstTime) return
-    if (items.length === 0) return
+    if (visible.length === 0) return
     try {
       const seen = localStorage.getItem(SEEN_KEY)
       if (!seen) {
@@ -80,9 +123,24 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
         localStorage.setItem(SEEN_KEY, '1')
       }
     } catch { /* ignore */ }
-  }, [autoOpenForFirstTime, items.length])
+  }, [autoOpenForFirstTime, visible.length])
 
-  if (items.length === 0) return null
+  // Close the modal automatically when the user dismisses the last
+  // visible item — otherwise they're staring at an empty list.
+  useEffect(() => {
+    if (open && visible.length === 0) setOpen(false)
+  }, [open, visible.length])
+
+  if (visible.length === 0) return null
+
+  function dismiss(id: string) {
+    setDismissed(prev => {
+      const filtered = prev.filter(e => e.id !== id)
+      const next = [...filtered, { id, at: Date.now() }]
+      writeDismissed(next)
+      return next
+    })
+  }
 
   function go(postId: string) {
     setOpen(false)
@@ -112,7 +170,7 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
           📌 {t('highlights_title')}
         </span>
         <span className="text-xs text-amber-700 dark:text-amber-300 flex-shrink-0">
-          {items.length}
+          {visible.length}
         </span>
       </button>
 
@@ -153,16 +211,21 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
             {/* List */}
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain">
               <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-                {items.map((it) => {
+                {visible.map((it) => {
                   const bk = badgeKey(it.badge)
                   const icon = CATEGORY_ICON[it.category] || '💬'
                   const thumb = it.imageUrls?.[0]
                   return (
-                    <li key={it.id}>
+                    // The row-button and dismiss-button are siblings (not
+                    // nested) so a tap on × never bubbles into the
+                    // scroll-to-post handler. Flex naturally lays the
+                    // dismiss on the trailing edge: visual right in LTR,
+                    // visual left in RTL — no manual direction logic.
+                    <li key={it.id} className="flex items-stretch active:bg-gray-50 dark:active:bg-gray-800">
                       <button
                         type="button"
                         onClick={() => go(it.id)}
-                        className="w-full text-start flex gap-3 px-4 py-3 active:bg-gray-50 dark:active:bg-gray-800"
+                        className="flex-1 min-w-0 text-start flex gap-3 px-4 py-3"
                       >
                         {/* Thumbnail OR category icon */}
                         {thumb ? (
@@ -228,6 +291,14 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
                             )}
                           </div>
                         </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => dismiss(it.id)}
+                        aria-label={lang === 'en' ? 'Dismiss' : lang === 'ur' ? 'ہٹائیں' : 'إخفاء'}
+                        className="flex-shrink-0 self-stretch px-3 flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 active:opacity-70"
+                      >
+                        <FiX className="w-4 h-4" />
                       </button>
                     </li>
                   )
