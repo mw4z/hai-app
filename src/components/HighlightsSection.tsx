@@ -117,6 +117,17 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
   if (barHiddenAt !== null) return null
 
   function hideBar() {
+    // Native confirm — on Capacitor WebView this renders as the
+    // platform's actual UIAlertController (iOS) / AlertDialog
+    // (Android), which is what the user asked for. Synchronous and
+    // trilingual via the passed string.
+    const msg =
+      lang === 'en'
+        ? 'Hide highlights for a week?'
+        : lang === 'ur'
+          ? 'ایک ہفتے کیلئے ہائی لائٹس چھپائیں؟'
+          : 'إخفاء "المهم" لمدة أسبوع؟'
+    if (typeof window !== 'undefined' && !window.confirm(msg)) return
     const now = Date.now()
     writeBarHiddenAt(now)
     setBarHiddenAt(now)
@@ -163,10 +174,9 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
         <button
           type="button"
           onClick={hideBar}
-          aria-label={lang === 'en' ? 'Hide highlights' : lang === 'ur' ? 'ہائی لائٹس چھپائیں' : 'إخفاء المهم'}
-          className="flex-shrink-0 self-stretch px-3 flex items-center justify-center text-amber-700/70 hover:text-amber-900 dark:text-amber-300/70 dark:hover:text-amber-100 active:opacity-60"
+          className="flex-shrink-0 self-stretch px-3 flex items-center justify-center text-xs font-semibold text-amber-700 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100 active:opacity-60"
         >
-          <FiX className="w-4 h-4" />
+          {lang === 'en' ? 'Hide' : lang === 'ur' ? 'چھپائیں' : 'إخفاء'}
         </button>
       </div>
 
