@@ -40,9 +40,20 @@ export function getPostExpiryDate(category: string | null | undefined, createdAt
  *
  * Reads post.category (the v2 column) for the bucket lookup; falls
  * back to DEFAULT_HOURS for any row whose category is null.
+ *
+ * REQUEST intent override: a post with `intent='REQUEST'` is a
+ * community ask ("أحتاج سباك", "أبحث عن شقة") and is NOT subject to
+ * its category's commercial expiry. Without this override, a SERVICES
+ * request created via /ask would archive after 24h — fast enough that
+ * the user sees it flicker out as the feed's 60s cache rolls over,
+ * which is exactly the "sometimes shows, sometimes not, sometimes
+ * delayed" symptom. Pinned to 7 days, same as NEIGHBORHOOD_REPORTS.
  */
+const REQUEST_HOURS = 168 // 7 days
+
 export function shouldArchivePost(post: {
   category?: string | null
+  intent?: string | null
   createdAt: Date
   activeThreadId?: string | null
   isPinned?: boolean
@@ -54,13 +65,15 @@ export function shouldArchivePost(post: {
   // Posts with active coordination threads stay visible
   if (post.activeThreadId) return false
 
-  const hours = (post.category && EXPIRY_HOURS[post.category]) || DEFAULT_HOURS
+  const baseHours = post.intent === 'REQUEST'
+    ? REQUEST_HOURS
+    : ((post.category && EXPIRY_HOURS[post.category]) || DEFAULT_HOURS)
 
   // High engagement posts get 2x duration
   const commentCount = post._count?.comments || 0
   const multiplier = commentCount >= HIGH_ENGAGEMENT_COMMENTS ? 2 : 1
 
-  const expiryMs = hours * multiplier * 60 * 60 * 1000
+  const expiryMs = baseHours * multiplier * 60 * 60 * 1000
   const expiryDate = new Date(post.createdAt.getTime() + expiryMs)
 
   return Date.now() > expiryDate.getTime()

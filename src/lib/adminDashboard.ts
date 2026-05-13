@@ -74,6 +74,9 @@ export async function getAdminDashboardData(userId: string): Promise<AdminDashbo
       select: {
         id: true,
         category: true,
+        // Needed by shouldArchivePost — REQUEST posts get the
+        // community-ask 7-day lifetime regardless of category.
+        intent: true,
         createdAt: true,
         activeThreadId: true,
         isPinned: true,
