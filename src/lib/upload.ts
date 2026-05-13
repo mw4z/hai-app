@@ -249,19 +249,25 @@ async function validatePdfSafety(file: File): Promise<void> {
  *    because of a compression failure.
  *  - Files under 256KB skip compression entirely — the overhead
  *    of round-tripping through pdf-lib isn't worth it.
- *  - Files over 2MB ALSO skip compression. pdf-lib's parse of a
- *    25MB PDF on mobile is 1-3 seconds, and image-heavy PDFs at
- *    that size save almost nothing (the bulk is already-DCT-
- *    encoded JPEG). The user-reported "upload takes too long"
- *    regression was almost entirely this parse cost; skipping it
- *    here trades a few % of payload size for several seconds of
- *    perceived responsiveness.
+ *  - Files over 8MB skip compression. pdf-lib's parse of a 25MB
+ *    PDF on mobile is 3-8 seconds, and image-heavy PDFs at that
+ *    size save almost nothing (the bulk is already-DCT-encoded
+ *    JPEG). At the upper end the parse cost dominates.
  *  - We don't strip metadata. Some PDFs carry meaningful info
  *    there (digital signatures, accessibility tags); preserving
  *    is safer than aggressive stripping.
+ *
+ * Why 8MB and not 2MB (previous): files in the 4-8MB range are
+ * the SLOWEST uploads in practice — they're above the 4.5MB
+ * Vercel function body cap so they get forced into the 3-RTT
+ * client-direct path. If lossless re-save can drop them under
+ * 4MB, they switch to the 1-RTT fast path, which is a 2-4x
+ * total speedup that easily pays for the 1-2s parse cost. For
+ * text-heavy PDFs (price lists, menus) re-save commonly saves
+ * 10-20%, enough to cross the threshold.
  */
 const COMPRESS_MIN_BYTES = 256 * 1024
-const COMPRESS_MAX_BYTES = 2 * 1024 * 1024
+const COMPRESS_MAX_BYTES = 8 * 1024 * 1024
 
 async function compressPdf(
   file: File,
