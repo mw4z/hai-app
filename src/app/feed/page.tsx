@@ -363,55 +363,6 @@ export default async function FeedPage({
     })
   }
 
-  // ── "المهم في الحي" rail items. Derived from the already-loaded
-  // ── post set (no extra DB hit) so the rail is consistent with what
-  // ── the feed shows. Inclusion rules:
-  //   • isPinned post (mod-curated, no age cap, max 1 month)
-  //   • category=NEIGHBORHOOD_REPORTS with priority IN ('HIGH','CRITICAL')
-  //     created in the last 7 days
-  //   • category=EVENTS posted in the last 14 days (anchor of future
-  //     events strip — Phase 1 will use eventStartAt)
-  // Capped at 3. Sorted by (isPinned desc, priority desc, createdAt desc).
-  // The rail is a *summary* surface; the rail cards link by anchor to
-  // the same post in the main feed list, so we do NOT dedupe — duplicate
-  // exposure is the intent. EmergencyAlerts already render via their own
-  // top banner (EmergencyBanner) so they're excluded here.
-  const importantNow = Date.now()
-  const SEVEN_DAYS = 7 * 24 * 3600_000
-  const FOURTEEN_DAYS = 14 * 24 * 3600_000
-  const importantRaw = activePosts
-    .filter(p => {
-      const ageMs = importantNow - new Date(p.createdAt).getTime()
-      if (p.isPinned) return ageMs < 30 * 24 * 3600_000
-      if (p.category === 'NEIGHBORHOOD_REPORTS' &&
-          (p.priority === 'HIGH' || p.priority === 'CRITICAL') &&
-          ageMs < SEVEN_DAYS) return true
-      if (p.category === 'EVENTS' && ageMs < FOURTEEN_DAYS) return true
-      return false
-    })
-    .sort((a, b) => {
-      if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
-      const rank = (x: string | null) => x === 'CRITICAL' ? 2 : x === 'HIGH' ? 1 : 0
-      const r = rank(b.priority as any) - rank(a.priority as any)
-      if (r !== 0) return r
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    })
-    .slice(0, 3)
-    .map(p => ({
-      id: p.id,
-      title: p.title,
-      category: p.category,
-      priority: p.priority,
-      isPinned: p.isPinned,
-      createdAt: p.createdAt,
-      author: {
-        id: p.author.id,
-        name: p.author.name,
-        lastName: p.author.lastName,
-        avatarUrl: p.author.avatarUrl,
-      },
-    }))
-
   // Chip indicator: presence-only dot scoped to the last 6 hours.
   // Why not a count: a number badge reads as "unread / new for me",
   // but the value is just neighborhood-wide volume — a refresher
@@ -492,7 +443,6 @@ export default async function FeedPage({
       deliveryRequests={JSON.parse(JSON.stringify(deliveryRequests))}
       initialRides={JSON.parse(JSON.stringify(initialOpenRides))}
       initialPolls={JSON.parse(JSON.stringify(pollsRaw))}
-      initialImportant={JSON.parse(JSON.stringify(importantRaw))}
     />
   )
 }

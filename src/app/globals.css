@@ -164,19 +164,6 @@ input, textarea, [contenteditable="true"] {
   animation: msg-jump-flash 1.6s ease-out;
 }
 
-/* Brief outline pulse when a post is targeted by the
-   "المهم في الحي" rail (ImportantRail jumpToPost). Uses box-shadow so
-   the layout doesn't shift. Compositor-only. */
-@keyframes hai-important-pulse-keyframe {
-  0%   { box-shadow: 0 0 0 0 rgba(0, 168, 132, 0.55); }
-  50%  { box-shadow: 0 0 0 6px rgba(0, 168, 132, 0.20); }
-  100% { box-shadow: 0 0 0 0 rgba(0, 168, 132, 0); }
-}
-.hai-important-pulse {
-  animation: hai-important-pulse-keyframe 1.6s ease-out;
-  border-radius: var(--hai-radius-lg, 16px);
-}
-
 /* Chat bubble entrance — iMessage-style: slight scale-up + slide
    with a soft spring at the end so it lands instead of just stopping.
    CSS animations only play on mount, so this fires once per newly-
