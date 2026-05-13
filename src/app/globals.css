@@ -961,3 +961,28 @@ body.hai-scroll-locked .hai-app-shell__scroll {
 @media (prefers-reduced-motion: reduce) {
   .hai-highlight-flash { animation: none; }
 }
+
+/* PDF upload stage label — animated typing dots after the label
+   text (e.g., 'جاري الرفع', '…') signal that the stage is still
+   in progress. ::after appends the dots; the keyframe steps
+   through 0→1→2→3 dots over 1.4s so the cadence reads as a
+   typing indicator. The label text itself is static; only the
+   trailing dots animate, so screen readers announce the label
+   once instead of every tick. */
+@keyframes hai-typing-dots {
+  0%, 20%   { content: '.'; }
+  40%       { content: '..'; }
+  60%       { content: '...'; }
+  80%, 100% { content: ''; }
+}
+.hai-typing-dots::after {
+  content: '';
+  display: inline-block;
+  min-width: 1ch;
+  text-align: start;
+  animation: hai-typing-dots 1.4s steps(1, end) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hai-typing-dots::after { animation: none; content: '…'; }
+}
+

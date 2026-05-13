@@ -97,6 +97,45 @@ const MAX_PDF_BYTES = 25 * 1024 * 1024
 const PDF_UPLOAD_TIMEOUT_MS = 120_000
 
 /**
+ * Stages of the PDF pipeline. Surfaced via uploadPdf's onStage
+ * callback so the UI can show "Scanning…" then "Compressing…"
+ * then "Uploading X%…" with the right label at each step.
+ *
+ *  scanning    — validatePdfSafety (magic bytes, active content,
+ *                encryption, page count). ~50ms on a 5MB file.
+ *  compressing — pdf-lib re-save. ~100ms-2s depending on size.
+ *  uploading   — actual byte transfer to Vercel Blob. The
+ *                bulk of total time on mobile (seconds, not ms).
+ *                Progress percent ticks via onProgress in parallel.
+ */
+export type UploadStage = 'scanning' | 'compressing' | 'uploading'
+
+/**
+ * Trilingual label for the current upload stage. Used by every
+ * surface that renders a "Scanning… / Compressing… / Uploading…"
+ * tile (post composer preview, comment composer preview, chat
+ * pending bubble). Keeps the copy in one place so the wording
+ * matches across the app.
+ *
+ * Note: callers pair the returned string with the `.hai-typing-dots`
+ * class for the animated trailing dots — that's why we DON'T
+ * include "…" here; the CSS pseudo-element supplies the dots.
+ */
+export function uploadStageLabel(
+  stage: UploadStage,
+  lang: 'ar' | 'en' | 'ur',
+): string {
+  switch (stage) {
+    case 'scanning':
+      return lang === 'en' ? 'Scanning' : lang === 'ur' ? 'اسکین ہو رہی ہے' : 'جاري الفحص'
+    case 'compressing':
+      return lang === 'en' ? 'Compressing' : lang === 'ur' ? 'دبا رہا ہے' : 'جاري الضغط'
+    case 'uploading':
+      return lang === 'en' ? 'Uploading' : lang === 'ur' ? 'اپ لوڈ ہو رہا ہے' : 'جاري الرفع'
+  }
+}
+
+/**
  * Lightweight safety guard for user-uploaded PDFs. NOT a full
  * antivirus scan — we never look at content; we look for clear
  * structural / metadata red flags that take milliseconds to check
@@ -265,7 +304,10 @@ async function compressPdf(
 
 export async function uploadPdf(
   file: File,
-  opts?: { onProgress?: (percent: number) => void },
+  opts?: {
+    onProgress?: (percent: number) => void
+    onStage?: (stage: UploadStage) => void
+  },
 ): Promise<{
   url: string
   name: string
@@ -286,11 +328,13 @@ export async function uploadPdf(
   // attachment to neighbors. Same arrayBuffer() the compressor
   // re-reads below — modern browsers cache File reads so the
   // double-read isn't a real cost.
+  opts?.onStage?.('scanning')
   await validatePdfSafety(file)
 
   // Compress before upload. compressPdf returns the smaller of the
   // re-saved version vs the original, so this is always a win.
   // Logs are dev-only — strip in production via console silencing.
+  opts?.onStage?.('compressing')
   const compressed = await compressPdf(file, (msg) => {
     if (typeof window !== 'undefined' && (window as any).__HAI_DEBUG__) {
       console.log(msg)
@@ -322,6 +366,7 @@ export async function uploadPdf(
     }, PDF_UPLOAD_TIMEOUT_MS)
   })
 
+  opts?.onStage?.('uploading')
   const upstream = upload(key, compressed, {
     access: 'public',
     handleUploadUrl: '/api/upload-pdf',

@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
 import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiBell, FiBellOff, FiImage, FiUser, FiPaperclip } from 'react-icons/fi'
 import AttachmentMenu from './AttachmentMenu'
 import SubtypeChip from './posts/SubtypeChip'
-import { uploadFiles, uploadPdf } from '@/lib/upload'
+import { uploadFiles, uploadPdf, uploadStageLabel, type UploadStage } from '@/lib/upload'
 import { playSend, playReaction, playDelete } from '@/lib/sound'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
 import EmojiPicker from './EmojiPickerWrapper'
@@ -441,6 +441,7 @@ export default function PostCard({
     size: number
     uploading: boolean
     percent: number
+    stage: UploadStage
     error?: string
   }
   const [commentPdf, setCommentPdf] = useState<PdfState | null>(null)
@@ -1750,17 +1751,19 @@ export default function PostCard({
           if (file.type !== 'application/pdf') { toast.error(lang === 'en' ? 'Only PDF files' : 'فقط ملفات PDF'); return }
           if (file.size > 25 * 1024 * 1024) { toast.error(lang === 'en' ? 'PDF too large (max 25MB)' : 'حجم الملف كبير'); return }
           // Upload on pick — comment submit reads the cached URL.
-          setCommentPdf({ url: null, name: file.name, size: file.size, uploading: true, percent: 0 })
+          setCommentPdf({ url: null, name: file.name, size: file.size, uploading: true, percent: 0, stage: 'scanning' })
           try {
             const result = await uploadPdf(file, {
               onProgress: (percent) =>
                 setCommentPdf((prev) => (prev && prev.uploading ? { ...prev, percent } : prev)),
+              onStage: (stage) =>
+                setCommentPdf((prev) => (prev && prev.uploading ? { ...prev, stage } : prev)),
             })
-            setCommentPdf({ url: result.url, name: result.name, size: result.size, uploading: false, percent: 100 })
+            setCommentPdf({ url: result.url, name: result.name, size: result.size, uploading: false, percent: 100, stage: 'uploading' })
           } catch (err: any) {
             const message = err?.message || (lang === 'en' ? 'PDF upload failed' : 'فشل رفع الملف')
             toast.error(message)
-            setCommentPdf({ url: null, name: file.name, size: file.size, uploading: false, percent: 0, error: message })
+            setCommentPdf({ url: null, name: file.name, size: file.size, uploading: false, percent: 0, stage: 'uploading', error: message })
           }
         }}
       />
@@ -1775,17 +1778,19 @@ export default function PostCard({
           if (!file) return
           if (file.type !== 'application/pdf') { toast.error(lang === 'en' ? 'Only PDF files' : 'فقط ملفات PDF'); return }
           if (file.size > 25 * 1024 * 1024) { toast.error(lang === 'en' ? 'PDF too large (max 25MB)' : 'حجم الملف كبير'); return }
-          setReplyPdf({ url: null, name: file.name, size: file.size, uploading: true, percent: 0 })
+          setReplyPdf({ url: null, name: file.name, size: file.size, uploading: true, percent: 0, stage: 'scanning' })
           try {
             const result = await uploadPdf(file, {
               onProgress: (percent) =>
                 setReplyPdf((prev) => (prev && prev.uploading ? { ...prev, percent } : prev)),
+              onStage: (stage) =>
+                setReplyPdf((prev) => (prev && prev.uploading ? { ...prev, stage } : prev)),
             })
-            setReplyPdf({ url: result.url, name: result.name, size: result.size, uploading: false, percent: 100 })
+            setReplyPdf({ url: result.url, name: result.name, size: result.size, uploading: false, percent: 100, stage: 'uploading' })
           } catch (err: any) {
             const message = err?.message || (lang === 'en' ? 'PDF upload failed' : 'فشل رفع الملف')
             toast.error(message)
-            setReplyPdf({ url: null, name: file.name, size: file.size, uploading: false, percent: 0, error: message })
+            setReplyPdf({ url: null, name: file.name, size: file.size, uploading: false, percent: 0, stage: 'uploading', error: message })
           }
         }}
       />
@@ -2088,15 +2093,21 @@ export default function PostCard({
                             {replyPdf.uploading ? (
                               <div className="px-1">
                                 <div className="flex items-center justify-between mb-0.5 text-[10px]">
-                                  <span className="text-gray-500 dark:text-gray-400">
-                                    {lang === 'en' ? 'Uploading…' : 'جاري الرفع…'}
+                                  <span
+                                    key={replyPdf.stage}
+                                    className="hai-typing-dots text-gray-500 dark:text-gray-400 animate-fade-in"
+                                  >
+                                    {uploadStageLabel(replyPdf.stage, lang as 'ar' | 'en' | 'ur')}
                                   </span>
                                   <span className="text-gray-500 dark:text-gray-400 font-medium tabular-nums">
-                                    {replyPdf.percent}%
+                                    {replyPdf.stage === 'uploading' ? `${replyPdf.percent}%` : ''}
                                   </span>
                                 </div>
                                 <div className="h-0.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                  <div className="h-full bg-rose-500 transition-all duration-300" style={{ width: `${Math.max(2, Math.min(100, replyPdf.percent))}%` }} />
+                                  <div
+                                    className={`h-full transition-all duration-300 ${replyPdf.stage === 'uploading' ? 'bg-rose-500' : 'bg-rose-300 dark:bg-rose-400/60 animate-pulse'}`}
+                                    style={{ width: replyPdf.stage === 'uploading' ? `${Math.max(2, Math.min(100, replyPdf.percent))}%` : '30%' }}
+                                  />
                                 </div>
                               </div>
                             ) : replyPdf.error ? (
@@ -2173,15 +2184,21 @@ export default function PostCard({
                   {commentPdf.uploading ? (
                     <div className="px-1">
                       <div className="flex items-center justify-between mb-0.5 text-[10px]">
-                        <span className="text-gray-500 dark:text-gray-400">
-                          {lang === 'en' ? 'Uploading…' : 'جاري الرفع…'}
+                        <span
+                          key={commentPdf.stage}
+                          className="hai-typing-dots text-gray-500 dark:text-gray-400 animate-fade-in"
+                        >
+                          {uploadStageLabel(commentPdf.stage, lang as 'ar' | 'en' | 'ur')}
                         </span>
                         <span className="text-gray-500 dark:text-gray-400 font-medium tabular-nums">
-                          {commentPdf.percent}%
+                          {commentPdf.stage === 'uploading' ? `${commentPdf.percent}%` : ''}
                         </span>
                       </div>
                       <div className="h-0.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                        <div className="h-full bg-rose-500 transition-all duration-300" style={{ width: `${Math.max(2, Math.min(100, commentPdf.percent))}%` }} />
+                        <div
+                          className={`h-full transition-all duration-300 ${commentPdf.stage === 'uploading' ? 'bg-rose-500' : 'bg-rose-300 dark:bg-rose-400/60 animate-pulse'}`}
+                          style={{ width: commentPdf.stage === 'uploading' ? `${Math.max(2, Math.min(100, commentPdf.percent))}%` : '30%' }}
+                        />
                       </div>
                     </div>
                   ) : commentPdf.error ? (

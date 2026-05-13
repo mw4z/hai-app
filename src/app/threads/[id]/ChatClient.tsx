@@ -11,7 +11,7 @@ import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, Fi
 import AttachmentMenu from '@/components/AttachmentMenu'
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
-import { uploadFiles, uploadPdf } from '@/lib/upload'
+import { uploadFiles, uploadPdf, uploadStageLabel, type UploadStage } from '@/lib/upload'
 import PdfTile from '@/components/PdfTile'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
@@ -184,7 +184,7 @@ export default function ChatClient({
     try {
       // Strip volatile/local-only fields that shouldn't outlive the session
       const serializable = messages.map((m: any) => {
-        const { localPreview, pending, percent, ...rest } = m
+        const { localPreview, pending, percent, stage, ...rest } = m
         return rest
       })
       localStorage.setItem(
@@ -771,6 +771,10 @@ export default function ChatClient({
       // Carries the live upload percent so the render path's
       // overlay can tick — pulled out in the JSX via `(msg as any).percent`.
       percent: 0,
+      // Initial stage. The pipeline flips it scanning → compressing
+      // → uploading via onStage below so the bubble label reflects
+      // what the upload is actually doing right now.
+      stage: 'scanning' as UploadStage,
     }
     setMessages((prev) => [...prev, placeholder])
     requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }))
@@ -785,6 +789,13 @@ export default function ChatClient({
           setMessages((prev) =>
             prev.map((m: any) =>
               m.id === tempId && m.pending ? { ...m, percent } : m,
+            ),
+          )
+        },
+        onStage: (stage) => {
+          setMessages((prev) =>
+            prev.map((m: any) =>
+              m.id === tempId && m.pending ? { ...m, stage } : m,
             ),
           )
         },
@@ -1980,22 +1991,34 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
                     // filename and size badge get lost in the green.
                     tone={isMe ? 'onPrimary' : 'onSurface'}
                   />
-                  {pending && (
-                    <div className="mt-1.5 px-1 pb-0.5">
-                      <div className="flex items-center justify-between mb-0.5 text-[10px] text-white/80">
-                        <span>
-                          {lang === 'en' ? 'Uploading…' : lang === 'ur' ? 'اپ لوڈ ہو رہا ہے…' : 'جاري الرفع…'}
-                        </span>
-                        <span className="font-medium tabular-nums">{percent}%</span>
+                  {pending && (() => {
+                    const stage: UploadStage = ((msg as any).stage as UploadStage) || 'scanning'
+                    return (
+                      <div className="mt-1.5 px-1 pb-0.5">
+                        <div className="flex items-center justify-between mb-0.5 text-[10px] text-white/80">
+                          <span
+                            key={stage}
+                            className="hai-typing-dots animate-fade-in"
+                          >
+                            {uploadStageLabel(stage, lang as 'ar' | 'en' | 'ur')}
+                          </span>
+                          <span className="font-medium tabular-nums">
+                            {stage === 'uploading' ? `${percent}%` : ''}
+                          </span>
+                        </div>
+                        <div className="h-0.5 w-full bg-white/20 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-300 ${stage === 'uploading' ? 'bg-white/80' : 'bg-white/60 animate-pulse'}`}
+                            style={{
+                              width: stage === 'uploading'
+                                ? `${Math.max(2, Math.min(100, percent))}%`
+                                : '30%',
+                            }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-0.5 w-full bg-white/20 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-white/80 transition-all duration-300"
-                          style={{ width: `${Math.max(2, Math.min(100, percent))}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
+                    )
+                  })()}
                 </div>
                 <p className={`text-[10px] mt-1 px-1 flex items-center gap-0.5 ${isMe ? 'text-gray-400 justify-start' : 'text-gray-400 justify-end'}`}>
                   {timeStr}

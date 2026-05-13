@@ -9,7 +9,7 @@ import type { TranslationKey } from '@/lib/i18n'
 import { useNetworkStatus } from '@/lib/network'
 import { translateApiError } from '@/lib/apiError'
 import RiyalIcon from '@/components/RiyalIcon'
-import { uploadFiles, uploadPdf } from '@/lib/upload'
+import { uploadFiles, uploadPdf, uploadStageLabel, type UploadStage } from '@/lib/upload'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
 import PdfTile from '@/components/PdfTile'
@@ -405,6 +405,11 @@ export default function NewPostPage() {
     size: number
     uploading: boolean
     percent: number
+    // Current pipeline stage (only meaningful while uploading=true).
+    // Drives the animated stage label on the tile — "Scanning… /
+    // Compressing… / Uploading…" — so the user can see WHY the
+    // upload is taking time, not just that it is.
+    stage: UploadStage
     error?: string
   } | null>(null)
   const [loading, setLoading] = useState(false)
@@ -535,10 +540,11 @@ export default function NewPostPage() {
       return
     }
 
-    // Immediately stage the tile with uploading=true so the user
-    // sees "Uploading…" the moment they pick the file. Then kick off
-    // the actual upload in the background.
-    setPdf({ url: null, name: file.name, size: file.size, uploading: true, percent: 0 })
+    // Immediately stage the tile with uploading=true + stage='scanning'
+    // so the user sees a meaningful label the moment they pick the
+    // file. Stage flips to 'compressing' then 'uploading' as the
+    // pipeline advances.
+    setPdf({ url: null, name: file.name, size: file.size, uploading: true, percent: 0, stage: 'scanning' })
 
     try {
       const result = await uploadPdf(file, {
@@ -552,6 +558,13 @@ export default function NewPostPage() {
               : prev,
           )
         },
+        onStage: (stage) => {
+          setPdf((prev) =>
+            prev && prev.uploading
+              ? { ...prev, stage }
+              : prev,
+          )
+        },
       })
       setPdf({
         url: result.url,
@@ -559,6 +572,7 @@ export default function NewPostPage() {
         size: result.size,
         uploading: false,
         percent: 100,
+        stage: 'uploading',
       })
     } catch (err: any) {
       // Surface the error on the tile AND fire a toast. The tile
@@ -574,6 +588,7 @@ export default function NewPostPage() {
         size: file.size,
         uploading: false,
         percent: 0,
+        stage: 'uploading',
         error: message,
       })
     }
@@ -1256,17 +1271,35 @@ export default function NewPostPage() {
                   {pdf.uploading ? (
                     <div className="px-1">
                       <div className="flex items-center justify-between mb-1 text-[11px]">
-                        <span className="text-gray-500 dark:text-gray-400">
-                          {lang === 'en' ? 'Uploading…' : lang === 'ur' ? 'اپ لوڈ ہو رہا ہے…' : 'جاري الرفع…'}
+                        {/* Stage label with animated typing dots (CSS
+                            ::after via .hai-typing-dots cycles 1→3
+                            dots). `key={stage}` remounts the span on
+                            stage change so the dot animation
+                            restarts in sync with the new label. */}
+                        <span
+                          key={pdf.stage}
+                          className="hai-typing-dots text-gray-500 dark:text-gray-400 animate-fade-in"
+                        >
+                          {uploadStageLabel(pdf.stage, lang as 'ar' | 'en' | 'ur')}
                         </span>
                         <span className="text-gray-500 dark:text-gray-400 font-medium tabular-nums">
-                          {pdf.percent}%
+                          {pdf.stage === 'uploading' ? `${pdf.percent}%` : ''}
                         </span>
                       </div>
                       <div className="h-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-rose-500 transition-all duration-300"
-                          style={{ width: `${Math.max(2, Math.min(100, pdf.percent))}%` }}
+                          className={`h-full transition-all duration-300 ${pdf.stage === 'uploading' ? 'bg-rose-500' : 'bg-rose-300 dark:bg-rose-400/60 animate-pulse'}`}
+                          style={{
+                            // During scanning/compressing the percent is
+                            // 0 — show an indeterminate "shimmer" bar
+                            // (30% width, pulsing) so the user sees
+                            // motion. During upload, real percent drives
+                            // the width.
+                            width:
+                              pdf.stage === 'uploading'
+                                ? `${Math.max(2, Math.min(100, pdf.percent))}%`
+                                : '30%',
+                          }}
                         />
                       </div>
                     </div>
