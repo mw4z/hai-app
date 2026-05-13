@@ -380,22 +380,24 @@ export default function NewPostPage() {
   const [price, setPrice] = useState('')
   const [images, setImages] = useState<{ file: File; preview: string; url?: string }[]>([])
   const [uploading, setUploading] = useState(false)
-  // Separate "uploading PDF" flag so the publish button can label
-  // its in-progress state correctly. The legacy `uploading` flag
-  // covers both branches for the disabled-state, but the button
-  // copy needs to distinguish "رفع الصور…" (images) from
-  // "رفع الملف…" (single PDF) — using one flag would mislabel
-  // mid-flight when only a PDF is attached.
-  const [uploadingPdf, setUploadingPdf] = useState(false)
-  // PDF attachment — single document up to 25MB. While selected but
-  // not yet uploaded, `localFile` holds the raw File for upload on
-  // submit; once uploaded, `url` is set. The composer shows a tile
-  // preview either way.
+  // PDF attachment — single document up to 25MB. Upload kicks off
+  // the moment the user picks the file (NOT on submit), so by the
+  // time they tap Publish the URL is already cached and submit is
+  // instant. The tile shows "Uploading X%…" while in flight; submit
+  // blocks if `uploading` is still true.
+  //
+  // Why upload-on-pick instead of upload-on-submit: a 25MB PDF on
+  // mobile 4G is 30-60s; doing it during the publish tap makes the
+  // button feel hung. Doing it in the background while the user
+  // writes the post body usually finishes before they even tap
+  // Publish.
   const [pdf, setPdf] = useState<{
-    localFile: File | null
     url: string | null
     name: string
     size: number
+    uploading: boolean
+    percent: number
+    error?: string
   } | null>(null)
   const [loading, setLoading] = useState(false)
   const { isOffline } = useNetworkStatus()
@@ -497,7 +499,7 @@ export default function NewPostPage() {
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const pdfInputRef = useRef<HTMLInputElement>(null)
 
-  function handlePdfSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePdfSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
@@ -509,7 +511,49 @@ export default function NewPostPage() {
       toast.error(lang === 'en' ? 'PDF too large (max 25MB)' : lang === 'ur' ? 'PDF بہت بڑی ہے (زیادہ سے زیادہ 25MB)' : 'حجم الملف كبير (أقصى 25 ميقا)')
       return
     }
-    setPdf({ localFile: file, url: null, name: file.name, size: file.size })
+
+    // Immediately stage the tile with uploading=true so the user
+    // sees "Uploading…" the moment they pick the file. Then kick off
+    // the actual upload in the background.
+    setPdf({ url: null, name: file.name, size: file.size, uploading: true, percent: 0 })
+
+    try {
+      const result = await uploadPdf(file, {
+        onProgress: (percent) => {
+          // Keep the same name/size on every progress tick — only
+          // bump `percent`. Note: the underlying client emits
+          // progress at file-bytes boundaries, not a smooth percent.
+          setPdf((prev) =>
+            prev && prev.uploading
+              ? { ...prev, percent }
+              : prev,
+          )
+        },
+      })
+      setPdf({
+        url: result.url,
+        name: result.name,
+        size: result.size,
+        uploading: false,
+        percent: 100,
+      })
+    } catch (err: any) {
+      // Surface the error on the tile AND fire a toast. The tile
+      // shows a Retry hint; the user can tap ✕ to clear and try
+      // again from the picker.
+      const message =
+        err?.message ||
+        (lang === 'en' ? 'PDF upload failed' : lang === 'ur' ? 'PDF اپ لوڈ ناکام' : 'فشل رفع الملف')
+      toast.error(message)
+      setPdf({
+        url: null,
+        name: file.name,
+        size: file.size,
+        uploading: false,
+        percent: 0,
+        error: message,
+      })
+    }
   }
   const [showImageSheet, setShowImageSheet] = useState(false)
 
@@ -626,41 +670,38 @@ export default function NewPostPage() {
       const imageUrls = await uploadImages()
       if (imageUrls === null) { setLoading(false); return }
 
-      // Upload the PDF (if any) via the client-direct path before
-      // building the request body. uploadPdf goes browser → Vercel
-      // Blob, so the Next.js function never sees 25MB of file bytes.
-      // A failure here aborts submit and surfaces the error to the
-      // user — the post is not created without its attachment.
-      let pdfUrl: string | null = pdf?.url ?? null
-      let pdfName: string | null = pdf?.name ?? null
-      if (pdf && pdf.localFile && !pdf.url) {
-        // Set BOTH flags: `uploading` keeps the button disabled
-        // (unchanged behavior), `uploadingPdf` lets the label render
-        // "رفع الملف…" instead of "رفع الصور…".
-        setUploading(true)
-        setUploadingPdf(true)
-        try {
-          const result = await uploadPdf(pdf.localFile)
-          pdfUrl = result.url
-          pdfName = result.name
-          // Cache on the local state too in case of retry after
-          // category_mismatch — we don't want to re-upload the PDF
-          // when the user accepts the suggested category.
-          setPdf({ localFile: null, url: result.url, name: result.name, size: result.size })
-        } catch (err: any) {
-          toast.error(
-            err?.message ||
-              (lang === 'en' ? 'PDF upload failed' : lang === 'ur' ? 'PDF اپ لوڈ ناکام' : 'فشل رفع الملف'),
-          )
-          setLoading(false)
-          setUploading(false)
-          setUploadingPdf(false)
-          return
-        } finally {
-          setUploading(false)
-          setUploadingPdf(false)
-        }
+      // PDF was uploaded on pick (handlePdfSelect kicked off the
+      // upload in the background the moment the user chose a file).
+      // By the time the user hits Publish, the URL is almost always
+      // already cached. Two edge cases:
+      //
+      //  - Still uploading: ask the user to wait. We DO NOT block in
+      //    handleSubmit by awaiting here — that's exactly the "feels
+      //    hung" behavior we just removed. The user can retry once
+      //    the tile flips out of its "Uploading X%…" state.
+      //  - Upload errored: ask the user to remove or retry the PDF.
+      //    Submitting without an attachment they chose would silently
+      //    drop it on the floor.
+      if (pdf?.uploading) {
+        setLoading(false)
+        toast.error(
+          lang === 'en' ? 'PDF still uploading — give it a moment' :
+          lang === 'ur' ? 'PDF ابھی اپ لوڈ ہو رہی ہے — ذرا انتظار کریں' :
+          'يرجى الانتظار حتى ينتهي رفع الملف',
+        )
+        return
       }
+      if (pdf?.error) {
+        setLoading(false)
+        toast.error(
+          lang === 'en' ? 'PDF upload failed — remove it or pick again' :
+          lang === 'ur' ? 'PDF اپ لوڈ ناکام — ہٹا کر دوبارہ منتخب کریں' :
+          'فشل رفع الملف — احذف الإرفاق وأعد المحاولة',
+        )
+        return
+      }
+      const pdfUrl: string | null = pdf?.url ?? null
+      const pdfName: string | null = pdf?.name ?? null
 
       // Submit with overridable category/marketplaceType so we can
       // resubmit with the classifier's suggestion if the user accepts.
@@ -796,11 +837,7 @@ export default function NewPostPage() {
             {!loading && !uploading && <FiSend className="w-4 h-4" />}
             <span>
               {uploading
-                ? (uploadingPdf
-                    // Single PDF upload — "uploading the file"
-                    ? (lang === 'en' ? 'Uploading PDF…' : lang === 'ur' ? 'PDF اپ لوڈ…' : 'رفع الملف…')
-                    // Image batch upload — keep the original copy
-                    : (lang === 'en' ? 'Uploading photos…' : lang === 'ur' ? 'تصاویر اپ لوڈ…' : 'رفع الصور…'))
+                ? (lang === 'en' ? 'Uploading photos…' : lang === 'ur' ? 'تصاویر اپ لوڈ…' : 'رفع الصور…')
                 : loading
                   ? (lang === 'en' ? 'Publishing…' : lang === 'ur' ? 'شائع…' : 'جاري النشر…')
                   : (lang === 'en' ? 'Publish' : lang === 'ur' ? 'شائع کریں' : 'نشر')}
@@ -1113,18 +1150,52 @@ export default function NewPostPage() {
                 📄 {lang === 'en' ? 'Attach PDF (optional)' : lang === 'ur' ? 'PDF منسلک کریں (اختیاری)' : 'إرفاق ملف PDF (اختياري)'}
               </label>
               {pdf ? (
-                <div className="flex items-stretch gap-2">
-                  <div className="flex-1 min-w-0">
-                    <PdfTile url={pdf.url || '#'} name={pdf.name} size={pdf.size} variant="preview" />
+                <div className="space-y-1.5">
+                  <div className="flex items-stretch gap-2">
+                    <div className="flex-1 min-w-0">
+                      <PdfTile url={pdf.url || '#'} name={pdf.name} size={pdf.size} variant="preview" />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPdf(null)}
+                      aria-label={lang === 'en' ? 'Remove PDF' : 'إزالة الملف'}
+                      className="flex-shrink-0 w-10 self-stretch rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 active:scale-95 transition-transform flex items-center justify-center"
+                    >
+                      <FiX className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setPdf(null)}
-                    aria-label={lang === 'en' ? 'Remove PDF' : 'إزالة الملف'}
-                    className="flex-shrink-0 w-10 self-stretch rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 active:scale-95 transition-transform flex items-center justify-center"
-                  >
-                    <FiX className="w-4 h-4" />
-                  </button>
+                  {/* Upload state. Three branches:
+                       - uploading: "X% rising" with a thin progress bar
+                       - error:     red retry hint
+                       - ready:     small "Ready" confirmation
+                      Compact strip below the tile so the picker doesn't
+                      jump as the state changes. */}
+                  {pdf.uploading ? (
+                    <div className="px-1">
+                      <div className="flex items-center justify-between mb-1 text-[11px]">
+                        <span className="text-gray-500 dark:text-gray-400">
+                          {lang === 'en' ? 'Uploading…' : lang === 'ur' ? 'اپ لوڈ ہو رہا ہے…' : 'جاري الرفع…'}
+                        </span>
+                        <span className="text-gray-500 dark:text-gray-400 font-medium tabular-nums">
+                          {pdf.percent}%
+                        </span>
+                      </div>
+                      <div className="h-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-rose-500 transition-all duration-300"
+                          style={{ width: `${Math.max(2, Math.min(100, pdf.percent))}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : pdf.error ? (
+                    <p className="px-1 text-[11px] text-rose-600 dark:text-rose-400">
+                      {lang === 'en' ? 'Upload failed — remove and try again' : lang === 'ur' ? 'اپ لوڈ ناکام — ہٹا کر دوبارہ کوشش کریں' : 'فشل الرفع — احذف الإرفاق وأعد المحاولة'}
+                    </p>
+                  ) : (
+                    <p className="px-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+                      ✓ {lang === 'en' ? 'Ready to publish' : lang === 'ur' ? 'شائع کرنے کیلئے تیار' : 'جاهز للنشر'}
+                    </p>
+                  )}
                 </div>
               ) : (
                 <>

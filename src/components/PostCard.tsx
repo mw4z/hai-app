@@ -417,19 +417,21 @@ export default function PostCard({
   const [replyImage, setReplyImage] = useState<File | null>(null)
   const [replyImagePreview, setReplyImagePreview] = useState<string | null>(null)
   // PDF attachment on the top-level comment composer + the reply
-  // composer. Same shape as the post composer's `pdf` state.
-  const [commentPdf, setCommentPdf] = useState<{
-    localFile: File | null
+  // composer. Same shape as the post composer's `pdf` state —
+  // upload kicks off the moment the file is picked so submit is
+  // instant. While the upload is in flight, `uploading` is true
+  // and `percent` ticks toward 100; on completion `url` is set.
+  // On failure, `error` is set so the tile can show a retry hint.
+  type PdfState = {
     url: string | null
     name: string
     size: number
-  } | null>(null)
-  const [replyPdf, setReplyPdf] = useState<{
-    localFile: File | null
-    url: string | null
-    name: string
-    size: number
-  } | null>(null)
+    uploading: boolean
+    percent: number
+    error?: string
+  }
+  const [commentPdf, setCommentPdf] = useState<PdfState | null>(null)
+  const [replyPdf, setReplyPdf] = useState<PdfState | null>(null)
   const commentPdfInputRef = useRef<HTMLInputElement>(null)
   const replyPdfInputRef = useRef<HTMLInputElement>(null)
   const commentImgRef = useRef<HTMLInputElement>(null)
@@ -629,24 +631,29 @@ export default function PostCard({
         if (!urls[0]) { toast.error(t('common_error')); return }
         imageUrl = urls[0]
       }
-      // PDF upload via client-direct path (bypasses Next.js function
-      // body cap so 25MB documents work). Cache the resulting URL on
-      // the state in case of a retry — and bail with a toast if the
-      // upload itself fails so we don't post a comment with a missing
-      // attachment.
-      let pdfUrl: string | null = commentPdf?.url ?? null
-      let pdfName: string | null = commentPdf?.name ?? null
-      if (commentPdf && commentPdf.localFile && !commentPdf.url) {
-        try {
-          const result = await uploadPdf(commentPdf.localFile)
-          pdfUrl = result.url
-          pdfName = result.name
-          setCommentPdf({ localFile: null, url: result.url, name: result.name, size: result.size })
-        } catch (err: any) {
-          toast.error(err?.message || t('common_error'))
-          return
-        }
+      // PDF was uploaded the moment the user picked it; we only need
+      // to read the cached URL here. Two edge cases mirror the post
+      // composer's submit guards:
+      //   - Still uploading → ask user to wait (don't await — that's
+      //     what made the publish flow feel hung).
+      //   - Errored → ask user to remove or retry.
+      if (commentPdf?.uploading) {
+        toast.error(
+          lang === 'en' ? 'PDF still uploading — give it a moment' :
+          lang === 'ur' ? 'PDF اپ لوڈ ہو رہی ہے — ذرا انتظار' :
+          'يرجى الانتظار حتى ينتهي رفع الملف',
+        )
+        return
       }
+      if (commentPdf?.error) {
+        toast.error(
+          lang === 'en' ? 'PDF upload failed — remove it or pick again' :
+          'فشل رفع الملف — احذف الإرفاق وأعد المحاولة',
+        )
+        return
+      }
+      const pdfUrl: string | null = commentPdf?.url ?? null
+      const pdfName: string | null = commentPdf?.name ?? null
       const res = await fetch(`/api/posts/${post.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -679,20 +686,23 @@ export default function PostCard({
         if (!urls[0]) { toast.error(t('common_error')); return }
         imageUrl = urls[0]
       }
-      // PDF on a reply — same flow as handleComment, with reply state.
-      let pdfUrl: string | null = replyPdf?.url ?? null
-      let pdfName: string | null = replyPdf?.name ?? null
-      if (replyPdf && replyPdf.localFile && !replyPdf.url) {
-        try {
-          const result = await uploadPdf(replyPdf.localFile)
-          pdfUrl = result.url
-          pdfName = result.name
-          setReplyPdf({ localFile: null, url: result.url, name: result.name, size: result.size })
-        } catch (err: any) {
-          toast.error(err?.message || t('common_error'))
-          return
-        }
+      // PDF on a reply — uploaded on pick, mirror the guards above.
+      if (replyPdf?.uploading) {
+        toast.error(
+          lang === 'en' ? 'PDF still uploading — give it a moment' :
+          'يرجى الانتظار حتى ينتهي رفع الملف',
+        )
+        return
       }
+      if (replyPdf?.error) {
+        toast.error(
+          lang === 'en' ? 'PDF upload failed — remove it or pick again' :
+          'فشل رفع الملف — احذف الإرفاق وأعد المحاولة',
+        )
+        return
+      }
+      const pdfUrl: string | null = replyPdf?.url ?? null
+      const pdfName: string | null = replyPdf?.name ?? null
       const res = await fetch(`/api/posts/${post.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1706,13 +1716,25 @@ export default function PostCard({
         type="file"
         accept="application/pdf"
         className="hidden"
-        onChange={(e) => {
+        onChange={async (e) => {
           const file = e.target.files?.[0]
           e.currentTarget.value = ''
           if (!file) return
           if (file.type !== 'application/pdf') { toast.error(lang === 'en' ? 'Only PDF files' : 'فقط ملفات PDF'); return }
           if (file.size > 25 * 1024 * 1024) { toast.error(lang === 'en' ? 'PDF too large (max 25MB)' : 'حجم الملف كبير'); return }
-          setCommentPdf({ localFile: file, url: null, name: file.name, size: file.size })
+          // Upload on pick — comment submit reads the cached URL.
+          setCommentPdf({ url: null, name: file.name, size: file.size, uploading: true, percent: 0 })
+          try {
+            const result = await uploadPdf(file, {
+              onProgress: (percent) =>
+                setCommentPdf((prev) => (prev && prev.uploading ? { ...prev, percent } : prev)),
+            })
+            setCommentPdf({ url: result.url, name: result.name, size: result.size, uploading: false, percent: 100 })
+          } catch (err: any) {
+            const message = err?.message || (lang === 'en' ? 'PDF upload failed' : 'فشل رفع الملف')
+            toast.error(message)
+            setCommentPdf({ url: null, name: file.name, size: file.size, uploading: false, percent: 0, error: message })
+          }
         }}
       />
       <input
@@ -1720,13 +1742,24 @@ export default function PostCard({
         type="file"
         accept="application/pdf"
         className="hidden"
-        onChange={(e) => {
+        onChange={async (e) => {
           const file = e.target.files?.[0]
           e.currentTarget.value = ''
           if (!file) return
           if (file.type !== 'application/pdf') { toast.error(lang === 'en' ? 'Only PDF files' : 'فقط ملفات PDF'); return }
           if (file.size > 25 * 1024 * 1024) { toast.error(lang === 'en' ? 'PDF too large (max 25MB)' : 'حجم الملف كبير'); return }
-          setReplyPdf({ localFile: file, url: null, name: file.name, size: file.size })
+          setReplyPdf({ url: null, name: file.name, size: file.size, uploading: true, percent: 0 })
+          try {
+            const result = await uploadPdf(file, {
+              onProgress: (percent) =>
+                setReplyPdf((prev) => (prev && prev.uploading ? { ...prev, percent } : prev)),
+            })
+            setReplyPdf({ url: result.url, name: result.name, size: result.size, uploading: false, percent: 100 })
+          } catch (err: any) {
+            const message = err?.message || (lang === 'en' ? 'PDF upload failed' : 'فشل رفع الملف')
+            toast.error(message)
+            setReplyPdf({ url: null, name: file.name, size: file.size, uploading: false, percent: 0, error: message })
+          }
         }}
       />
       {showComments && (
@@ -2011,18 +2044,39 @@ export default function PostCard({
                           </div>
                         )}
                         {replyPdf && (
-                          <div className="flex items-stretch gap-2 pb-2">
-                            <div className="flex-1 min-w-0">
-                              <PdfTile url={replyPdf.url || '#'} name={replyPdf.name} size={replyPdf.size} variant="preview" />
+                          <div className="pb-2 space-y-1">
+                            <div className="flex items-stretch gap-2">
+                              <div className="flex-1 min-w-0">
+                                <PdfTile url={replyPdf.url || '#'} name={replyPdf.name} size={replyPdf.size} variant="preview" />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setReplyPdf(null)}
+                                aria-label={lang === 'en' ? 'Remove PDF' : 'إزالة الملف'}
+                                className="flex-shrink-0 w-9 self-stretch rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 active:scale-95 transition-transform flex items-center justify-center"
+                              >
+                                <FiX className="w-4 h-4" />
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => setReplyPdf(null)}
-                              aria-label={lang === 'en' ? 'Remove PDF' : 'إزالة الملف'}
-                              className="flex-shrink-0 w-9 self-stretch rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 active:scale-95 transition-transform flex items-center justify-center"
-                            >
-                              <FiX className="w-4 h-4" />
-                            </button>
+                            {replyPdf.uploading ? (
+                              <div className="px-1">
+                                <div className="flex items-center justify-between mb-0.5 text-[10px]">
+                                  <span className="text-gray-500 dark:text-gray-400">
+                                    {lang === 'en' ? 'Uploading…' : 'جاري الرفع…'}
+                                  </span>
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium tabular-nums">
+                                    {replyPdf.percent}%
+                                  </span>
+                                </div>
+                                <div className="h-0.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                  <div className="h-full bg-rose-500 transition-all duration-300" style={{ width: `${Math.max(2, Math.min(100, replyPdf.percent))}%` }} />
+                                </div>
+                              </div>
+                            ) : replyPdf.error ? (
+                              <p className="px-1 text-[10px] text-rose-600 dark:text-rose-400">
+                                {lang === 'en' ? 'Upload failed — remove and retry' : 'فشل الرفع — احذف وأعد المحاولة'}
+                              </p>
+                            ) : null}
                           </div>
                         )}
                         <form onSubmit={handleReply} className="hai-comment-input hai-comment-input--compact">
@@ -2075,18 +2129,39 @@ export default function PostCard({
                 </div>
               )}
               {commentPdf && (
-                <div className="flex items-stretch gap-2 px-3 pb-2">
-                  <div className="flex-1 min-w-0">
-                    <PdfTile url={commentPdf.url || '#'} name={commentPdf.name} size={commentPdf.size} variant="preview" />
+                <div className="px-3 pb-2 space-y-1">
+                  <div className="flex items-stretch gap-2">
+                    <div className="flex-1 min-w-0">
+                      <PdfTile url={commentPdf.url || '#'} name={commentPdf.name} size={commentPdf.size} variant="preview" />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCommentPdf(null)}
+                      aria-label={lang === 'en' ? 'Remove PDF' : 'إزالة الملف'}
+                      className="flex-shrink-0 w-9 self-stretch rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 active:scale-95 transition-transform flex items-center justify-center"
+                    >
+                      <FiX className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setCommentPdf(null)}
-                    aria-label={lang === 'en' ? 'Remove PDF' : 'إزالة الملف'}
-                    className="flex-shrink-0 w-9 self-stretch rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 active:scale-95 transition-transform flex items-center justify-center"
-                  >
-                    <FiX className="w-4 h-4" />
-                  </button>
+                  {commentPdf.uploading ? (
+                    <div className="px-1">
+                      <div className="flex items-center justify-between mb-0.5 text-[10px]">
+                        <span className="text-gray-500 dark:text-gray-400">
+                          {lang === 'en' ? 'Uploading…' : 'جاري الرفع…'}
+                        </span>
+                        <span className="text-gray-500 dark:text-gray-400 font-medium tabular-nums">
+                          {commentPdf.percent}%
+                        </span>
+                      </div>
+                      <div className="h-0.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div className="h-full bg-rose-500 transition-all duration-300" style={{ width: `${Math.max(2, Math.min(100, commentPdf.percent))}%` }} />
+                      </div>
+                    </div>
+                  ) : commentPdf.error ? (
+                    <p className="px-1 text-[10px] text-rose-600 dark:text-rose-400">
+                      {lang === 'en' ? 'Upload failed — remove and retry' : 'فشل الرفع — احذف وأعد المحاولة'}
+                    </p>
+                  ) : null}
                 </div>
               )}
               <form onSubmit={handleComment} className="hai-comment-input">

@@ -81,10 +81,25 @@ export async function uploadFiles(files: File[]): Promise<string[]> {
  *
  * Returns the blob URL plus the original filename so callers can store
  * both — the filename is what we render in the PdfTile.
+ *
+ * Wraps the upload in a hard 120s timeout. @vercel/blob/client.upload
+ * itself does not honor AbortSignal in all of its phases — the actual
+ * file PUT can hang if the connection drops mid-transfer. The wrapper
+ * just rejects after the deadline so the caller doesn't sit forever.
+ * Mobile is the common case here and a 25MB PDF on a slow 4G link is
+ * ~40-60s; 120s gives a healthy margin without being "forever".
+ *
+ * If onProgress is supplied, it's called whenever the @vercel/blob
+ * client emits a progress event (currently fires at file-bytes
+ * boundaries; not a smooth percent — but enough for "still working").
  */
 const MAX_PDF_BYTES = 25 * 1024 * 1024
+const PDF_UPLOAD_TIMEOUT_MS = 120_000
 
-export async function uploadPdf(file: File): Promise<{
+export async function uploadPdf(
+  file: File,
+  opts?: { onProgress?: (percent: number) => void },
+): Promise<{
   url: string
   name: string
   size: number
@@ -102,20 +117,47 @@ export async function uploadPdf(file: File): Promise<{
   const { upload } = await import('@vercel/blob/client')
 
   // Strip directory separators from the original name so the pathname
-  // is a flat key under pdfs/. The cuid()-style prefix prevents
-  // collisions between two users uploading the same filename.
+  // is a flat key under pdfs/. The random prefix prevents collisions
+  // between two users uploading the same filename.
   const safe = file.name.replace(/[/\\]/g, '_').slice(0, 120)
   const key = `pdfs/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}-${safe}`
 
-  const blob = await upload(key, file, {
+  // Race the upload against a 120s deadline so a hung TCP connection
+  // surfaces as an error toast instead of an infinite spinner. We DO
+  // pass an AbortSignal in case the underlying client respects it,
+  // but the Promise.race guarantees the rejection even if it doesn't.
+  const abortController = new AbortController()
+  let timedOut = false
+  const deadline = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      timedOut = true
+      abortController.abort()
+      reject(new Error('انتهت مهلة رفع الملف — تحقّق من الإنترنت'))
+    }, PDF_UPLOAD_TIMEOUT_MS)
+  })
+
+  const upstream = upload(key, file, {
     access: 'public',
     handleUploadUrl: '/api/upload-pdf',
     contentType: 'application/pdf',
+    abortSignal: abortController.signal,
+    onUploadProgress: opts?.onProgress
+      ? (ev) => { try { opts.onProgress!(Math.round(ev.percentage ?? 0)) } catch {} }
+      : undefined,
   })
 
-  return {
-    url: blob.url,
-    name: file.name,
-    size: file.size,
+  try {
+    const blob = await Promise.race([upstream, deadline])
+    return {
+      url: blob.url,
+      name: file.name,
+      size: file.size,
+    }
+  } catch (err: any) {
+    if (timedOut) throw err
+    // Surface the underlying error message — Vercel Blob errors are
+    // already user-readable for the common cases (file too large,
+    // unauthorized, network).
+    throw new Error(err?.message || 'فشل رفع الملف')
   }
 }
