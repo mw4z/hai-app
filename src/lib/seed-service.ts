@@ -555,7 +555,19 @@ export async function clearSeedContent(options: {
   }
 
   if (scope === 'posts' || scope === 'all') {
-    // Cascade-delete comments + reactions when posts go via Prisma cascade
+    // FK dependents that DON'T cascade on Post delete:
+    //   Report.post  (line 455 of schema)  ← reported posts
+    //   Payment.post (line 645 of schema)  ← paid-promotion rows
+    // Comments, reactions, bookmarks, and subscriptions DO cascade
+    // from Post, so we don't touch those here. Reports must go
+    // first or the post.deleteMany 500s with P2003 the moment any
+    // seed post has been reported by a real user.
+    await db.report.deleteMany({
+      where: { post: { isSeed: true, ...nbhdFilter } },
+    })
+    await db.payment.deleteMany({
+      where: { post: { isSeed: true, ...nbhdFilter } },
+    })
     const del = await db.post.deleteMany({
       where: {
         isSeed: true,
@@ -608,8 +620,12 @@ export async function clearSeedContent(options: {
 
       // Posts + comments authored by seed users — defensive (scope='all'
       // above already removed isSeed=true posts; this catches anything
-      // a seed user authored without the flag).
+      // a seed user authored without the isSeed flag). Same non-cascade
+      // dependents (Report.post + Payment.post) have to be cleared
+      // before the post.deleteMany, otherwise P2003.
       await db.comment.deleteMany({ where: { authorId: inIds } })
+      await db.report.deleteMany({ where: { post: { authorId: inIds } } })
+      await db.payment.deleteMany({ where: { post: { authorId: inIds } } })
       await db.post.deleteMany({ where: { authorId: inIds } })
 
       // Engagement rows by seed users on any post (seed or real).
