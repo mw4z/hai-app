@@ -19,6 +19,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import type { TranslationKey } from '@/lib/i18n'
 import { fullName } from '@/lib/displayName'
 import HighlightsSection, { type HighlightItemPayload } from '@/components/HighlightsSection'
+import ImportantRail, { type ImportantItem } from '@/components/ImportantRail'
 
 // v2 filter chips — REQUESTS is a special intent-based chip (not a
 // PostCategory value) elevated to position 2 to surface request
@@ -124,6 +125,9 @@ interface Props {
    *  instead of fetching on mount. The 30s refresh keeps them current. */
   initialRides?: any[]
   initialPolls?: any[]
+  /** SSR'd "المهم في الحي" rail items (pinned + HIGH/CRITICAL civic +
+   *  recent events, capped at 3). Skipped in read-only browse mode. */
+  initialImportant?: ImportantItem[]
 }
 
 export default function FeedClient({
@@ -144,6 +148,7 @@ export default function FeedClient({
   deliveryRequests = [],
   initialRides = [],
   initialPolls = [],
+  initialImportant = [],
 }: Props) {
   const router = useRouter()
   const { t, lang } = useLanguage()
@@ -600,6 +605,14 @@ export default function FeedClient({
           rather than overlaying it. */}
       <div id="hai-pull-target" />
 
+      {/* "المهم في الحي" rail — pinned + HIGH/CRITICAL civic + recent
+          events, server-computed and capped at 3. Clicks scroll to the
+          matching PostCard below; dismiss is local-only. Read-only
+          browse mode skips this (the rail is your-neighborhood scoped). */}
+      {!isReadOnly && initialImportant.length > 0 && (
+        <ImportantRail items={initialImportant} />
+      )}
+
       {/* Neighborhood Highlights — hidden when empty. Auto-opens once
           per device for first-time users. Skipped in read-only browse
           mode (the highlights bundle is the user's home neighborhood). */}
@@ -865,7 +878,7 @@ export default function FeedClient({
         ) : (
           <>
             {displayPosts.map((post, idx) => (
-              <div key={post.id}>
+              <div key={post.id} id={`post-${post.id}`}>
                 <div data-tour={idx === 0 ? 'first-post' : undefined} style={{ animationDelay: `${Math.min(idx * 50, 300)}ms`, animationFillMode: 'backwards' }} className="animate-fade-in-up">
                   <PostCard post={post} currentUserId={user.id} currentUserPhone={user.phone} currentUserRole={user.role} isBookmarked={bookmarkedIds.includes(post.id)} isFollowing={followedIds.includes(post.id)} onDelete={(id) => setPosts(prev => prev.filter(p => p.id !== id))} />
                 </div>

@@ -125,18 +125,22 @@ const JOB_RULES: Rule[] = [
 // SERVICES — provider category. Keywords are profession names + "I
 // need / I offer" framing.
 const SERVICES_RULES: Rule[] = [
-  // Trades
-  { pattern: /(?:سباك|سباكة|كهربائي|كهرباء|نجار|نجارة|دهان|دهانات|حداد|حدادة|بلاط|سيراميك|بناء|بنّاء|بناي|لحام|تصليح|فني)/i, weight: 3 },
+  // Trades — includes colloquial Hejazi/Saudi spellings the WhatsApp
+  // group used (سواق, معلمة, معلّم, ميكانيكي, فني تكييف). Diacritics
+  // optional — RegExp covers both with the explicit alternates.
+  { pattern: /(?:سباك|سباكة|كهربائي|كهرباء|نجار|نجارة|دهان|دهانات|حداد|حدادة|بلاط|سيراميك|بناء|بنّاء|بناي|لحام|تصليح|فني|فني\s*تكييف|ميكانيكي|ميكانيكا)/i, weight: 3 },
   // Maintenance / appliances
   { pattern: /(?:مكيف|تكييف|صيانة|اصلاح|إصلاح|تركيب|فك|نقل)/i, weight: 3 },
   // Cleaning / household help
   { pattern: /(?:تنظيف|نظافة|عاملة|عاملة\s*منزلية|عامل\s*نظافة|خادمة|شركة\s*تنظيف|مكافحة\s*حشرات)/i, weight: 3 },
-  // Moving / driving services (when offered as a service business)
-  { pattern: /(?:نقل\s*عفش|سائق|مشاوير|مشوار|شحن|توصيل)/i, weight: 2 },
+  // Moving / driving services (when offered as a service business).
+  // Includes WhatsApp colloquial "سواق" alongside formal "سائق".
+  { pattern: /(?:نقل\s*عفش|سائق|سواق|مشاوير|مشوار|شحن|توصيل)/i, weight: 2 },
   // Personal care
   { pattern: /(?:حلاق|كوافير|صالون|مكياج|عناية|عناية\s*بالبشرة)/i, weight: 3 },
-  // Tutoring / teaching
-  { pattern: /(?:مدرس|معلم|خصوصي|دروس|شرح|تعليم)/i, weight: 3 },
+  // Tutoring / teaching — "معلمة" / "معلّمة" / "مدرّسة" colloquial
+  // forms common in the WhatsApp group for tutor requests.
+  { pattern: /(?:مدرس|مدرّس|مدرسة|مدرّسة|معلم|معلّم|معلمة|معلّمة|خصوصي|دروس|شرح|تعليم|تأسيس|محفظ|محفظة)/i, weight: 3 },
   // Media / digital services
   { pattern: /(?:تصوير|مصور|فيديو|مونتاج|برمجة|تصميم|موقع|تطبيق|سوشال\s*ميديا)/i, weight: 3 },
   // Auto services
@@ -203,6 +207,14 @@ const NEIGHBORHOOD_REPORTS_RULES: Rule[] = [
   { pattern: /(?:نفايات|وسخ|رائحة|روائح|ريحة|صرف\s*صحي)/i, weight: 2 },
   // Authority routes (signals a real report)
   { pattern: /(?:بلدية|أمانة|امانة|تبليغ|اتصلت\s*الشرطة|الشرطة|الدفاع\s*المدني|شكوى|رفع\s*شكوى|ضرر)/i, weight: 2 },
+  // Urban development / civic-proposal vocabulary lifted from the
+  // زايدي WhatsApp group: U-turns, walkways, tree-planting, missing
+  // clinics. These are CIVIC topics — not commercial — so they route
+  // here. (Phase 1 will introduce a civicType subtype; for now they
+  // just land in NEIGHBORHOOD_REPORTS.)
+  { pattern: /(?:ممشى|ممشاة|يوتيرن|يو\s*تيرن|تطوير|تشجير|أشجار|اشجار|سواد|تجميل\s*الحي)/i, weight: 3 },
+  { pattern: /(?:مستوصف|مستوصفات|مركز\s*صحي|عيادة\s*مفقودة|عيادة\s*ناقصة|نقص\s*خدمات)/i, weight: 3 },
+  { pattern: /(?:إنارة\s*مفقودة|انارة\s*مفقودة|رصيف|أرصفة|ارصفة|نقل\s*عام|محطة\s*باص)/i, weight: 2 },
   // Child safety
   { pattern: /(?:اطفال\s*ضايعين|أطفال\s*ضايعين|خطر\s*على\s*الاطفال|خطر\s*على\s*الأطفال)/i, weight: 3 },
   // Fire / emergency
@@ -222,8 +234,9 @@ const RIDES_RULES: Rule[] = [
 ]
 
 const REAL_ESTATE_RULES: Rule[] = [
-  // Property types
-  { pattern: /(?:شقة|غرفة|دور|فيلا|فلة|استراحة|عمارة)/i, weight: 3 },
+  // Property types — adds مستودع / محل (commercial unit & shop), both
+  // recurring in the زايدي WhatsApp data alongside the housing terms.
+  { pattern: /(?:شقة|شقه|غرفة|دور|فيلا|فلة|استراحة|عمارة|مستودع|مستودعات|محل|محلات)/i, weight: 3 },
   // Rent / sale framing
   { pattern: /(?:ايجار|إيجار|للايجار|للإيجار|تمليك|عقار|أرض|قطعة\s*أرض|قطعة\s*ارض|للبيع\s*أرض|للبيع\s*ارض|أرض\s*للبيع|ارض\s*للبيع)/i, weight: 3 },
   // Lease structure

@@ -139,3 +139,107 @@ test('no false-positive: a real safety report that mentions "store" stays in NEI
   })
   assert.equal(r.finalCategory, 'NEIGHBORHOOD_REPORTS')
 })
+
+// ── Phase 0 WhatsApp-group phrasings ───────────────────────────────────
+// The زايدي group used a small set of recurring phrases — drivers as
+// "سواق", tutors as "معلمة", civic asks like "ممشى" / "يوتيرن" /
+// "تشجير", and missing-amenity asks like "مستوصف". These rules cover
+// them without inventing new categories.
+
+test('colloquial سواق request → SERVICES + REQUEST', () => {
+  const r = classifyPostCategory({
+    title: 'محتاج سواق يومي',
+    body: 'محتاج سواق يومي للمدرسة الصباح، أي أحد يعرف؟',
+    selectedCategory: 'SERVICES',
+  })
+  assert.equal(r.finalCategory, 'SERVICES')
+  assert.equal(r.finalIntent, 'REQUEST')
+})
+
+test('colloquial معلمة request → SERVICES + REQUEST', () => {
+  const r = classifyPostCategory({
+    title: 'محتاجين معلمة تأسيس',
+    body: 'أبحث عن معلمة تأسيس لطفلتي، تجي للبيت',
+    selectedCategory: 'SERVICES',
+  })
+  assert.equal(r.finalCategory, 'SERVICES')
+  assert.equal(r.finalIntent, 'REQUEST')
+})
+
+test('مستودع listing → REAL_ESTATE', () => {
+  const r = classifyPostCategory({
+    title: 'مستودع للإيجار في الحي',
+    body: 'مستودع 200 متر للإيجار قريب من شارع الستين، عقد سنوي',
+    selectedCategory: 'REAL_ESTATE',
+  })
+  assert.equal(r.finalCategory, 'REAL_ESTATE')
+})
+
+test('محل listing → REAL_ESTATE', () => {
+  const r = classifyPostCategory({
+    title: 'محل للإيجار',
+    body: 'محل تجاري للإيجار في موقع ممتاز، السعر للتفاوض',
+    selectedCategory: 'REAL_ESTATE',
+  })
+  assert.equal(r.finalCategory, 'REAL_ESTATE')
+})
+
+test('civic ممشى proposal → NEIGHBORHOOD_REPORTS (real-estate decoy ignored)', () => {
+  // User might mis-pick REAL_ESTATE because "الحي" appears; classifier
+  // should pull it into NEIGHBORHOOD_REPORTS via the civic vocabulary.
+  const r = classifyPostCategory({
+    title: 'نحتاج ممشى في الحي',
+    body: 'الحي يحتاج ممشى للعائلات، نتمنى تطوير الأرصفة والإنارة',
+    selectedCategory: 'NEIGHBORHOOD_REPORTS',
+  })
+  assert.equal(r.finalCategory, 'NEIGHBORHOOD_REPORTS')
+})
+
+test('civic يوتيرن complaint → NEIGHBORHOOD_REPORTS', () => {
+  const r = classifyPostCategory({
+    title: 'يوتيرن خطر',
+    body: 'اليوتيرن قبل المسجد فيه ازدحام شديد ومخاطر، رفعنا شكوى للبلدية',
+    selectedCategory: 'NEIGHBORHOOD_REPORTS',
+  })
+  assert.equal(r.finalCategory, 'NEIGHBORHOOD_REPORTS')
+})
+
+test('civic تشجير suggestion → NEIGHBORHOOD_REPORTS', () => {
+  const r = classifyPostCategory({
+    title: 'تشجير الشوارع',
+    body: 'حملة تشجير للحي بالتعاون مع البلدية، اقتراح للأمانة',
+    selectedCategory: 'NEIGHBORHOOD_REPORTS',
+  })
+  assert.equal(r.finalCategory, 'NEIGHBORHOOD_REPORTS')
+})
+
+test('missing مستوصف ask → NEIGHBORHOOD_REPORTS', () => {
+  const r = classifyPostCategory({
+    title: 'نقص مستوصف في الحي',
+    body: 'حيّنا يحتاج مستوصف قريب، أقرب مركز صحي بعيد',
+    selectedCategory: 'NEIGHBORHOOD_REPORTS',
+  })
+  assert.equal(r.finalCategory, 'NEIGHBORHOOD_REPORTS')
+})
+
+test('place recommendation question stays GENERAL (no false service pull)', () => {
+  // "وين أحسن صيدلية" — recommendation ask. Should NOT get pulled into
+  // SERVICES or MARKETPLACE; the user picks GENERAL via the Ask tile.
+  const r = classifyPostCategory({
+    title: 'وين أحسن صيدلية',
+    body: 'محتاج صيدلية تفتح متأخر، توصية من الجيران',
+    selectedCategory: 'GENERAL',
+  })
+  assert.equal(r.finalCategory, 'GENERAL')
+  assert.equal(r.finalIntent, 'REQUEST')
+})
+
+test('place recommendation about مطعم stays GENERAL', () => {
+  const r = classifyPostCategory({
+    title: 'أحسن مطعم في الحي',
+    body: 'أبحث عن توصية لمطعم عائلي قريب، من جربوه؟',
+    selectedCategory: 'GENERAL',
+  })
+  assert.equal(r.finalCategory, 'GENERAL')
+  assert.equal(r.finalIntent, 'REQUEST')
+})

@@ -1313,6 +1313,22 @@ export default function PostCard({
         </a>
       )}
 
+      {/* Civic disclaimer — NEIGHBORHOOD_REPORTS posts are user-authored
+          observations / suggestions, not official statements. The
+          footer lowers complaint surface and signals to readers that
+          unverified claims belong here, not in operational responses.
+          Stored as plain Arabic — RTL/CSS handles direction; never
+          manually reversed. */}
+      {post.category === 'NEIGHBORHOOD_REPORTS' && (
+        <p className="hai-mt-2 text-[11px] leading-snug text-gray-500 dark:text-gray-400 italic">
+          {lang === 'en'
+            ? '⚠️ A neighbor suggestion/observation — not an official statement.'
+            : lang === 'ur'
+              ? '⚠️ پڑوسی کی تجویز/مشاہدہ — کسی سرکاری ادارے کا بیان نہیں۔'
+              : '⚠️ اقتراح/ملاحظة مجتمعية لا تمثل جهة رسمية'}
+        </p>
+      )}
+
       {/* Render from postData.imageUrls (not post.imageUrls) so the
           grid + lightbox update immediately after a successful edit. */}
       {postData.imageUrls.length > 0 && (

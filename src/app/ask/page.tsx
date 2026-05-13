@@ -51,6 +51,68 @@ const ASK_CATEGORIES: AskCategory[] = [
 
 const DEFAULT_CATEGORY = 'SERVICES'
 
+// Phase 0 intent selector — the 6 tiles map to the existing
+// (category × intent × marketplaceType) matrix. No new enums.
+// The RIDES tile short-circuits to /rides/new because rides/delivery
+// live on RideRequest, not Post.
+interface AskIntentChoice {
+  key: string
+  // Display
+  emoji: string
+  titleAr: string; titleEn: string; titleUr: string
+  subAr: string;   subEn: string;   subUr: string
+  // Outcome — either a post mapping or a route hint.
+  postMap?: { category: string; intent: 'REQUEST'; marketplaceType?: 'SELL' | 'BUY' | 'JOB' }
+  route?: string
+}
+const ASK_INTENT_CHOICES: AskIntentChoice[] = [
+  {
+    key: 'product_buy',
+    emoji: '🛒',
+    titleAr: 'منتج للشراء',    titleEn: 'A product to buy', titleUr: 'خریدنے کیلئے سامان',
+    subAr:  'أبحث عن منتج عند جيراني', subEn: 'Looking to buy something locally', subUr: 'محلے سے کچھ خریدنا',
+    postMap: { category: 'MARKETPLACE', intent: 'REQUEST', marketplaceType: 'BUY' },
+  },
+  {
+    key: 'service_need',
+    emoji: '🔧',
+    titleAr: 'أحتاج خدمة',     titleEn: 'I need a service', titleUr: 'مجھے خدمت چاہیے',
+    subAr:  'سباك، كهربائي، مدرّسة…', subEn: 'Plumber, electrician, tutor…', subUr: 'پلمبر، الیکٹریشن، استاد…',
+    postMap: { category: 'SERVICES', intent: 'REQUEST' },
+  },
+  {
+    key: 'real_estate',
+    emoji: '🏠',
+    titleAr: 'أبحث عن عقار',   titleEn: 'Looking for property', titleUr: 'جائیداد ڈھونڈنا',
+    subAr:  'شقة، فيلا، محل، مستودع', subEn: 'Apartment, villa, shop, warehouse', subUr: 'فلیٹ، ولا، دکان، گودام',
+    postMap: { category: 'REAL_ESTATE', intent: 'REQUEST' },
+  },
+  {
+    key: 'home_food',
+    emoji: '🍱',
+    titleAr: 'منتج أو أكل منزلي', titleEn: 'Home food / product', titleUr: 'گھریلو کھانا / مصنوعات',
+    subAr:  'أبحث عن منتج بيتي محلي', subEn: 'Local home-cooked or handmade', subUr: 'مقامی گھریلو',
+    postMap: { category: 'HOME_BUSINESSES', intent: 'REQUEST' },
+  },
+  {
+    key: 'ride_delivery',
+    emoji: '🚗',
+    titleAr: 'مشوار أو توصيل',  titleEn: 'Ride or delivery', titleUr: 'سواری یا ڈیلیوری',
+    subAr:  'يفتح صفحة المشاوير', subEn: 'Opens the rides surface', subUr: 'رائیڈز اسکرین کھولتا ہے',
+    route: '/rides/new',
+  },
+  {
+    key: 'recommendation',
+    emoji: '💬',
+    titleAr: 'توصية أو سؤال عام', titleEn: 'Recommendation or question', titleUr: 'سفارش یا سوال',
+    subAr:  'وين أحسن مطعم/صيدلية/مكان', subEn: 'Best restaurant / clinic / place', subUr: 'بہترین جگہ کہاں؟',
+    // GENERAL category becomes visible under the REQUESTS chip (which
+    // filters by intent=REQUEST, not by category), so recommendation
+    // asks reach neighbors without polluting category chips.
+    postMap: { category: 'GENERAL', intent: 'REQUEST' },
+  },
+]
+
 // Cycling placeholder examples — same idea as the legacy LOOKING_FOR
 // flow. AR is the dominant language so the cycle is anchored there;
 // EN / UR examples are used when the UI lang matches.
@@ -88,6 +150,32 @@ export default function AskNeighborsPage() {
   // it on every keystroke — their choice is sacred.
   const [userOverrode, setUserOverrode] = useState(false)
   const [showCategoryPicker, setShowCategoryPicker] = useState(false)
+  // Phase 0 intent selector — when set, locks category/intent/marketplaceType.
+  // null = user hasn't picked a tile yet (or chose to clear it).
+  const [intentChoice, setIntentChoice] = useState<string | null>(null)
+  const [marketplaceType, setMarketplaceType] = useState<'SELL' | 'BUY' | 'JOB'>('SELL')
+
+  function applyIntentChoice(choice: AskIntentChoice) {
+    if (choice.route) {
+      router.push(choice.route)
+      return
+    }
+    if (!choice.postMap) return
+    setIntentChoice(choice.key)
+    setCategory(choice.postMap.category)
+    setMarketplaceType(choice.postMap.marketplaceType ?? 'SELL')
+    // Picking a tile is an explicit, intentional override. After this
+    // the inference effect must NOT change the category from under the
+    // user as they type.
+    setUserOverrode(true)
+    setShowCategoryPicker(false)
+  }
+  function clearIntentChoice() {
+    setIntentChoice(null)
+    setCategory(DEFAULT_CATEGORY)
+    setMarketplaceType('SELL')
+    setUserOverrode(false)
+  }
 
   // v1 rule-based suggestion. Runs synchronously on every text change
   // (sub-millisecond). If the user has manually picked a category, we
@@ -257,6 +345,10 @@ export default function AskNeighborsPage() {
           body: trimmed,
           category,
           intent: 'REQUEST',
+          // marketplaceType is only meaningful when category=MARKETPLACE,
+          // but the API safely ignores it otherwise. Sending it lets the
+          // "product to buy" tile land as MARKETPLACE+BUY on first try.
+          marketplaceType,
           imageUrls,
           locationLat: location?.lat || null,
           locationLng: location?.lng || null,
@@ -320,9 +412,67 @@ export default function AskNeighborsPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-4">
+        {/* Phase 0 intent selector — 6 tiles mapped to category × intent
+            × marketplaceType. When null, the tiles take the top of the
+            page. When picked, the tiles collapse into a single "selected"
+            pill with a tap-to-change. The "Ride or delivery" tile
+            short-circuits to /rides/new (no Post). */}
+        {intentChoice === null ? (
+          <div>
+            <p className="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">
+              {lang === 'en' ? 'What are you looking for?' : lang === 'ur' ? 'آپ کیا تلاش کر رہے ہیں؟' : 'وش تبي تلقى؟'}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {ASK_INTENT_CHOICES.map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => applyIntentChoice(c)}
+                  className="flex items-start gap-2 text-start p-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 active:scale-[0.98] transition-transform"
+                >
+                  <span className="text-xl flex-shrink-0">{c.emoji}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm font-bold text-gray-900 dark:text-white leading-tight">
+                      {lang === 'en' ? c.titleEn : lang === 'ur' ? c.titleUr : c.titleAr}
+                    </span>
+                    <span className="block text-[11px] text-gray-500 dark:text-gray-400 leading-snug mt-0.5">
+                      {lang === 'en' ? c.subEn : lang === 'ur' ? c.subUr : c.subAr}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-2">
+              {lang === 'en'
+                ? "Or just start typing — we'll suggest a category."
+                : lang === 'ur'
+                  ? 'یا سیدھا لکھنا شروع کریں — ہم زمرہ تجویز کریں گے۔'
+                  : 'أو ابدأ بالكتابة وسنقترح القسم تلقائياً.'}
+            </p>
+          </div>
+        ) : (() => {
+          const c = ASK_INTENT_CHOICES.find(x => x.key === intentChoice)
+          if (!c) return null
+          return (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
+              <span className="text-lg">{c.emoji}</span>
+              <span className="flex-1 text-sm font-semibold text-primary-700 dark:text-primary-300 truncate">
+                {lang === 'en' ? c.titleEn : lang === 'ur' ? c.titleUr : c.titleAr}
+              </span>
+              <button
+                type="button"
+                onClick={clearIntentChoice}
+                className="text-[11px] font-semibold text-primary-700 dark:text-primary-300 underline-offset-2 hover:underline"
+              >
+                {lang === 'en' ? 'Change' : lang === 'ur' ? 'تبدیل کریں' : 'تغيير'}
+              </button>
+            </div>
+          )
+        })()}
+
         {/* Big input */}
         <textarea
-          autoFocus
+          autoFocus={intentChoice !== null}
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={placeholderText}
