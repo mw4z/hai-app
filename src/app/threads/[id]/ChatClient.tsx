@@ -80,8 +80,62 @@ function WhatsAppCheck({ double, read }: { double: boolean; read: boolean }) {
   )
 }
 
+/** Small clock icon for messages that haven't reached the server yet.
+ *  Same visual weight as WhatsAppCheck so the row alignment doesn't
+ *  shift when the status flips from clock → ✓ on send confirmation. */
+function PendingClock() {
+  return (
+    <svg
+      width="11"
+      height="11"
+      viewBox="0 0 11 11"
+      className="ml-1 inline-block flex-shrink-0"
+      style={{ marginBottom: -1 }}
+      aria-label="sending"
+    >
+      {/* Outline */}
+      <circle
+        cx="5.5" cy="5.5" r="4.6"
+        fill="none"
+        stroke="rgba(255,255,255,0.85)"
+        strokeWidth="1"
+      />
+      {/* Hour hand (12 → 4 o'clock) */}
+      <path
+        d="M5.5 5.5 V2.5"
+        stroke="rgba(255,255,255,0.85)"
+        strokeWidth="1"
+        strokeLinecap="round"
+      />
+      <path
+        d="M5.5 5.5 L7.5 5.5"
+        stroke="rgba(255,255,255,0.85)"
+        strokeWidth="1"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 function MsgStatus({ msg, isMe }: { msg: Msg; isMe: boolean }) {
   if (!isMe) return null
+
+  // Pending: the optimistic placeholder hasn't been swapped for the
+  // server response yet. tempId persists post-swap as a stable React
+  // key, but msg.id flips from "pending-…" to the real cuid the
+  // moment the POST resolves. Checking the id prefix is the cleanest
+  // discriminator and covers every flow that uses optimistic insert:
+  // sendText (text), sendImage / sendImages (images), sendPdf (PDF),
+  // and any future type that builds its placeholder the same way.
+  //
+  // While pending we render a clock instead of a check — the
+  // message hasn't been delivered yet, and if the connection is
+  // down / hung the clock stays put so the user knows it didn't
+  // ship. The previous behavior fell through to a single check
+  // mark which falsely signaled "sent" the instant the bubble
+  // appeared on screen.
+  if (msg.id.startsWith('pending-')) return <PendingClock />
+
   if (msg.readAt) return <WhatsAppCheck double read />
   if (msg.deliveredAt) return <WhatsAppCheck double read={false} />
   return <WhatsAppCheck double={false} read={false} />
