@@ -48,6 +48,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, ...result })
   } catch (err) {
     console.error('[SEED_CLEAR] failed', err)
-    return NextResponse.json({ error: 'server_error' }, { status: 500 })
+    // SUPER_ADMIN-only route — surface the underlying Prisma error
+    // message so admins can diagnose FK / schema drift issues from
+    // the client toast instead of just seeing "server_error".
+    const message = err instanceof Error ? err.message : String(err)
+    const code = (err as { code?: string })?.code
+    return NextResponse.json(
+      { error: 'server_error', code, message },
+      { status: 500 },
+    )
   }
 }

@@ -569,8 +569,113 @@ export async function clearSeedContent(options: {
     // Deleting seed users is risky (they may have real rep history) — only
     // when explicitly requested. Unscoped by neighborhood since seed users
     // are shared across all neighborhoods via phone convention.
-    const del = await db.user.deleteMany({ where: { isSeed: true } })
-    usersDeleted = del.count
+    //
+    // ── FK dependency cleanup ────────────────────────────────────────
+    // The Prisma schema has ~20 User relations that DON'T set
+    // `onDelete: Cascade` (Post.author, Reaction.user, Notification.user,
+    // Thread.user1/user2, Message.sender, RideRequest.requester,
+    // RideOffer.driver, Poll.author, PollRequest.user, Report.reporter,
+    // Report.reportedUser, UserReport.*, Bookmark.user, PostSubscription.user,
+    // EmergencyAlert.author, EmergencyAlertRequest.*, InviteRedemption.*,
+    // SupportTicket.user). Postgres enforces these as `ON DELETE NO ACTION`
+    // (effectively RESTRICT), so a bare `user.deleteMany` 500s with P2003
+    // the moment ANY of these rows still references a seed user — even
+    // through indirect paths like a real user receiving a notification
+    // triggered by a seed user's post. (Bug surfaced when admin clicked
+    // "Delete seed posts + users" → server_error.)
+    //
+    // The relations that DO cascade are ServiceItem, ModActionLog,
+    // DeviceToken, NotifPreference, NotificationPreference,
+    // EmergencyAlertDismissal, NotifJob, InviteCode, InviteFraudSignal —
+    // those auto-clean when User is finally deleted, no manual step.
+    //
+    // Order: defensive sweep of seed users' posts/comments first (in
+    // case earlier scopes left any), then their reactions/bookmarks/
+    // subs/notifs, then chat (messages then threads — message.thread
+    // cascades, but we delete by senderId here), then rides/polls/
+    // reports/emergency/invites/support. Reviewer FKs on PollRequest /
+    // EmergencyAlert / EmergencyAlertRequest are NULL'd instead of
+    // dropping the real record (a seed mod shouldn't take real records
+    // with them on cleanup).
+    const seedUsers = await db.user.findMany({
+      where: { isSeed: true },
+      select: { id: true },
+    })
+    const seedUserIds = seedUsers.map((u) => u.id)
+
+    if (seedUserIds.length > 0) {
+      const inIds = { in: seedUserIds }
+
+      // Posts + comments authored by seed users — defensive (scope='all'
+      // above already removed isSeed=true posts; this catches anything
+      // a seed user authored without the flag).
+      await db.comment.deleteMany({ where: { authorId: inIds } })
+      await db.post.deleteMany({ where: { authorId: inIds } })
+
+      // Engagement rows by seed users on any post (seed or real).
+      await db.reaction.deleteMany({ where: { userId: inIds } })
+      await db.bookmark.deleteMany({ where: { userId: inIds } })
+      await db.postSubscription.deleteMany({ where: { userId: inIds } })
+
+      // Notifications delivered TO seed users (PostSubscription fan-out
+      // can land notifications on seed subscribers in practice).
+      await db.notification.deleteMany({ where: { userId: inIds } })
+
+      // Chat: messages by senderId, then threads where seed is either party.
+      // Message.thread cascades, so dropping the thread cleans up the
+      // remaining messages even if a real user sent some.
+      await db.message.deleteMany({ where: { senderId: inIds } })
+      await db.thread.deleteMany({
+        where: { OR: [{ user1Id: inIds }, { user2Id: inIds }] },
+      })
+
+      // Rides — offers reference RideRequest, so offers first.
+      await db.rideOffer.deleteMany({ where: { driverId: inIds } })
+      await db.rideRequest.deleteMany({ where: { requesterId: inIds } })
+
+      // Polls authored by seed users — PollVote/PollOption cascade.
+      await db.poll.deleteMany({ where: { authorId: inIds } })
+
+      // PollRequests: drop seed-submitted requests; NULL reviewedById on
+      // any real PollRequest a seed mod happened to have reviewed.
+      await db.pollRequest.deleteMany({ where: { userId: inIds } })
+      await db.pollRequest.updateMany({
+        where: { reviewedById: inIds },
+        data: { reviewedById: null },
+      })
+
+      // Reports filed BY seed users + reports filed AGAINST seed users.
+      await db.report.deleteMany({
+        where: { OR: [{ reporterId: inIds }, { reportedUserId: inIds }] },
+      })
+      await db.userReport.deleteMany({
+        where: { OR: [{ reporterId: inIds }, { reportedUserId: inIds }] },
+      })
+
+      // Emergency alerts authored by seed users; NULL revoker FK.
+      await db.emergencyAlert.deleteMany({ where: { authorId: inIds } })
+      await db.emergencyAlert.updateMany({
+        where: { revokedById: inIds },
+        data: { revokedById: null },
+      })
+      await db.emergencyAlertRequest.deleteMany({ where: { requesterId: inIds } })
+      await db.emergencyAlertRequest.updateMany({
+        where: { reviewedById: inIds },
+        data: { reviewedById: null },
+      })
+
+      // Invite redemptions where seed is either side.
+      await db.inviteRedemption.deleteMany({
+        where: { OR: [{ inviterId: inIds }, { inviteeId: inIds }] },
+      })
+
+      // Support tickets filed by seed users.
+      await db.supportTicket.deleteMany({ where: { userId: inIds } })
+
+      // Finally — every remaining cascade FK auto-cleans here.
+      const del = await db.user.deleteMany({ where: { id: inIds } })
+      usersDeleted = del.count
+    }
   }
 
   return { posts: postsDeleted, comments: commentsDeleted, users: usersDeleted }
