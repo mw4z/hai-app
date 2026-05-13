@@ -20,6 +20,20 @@ interface Props {
    *                shows a remove control — that lives with state).
    */
   variant?: 'card' | 'comment' | 'message' | 'preview'
+  /**
+   * Tone for the 'message' variant only — the chat bubble's
+   * background color dictates which text colors are legible:
+   *
+   *  - 'onSurface' (default): bubble is white (light mode) or
+   *    #242625 (dark mode). Text uses the usual gray scale.
+   *  - 'onPrimary': bubble is bg-primary-600 (green) — the "my"
+   *    bubble side. Text needs to be white-ish so it isn't lost
+   *    against the green; same trick as SmartText's 'onGreen'.
+   *
+   * Other variants ignore this prop (they sit on light surfaces
+   * with predictable contrast).
+   */
+  tone?: 'onSurface' | 'onPrimary'
 }
 
 /**
@@ -33,12 +47,24 @@ interface Props {
  * preview by design — full-text PDF rendering is heavy and most
  * Capacitor wrappers ship without it.
  */
-export default function PdfTile({ url, name, size, variant = 'card' }: Props) {
+export default function PdfTile({
+  url,
+  name,
+  size,
+  variant = 'card',
+  tone = 'onSurface',
+}: Props) {
   const { lang } = useLanguage()
   const displayName = name || 'document.pdf'
   const sizeLabel = formatSize(size)
 
   const openLabel = lang === 'en' ? 'Open' : lang === 'ur' ? 'کھولیں' : 'فتح'
+
+  // The 'message' variant adapts to the parent bubble's background:
+  // green "my" bubble (onPrimary) needs white text; white/dark
+  // "their" bubble (onSurface) uses the standard gray scale. Other
+  // variants ignore `tone` because they sit on predictable surfaces.
+  const isMsgOnPrimary = variant === 'message' && tone === 'onPrimary'
 
   // Container classes per variant — keep visual rhythm consistent
   // with the surrounding surface. All variants share the icon+text
@@ -48,21 +74,38 @@ export default function PdfTile({ url, name, size, variant = 'card' }: Props) {
       'flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 active:scale-[0.98] transition-transform',
     comment:
       'flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 active:scale-[0.98] transition-transform',
-    message:
-      'flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/10 dark:bg-white/5 backdrop-blur border border-white/15 active:scale-[0.98] transition-transform',
+    // Translucent overlay on whatever bubble sits behind. Border /
+    // bg shift slightly on the green bubble so the tile reads as a
+    // raised inset instead of disappearing into the bubble color.
+    message: isMsgOnPrimary
+      ? 'flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/15 border border-white/25 active:scale-[0.98] transition-transform'
+      : 'flex items-center gap-2.5 px-3 py-2 rounded-xl bg-black/[0.04] dark:bg-white/5 border border-black/10 dark:border-white/10 active:scale-[0.98] transition-transform',
     preview:
       'flex items-center gap-3 px-3 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/60',
   }
 
+  // Per-tone text colors. Each (variant × tone) combo gets a tested
+  // pair so the filename + size sublabel + "Open" CTA all stay
+  // legible against the surface they sit on.
+  const titleColorClass = isMsgOnPrimary
+    ? 'text-white'
+    : 'text-gray-900 dark:text-white'
+  const subColorClass = isMsgOnPrimary
+    ? 'text-white/75'
+    : 'text-gray-500 dark:text-gray-400'
+  const openColorClass = isMsgOnPrimary
+    ? 'text-white'
+    : 'text-rose-600 dark:text-rose-400'
+
   const titleClass =
     variant === 'comment'
-      ? 'text-[12px] font-semibold leading-tight truncate'
-      : 'text-[13px] font-semibold leading-tight truncate'
+      ? `text-[12px] font-semibold leading-tight truncate ${titleColorClass}`
+      : `text-[13px] font-semibold leading-tight truncate ${titleColorClass}`
 
   const subClass =
     variant === 'comment'
-      ? 'text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-0.5'
-      : 'text-[11px] text-gray-500 dark:text-gray-400 leading-tight mt-0.5'
+      ? `text-[10px] leading-tight mt-0.5 ${subColorClass}`
+      : `text-[11px] leading-tight mt-0.5 ${subColorClass}`
 
   // Preview variant doesn't navigate — the composer renders it next
   // to a ✕ remove button. Everything else is a tap-to-open link.
@@ -114,7 +157,7 @@ export default function PdfTile({ url, name, size, variant = 'card' }: Props) {
         📄
       </span>
       <div className="min-w-0 flex-1">
-        <p className={`${titleClass} text-gray-900 dark:text-white`}>
+        <p className={titleClass}>
           {displayName}
         </p>
         <p className={subClass}>
@@ -128,7 +171,7 @@ export default function PdfTile({ url, name, size, variant = 'card' }: Props) {
         </p>
       </div>
       {variant !== 'preview' && (
-        <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 flex-shrink-0">
+        <span className={`text-[11px] font-semibold flex-shrink-0 ${openColorClass}`}>
           {openLabel}
         </span>
       )}

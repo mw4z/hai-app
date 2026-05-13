@@ -1971,7 +1971,15 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
                 <div className={`relative rounded-2xl px-2.5 py-2 shadow-sm ${
                   isMe ? `bg-primary-600 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white dark:bg-[#242625] ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
                 } ${pending ? 'opacity-90' : ''}`}>
-                  <PdfTile url={safeUrl} name={msg.pdfName} variant="message" />
+                  <PdfTile
+                    url={safeUrl}
+                    name={msg.pdfName}
+                    variant="message"
+                    // isMe → green bubble bg → PdfTile must use
+                    // white text + lighter sublabel; otherwise the
+                    // filename and size badge get lost in the green.
+                    tone={isMe ? 'onPrimary' : 'onSurface'}
+                  />
                   {pending && (
                     <div className="mt-1.5 px-1 pb-0.5">
                       <div className="flex items-center justify-between mb-0.5 text-[10px] text-white/80">
