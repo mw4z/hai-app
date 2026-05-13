@@ -380,10 +380,17 @@ export default function NewPostPage() {
   const [price, setPrice] = useState('')
   const [images, setImages] = useState<{ file: File; preview: string; url?: string }[]>([])
   const [uploading, setUploading] = useState(false)
+  // Separate "uploading PDF" flag so the publish button can label
+  // its in-progress state correctly. The legacy `uploading` flag
+  // covers both branches for the disabled-state, but the button
+  // copy needs to distinguish "رفع الصور…" (images) from
+  // "رفع الملف…" (single PDF) — using one flag would mislabel
+  // mid-flight when only a PDF is attached.
+  const [uploadingPdf, setUploadingPdf] = useState(false)
   // PDF attachment — single document up to 25MB. While selected but
   // not yet uploaded, `localFile` holds the raw File for upload on
   // submit; once uploaded, `url` is set. The composer shows a tile
-  // preview either way. Submit re-uses the existing `uploading` flag.
+  // preview either way.
   const [pdf, setPdf] = useState<{
     localFile: File | null
     url: string | null
@@ -627,7 +634,11 @@ export default function NewPostPage() {
       let pdfUrl: string | null = pdf?.url ?? null
       let pdfName: string | null = pdf?.name ?? null
       if (pdf && pdf.localFile && !pdf.url) {
+        // Set BOTH flags: `uploading` keeps the button disabled
+        // (unchanged behavior), `uploadingPdf` lets the label render
+        // "رفع الملف…" instead of "رفع الصور…".
         setUploading(true)
+        setUploadingPdf(true)
         try {
           const result = await uploadPdf(pdf.localFile)
           pdfUrl = result.url
@@ -637,12 +648,17 @@ export default function NewPostPage() {
           // when the user accepts the suggested category.
           setPdf({ localFile: null, url: result.url, name: result.name, size: result.size })
         } catch (err: any) {
-          toast.error(err?.message || 'فشل رفع الملف')
+          toast.error(
+            err?.message ||
+              (lang === 'en' ? 'PDF upload failed' : lang === 'ur' ? 'PDF اپ لوڈ ناکام' : 'فشل رفع الملف'),
+          )
           setLoading(false)
           setUploading(false)
+          setUploadingPdf(false)
           return
         } finally {
           setUploading(false)
+          setUploadingPdf(false)
         }
       }
 
@@ -780,7 +796,11 @@ export default function NewPostPage() {
             {!loading && !uploading && <FiSend className="w-4 h-4" />}
             <span>
               {uploading
-                ? (lang === 'en' ? 'Uploading…' : lang === 'ur' ? 'اپ لوڈ…' : 'رفع الصور…')
+                ? (uploadingPdf
+                    // Single PDF upload — "uploading the file"
+                    ? (lang === 'en' ? 'Uploading PDF…' : lang === 'ur' ? 'PDF اپ لوڈ…' : 'رفع الملف…')
+                    // Image batch upload — keep the original copy
+                    : (lang === 'en' ? 'Uploading photos…' : lang === 'ur' ? 'تصاویر اپ لوڈ…' : 'رفع الصور…'))
                 : loading
                   ? (lang === 'en' ? 'Publishing…' : lang === 'ur' ? 'شائع…' : 'جاري النشر…')
                   : (lang === 'en' ? 'Publish' : lang === 'ur' ? 'شائع کریں' : 'نشر')}
