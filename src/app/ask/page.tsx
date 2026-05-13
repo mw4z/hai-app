@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiArrowRight, FiArrowLeft, FiSend, FiImage, FiX } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
@@ -140,20 +140,41 @@ const PLACEHOLDER_EXAMPLES_UR = [
 
 export default function AskNeighborsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { lang } = useLanguage()
   const { isOffline } = useNetworkStatus()
 
+  // Deep-link target: /ask?intent=<key> pre-applies one of the intent
+  // tiles on mount (same effect as tapping the tile manually). Used
+  // by the feed empty-state CTAs — "Request service" lands here with
+  // intent=service_need so the user starts on the right footing
+  // without an extra tap. An invalid / missing intent falls through
+  // to the default-category, no-intent state.
+  const initialIntentKey = searchParams?.get('intent') || ''
+
   const [text, setText] = useState('')
-  const [category, setCategory] = useState<string>(DEFAULT_CATEGORY)
+  // Seed category/intent/marketplaceType from the URL deep-link if
+  // one was provided, otherwise fall back to the existing defaults.
+  const initialIntent = ASK_INTENT_CHOICES.find(
+    (c) => c.key === initialIntentKey && c.postMap,
+  )
+  const [category, setCategory] = useState<string>(
+    initialIntent?.postMap?.category ?? DEFAULT_CATEGORY,
+  )
   // Track whether the user has explicitly overridden the suggested
   // category. Once they pick anything from the strip, we stop nudging
-  // it on every keystroke — their choice is sacred.
-  const [userOverrode, setUserOverrode] = useState(false)
+  // it on every keystroke — their choice is sacred. A URL deep-link
+  // counts as an explicit override.
+  const [userOverrode, setUserOverrode] = useState(!!initialIntent)
   const [showCategoryPicker, setShowCategoryPicker] = useState(false)
   // Phase 0 intent selector — when set, locks category/intent/marketplaceType.
   // null = user hasn't picked a tile yet (or chose to clear it).
-  const [intentChoice, setIntentChoice] = useState<string | null>(null)
-  const [marketplaceType, setMarketplaceType] = useState<'SELL' | 'BUY' | 'JOB'>('SELL')
+  const [intentChoice, setIntentChoice] = useState<string | null>(
+    initialIntent?.key ?? null,
+  )
+  const [marketplaceType, setMarketplaceType] = useState<'SELL' | 'BUY' | 'JOB'>(
+    initialIntent?.postMap?.marketplaceType ?? 'SELL',
+  )
 
   function applyIntentChoice(choice: AskIntentChoice) {
     if (choice.route) {

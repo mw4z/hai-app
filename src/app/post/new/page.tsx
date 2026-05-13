@@ -302,9 +302,26 @@ export default function NewPostPage() {
   // SUPER_ADMIN deep-link target: /post/new?neighborhood=<id> pre-selects
   // that neighborhood in the picker once the list has loaded.
   const initialNeighborhoodParam = searchParams?.get('neighborhood') || ''
+  // Deep-link target: /post/new?category=NEIGHBORHOOD_REPORTS jumps
+  // straight to the content step with that tile selected. Used by the
+  // feed empty-state CTAs (Report issue → NEIGHBORHOOD_REPORTS,
+  // Offer help → SERVICES) so each button transfers to its dedicated
+  // composer instead of dropping the user back at the category grid.
+  // Validated against the known set so an invalid value silently
+  // falls back to the picker. RIDES is intentionally excluded —
+  // /rides/new is a separate flow.
+  const initialCategoryParam = (() => {
+    const v = searchParams?.get('category') || ''
+    const valid = new Set([
+      'MARKETPLACE', 'SERVICES', 'HOME_BUSINESSES', 'REAL_ESTATE',
+      'NEIGHBORHOOD_REPORTS', 'LOST_FOUND', 'GENERAL',
+      'EVENTS', 'COMPETITIONS',
+    ])
+    return valid.has(v) ? v : ''
+  })()
   const { lang, t } = useLanguage()
-  const [step, setStep] = useState<'category' | 'content'>('category')
-  const [category, setCategory] = useState('')
+  const [step, setStep] = useState<'category' | 'content'>(initialCategoryParam ? 'content' : 'category')
+  const [category, setCategory] = useState(initialCategoryParam)
   // Marketplace listing subtype — only meaningful when category=MARKETPLACE.
   // Default SELL matches the schema default and keeps existing flows.
   const [marketplaceType, setMarketplaceType] = useState<'SELL' | 'BUY' | 'JOB'>('SELL')

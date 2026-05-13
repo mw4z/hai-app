@@ -690,28 +690,12 @@ export default function FeedClient({
       )}
 
 
-      {/* CTA banner when feed has very few posts */}
-      {!isReadOnly && posts.length === 0 && (
-        <div className="px-4 pt-4">
-          <div className="bg-primary-50 border border-primary-100 rounded-2xl p-4">
-            <p className="text-primary-800 font-semibold text-sm mb-3">{t('feed_cta_title')}</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => router.push('/post/new')} className="flex items-center gap-2 bg-white rounded-xl px-3 py-2.5 text-xs font-medium text-gray-700 border border-gray-100 active:scale-95 transition-transform">
-                <span>🔎</span>{t('feed_cta_ask')}
-              </button>
-              <button onClick={() => router.push('/post/new')} className="flex items-center gap-2 bg-white rounded-xl px-3 py-2.5 text-xs font-medium text-gray-700 border border-gray-100 active:scale-95 transition-transform">
-                <span>🔧</span>{t('feed_cta_service')}
-              </button>
-              <button onClick={() => router.push('/post/new')} className="flex items-center gap-2 bg-white rounded-xl px-3 py-2.5 text-xs font-medium text-gray-700 border border-gray-100 active:scale-95 transition-transform">
-                <span>⚠️</span>{t('feed_cta_report')}
-              </button>
-              <button onClick={() => router.push('/post/new')} className="flex items-center gap-2 bg-white rounded-xl px-3 py-2.5 text-xs font-medium text-gray-700 border border-gray-100 active:scale-95 transition-transform">
-                <span>🤝</span>{t('feed_cta_help')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Empty-state CTA lives in the bottom block (search for
+          🏘️ / feed_cta_title). The compact top card that used to
+          live here duplicated the same four buttons under the same
+          title — both fired simultaneously when posts.length === 0,
+          so the user saw "حيّك يحتاجك!" twice. Removed in favor of
+          the single full-size empty state. */}
 
       {/* Open ride requests from neighborhood */}
       {openRides.length > 0 && selectedCategory === 'ALL' && (
@@ -848,17 +832,30 @@ export default function FeedClient({
               {isReadOnly ? t('feed_no_posts_readonly') : t('feed_be_first')}
             </p>
             {!isReadOnly && (
+              // Each button routes to its own dedicated surface
+              // instead of dropping the user back into the generic
+              // composer's category picker:
+              //
+              //   🔎 Ask neighbors   → /ask
+              //   🔧 Request service → /ask?intent=service_need
+              //                        (Ask flow with the "I need a
+              //                        service" intent pre-selected)
+              //   ⚠️ Report issue    → /post/new?category=NEIGHBORHOOD_REPORTS
+              //   🤝 Offer help      → /post/new?category=SERVICES
+              //                        (composer pre-selects the
+              //                        Services tile; provider-gate
+              //                        logic still applies on submit)
               <div className="grid grid-cols-2 gap-2 max-w-sm mx-auto">
-                <button onClick={() => router.push('/post/new')} className="flex items-center justify-center gap-2 bg-primary-600 text-white rounded-xl px-4 py-3 text-sm font-medium active:scale-95 transition-transform">
+                <button onClick={() => router.push('/ask')} className="flex items-center justify-center gap-2 bg-primary-600 text-white rounded-xl px-4 py-3 text-sm font-medium active:scale-95 transition-transform">
                   <span>🔎</span>{t('feed_cta_ask')}
                 </button>
-                <button onClick={() => router.push('/post/new')} className="flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 active:scale-95 transition-transform">
+                <button onClick={() => router.push('/ask?intent=service_need')} className="flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 active:scale-95 transition-transform">
                   <span>🔧</span>{t('feed_cta_service')}
                 </button>
-                <button onClick={() => router.push('/post/new')} className="flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 active:scale-95 transition-transform">
+                <button onClick={() => router.push('/post/new?category=NEIGHBORHOOD_REPORTS')} className="flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 active:scale-95 transition-transform">
                   <span>⚠️</span>{t('feed_cta_report')}
                 </button>
-                <button onClick={() => router.push('/post/new')} className="flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 active:scale-95 transition-transform">
+                <button onClick={() => router.push('/post/new?category=SERVICES')} className="flex items-center justify-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 active:scale-95 transition-transform">
                   <span>🤝</span>{t('feed_cta_help')}
                 </button>
               </div>
