@@ -80,8 +80,8 @@ interface CategoryGroupDef {
 }
 
 const GROUPS: CategoryGroupDef[] = [
-  { key: 'commerce',     label: 'تجارة وأعمال',     labelEn: 'Commerce & work',      labelUr: 'تجارت اور کاروبار' },
-  { key: 'neighborhood', label: 'حياة الحي',         labelEn: 'Neighborhood life',    labelUr: 'محلے کی زندگی' },
+  { key: 'commerce',     label: 'تسوق وخدمات',     labelEn: 'Shop & services',       labelUr: 'خریداری اور خدمات' },
+  { key: 'neighborhood', label: 'شؤون الجيران',    labelEn: 'Neighbor matters',      labelUr: 'پڑوسیوں کے معاملات' },
   { key: 'community',    label: 'فعاليات ومسابقات', labelEn: 'Events & competitions', labelUr: 'تقریبات اور مقابلے' },
 ]
 
