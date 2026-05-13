@@ -65,12 +65,45 @@ export default function PdfTile({ url, name, size, variant = 'card' }: Props) {
       : 'text-[11px] text-gray-500 dark:text-gray-400 leading-tight mt-0.5'
 
   // Preview variant doesn't navigate — the composer renders it next
-  // to a ✕ remove button. Everything else opens in a new tab.
+  // to a ✕ remove button. Everything else is a tap-to-open link.
+  //
+  // On native (Capacitor iOS / Android) the default <a target="_blank">
+  // bounces the user out to the system browser (Safari / Chrome),
+  // which feels broken — they leave the Hai app entirely to read a
+  // PDF, and the OS's "back to app" gesture is fiddly. We intercept
+  // the tap and open via @capacitor/browser instead:
+  //
+  //   - iOS:     SFSafariViewController (in-app Safari sheet)
+  //   - Android: Chrome Custom Tabs (in-app browser sheet)
+  //
+  // Both render PDFs natively via the OS PDF viewer pipeline and
+  // dismiss back into the Hai app with a single tap. On web we keep
+  // the default new-tab behavior — that's the right idiom for browsers.
   const Wrapper: React.ElementType = variant === 'preview' ? 'div' : 'a'
   const wrapperProps =
     variant === 'preview'
       ? {}
-      : { href: url, target: '_blank', rel: 'noopener noreferrer' }
+      : {
+          href: url,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          onClick: async (e: React.MouseEvent) => {
+            const isNative =
+              typeof window !== 'undefined' &&
+              !!(window as any).Capacitor?.isNativePlatform?.()
+            if (!isNative) return // web: let the default new-tab happen
+            e.preventDefault()
+            try {
+              const { Browser } = await import('@capacitor/browser')
+              await Browser.open({ url, presentationStyle: 'popover' })
+            } catch {
+              // Fall back to the default open if the plugin barfs.
+              // Use window.open here because we already preventDefault'd
+              // the anchor.
+              window.open(url, '_blank', 'noopener,noreferrer')
+            }
+          },
+        }
 
   return (
     <Wrapper {...wrapperProps} className={containerByVariant[variant]}>
