@@ -362,6 +362,37 @@ export async function uploadPdf(
     `[HAI_UPLOAD] compress ${Date.now() - tCompress}ms (${file.size}B → ${compressed.size}B)`,
   )
 
+  // ── Fast path: ≤4MB → server-side put() (single round trip) ──
+  // For files that fit under Vercel's function body cap, we skip
+  // the client-direct dance entirely. Saves ~500ms-1s of RTT
+  // overhead (token request + webhook) compared to handleUpload.
+  // Especially noticeable on mobile cellular where every round trip
+  // is costly.
+  const FAST_PATH_MAX = 4 * 1024 * 1024
+  if (compressed.size <= FAST_PATH_MAX) {
+    opts?.onStage?.('uploading')
+    const tNet = Date.now()
+    const fd = new FormData()
+    fd.append('pdf', compressed)
+    const res = await fetch('/api/upload-pdf-fast', { method: 'POST', body: fd })
+    console.log(`[HAI_UPLOAD] fast-path network ${Date.now() - tNet}ms · total ${Date.now() - t0}ms`)
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      throw new Error(d.error || 'فشل رفع الملف')
+    }
+    const data = await res.json()
+    return {
+      url: data.url as string,
+      name: file.name,
+      size: compressed.size,
+    }
+  }
+
+  // ── Client-direct: >4MB → @vercel/blob handleUpload (3 RTTs) ──
+  // Required for anything above Vercel's function body cap. Token
+  // request, direct PUT to blob storage, server webhook. Slower
+  // per-request but unbounded by function body size.
+  //
   // Dynamic import so the @vercel/blob/client bundle isn't pulled
   // into routes that never upload PDFs (post composer, chat, etc.
   // would otherwise carry the helper in their first paint bundle).
