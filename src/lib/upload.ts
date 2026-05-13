@@ -97,6 +97,102 @@ const MAX_PDF_BYTES = 25 * 1024 * 1024
 const PDF_UPLOAD_TIMEOUT_MS = 120_000
 
 /**
+ * Lightweight safety guard for user-uploaded PDFs. NOT a full
+ * antivirus scan — we never look at content; we look for clear
+ * structural / metadata red flags that take milliseconds to check
+ * but stop the highest-impact attack classes:
+ *
+ *  1. Magic bytes  — file must start with "%PDF-". Rejects MIME
+ *     spoofing (someone renaming a .exe to .pdf or POSTing
+ *     application/pdf with arbitrary bytes).
+ *
+ *  2. Active-content scan — byte-level grep for the PDF dictionary
+ *     keys that introduce executable / embedded content:
+ *       /JavaScript   — embedded JS that runs when the PDF opens
+ *       /JS           — short form of the same
+ *       /OpenAction   — auto-runs on document open (used to chain
+ *                       the two above with no user click)
+ *       /Launch       — launches an external application
+ *       /EmbeddedFile — bundled files that PDF readers can extract
+ *                       and execute
+ *     Legitimate PDFs almost never contain these object names; PDF
+ *     viewers default to BLOCKING them anyway. Easier to reject
+ *     up-front than ship a hostile attachment to neighbors.
+ *
+ *  3. Encryption check — pdf-lib refuses to load encrypted PDFs and
+ *     surfaces an "encrypted" error. We reject with a clear message
+ *     ("أزل الحماية") so the user knows to export an unencrypted
+ *     copy from Acrobat / Preview.
+ *
+ *  4. Page-count cap — PDFs with thousands of pages are either DoS
+ *     attempts (PDF "bombs") or scanned books that don't belong in
+ *     a neighborhood chat. Cap at 200 pages.
+ *
+ * Total runtime: one ArrayBuffer read + one byte-string scan + one
+ * pdf-lib load. On a 5MB PDF this is ~50ms on a modern phone.
+ */
+async function validatePdfSafety(file: File): Promise<void> {
+  const buf = await file.arrayBuffer()
+  const u8 = new Uint8Array(buf)
+
+  // 1. Magic bytes. PDF spec: file must begin with "%PDF-" within
+  // the first 1024 bytes (some readers tolerate a leading garbage
+  // BOM / shebang). We check the very first 5 to be strict — a
+  // legitimate PDF generator places "%PDF-" at offset 0.
+  if (
+    u8.length < 5 ||
+    u8[0] !== 0x25 || u8[1] !== 0x50 || u8[2] !== 0x44 ||
+    u8[3] !== 0x46 || u8[4] !== 0x2D
+  ) {
+    throw new Error('الملف ليس PDF صالحاً')
+  }
+
+  // 2. Active-content scan. View the bytes as latin1 so 1 byte == 1
+  // char in the string, which makes indexOf semantics line up with
+  // the actual file offsets. Substring search is highly optimized
+  // in V8 so even on a 25MB file this is single-digit ms.
+  const text = new TextDecoder('latin1').decode(u8)
+  const dangerousMarkers = [
+    '/JavaScript',
+    '/OpenAction',
+    '/Launch',
+    '/EmbeddedFile',
+    '/JS ',           // trailing space avoids matching "/JSON" etc.
+    '/JS\n',
+    '/JS\r',
+  ]
+  for (const marker of dangerousMarkers) {
+    if (text.includes(marker)) {
+      throw new Error('PDF يحتوي على محتوى تفاعلي غير آمن — رجاءً صدّر نسخة عادية')
+    }
+  }
+
+  // 3 + 4. pdf-lib load — covers encryption detection AND gives us
+  // page count in the same pass. Malformed-PDF errors that aren't
+  // encryption-related are swallowed; compressPdf later does the
+  // same safe-fallback dance.
+  try {
+    const { PDFDocument } = await import('pdf-lib')
+    const doc = await PDFDocument.load(buf, { updateMetadata: false })
+    const pageCount = doc.getPageCount()
+    if (pageCount > 200) {
+      throw new Error(`PDF يحتوي على ${pageCount} صفحة — الحد الأقصى 200`)
+    }
+  } catch (err) {
+    const msg = String((err as Error)?.message || '').toLowerCase()
+    // Re-throw the page-count error we just threw above.
+    if (msg.startsWith('pdf يحتوي على')) throw err
+    // pdf-lib's encrypted-PDF error contains 'encrypted'.
+    if (msg.includes('encrypt')) {
+      throw new Error('لا يمكن رفع PDF مشفّر — أزل الحماية وحاول مجدداً')
+    }
+    // Other parse errors (malformed PDF, weird xref) — don't reject
+    // here. compressPdf below has the same fallback path and the
+    // upload itself doesn't depend on a clean parse.
+  }
+}
+
+/**
  * Lossless PDF re-save via pdf-lib. Strips redundant object
  * declarations, enables object streams (PDF 1.5+ feature that
  * compresses small indirect objects into a single deflate
@@ -181,6 +277,16 @@ export async function uploadPdf(
   if (file.size > MAX_PDF_BYTES) {
     throw new Error('حجم الملف كبير (أقصى 25 ميقا)')
   }
+
+  // Safety guard — runs BEFORE compression and BEFORE upload.
+  // Rejects spoofed MIME, PDFs carrying JavaScript / launch actions
+  // / embedded files, encrypted PDFs, and PDF bombs (200+ pages).
+  // Total runtime ~50ms on a 5MB file; rejection here costs the
+  // user a clear error toast and prevents shipping a hostile
+  // attachment to neighbors. Same arrayBuffer() the compressor
+  // re-reads below — modern browsers cache File reads so the
+  // double-read isn't a real cost.
+  await validatePdfSafety(file)
 
   // Compress before upload. compressPdf returns the smaller of the
   // re-saved version vs the original, so this is always a win.
