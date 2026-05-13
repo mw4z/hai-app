@@ -16,6 +16,7 @@ import { useNetworkStatus, isOfflineError, OfflineError } from '@/lib/network'
 import { useConfirm } from './ConfirmProvider'
 import { pickImageOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
+import PdfTile from '@/components/PdfTile'
 import { useAttachContact } from '@/hooks/useAttachContact'
 import ImageLightbox from './ImageLightbox'
 import SmartText from './SmartText'
@@ -103,6 +104,8 @@ interface Post {
   isPinned: boolean
   price: number | null
   imageUrls: string[]
+  pdfUrl?: string | null
+  pdfName?: string | null
   locationLat?: number | null
   locationLng?: number | null
   locationName?: string | null
@@ -1332,6 +1335,16 @@ export default function PostCard({
           </span>
           <span className="hai-meta hai-shrink-0">{lang === 'en' ? 'Open map' : lang === 'ur' ? 'نقشہ کھولیں' : 'فتح الخريطة'}</span>
         </a>
+      )}
+
+      {/* PDF attachment — rendered between location and the civic
+          disclaimer footer so it sits with the post's other meta
+          attachments. Tap opens the document in a new tab (or the
+          native PDF viewer on iOS/Android via the OS file handler). */}
+      {post.pdfUrl && (
+        <div className="hai-mt-2">
+          <PdfTile url={post.pdfUrl} name={post.pdfName} variant="card" />
+        </div>
       )}
 
       {/* Civic disclaimer — NEIGHBORHOOD_REPORTS posts are user-authored

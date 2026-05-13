@@ -72,3 +72,50 @@ export async function uploadFiles(files: File[]): Promise<string[]> {
   const data = await res.json()
   return data.urls || []
 }
+
+/**
+ * Upload a single PDF up to 25MB. Goes via the client-direct path
+ * (the file streams from the browser straight to Vercel Blob; the
+ * Next.js function only issues an auth token) because 25MB blows past
+ * Vercel's per-function body cap.
+ *
+ * Returns the blob URL plus the original filename so callers can store
+ * both — the filename is what we render in the PdfTile.
+ */
+const MAX_PDF_BYTES = 25 * 1024 * 1024
+
+export async function uploadPdf(file: File): Promise<{
+  url: string
+  name: string
+  size: number
+}> {
+  if (file.type !== 'application/pdf') {
+    throw new Error('فقط ملفات PDF')
+  }
+  if (file.size > MAX_PDF_BYTES) {
+    throw new Error('حجم الملف كبير (أقصى 25 ميقا)')
+  }
+
+  // Dynamic import so the @vercel/blob/client bundle isn't pulled
+  // into routes that never upload PDFs (post composer, chat, etc.
+  // would otherwise carry the helper in their first paint bundle).
+  const { upload } = await import('@vercel/blob/client')
+
+  // Strip directory separators from the original name so the pathname
+  // is a flat key under pdfs/. The cuid()-style prefix prevents
+  // collisions between two users uploading the same filename.
+  const safe = file.name.replace(/[/\\]/g, '_').slice(0, 120)
+  const key = `pdfs/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}-${safe}`
+
+  const blob = await upload(key, file, {
+    access: 'public',
+    handleUploadUrl: '/api/upload-pdf',
+    contentType: 'application/pdf',
+  })
+
+  return {
+    url: blob.url,
+    name: file.name,
+    size: file.size,
+  }
+}

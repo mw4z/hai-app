@@ -14,6 +14,8 @@ interface CommonPostFields {
   authorId: string
   neighborhoodId: string
   imageUrls?: string[]
+  pdfUrl?: string | null
+  pdfName?: string | null
   price?: number | null
   locationLat?: number | null
   locationLng?: number | null
@@ -37,6 +39,8 @@ export async function createPost(input: CreatePostInput) {
     authorId: input.authorId,
     neighborhoodId: input.neighborhoodId,
     imageUrls: input.imageUrls ?? [],
+    pdfUrl: input.pdfUrl ?? null,
+    pdfName: input.pdfName ?? null,
     price: input.price ?? null,
     locationLat: input.locationLat ?? null,
     locationLng: input.locationLng ?? null,

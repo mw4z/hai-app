@@ -337,6 +337,13 @@ model Post {
   activeThreadId String?       // for exclusive mode: the one active thread
   price          Float?        // for marketplace items
   imageUrls      String[]      // array of image URLs
+  // PDF attachment — single optional document up to 25MB. pdfUrl points
+  // at the Vercel Blob; pdfName is the original filename for display.
+  // Uploaded via /api/upload-pdf (client-direct so we bypass the
+  // Next.js function body cap). Rendered through the shared PdfTile
+  // component in PostCard.
+  pdfUrl         String?
+  pdfName        String?
   locationLat    Float?        // attached map location
   locationLng    Float?
   locationName   String?       // place name for display
@@ -612,6 +619,10 @@ model Comment {
   id        String    @id @default(cuid())
   body      String
   imageUrl  String?
+  // PDF attachment on a comment — same Vercel-Blob-backed model as
+  // Post.pdfUrl / Post.pdfName. Nullable; defaults to no attachment.
+  pdfUrl    String?
+  pdfName   String?
   post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId    String
   author    User      @relation(fields: [authorId], references: [id])
@@ -1051,6 +1062,10 @@ model Message {
   lat         Float?
   lng         Float?
   imageUrl    String?
+  // PDF attachment on a chat message — same model as Post.pdfUrl.
+  // Set only when type == PDF; null on every other message type.
+  pdfUrl      String?
+  pdfName     String?
   edited      Boolean     @default(false)
   reactions   Json        @default("[]")  // [{emoji, userId}]
   // userIds who hid this message via "Delete for me". The read query
@@ -1072,6 +1087,7 @@ enum MessageType {
   TEXT
   LOCATION
   IMAGE
+  PDF
   DELETED
 }
 

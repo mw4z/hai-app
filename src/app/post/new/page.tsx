@@ -9,9 +9,10 @@ import type { TranslationKey } from '@/lib/i18n'
 import { useNetworkStatus } from '@/lib/network'
 import { translateApiError } from '@/lib/apiError'
 import RiyalIcon from '@/components/RiyalIcon'
-import { uploadFiles } from '@/lib/upload'
+import { uploadFiles, uploadPdf } from '@/lib/upload'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
+import PdfTile from '@/components/PdfTile'
 import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { playSuccess, playError } from '@/lib/sound'
 import { FiX } from 'react-icons/fi'
@@ -379,6 +380,16 @@ export default function NewPostPage() {
   const [price, setPrice] = useState('')
   const [images, setImages] = useState<{ file: File; preview: string; url?: string }[]>([])
   const [uploading, setUploading] = useState(false)
+  // PDF attachment — single document up to 25MB. While selected but
+  // not yet uploaded, `localFile` holds the raw File for upload on
+  // submit; once uploaded, `url` is set. The composer shows a tile
+  // preview either way. Submit re-uses the existing `uploading` flag.
+  const [pdf, setPdf] = useState<{
+    localFile: File | null
+    url: string | null
+    name: string
+    size: number
+  } | null>(null)
   const [loading, setLoading] = useState(false)
   const { isOffline } = useNetworkStatus()
   const [location, setLocation] = useState<{ lat: number; lng: number; name: string } | null>(null)
@@ -477,6 +488,22 @@ export default function NewPostPage() {
 
   const imageInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
+  const pdfInputRef = useRef<HTMLInputElement>(null)
+
+  function handlePdfSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (file.type !== 'application/pdf') {
+      toast.error(lang === 'en' ? 'Only PDF files' : lang === 'ur' ? 'صرف PDF فائلیں' : 'فقط ملفات PDF')
+      return
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error(lang === 'en' ? 'PDF too large (max 25MB)' : lang === 'ur' ? 'PDF بہت بڑی ہے (زیادہ سے زیادہ 25MB)' : 'حجم الملف كبير (أقصى 25 ميقا)')
+      return
+    }
+    setPdf({ localFile: file, url: null, name: file.name, size: file.size })
+  }
   const [showImageSheet, setShowImageSheet] = useState(false)
 
   function applyPostImages(files: File[]) {
@@ -592,6 +619,33 @@ export default function NewPostPage() {
       const imageUrls = await uploadImages()
       if (imageUrls === null) { setLoading(false); return }
 
+      // Upload the PDF (if any) via the client-direct path before
+      // building the request body. uploadPdf goes browser → Vercel
+      // Blob, so the Next.js function never sees 25MB of file bytes.
+      // A failure here aborts submit and surfaces the error to the
+      // user — the post is not created without its attachment.
+      let pdfUrl: string | null = pdf?.url ?? null
+      let pdfName: string | null = pdf?.name ?? null
+      if (pdf && pdf.localFile && !pdf.url) {
+        setUploading(true)
+        try {
+          const result = await uploadPdf(pdf.localFile)
+          pdfUrl = result.url
+          pdfName = result.name
+          // Cache on the local state too in case of retry after
+          // category_mismatch — we don't want to re-upload the PDF
+          // when the user accepts the suggested category.
+          setPdf({ localFile: null, url: result.url, name: result.name, size: result.size })
+        } catch (err: any) {
+          toast.error(err?.message || 'فشل رفع الملف')
+          setLoading(false)
+          setUploading(false)
+          return
+        } finally {
+          setUploading(false)
+        }
+      }
+
       // Submit with overridable category/marketplaceType so we can
       // resubmit with the classifier's suggestion if the user accepts.
       const submit = async (
@@ -611,6 +665,8 @@ export default function NewPostPage() {
           ...(useCategory === 'GENERAL' ? { intent: 'NORMAL' } : {}),
           price: price ? parseFloat(price) : null,
           imageUrls,
+          pdfUrl,
+          pdfName,
           locationLat: location?.lat || null,
           locationLng: location?.lng || null,
           locationName: location?.name || null,
@@ -1020,6 +1076,46 @@ export default function NewPostPage() {
                   </button>
                   <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleImageSelect} className="hidden" />
                   <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
+                </>
+              )}
+            </div>
+
+            {/* PDF attachment — single optional document, max 25MB.
+                Real-world fit: real-estate floor plans, service price
+                lists, event flyers, restaurant menus. Tile uses the
+                shared PdfTile component in 'preview' variant; tap on
+                the tile body opens nothing in the composer (the ✕
+                next to it removes the attachment). On submit, if a
+                localFile is present we call uploadPdf() and add the
+                returned URL + name to the body. */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5 mb-2">
+                📄 {lang === 'en' ? 'Attach PDF (optional)' : lang === 'ur' ? 'PDF منسلک کریں (اختیاری)' : 'إرفاق ملف PDF (اختياري)'}
+              </label>
+              {pdf ? (
+                <div className="flex items-stretch gap-2">
+                  <div className="flex-1 min-w-0">
+                    <PdfTile url={pdf.url || '#'} name={pdf.name} size={pdf.size} variant="preview" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPdf(null)}
+                    aria-label={lang === 'en' ? 'Remove PDF' : 'إزالة الملف'}
+                    className="flex-shrink-0 w-10 self-stretch rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 active:scale-95 transition-transform flex items-center justify-center"
+                  >
+                    <FiX className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => pdfInputRef.current?.click()}
+                    className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-3 text-sm text-gray-400 cursor-pointer hover:border-rose-300 hover:text-rose-500 transition-colors"
+                  >
+                    <span>+ {lang === 'en' ? 'Choose PDF' : lang === 'ur' ? 'PDF منتخب کریں' : 'اختر ملف PDF'}</span>
+                  </button>
+                  <input ref={pdfInputRef} type="file" accept="application/pdf" onChange={handlePdfSelect} className="hidden" />
                 </>
               )}
             </div>

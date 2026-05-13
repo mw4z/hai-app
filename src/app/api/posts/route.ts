@@ -77,6 +77,17 @@ export async function POST(req: NextRequest) {
       locationName,
       neighborhoodId: requestedNeighborhoodId,
     } = reqBody
+    // PDF attachment — optional. Both fields nullable; we trust the
+    // composer's client-side validator (only application/pdf gets
+    // through uploadPdf) but still cap the URL length and the
+    // filename here so a malicious caller can't write 10MB of JSON
+    // into the Post row. Vercel Blob URLs are well under 200 chars
+    // in practice; 500 is a safe ceiling.
+    const pdfUrlRaw = typeof reqBody.pdfUrl === 'string' ? reqBody.pdfUrl.trim() : ''
+    const pdfNameRaw = typeof reqBody.pdfName === 'string' ? reqBody.pdfName.trim() : ''
+    const pdfUrl =
+      pdfUrlRaw.startsWith('https://') && pdfUrlRaw.length < 500 ? pdfUrlRaw : null
+    const pdfName = pdfUrl ? pdfNameRaw.slice(0, 200) || 'document.pdf' : null
     // `category` is `let` because the server-side classifier may
     // AUTO_CORRECT it after content analysis below.
     let category: string = reqBody.category
@@ -461,6 +472,8 @@ export async function POST(req: NextRequest) {
         coordinationMode,
         price: price || null,
         imageUrls: validatedImages,
+        pdfUrl,
+        pdfName,
         locationLat: locationLat || null,
         locationLng: locationLng || null,
         locationName: locationName?.trim() || null,
