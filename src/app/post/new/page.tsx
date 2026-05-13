@@ -237,6 +237,29 @@ const CATEGORIES: CategoryItem[] = [
     placeholderEn: 'Example: Quran memorization contest for kids — great prizes',
     placeholderUr: 'مثال: بچوں کیلئے قرآن حفظ کا مقابلہ — قیمتی انعامات',
   },
+  // ── Neighborhood info — neutral, non-commercial, non-civic ──
+  // Maps to PostCategory.GENERAL with intent NORMAL on submit. Reserved
+  // for "محل جديد فتح / صيدلية جديدة / مكان نقل موقعه" — facts about
+  // the neighborhood. The classifier polices the boundary on the
+  // server: if the post turns out to be commercial ("خصم / عندنا" → MARKETPLACE)
+  // or a civic issue ("خطر / مشكلة" → NEIGHBORHOOD_REPORTS), it gets
+  // auto-routed to the right bucket. GENERAL is NOT a top-level chip;
+  // these posts are reachable via the ALL chip only.
+  {
+    key: 'GENERAL',
+    label: 'معلومة لأهل الحي',
+    labelEn: 'Neighborhood info',
+    labelUr: 'محلے کیلئے معلومات',
+    icon: 'ℹ️',
+    desc: 'معلومة مفيدة محايدة لجيرانك',
+    descEn: 'A neutral, useful tip for neighbors',
+    example: 'مثال: صيدلية جديدة فتحت، محل نقل موقعه',
+    exampleEn: 'e.g., a new pharmacy opened, a shop relocated',
+    keywords: ['معلومة', 'افتتاح', 'جديد', 'نقل', 'مكان', 'info', 'news', 'opened'],
+    placeholder: 'مثال: فتح محل نظارات جديد بجانب التموينات',
+    placeholderEn: 'Example: A new optical shop opened next to the supermarket',
+    placeholderUr: 'مثال: سپر مارکیٹ کے پاس عینکوں کی نئی دکان کھل گئی',
+  },
 ]
 
 // Categories that should show the price field in the content step.
@@ -536,6 +559,11 @@ export default function NewPostPage() {
           title,
           body,
           category: useCategory,
+          // "معلومة لأهل الحي" picker maps to GENERAL+NORMAL explicitly.
+          // The classifier still auto-routes the post if the text turns
+          // out to be commercial/civic — it just won't drift to REQUEST
+          // on a casual "فيه..." mention when the user is sharing info.
+          ...(useCategory === 'GENERAL' ? { intent: 'NORMAL' } : {}),
           price: price ? parseFloat(price) : null,
           imageUrls,
           locationLat: location?.lat || null,

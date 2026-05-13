@@ -868,3 +868,74 @@ test('Phase1: cross-category — GENERAL post carries no subtypes', () => {
   assert.equal(r.realEstateType ?? null, null)
   assert.equal(r.civicType ?? null, null)
 })
+
+// ════════════════════════════════════════════════════════════════════════
+// "معلومة لأهل الحي" — GENERAL+NORMAL composer path
+// Five scenarios from the spec. Boundary tests:
+//   - Neutral info posts stay in GENERAL+NORMAL.
+//   - Commercial promo language gets pulled to MARKETPLACE+OFFER.
+//   - Where-questions stay GENERAL+REQUEST (recommendation flow).
+//   - Danger-near-location is pulled to NEIGHBORHOOD_REPORTS.
+// ════════════════════════════════════════════════════════════════════════
+
+test('GeneralInfo: new eyewear shop opened → GENERAL + NORMAL', () => {
+  const r = classifyPostCategory({
+    title: 'فتح محل نظارات جديد',
+    body: 'فتح محل نظارات جديد بجانب التموينات، يمدينا نلقى نظاراتنا بالحي.',
+    selectedCategory: 'GENERAL',
+    selectedIntent: 'NORMAL',
+  })
+  assert.equal(r.finalCategory, 'GENERAL')
+  assert.equal(r.finalIntent, 'NORMAL')
+})
+
+test('GeneralInfo: abayas shop with خصم → MARKETPLACE + OFFER', () => {
+  const r = classifyPostCategory({
+    title: 'افتتحنا محل عبايات',
+    body: 'افتتحنا محل عبايات في الحي وعندنا خصم خاص هذا الأسبوع، تواصلوا معنا.',
+    selectedCategory: 'GENERAL',
+    selectedIntent: 'NORMAL',
+  })
+  // Either MARKETPLACE or HOME_BUSINESSES is acceptable — both are
+  // commercial buckets and the test just verifies the post leaves
+  // GENERAL.
+  assert.ok(
+    r.finalCategory === 'MARKETPLACE' || r.finalCategory === 'HOME_BUSINESSES',
+    `expected MARKETPLACE or HOME_BUSINESSES, got ${r.finalCategory}`,
+  )
+  assert.equal(r.finalIntent, 'OFFER')
+})
+
+test('GeneralInfo: new pharmacy opened → GENERAL + NORMAL', () => {
+  const r = classifyPostCategory({
+    title: 'فيه صيدلية جديدة',
+    body: 'فيه صيدلية جديدة فتحت في الحي قريبة من المسجد، تفتح الساعة ٨ صباحاً.',
+    selectedCategory: 'GENERAL',
+    selectedIntent: 'NORMAL',
+  })
+  assert.equal(r.finalCategory, 'GENERAL')
+  assert.equal(r.finalIntent, 'NORMAL')
+})
+
+test('GeneralInfo: where is an open pharmacy → GENERAL + REQUEST', () => {
+  // Same shape as the existing recommendation-guard test, restated
+  // here so the "info" path's request branch is regression-tested
+  // alongside the new NORMAL cases.
+  const r = classifyPostCategory({
+    title: 'وين صيدلية مفتوحة؟',
+    body: 'محتاج صيدلية تفتح متأخر، توصية من الجيران؟',
+    selectedCategory: 'GENERAL',
+  })
+  assert.equal(r.finalCategory, 'GENERAL')
+  assert.equal(r.finalIntent, 'REQUEST')
+})
+
+test('GeneralInfo: street danger near a location → NEIGHBORHOOD_REPORTS', () => {
+  const r = classifyPostCategory({
+    title: 'الشارع عند الصيدلية خطر',
+    body: 'الشارع عند الصيدلية خطر، السيارات تعدي بسرعة والمشاة معرضين.',
+    selectedCategory: 'GENERAL',
+    selectedIntent: 'NORMAL',
+  })
+  assert.equal(r.finalCategory, 'NEIGHBORHOOD_REPORTS')
+})

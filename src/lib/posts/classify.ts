@@ -108,8 +108,10 @@ const FOOD_HOME_RULES: Rule[] = [
 ]
 
 const MARKETPLACE_RULES: Rule[] = [
-  // Sell verbs / framing
-  { pattern: /(?:للبيع|للبيـع|أبيع|ابيع|بيع|عرض|معروض|عرض\s*للبيع|على\s*البيع|للبيع\s*فوري|تخفيض|تصفية|حراج|سومة)/i, weight: 3 },
+  // Sell verbs / framing — adds "خصم|عروض|عرض\s*خاص" so an opened-shop
+  // post like "افتتحنا محل عبايات وعندنا خصم" lands as MARKETPLACE
+  // instead of staying in GENERAL.
+  { pattern: /(?:للبيع|للبيـع|أبيع|ابيع|بيع|عرض|معروض|عرض\s*للبيع|على\s*البيع|للبيع\s*فوري|تخفيض|تصفية|حراج|سومة|خصم|خصومات|عروض|عرض\s*خاص)/i, weight: 3 },
   // Buy framing
   { pattern: /(?:أبغى\s*اشتري|ابغى\s*اشتري|أبي\s*اشتري|ابي\s*اشتري|طلب\s*شراء|مطلوب|شراء)/i, weight: 3 },
   // Condition descriptors
@@ -124,8 +126,10 @@ const MARKETPLACE_RULES: Rule[] = [
   { pattern: /(?:جوال|آيفون|ايفون|سامسونج|لابتوب|كمبيوتر|شاشة|تابلت|سماعة|شاحن|تلفزيون|تلفاز)/i, weight: 2 },
   // Auto parts (the cars themselves are still MARKETPLACE)
   { pattern: /(?:سيارة|سياره|قطع\s*غيار|كفرات|بطارية|زيوت|اكسسوارات)/i, weight: 2 },
-  // Apparel + accessories
-  { pattern: /(?:ملابس|شنطة|جزمة|عباية|فستان|نظارات|ساعات)/i, weight: 2 },
+  // Apparel + accessories. Includes "عبايات" plural — match-side
+  // singular/plural variants are kept explicit because classify.ts
+  // matches raw (un-normalized) text.
+  { pattern: /(?:ملابس|شنطة|جزمة|عباية|عبايات|فستان|نظارات|ساعات)/i, weight: 2 },
   // Contact framing common in marketplace listings
   { pattern: /(?:واتساب|تواصل\s*خاص|خاص\s*واتساب)/i, weight: 1 },
   // Buying — Arabic (weak — many of these appear in services too)
@@ -197,7 +201,11 @@ const REQUEST_MARKERS: Rule[] = [
 
 const OFFER_MARKERS: Rule[] = [
   { pattern: /(?:أوفر|اوفر|أقدم|اقدم|متوفر|متاح|تواصل|تواصلوا|للحجز|اطلب\s*الآن|اطلب\s*الان)/i, weight: 2 },
-  { pattern: /(?:offering|available|book\s*now|order\s*now|i\s*provide|i\s*offer)/i, weight: 2 },
+  // Explicit promotional language ("خصم / تخفيض / عندنا / للبيع")
+  // pushes intent to OFFER even when the post text is otherwise short.
+  // Lifts "افتتحنا محل عبايات وعندنا خصم" from NORMAL to OFFER.
+  { pattern: /(?:خصم|خصومات|تخفيض|تصفية|عروض|عرض\s*خاص|عندنا|للبيع|اطلبوا|احجزوا)/i, weight: 3 },
+  { pattern: /(?:offering|available|book\s*now|order\s*now|i\s*provide|i\s*offer|discount|sale|deal)/i, weight: 2 },
 ]
 
 const LOST_FOUND_RULES: Rule[] = [
@@ -258,6 +266,14 @@ const NEIGHBORHOOD_REPORTS_RULES: Rule[] = [
   // Urgency framing common in reports (low weight — also appears in
   // help-requests, so don't over-weight)
   { pattern: /(?:رجاء\s*الانتباه|يا\s*جماعة|اللي\s*ساكنين|مساعدة\s*عاجلة|عاجل|ضروري)/i, weight: 1 },
+  // Location-noun boost — paired with the "خطر / مشكلة / تحذير" alert
+  // rule above it, this lifts "الشارع عند الصيدلية خطر" from below
+  // MEDIUM (just +3) to ≥ MEDIUM (+4), so the classifier suggests
+  // NEIGHBORHOOD_REPORTS instead of allowing a casual GENERAL post.
+  // Weight 1 each so common mentions on non-civic posts (e.g. "للبيع
+  // شقة في الشارع 60") don't dominate their actual category.
+  { pattern: /(?:الشارع|الشوارع|الطريق|الطرق|التقاطع|الإشارة|الاشارة|أمام|امام)/i, weight: 1 },
+  { pattern: /(?:عند\s*المدرسة|عند\s*المسجد|عند\s*الحديقة|عند\s*التقاطع|في\s*الحي)/i, weight: 1 },
   // English
   { pattern: /(?:outage|leak|fire|smoke|smell|hazard|warning|danger|suspicious|theft|broken|pothole|road\s*closed|power\s*cut|water\s*cut)/i, weight: 3 },
 ]
