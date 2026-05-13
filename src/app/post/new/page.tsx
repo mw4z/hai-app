@@ -56,10 +56,35 @@ function draftHasContent(d: PostDraft | null): boolean {
 }
 
 // ── v2 categories (PostCategory) ─────────────────────────────────────
-// Single flat list of the 9 user-facing v2 buckets. GENERAL is admin-
-// only fallback and is intentionally not exposed here. RIDES routes to
-// the structured /rides/new flow because requesting a ride uses a
-// dedicated form; the rest land in this composer's content step.
+// 10 user-facing buckets organized into 3 themed groups. Each tile
+// carries a `group:` so the picker renders them under labeled
+// sections instead of one flat block — same pattern Apple's App
+// Store uses for "What to post" type taxonomies.
+//
+//   commerce      → money / business activity  (4 tiles)
+//   neighborhood  → local daily life / sharing (4 tiles)
+//   community     → events + contests          (2 tiles)
+//
+// Within a group, order is UX-driven (real frequency of use), NOT
+// alphabetical and NOT enum order. RIDES routes to /rides/new
+// (dedicated structured form); the rest land in this composer's
+// content step. GENERAL is the "معلومة لأهل الحي" neutral-info
+// bucket — composer-only, never a top-level feed chip.
+type CategoryGroup = 'commerce' | 'neighborhood' | 'community'
+
+interface CategoryGroupDef {
+  key: CategoryGroup
+  label: string
+  labelEn: string
+  labelUr: string
+}
+
+const GROUPS: CategoryGroupDef[] = [
+  { key: 'commerce',     label: 'تجارة وأعمال',     labelEn: 'Commerce & work',      labelUr: 'تجارت اور کاروبار' },
+  { key: 'neighborhood', label: 'حياة الحي',         labelEn: 'Neighborhood life',    labelUr: 'محلے کی زندگی' },
+  { key: 'community',    label: 'فعاليات ومسابقات', labelEn: 'Events & competitions', labelUr: 'تقریبات اور مقابلے' },
+]
+
 interface CategoryItem {
   key: string
   label: string
@@ -83,20 +108,11 @@ interface CategoryItem {
   /** Visually elevate the card (urgent / safety). NEIGHBORHOOD_REPORTS
    *  + LOST_FOUND get a subtle ring + warmer surface. */
   important?: boolean
+  /** Which section header this tile renders under. */
+  group: CategoryGroup
 }
-
-// Order is UX-driven (real frequency of use), NOT alphabetical and NOT
-// enum order. Layout reads as a 3-column grid:
-//
-//   Row 1 — core / highest frequency:        MARKETPLACE   SERVICES        HOME_BUSINESSES
-//   Row 2 — daily needs:                     RIDES         REAL_ESTATE
-//   Row 3 — important / urgent:              NEIGHBORHOOD_REPORTS  LOST_FOUND
-//   Row 4 — social / optional:               EVENTS        COMPETITIONS
-//
-// Rows 2-4 will appear with 2 cells side-by-side — the grid auto-flows
-// inside `.hai-option-grid-3` so the visual rhythm is preserved.
 const CATEGORIES: CategoryItem[] = [
-  // Row 1
+  // ── Group 1: تجارة وأعمال (commerce & work) ──────────────────────
   {
     key: 'MARKETPLACE',
     label: 'السوق',
@@ -111,6 +127,7 @@ const CATEGORIES: CategoryItem[] = [
     placeholder: 'مثال: للبيع جهاز تكييف مستعمل بحالة ممتازة',
     placeholderEn: 'Example: Used AC for sale — excellent condition',
     placeholderUr: 'مثال: استعمال شدہ اے سی برائے فروخت — بہترین حالت',
+    group: 'commerce',
   },
   {
     key: 'SERVICES',
@@ -126,6 +143,7 @@ const CATEGORIES: CategoryItem[] = [
     placeholder: 'مثال: فني تكييف — خبرة 10 سنوات — يخدم الحي',
     placeholderEn: 'Example: AC technician — 10y experience — serves the area',
     placeholderUr: 'مثال: اے سی ٹیکنیشن — 10 سال تجربہ — محلے میں خدمت',
+    group: 'commerce',
   },
   {
     key: 'HOME_BUSINESSES',
@@ -141,22 +159,7 @@ const CATEGORIES: CategoryItem[] = [
     placeholder: 'مثال: متوفر اليوم كبسة دجاج وسمبوسة — الطلب على الخاص',
     placeholderEn: 'Example: Today: chicken kabsa and samosa — order via DM',
     placeholderUr: 'مثال: آج چکن کبسہ اور سموسے دستیاب — آرڈر ڈی ایم پر',
-  },
-  // Row 2
-  {
-    key: 'RIDES',
-    label: 'مشاوير وتوصيل',
-    labelEn: 'Rides & Delivery',
-    labelUr: 'سواری اور ڈیلیوری',
-    icon: '🚗',
-    desc: 'اطلب توصيلة أو طلب من المتجر',
-    descEn: 'Request a ride or a store delivery',
-    example: 'مثال: محتاج توصيلة للعمل، أو طلب من البقالة',
-    exampleEn: 'e.g., ride to work, or grocery delivery',
-    keywords: ['مشوار', 'توصيل', 'توصيلة', 'سائق', 'طلب', 'بقالة', 'ride', 'lift', 'delivery'],
-    placeholder: '',
-    placeholderEn: '',
-    placeholderUr: '',
+    group: 'commerce',
   },
   {
     key: 'REAL_ESTATE',
@@ -172,8 +175,12 @@ const CATEGORIES: CategoryItem[] = [
     placeholder: 'مثال: شقة للإيجار — 3 غرف — التواصل على الخاص',
     placeholderEn: 'Example: Apartment for rent — 3 bedrooms — DM to contact',
     placeholderUr: 'مثال: کرائے کیلئے فلیٹ — 3 کمرے — رابطہ ڈی ایم پر',
+    group: 'commerce',
   },
-  // Row 3 — important / urgent
+  // ── Group 2: حياة الحي (neighborhood life) ───────────────────────
+  // NEIGHBORHOOD_REPORTS first inside the group so urgent reports
+  // sit near the top of the section's visual rhythm. Rides next
+  // (daily, common). Then lost/found and neutral info.
   {
     key: 'NEIGHBORHOOD_REPORTS',
     label: 'بلاغات الحي',
@@ -189,6 +196,23 @@ const CATEGORIES: CategoryItem[] = [
     placeholder: 'مثال: انقطاع المياه في الشارع الرئيسي',
     placeholderEn: 'Example: Water outage on main street',
     placeholderUr: 'مثال: مین سٹریٹ پر پانی کی بندش',
+    group: 'neighborhood',
+  },
+  {
+    key: 'RIDES',
+    label: 'مشاوير وتوصيل',
+    labelEn: 'Rides & Delivery',
+    labelUr: 'سواری اور ڈیلیوری',
+    icon: '🚗',
+    desc: 'اطلب توصيلة أو طلب من المتجر',
+    descEn: 'Request a ride or a store delivery',
+    example: 'مثال: محتاج توصيلة للعمل، أو طلب من البقالة',
+    exampleEn: 'e.g., ride to work, or grocery delivery',
+    keywords: ['مشوار', 'توصيل', 'توصيلة', 'سائق', 'طلب', 'بقالة', 'ride', 'lift', 'delivery'],
+    placeholder: '',
+    placeholderEn: '',
+    placeholderUr: '',
+    group: 'neighborhood',
   },
   {
     key: 'LOST_FOUND',
@@ -205,8 +229,33 @@ const CATEGORIES: CategoryItem[] = [
     placeholder: 'مثال: وجدت مفاتيح عند المسجد',
     placeholderEn: 'Example: Found keys near the mosque',
     placeholderUr: 'مثال: مسجد کے پاس چابیاں ملی ہیں',
+    group: 'neighborhood',
   },
-  // Row 4 — social / optional
+  // Neighborhood info — neutral, non-commercial, non-civic. Maps to
+  // PostCategory.GENERAL + intent NORMAL on submit. Reserved for
+  // "محل جديد فتح / صيدلية جديدة / مكان نقل موقعه" — facts about
+  // the neighborhood. The classifier polices the boundary on the
+  // server: if the post turns out commercial ("خصم / عندنا" →
+  // MARKETPLACE) or civic ("خطر / مشكلة" → NEIGHBORHOOD_REPORTS), it
+  // gets auto-routed. GENERAL is NOT a top-level chip; these posts
+  // are reachable via the ALL chip only.
+  {
+    key: 'GENERAL',
+    label: 'معلومة لأهل الحي',
+    labelEn: 'Neighborhood info',
+    labelUr: 'محلے کیلئے معلومات',
+    icon: 'ℹ️',
+    desc: 'معلومة مفيدة محايدة لجيرانك',
+    descEn: 'A neutral, useful tip for neighbors',
+    example: 'مثال: صيدلية جديدة فتحت، محل نقل موقعه',
+    exampleEn: 'e.g., a new pharmacy opened, a shop relocated',
+    keywords: ['معلومة', 'افتتاح', 'جديد', 'نقل', 'مكان', 'info', 'news', 'opened'],
+    placeholder: 'مثال: فتح محل نظارات جديد بجانب التموينات',
+    placeholderEn: 'Example: A new optical shop opened next to the supermarket',
+    placeholderUr: 'مثال: سپر مارکیٹ کے پاس عینکوں کی نئی دکان کھل گئی',
+    group: 'neighborhood',
+  },
+  // ── Group 3: فعاليات ومسابقات (events & competitions) ────────────
   {
     key: 'EVENTS',
     label: 'فعاليات ومناسبات',
@@ -221,6 +270,7 @@ const CATEGORIES: CategoryItem[] = [
     placeholder: 'مثال: توزيع إفطار رمضان عند مسجد الحي الساعة 6',
     placeholderEn: 'Example: Ramadan iftar distribution at the mosque at 6pm',
     placeholderUr: 'مثال: محلے کی مسجد پر شام 6 بجے افطار کی تقسیم',
+    group: 'community',
   },
   {
     key: 'COMPETITIONS',
@@ -236,29 +286,7 @@ const CATEGORIES: CategoryItem[] = [
     placeholder: 'مثال: مسابقة حفظ القرآن للأطفال — جوائز قيمة',
     placeholderEn: 'Example: Quran memorization contest for kids — great prizes',
     placeholderUr: 'مثال: بچوں کیلئے قرآن حفظ کا مقابلہ — قیمتی انعامات',
-  },
-  // ── Neighborhood info — neutral, non-commercial, non-civic ──
-  // Maps to PostCategory.GENERAL with intent NORMAL on submit. Reserved
-  // for "محل جديد فتح / صيدلية جديدة / مكان نقل موقعه" — facts about
-  // the neighborhood. The classifier polices the boundary on the
-  // server: if the post turns out to be commercial ("خصم / عندنا" → MARKETPLACE)
-  // or a civic issue ("خطر / مشكلة" → NEIGHBORHOOD_REPORTS), it gets
-  // auto-routed to the right bucket. GENERAL is NOT a top-level chip;
-  // these posts are reachable via the ALL chip only.
-  {
-    key: 'GENERAL',
-    label: 'معلومة لأهل الحي',
-    labelEn: 'Neighborhood info',
-    labelUr: 'محلے کیلئے معلومات',
-    icon: 'ℹ️',
-    desc: 'معلومة مفيدة محايدة لجيرانك',
-    descEn: 'A neutral, useful tip for neighbors',
-    example: 'مثال: صيدلية جديدة فتحت، محل نقل موقعه',
-    exampleEn: 'e.g., a new pharmacy opened, a shop relocated',
-    keywords: ['معلومة', 'افتتاح', 'جديد', 'نقل', 'مكان', 'info', 'news', 'opened'],
-    placeholder: 'مثال: فتح محل نظارات جديد بجانب التموينات',
-    placeholderEn: 'Example: A new optical shop opened next to the supermarket',
-    placeholderUr: 'مثال: سپر مارکیٹ کے پاس عینکوں کی نئی دکان کھل گئی',
+    group: 'community',
   },
 ]
 
@@ -737,67 +765,87 @@ export default function NewPostPage() {
               </p>
             </div>
 
-            {/* Tiles — 2-column on phones (more readable than 3),
-                3-column from sm+ (tablet/desktop). */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {visibleCategories.map((cat) => {
-                const restricted = isCategoryRestricted(cat.key)
+            {/* Grouped tiles — three labeled sections (Commerce,
+                Neighborhood Life, Events & Competitions) instead of
+                one flat 10-tile block. Group headers are small
+                uppercase tracking labels in iOS App Store style:
+                visually subtle, not loud, so the tiles themselves
+                stay the visual anchor. Each section renders its
+                own 2/3-column grid. */}
+            <div className="space-y-5">
+              {GROUPS.map((group) => {
+                const items = visibleCategories.filter((c) => c.group === group.key)
+                if (items.length === 0) return null
+                const groupLabel = lang === 'en' ? group.labelEn : lang === 'ur' ? group.labelUr : group.label
                 return (
-                  <button
-                    key={cat.key}
-                    onClick={() => {
-                      if (restricted) {
-                        if (cat.key === 'SERVICES') {
-                          toast.error(lang === 'en'
-                            ? 'Services posts are for verified providers only'
-                            : lang === 'ur'
-                              ? 'خدمات کی پوسٹس صرف تصدیق شدہ خدمات فراہم کرنے والوں کیلئے'
-                              : 'هذا القسم متاح فقط لمقدمي الخدمات')
-                        } else {
-                          toast.error(lang === 'en'
-                            ? 'Admin-only category'
-                            : lang === 'ur'
-                              ? 'صرف منتظمین کیلئے'
-                              : 'هذا القسم متاح فقط للمشرفين')
-                        }
-                        return
-                      }
-                      if (cat.key === 'RIDES') { router.push('/rides/new'); return }
-                      // SERVICES tile = "offer or request". Non-providers
-                      // can only request — route them to /ask, which
-                      // creates a SERVICES + intent=REQUEST post. Providers
-                      // go to the normal composer where they can offer.
-                      if (cat.key === 'SERVICES' && !canPostServiceOffer) {
-                        router.push('/ask?category=SERVICES')
-                        return
-                      }
-                      setCategory(cat.key); setStep('content')
-                    }}
-                    // min-h-[136px] keeps every tile a comfortable
-                    // touch target (>>44px), even when description
-                    // wraps. text-start so Arabic + English read
-                    // naturally per dir.
-                    className={`relative flex flex-col gap-1 text-start p-3.5 rounded-2xl border-2 min-h-[136px] active:scale-[0.97] transition-transform shadow-sm focus:outline-none focus-visible:outline-none ${
-                      restricted
-                        ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 opacity-50'
-                        : cat.important
-                          ? 'border-amber-300 dark:border-amber-500/60 bg-amber-50 dark:bg-amber-900/20'
-                          : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
-                    }`}
-                    aria-disabled={restricted}
-                    aria-label={labelOf(cat)}
-                  >
-                    <span className="text-3xl leading-none mb-1" aria-hidden>{cat.icon}</span>
-                    <span className="text-[15px] font-bold text-gray-900 dark:text-white leading-tight">
-                      {labelOf(cat)}
-                    </span>
-                    <span className="text-[12px] text-gray-700 dark:text-gray-300 leading-tight">
-                      {lang === 'en' ? cat.descEn : cat.desc}
-                    </span>
-                    <span className="text-[11px] text-gray-400 dark:text-gray-500 leading-tight mt-auto pt-1">
-                      {lang === 'en' ? cat.exampleEn : cat.example}
-                    </span>
-                  </button>
+                  <section key={group.key} className="space-y-2.5">
+                    <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-gray-400 dark:text-gray-500 px-1">
+                      {groupLabel}
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {items.map((cat) => {
+                        const restricted = isCategoryRestricted(cat.key)
+                        return (
+                          <button
+                            key={cat.key}
+                            onClick={() => {
+                              if (restricted) {
+                                if (cat.key === 'SERVICES') {
+                                  toast.error(lang === 'en'
+                                    ? 'Services posts are for verified providers only'
+                                    : lang === 'ur'
+                                      ? 'خدمات کی پوسٹس صرف تصدیق شدہ خدمات فراہم کرنے والوں کیلئے'
+                                      : 'هذا القسم متاح فقط لمقدمي الخدمات')
+                                } else {
+                                  toast.error(lang === 'en'
+                                    ? 'Admin-only category'
+                                    : lang === 'ur'
+                                      ? 'صرف منتظمین کیلئے'
+                                      : 'هذا القسم متاح فقط للمشرفين')
+                                }
+                                return
+                              }
+                              if (cat.key === 'RIDES') { router.push('/rides/new'); return }
+                              // SERVICES tile = "offer or request".
+                              // Non-providers can only request — route them
+                              // to /ask which creates SERVICES + intent=REQUEST.
+                              // Providers go to the normal composer where
+                              // intent=OFFER is allowed.
+                              if (cat.key === 'SERVICES' && !canPostServiceOffer) {
+                                router.push('/ask?category=SERVICES')
+                                return
+                              }
+                              setCategory(cat.key); setStep('content')
+                            }}
+                            // min-h-[136px] keeps every tile a comfortable
+                            // touch target (>>44px), even when description
+                            // wraps. text-start so Arabic + English read
+                            // naturally per dir.
+                            className={`relative flex flex-col gap-1 text-start p-3.5 rounded-2xl border-2 min-h-[136px] active:scale-[0.97] transition-transform shadow-sm focus:outline-none focus-visible:outline-none ${
+                              restricted
+                                ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 opacity-50'
+                                : cat.important
+                                  ? 'border-amber-300 dark:border-amber-500/60 bg-amber-50 dark:bg-amber-900/20'
+                                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                            }`}
+                            aria-disabled={restricted}
+                            aria-label={labelOf(cat)}
+                          >
+                            <span className="text-3xl leading-none mb-1" aria-hidden>{cat.icon}</span>
+                            <span className="text-[15px] font-bold text-gray-900 dark:text-white leading-tight">
+                              {labelOf(cat)}
+                            </span>
+                            <span className="text-[12px] text-gray-700 dark:text-gray-300 leading-tight">
+                              {lang === 'en' ? cat.descEn : cat.desc}
+                            </span>
+                            <span className="text-[11px] text-gray-400 dark:text-gray-500 leading-tight mt-auto pt-1">
+                              {lang === 'en' ? cat.exampleEn : cat.example}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </section>
                 )
               })}
             </div>
