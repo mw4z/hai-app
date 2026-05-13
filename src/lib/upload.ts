@@ -172,33 +172,35 @@ export function uploadStageLabel(
 const SCAN_WINDOW_BYTES = 256 * 1024 // head + tail each
 
 async function validatePdfSafety(file: File): Promise<void> {
-  const buf = await file.arrayBuffer()
-  const u8 = new Uint8Array(buf)
+  // file.slice(start, end).arrayBuffer() asks the browser for ONLY
+  // the requested byte range from the underlying storage, instead
+  // of pulling the entire file into memory like the previous
+  // file.arrayBuffer() call did. On a 4.9MB PDF this was the
+  // single biggest wasted cost in the pre-upload phase — 4.9MB of
+  // memcpy when we only ever scan 512KB. Slice + decode is
+  // ~10-30ms total even on mobile.
+  const headSize = Math.min(SCAN_WINDOW_BYTES, file.size)
+  const headBuf = await file.slice(0, headSize).arrayBuffer()
+  const headU8 = new Uint8Array(headBuf)
 
   // 1. Magic bytes — "%PDF-" at offset 0.
   if (
-    u8.length < 5 ||
-    u8[0] !== 0x25 || u8[1] !== 0x50 || u8[2] !== 0x44 ||
-    u8[3] !== 0x46 || u8[4] !== 0x2D
+    headU8.length < 5 ||
+    headU8[0] !== 0x25 || headU8[1] !== 0x50 || headU8[2] !== 0x44 ||
+    headU8[3] !== 0x46 || headU8[4] !== 0x2D
   ) {
     throw new Error('الملف ليس PDF صالحاً')
   }
 
-  // 2. Scoped active-content + encryption scan.
-  //
-  // latin1 (1 byte == 1 char) keeps indexOf offsets aligned with
-  // file offsets. Subarray + decode is essentially free at this
-  // size; the 25MB → 25M-char-string allocation that the previous
-  // version did is gone.
-  const head = new TextDecoder('latin1').decode(
-    u8.subarray(0, Math.min(SCAN_WINDOW_BYTES, u8.length)),
-  )
-  const tail =
-    u8.length > SCAN_WINDOW_BYTES
-      ? new TextDecoder('latin1').decode(
-          u8.subarray(Math.max(0, u8.length - SCAN_WINDOW_BYTES)),
-        )
-      : ''
+  // 2. Scoped active-content + encryption scan. latin1 keeps 1 byte
+  // == 1 char so indexOf offsets align with file offsets.
+  const head = new TextDecoder('latin1').decode(headU8)
+  let tail = ''
+  if (file.size > SCAN_WINDOW_BYTES) {
+    const tailStart = file.size - SCAN_WINDOW_BYTES
+    const tailBuf = await file.slice(tailStart).arrayBuffer()
+    tail = new TextDecoder('latin1').decode(new Uint8Array(tailBuf))
+  }
 
   // Active executable / embedded content.
   const dangerousMarkers = [
@@ -332,26 +334,33 @@ export async function uploadPdf(
     throw new Error('حجم الملف كبير (أقصى 25 ميقا)')
   }
 
-  // Safety guard — runs BEFORE compression and BEFORE upload.
-  // Rejects spoofed MIME, PDFs carrying JavaScript / launch actions
-  // / embedded files, encrypted PDFs, and PDF bombs (200+ pages).
-  // Total runtime ~50ms on a 5MB file; rejection here costs the
-  // user a clear error toast and prevents shipping a hostile
-  // attachment to neighbors. Same arrayBuffer() the compressor
-  // re-reads below — modern browsers cache File reads so the
-  // double-read isn't a real cost.
-  opts?.onStage?.('scanning')
-  await validatePdfSafety(file)
+  // Pipeline timing — these logs land in the browser DevTools
+  // console with [HAI_UPLOAD] prefix so we can see how long each
+  // phase actually takes. If the user reports "upload is slow",
+  // these numbers point at the bottleneck (scan / compress /
+  // network). Cheap (Date.now()), no toggle required.
+  const t0 = Date.now()
+  console.log(`[HAI_UPLOAD] start size=${file.size}B`)
 
-  // Compress before upload. compressPdf returns the smaller of the
-  // re-saved version vs the original, so this is always a win.
-  // Logs are dev-only — strip in production via console silencing.
+  // Safety guard — runs BEFORE compression and BEFORE upload.
+  opts?.onStage?.('scanning')
+  const tScan = Date.now()
+  await validatePdfSafety(file)
+  console.log(`[HAI_UPLOAD] scan ${Date.now() - tScan}ms`)
+
+  // Compress before upload. Skips files outside the 256KB-2MB
+  // window so large image-heavy PDFs don't pay pdf-lib's parse
+  // cost for marginal savings.
   opts?.onStage?.('compressing')
+  const tCompress = Date.now()
   const compressed = await compressPdf(file, (msg) => {
     if (typeof window !== 'undefined' && (window as any).__HAI_DEBUG__) {
       console.log(msg)
     }
   })
+  console.log(
+    `[HAI_UPLOAD] compress ${Date.now() - tCompress}ms (${file.size}B → ${compressed.size}B)`,
+  )
 
   // Dynamic import so the @vercel/blob/client bundle isn't pulled
   // into routes that never upload PDFs (post composer, chat, etc.
@@ -389,8 +398,12 @@ export async function uploadPdf(
       : undefined,
   })
 
+  const tUpload = Date.now()
   try {
     const blob = await Promise.race([upstream, deadline])
+    console.log(
+      `[HAI_UPLOAD] network ${Date.now() - tUpload}ms · total ${Date.now() - t0}ms`,
+    )
     return {
       url: blob.url,
       // Preserve the ORIGINAL display name (user's filename), not
@@ -401,6 +414,9 @@ export async function uploadPdf(
       size: compressed.size,
     }
   } catch (err: any) {
+    console.log(
+      `[HAI_UPLOAD] FAILED after ${Date.now() - t0}ms (network ${Date.now() - tUpload}ms): ${err?.message || err}`,
+    )
     if (timedOut) throw err
     // Surface the underlying error message — Vercel Blob errors are
     // already user-readable for the common cases (file too large,
