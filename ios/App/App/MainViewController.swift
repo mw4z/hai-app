@@ -60,6 +60,24 @@ class MainViewController: CAPBridgeViewController {
             webView.scrollView.alwaysBounceVertical = true
             webView.scrollView.alwaysBounceHorizontal = false
             webView.scrollView.bouncesZoom = false
+
+            // Native iOS edge-swipe back/forward. WKWebView uses the
+            // exact same gesture recognizer Safari does: the page
+            // tracks the finger 1:1 from the left edge, a snapshot of
+            // the previous page slides in underneath, rubber-bands
+            // back if you let go before the midpoint, commits the
+            // history navigation with native spring physics if you
+            // pass it. Capacitor leaves this off by default — turning
+            // it on is the single switch that gives every back-stack
+            // page (post detail → feed, profile → list, thread →
+            // inbox, etc.) the proper iOS feel without any JS code.
+            //
+            // Doesn't conflict with horizontal pans inside the app
+            // because the recognizer only arms within ~20pt of the
+            // left screen edge; the lightbox swipe-to-dismiss and
+            // chat horizontal gestures all start well past that
+            // strip, so they keep working unchanged.
+            webView.allowsBackForwardNavigationGestures = true
         }
 
         startPathMonitor()
