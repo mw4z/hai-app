@@ -483,6 +483,52 @@ export default function ChatClient({
     bottomRef.current?.scrollIntoView({ block: 'end' })
   }, [messages.length])
 
+  // Mount-only re-scroll pass. The single useEffect above lands on
+  // whatever the bottom is at first paint, but several things keep
+  // shifting it AFTER that paint:
+  //
+  //  - PdfTile bubbles render synchronously but the emoji + label
+  //    glyphs settle on the next frame, so the bubble grows by a
+  //    few px after first paint.
+  //  - refreshOnce() merges server data into the (possibly cached)
+  //    messages list. Same length → the length-dep useEffect above
+  //    doesn't refire, but bubble content may have changed (e.g.,
+  //    a pending PDF placeholder swapped for the real msg, gaining
+  //    a real pdfUrl, etc.).
+  //  - Font-face swap (Arabic + Latin) reflows text widths.
+  //
+  // The ResizeObserver further down catches some of this BUT only
+  // when the user is already within 600 px of the bottom — on a
+  // tall chat the initial scrollIntoView may not get us close
+  // enough on its first run, leaving the user a screen above the
+  // real bottom. This effect snaps directly to scrollHeight at a
+  // few intervals so we definitely land on the latest message.
+  useEffect(() => {
+    if (unreadDividerId) return // don't override the unread-divider landing
+    const snap = () => {
+      const ms = messagesRef.current
+      if (!ms) return
+      ms.scrollTop = ms.scrollHeight
+    }
+    snap()
+    const r = requestAnimationFrame(snap)
+    const timers = [
+      setTimeout(snap, 80),
+      setTimeout(snap, 250),
+      setTimeout(snap, 600),
+      setTimeout(snap, 1200),
+    ]
+    return () => {
+      cancelAnimationFrame(r)
+      timers.forEach(clearTimeout)
+    }
+  // Run once on mount; we deliberately don't add deps so it doesn't
+  // refire when a new message arrives (the length-dep useEffect
+  // above plus the per-message onLoad handlers cover that path
+  // with the user's scroll position respected).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Stick to bottom while content settles after first paint.
   //
   // The single scrollIntoView above lands on whatever the bottom is
