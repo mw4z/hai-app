@@ -169,10 +169,21 @@ function shuffle<T>(arr: T[]): T[] {
 async function getOrCreateSeedUser(neighborhoodId: string, personaIndex: number): Promise<string> {
   const persona = SEED_PERSONAS[personaIndex % SEED_PERSONAS.length]
 
-  let user = await db.user.findUnique({ where: { phone: persona.phone } })
+  // Explicit `select` everywhere we touch User so Prisma doesn't pull
+  // every scalar column. Without this, a schema-ahead-of-DB state (e.g.
+  // the `User.language` column added in 7578c59 before its migration
+  // landed in prod) crashes the seeder with P2022 — same pattern that
+  // broke /profile in commit 13a5b90. See project_db_migrations memory.
+  let user = await db.user.findUnique({
+    where: { phone: persona.phone },
+    select: { id: true, isSeed: true },
+  })
   if (!user) {
     try {
-      user = await db.user.create({
+      // `create` would otherwise return all scalars; pin the selection
+      // so a missing column on prod doesn't poison the INSERT's
+      // RETURNING clause.
+      const created = await db.user.create({
         data: {
           phone: persona.phone,
           name: persona.name,
@@ -180,14 +191,23 @@ async function getOrCreateSeedUser(neighborhoodId: string, personaIndex: number)
           isSeed: true,
           neighborhoodId,
         },
+        select: { id: true, isSeed: true },
       })
+      user = created
     } catch {
       // Race condition: another call created it first — just fetch it
-      user = await db.user.findUnique({ where: { phone: persona.phone } })
+      user = await db.user.findUnique({
+        where: { phone: persona.phone },
+        select: { id: true, isSeed: true },
+      })
     }
   } else if (!user.isSeed) {
     // Backfill the flag for pre-existing seed users (one-time, cheap)
-    await db.user.update({ where: { id: user.id }, data: { isSeed: true } })
+    await db.user.update({
+      where: { id: user.id },
+      data: { isSeed: true },
+      select: { id: true },
+    })
   }
   return user!.id
 }
@@ -255,10 +275,16 @@ async function insertSeedPosts(
     })
     // createPost defaults createdAt to now; backdate the row to match
     // our spread-out timestamps, plus stamp the seed flag the API path
-    // doesn't set.
+    // doesn't set. AND flip status from the default PENDING_AI →
+    // ACTIVE so the seeded posts actually appear in the feed — the
+    // server-side feed query filters status IN ('ACTIVE','IN_PROGRESS')
+    // and we have no AI moderation queue in this code path. Explicit
+    // `select` so a future Post-column migration drift doesn't crash
+    // the seeder via the RETURNING clause.
     await db.post.update({
       where: { id: post.id },
-      data: { isSeed: true, createdAt: timestamps[i] },
+      data: { isSeed: true, status: 'ACTIVE', createdAt: timestamps[i] },
+      select: { id: true },
     })
     created++
   }
