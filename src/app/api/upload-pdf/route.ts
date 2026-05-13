@@ -17,19 +17,26 @@ import { getSession } from '@/lib/auth'
  *     surfaced via the pathname so the client can display
  *     "user-uploaded-doc.pdf" instead of a random uuid.
  *
- * The flow:
- *  - Client calls `upload(pathname, file, { handleUploadUrl: '/api/upload-pdf' })`
- *  - That helper hits this route with a `type:'blob.generate-client-token'`
- *    body. We check the session here and respond with the upload token
- *    plus content-type/size restrictions baked in.
- *  - Vercel Blob streams the file directly from the browser to its
- *    storage edge — the Next.js function never sees the body bytes.
- *  - When the upload finishes the helper hits this route again with
- *    `type:'blob.upload-completed'`. We log it and return ok.
+ * The flow has TWO different call shapes hitting this same route:
  *
- * Auth: getSession() is checked on BOTH the token-generation step and
- * the upload-completed callback. A missing session denies the upload
- * before Vercel Blob ever sees the request.
+ *  A. body.type === 'blob.generate-client-token'
+ *     Client browser asks for an upload token. We're talking to the
+ *     end user → check the user's session cookies and reject if
+ *     missing.
+ *
+ *  B. body.type === 'blob.upload-completed'
+ *     Vercel Blob's server-to-server webhook tells us the upload
+ *     finished. NO user cookies on this request — Vercel auths via
+ *     its own signed Authorization header that handleUpload
+ *     validates internally against BLOB_READ_WRITE_TOKEN.
+ *
+ * Doing a session check at the TOP of this route was the bug behind
+ * "upload takes much time till timeout": case B 401'd, the webhook
+ * was treated as failed, and the client's await upload() never
+ * resolved (it was waiting for the server-side confirmation). The
+ * fix is to move the user-session check INSIDE onBeforeGenerateToken,
+ * which only runs on case A. handleUpload's internal token validation
+ * handles case B.
  */
 export const maxDuration = 30
 
@@ -37,11 +44,6 @@ const MAX_BYTES = 25 * 1024 * 1024 // 25MB
 const ALLOWED = ['application/pdf']
 
 export async function POST(req: NextRequest) {
-  const session = await getSession()
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   const body = (await req.json()) as HandleUploadBody
 
   try {
@@ -49,6 +51,17 @@ export async function POST(req: NextRequest) {
       body,
       request: req,
       onBeforeGenerateToken: async (pathname) => {
+        // User auth lives HERE, not at the route top. This callback
+        // only fires for the token-generation step (case A above) —
+        // the upload-completed webhook (case B) skips it and goes
+        // straight to onUploadCompleted with handleUpload's own
+        // signature validation. Throwing rejects the token request
+        // with the underlying error surfaced to the client; the
+        // catch block at the bottom turns it into a 400.
+        const session = await getSession()
+        if (!session) {
+          throw new Error('Unauthorized')
+        }
         return {
           allowedContentTypes: ALLOWED,
           maximumSizeInBytes: MAX_BYTES,
@@ -61,6 +74,10 @@ export async function POST(req: NextRequest) {
         }
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => {
+        // Server-to-server callback from Vercel Blob. No user auth
+        // here — handleUpload already validated the request via
+        // BLOB_READ_WRITE_TOKEN before this fires.
+        //
         // No DB write here — the post / comment / message that's
         // about to be created will reference blob.url. This callback
         // exists so Vercel knows we acknowledged the upload (and so
