@@ -184,7 +184,7 @@ export default function ChatClient({
     try {
       // Strip volatile/local-only fields that shouldn't outlive the session
       const serializable = messages.map((m: any) => {
-        const { localPreview, pending, ...rest } = m
+        const { localPreview, pending, percent, ...rest } = m
         return rest
       })
       localStorage.setItem(
@@ -727,10 +727,18 @@ export default function ChatClient({
   }
 
   /**
-   * PDF attachment in chat. Same shape as sendImage but uploads via
+   * PDF attachment in chat. Same shape as sendImages but uploads via
    * the client-direct path (Vercel Blob token + browser → blob),
    * which is necessary because messages allow up to 25MB documents
    * — well past the 4.5MB function body cap.
+   *
+   * Optimistic UX (matches the IMAGE flow): we insert a pending
+   * placeholder bubble into the messages list the moment the user
+   * picks the file, so the upload feels alive instead of silent.
+   * The bubble carries `pending: true` plus the live `percent` so
+   * the render path can show a progress overlay; when the upload
+   * resolves we replace the placeholder with the real server msg.
+   * On failure we drop the placeholder and toast the error.
    */
   async function sendPdf(file: File) {
     if (sendingImage) return // reuse the existing "uploading" lock
@@ -739,8 +747,48 @@ export default function ChatClient({
     const replyId = replyingTo?.id || null
     setReplyingTo(null)
     setSendingImage(true)
+
+    // Optimistic placeholder. Uses tempId so the React key stays the
+    // same when we swap in the real server message (matches the
+    // image-send pattern).
+    const tempId = `pending-pdf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const placeholder: any = {
+      id: tempId,
+      tempId,
+      type: 'PDF',
+      text: null,
+      lat: null,
+      lng: null,
+      imageUrl: null,
+      pdfUrl: null,
+      pdfName: file.name,
+      senderId: currentUserId,
+      createdAt: new Date().toISOString(),
+      readAt: null,
+      replyToId: replyId,
+      replyTo: null,
+      pending: true,
+      // Carries the live upload percent so the render path's
+      // overlay can tick — pulled out in the JSX via `(msg as any).percent`.
+      percent: 0,
+    }
+    setMessages((prev) => [...prev, placeholder])
+    requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }))
+
     try {
-      const result = await uploadPdf(file)
+      const result = await uploadPdf(file, {
+        onProgress: (percent) => {
+          // Update the placeholder's percent in place so the overlay
+          // re-renders without disturbing scroll. Only touch the
+          // pending placeholder — if the upload finished mid-tick
+          // and the message has already been swapped, skip.
+          setMessages((prev) =>
+            prev.map((m: any) =>
+              m.id === tempId && m.pending ? { ...m, percent } : m,
+            ),
+          )
+        },
+      })
       const res = await fetch(`/api/threads/${threadId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -751,9 +799,23 @@ export default function ChatClient({
           replyToId: replyId,
         }),
       })
-      if (res.ok) { const msg = await res.json(); setMessages(prev => [...prev, msg]) }
-      else { await showApiError(res, lang as 'ar' | 'en' | 'ur') }
+      if (res.ok) {
+        const msg = await res.json()
+        // Swap placeholder → real, dedup against any poll-race
+        // duplicate the 3s poll might have inserted by id.
+        setMessages((prev: any[]) => {
+          return prev
+            .map((m) => (m.id === tempId ? { ...msg, tempId } : m))
+            .filter((m, idx, arr) =>
+              m.id !== msg.id || arr.findIndex((x) => x.id === msg.id) === idx,
+            )
+        })
+      } else {
+        setMessages((prev) => prev.filter((m: any) => m.id !== tempId))
+        await showApiError(res, lang as 'ar' | 'en' | 'ur')
+      }
     } catch (err: any) {
+      setMessages((prev) => prev.filter((m: any) => m.id !== tempId))
       toast.error(err?.message || t('common_error'))
     } finally {
       setSendingImage(false)
@@ -1887,23 +1949,53 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
         // Android tablet users were reporting).
         className={`flex flex-col ${isMe ? 'ltr:items-end rtl:items-start' : 'ltr:items-start rtl:items-end'} ${isLastInGroup ? 'mb-2' : 'mb-[3px]'} ${isFirstInGroup && !showDate ? 'mt-3' : ''}`}
       >
-        {msg.type === 'PDF' && msg.pdfUrl ? (
+        {msg.type === 'PDF' && (msg.pdfUrl || (msg as any).pending) ? (
           // PDF bubble — same width budget as image messages so it
-          // doesn't visually balloon. Renders the shared PdfTile in
-          // 'message' variant which uses a translucent overlay so it
-          // looks at home inside the bubble's chat background.
-          <div className={`max-w-[85%]`} data-msg-id={msg.id} {...longPress}>
-            {replyQuote && <div className="mb-1">{replyQuote}</div>}
-            <div className={`rounded-2xl px-2.5 py-2 shadow-sm ${
-              isMe ? `bg-primary-600 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white dark:bg-[#242625] ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
-            }`}>
-              <PdfTile url={msg.pdfUrl} name={msg.pdfName} variant="message" />
-            </div>
-            <p className={`text-[10px] mt-1 px-1 flex items-center gap-0.5 ${isMe ? 'text-gray-400 justify-start' : 'text-gray-400 justify-end'}`}>
-              {timeStr}
-              <MsgStatus msg={msg} isMe={isMe} />
-            </p>
-          </div>
+          // doesn't visually balloon. While the upload is in flight
+          // (pending=true, no pdfUrl yet), we render an "Uploading…"
+          // overlay with the live percent on top of the placeholder
+          // tile so the user can see something is happening — same
+          // pattern as image bubbles, just adapted for the document
+          // tile (no thumbnail to dim, so we use a translucent
+          // overlay row beneath the tile).
+          (() => {
+            const pending = !!(msg as any).pending
+            const percent = (msg as any).percent ?? 0
+            // Placeholder URL is a no-op '#' so PdfTile renders the
+            // same shape (icon + name + sublabel) without navigating
+            // on tap during upload.
+            const safeUrl = msg.pdfUrl || '#'
+            return (
+              <div className={`max-w-[85%]`} data-msg-id={msg.id} {...longPress}>
+                {replyQuote && <div className="mb-1">{replyQuote}</div>}
+                <div className={`relative rounded-2xl px-2.5 py-2 shadow-sm ${
+                  isMe ? `bg-primary-600 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white dark:bg-[#242625] ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
+                } ${pending ? 'opacity-90' : ''}`}>
+                  <PdfTile url={safeUrl} name={msg.pdfName} variant="message" />
+                  {pending && (
+                    <div className="mt-1.5 px-1 pb-0.5">
+                      <div className="flex items-center justify-between mb-0.5 text-[10px] text-white/80">
+                        <span>
+                          {lang === 'en' ? 'Uploading…' : lang === 'ur' ? 'اپ لوڈ ہو رہا ہے…' : 'جاري الرفع…'}
+                        </span>
+                        <span className="font-medium tabular-nums">{percent}%</span>
+                      </div>
+                      <div className="h-0.5 w-full bg-white/20 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-white/80 transition-all duration-300"
+                          style={{ width: `${Math.max(2, Math.min(100, percent))}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <p className={`text-[10px] mt-1 px-1 flex items-center gap-0.5 ${isMe ? 'text-gray-400 justify-start' : 'text-gray-400 justify-end'}`}>
+                  {timeStr}
+                  <MsgStatus msg={msg} isMe={isMe} />
+                </p>
+              </div>
+            )
+          })()
         ) : msg.type === 'IMAGE' && (msg.imageUrl || (msg as any).localPreview) ? (
           <div className={`max-w-[85%]`} data-msg-id={msg.id} {...longPress}>
             {replyQuote && <div className="mb-1">{replyQuote}</div>}
