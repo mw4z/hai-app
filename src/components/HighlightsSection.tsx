@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { useConfirm } from '@/components/ConfirmProvider'
 import { FiX, FiStar, FiHeart, FiMessageSquare, FiClock } from 'react-icons/fi'
 import type { TranslationKey } from '@/lib/i18n'
 
@@ -89,6 +90,7 @@ interface Props {
 
 export default function HighlightsSection({ items, autoOpenForFirstTime = true }: Props) {
   const { t, lang } = useLanguage()
+  const confirmDialog = useConfirm()
   const [open, setOpen] = useState(false)
   // Hydrate after mount — SSR can't read localStorage, and starting
   // null keeps server/first-client markup identical (no hydration
@@ -116,18 +118,29 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
   if (items.length === 0) return null
   if (barHiddenAt !== null) return null
 
-  function hideBar() {
-    // Native confirm — on Capacitor WebView this renders as the
-    // platform's actual UIAlertController (iOS) / AlertDialog
-    // (Android), which is what the user asked for. Synchronous and
-    // trilingual via the passed string.
-    const msg =
-      lang === 'en'
-        ? 'Hide highlights for a week?'
-        : lang === 'ur'
-          ? 'ایک ہفتے کیلئے ہائی لائٹس چھپائیں؟'
-          : 'إخفاء "المهم" لمدة أسبوع؟'
-    if (typeof window !== 'undefined' && !window.confirm(msg)) return
+  async function hideBar() {
+    // App-styled confirm via the project's ConfirmProvider (same
+    // surface BottomNav, AdminClient, etc. use). Stays inside the
+    // Hai design language — no OS-level dialog.
+    const ok = await confirmDialog({
+      title:
+        lang === 'en' ? 'Hide highlights?'
+        : lang === 'ur' ? 'ہائی لائٹس چھپائیں؟'
+        : 'إخفاء "المهم"؟',
+      message:
+        lang === 'en' ? 'Hide this section for a week. It will come back on its own after that.'
+        : lang === 'ur' ? 'یہ سیکشن ایک ہفتے کیلئے چھپ جائے گا، پھر خود واپس آ جائے گا۔'
+        : 'سيتم إخفاء هذا القسم لمدة أسبوع، وسيعود تلقائياً بعد ذلك.',
+      confirmText:
+        lang === 'en' ? 'Hide'
+        : lang === 'ur' ? 'چھپائیں'
+        : 'إخفاء',
+      cancelText:
+        lang === 'en' ? 'Cancel'
+        : lang === 'ur' ? 'منسوخ'
+        : 'إلغاء',
+    })
+    if (!ok) return
     const now = Date.now()
     writeBarHiddenAt(now)
     setBarHiddenAt(now)
