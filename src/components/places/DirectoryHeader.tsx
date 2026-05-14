@@ -42,7 +42,14 @@ export default function DirectoryHeader({ title, backHref }: Props) {
         className="fixed top-0 left-0 right-0 z-30 pointer-events-none bg-gray-50 dark:bg-gray-900"
         style={{ height: 'env(safe-area-inset-top, 0px)' }}
       />
-      <header className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur border-b border-gray-200/60 dark:border-gray-700/60">
+      {/* Header is fully opaque (no /95 + backdrop-blur). The
+          translucent + blur combo was producing a visibly darker
+          tone than the surrounding solid bg-gray-900, so the
+          header bar read as a separate, darker band on dark mode
+          even though both targeted the same color. Pinning to a
+          solid bg-gray-50 / bg-gray-900 guarantees the header
+          matches the page bg edge-to-edge. */}
+      <header className="sticky top-0 z-30 bg-gray-50 dark:bg-gray-900 border-b border-gray-200/60 dark:border-gray-700/60">
         <div className="max-w-[760px] mx-auto px-3 py-2.5 flex items-center gap-2">
           <button
             type="button"
