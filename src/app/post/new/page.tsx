@@ -863,6 +863,12 @@ export default function NewPostPage() {
       }
 
       clearDraft()
+      // Meaningful-action trigger for the notification nudge.
+      try {
+        window.dispatchEvent(new Event('hai:nudge-trigger'))
+      } catch {
+        // ignore
+      }
       sessionStorage.setItem('hai_feed_refresh', '1')
       router.push('/feed')
     } catch {

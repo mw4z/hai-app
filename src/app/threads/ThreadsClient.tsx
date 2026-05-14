@@ -85,6 +85,17 @@ export default function ThreadsClient({
   const router = useRouter()
   const [threads, setThreads] = useState(initialThreads)
 
+  // Opening the threads list is a meaningful moment for the
+  // notification-permission nudge — engaging with messages
+  // implies the user cares about notifications.
+  useEffect(() => {
+    try {
+      window.dispatchEvent(new Event('hai:nudge-trigger'))
+    } catch {
+      // ignore
+    }
+  }, [])
+
   useEffect(() => {
     async function refresh() {
       try {

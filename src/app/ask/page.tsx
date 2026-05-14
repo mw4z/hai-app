@@ -416,6 +416,14 @@ export default function AskNeighborsPage() {
         : lang === 'ur' ? 'پڑوسیوں کو بھیج دیا!'
         : 'وصل سؤالك للجيران!',
       )
+      // Meaningful-action trigger for the notification nudge.
+      // All gates (mobile only, cooldown, snooze, no-overlay,
+      // permission state) are evaluated inside the listener.
+      try {
+        window.dispatchEvent(new Event('hai:nudge-trigger'))
+      } catch {
+        // ignore
+      }
       sessionStorage.setItem('hai_feed_refresh', '1')
       router.push('/feed')
     } catch {

@@ -209,6 +209,20 @@ export default function ChatClient({
   const attachContact = useAttachContact()
   const router = useRouter()
   const { isOffline } = useNetworkStatus()
+
+  // Opening a chat is a meaningful moment for the notification-
+  // permission nudge — DM replies are the most disruptive thing
+  // to miss without push enabled. All gates apply inside the
+  // listener; the nudge will only paint if the user is on
+  // native, hasn't dismissed recently, and no overlay/banner is
+  // covering the screen.
+  useEffect(() => {
+    try {
+      window.dispatchEvent(new Event('hai:nudge-trigger'))
+    } catch {
+      // ignore
+    }
+  }, [])
   const offlineMsg = () => lang === 'en'
     ? 'No internet connection. Try again when reconnected.'
     : lang === 'ur'

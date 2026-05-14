@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
@@ -57,6 +57,19 @@ export default function NotificationsClient({
 }) {
   const { t, lang } = useLanguage()
   const [notifications, setNotifications] = useState(initialNotifications)
+
+  // Opening the notifications page is a meaningful moment for
+  // the notification-permission nudge — the user is actively
+  // engaging with notifications. All gates (mobile only, cooldown,
+  // snooze, overlay/emergency, permission state) apply inside
+  // the listener.
+  useEffect(() => {
+    try {
+      window.dispatchEvent(new Event('hai:nudge-trigger'))
+    } catch {
+      // ignore
+    }
+  }, [])
 
   // Auto-refresh notifications every 5 seconds
   const refreshNotifications = useCallback(async () => {

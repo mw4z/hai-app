@@ -118,6 +118,12 @@ export default function NewRidePage() {
         return
       }
       toast.success(lang === 'en' ? 'Request published' : lang === 'ur' ? 'درخواست شائع ہو گئی' : 'تم نشر طلبك')
+      // Meaningful-action trigger for the notification nudge.
+      try {
+        window.dispatchEvent(new Event('hai:nudge-trigger'))
+      } catch {
+        // ignore
+      }
       router.push(`/rides/${data.id}`)
     } catch {
       toast.error(lang === 'en' ? 'Connection error' : lang === 'ur' ? 'رابطہ ناکام' : 'تعذر الاتصال')
