@@ -358,13 +358,24 @@ export default function PushRegistration() {
         const { PushNotifications } = await import('@capacitor/push-notifications')
         const platform = window.Capacitor?.getPlatform() || 'android'
 
-        const perm = await PushNotifications.requestPermissions()
+        // Contextual permission flow: do NOT open the OS prompt
+        // on cold start. The user must first understand the app,
+        // then opt in via NotificationPermissionNudge's primary
+        // button (which calls PushNotifications.requestPermissions
+        // itself and then re-fires the 'focus' event to drive this
+        // path on the next cycle).
+        //
+        // checkPermissions() is a read-only probe — never raises a
+        // dialog. We register only when permission is ALREADY
+        // 'granted'. Any other state ('prompt', 'denied', 'prompt-
+        // with-rationale') is left for the nudge to handle.
+        const perm = await PushNotifications.checkPermissions()
         if (perm.receive !== 'granted') {
-          console.log('[PUSH] permission not granted:', perm.receive)
-          // Reset the registered flag so a later re-attempt (after the
-          // user enables Notifications in iOS Settings and refocuses
-          // the app) can re-run init. Without this reset the flag was
-          // stuck true from attempt(), dead-locking every retry path.
+          console.log('[PUSH] permission not granted (contextual flow, not auto-prompting):', perm.receive)
+          // Reset the registered flag so a later re-attempt (after
+          // the user enables Notifications via the nudge → OS
+          // prompt or via app settings) can re-run init when the
+          // 'focus' event refires.
           registeredRef.current = false
           return
         }

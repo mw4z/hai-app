@@ -10,6 +10,7 @@ import ArrivalAlert from '@/components/ArrivalAlert'
 import CapacitorBridge from '@/components/CapacitorBridge'
 import DebugOverlay from '@/components/DebugOverlay'
 import PushRegistration from '@/components/PushRegistration'
+import NotificationPermissionNudge from '@/components/NotificationPermissionNudge'
 import SwipeBack from '@/components/SwipeBack'
 import AndroidBackButton from '@/components/AndroidBackButton'
 import NeighborhoodTravelOverlay from '@/components/NeighborhoodTravelOverlay'
@@ -187,6 +188,7 @@ export default function RootLayout({
         <CapacitorBridge />
         <DebugOverlay />
         <PushRegistration />
+        <NotificationPermissionNudge />
         <LangProvider initialLang={lang}>
           <NetworkProvider>
           <ConfirmProvider>
