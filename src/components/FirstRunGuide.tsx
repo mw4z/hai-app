@@ -178,8 +178,24 @@ export default function FirstRunGuide({ enabled = true }: Props) {
   }, [])
 
   // ── ESC + Android back close the guide (treated as "Skip").
+  //
+  //  Gated on a derived `guideOpen` boolean so the effect runs
+  //  exactly ONCE per open session — going next/back inside the
+  //  tour doesn't re-trigger setup. Without this we'd push a
+  //  fresh history sentinel on EVERY step change (4 steps = 4
+  //  ghost back-stack entries), and after the user dismisses
+  //  the tour Android back would silently eat each ghost before
+  //  reaching the real previous page — eventually exiting the
+  //  app instead of going back.
+  //
+  //  On close we actively pop the sentinel via history.back()
+  //  unless the dismissal was already triggered by a back press
+  //  (closedViaBack flag), in which case the browser has
+  //  already popped it for us.
+  const guideOpen = stepIndex >= 0
   useEffect(() => {
-    if (stepIndex < 0) return
+    if (!guideOpen) return
+    let closedViaBack = false
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.preventDefault()
@@ -187,24 +203,28 @@ export default function FirstRunGuide({ enabled = true }: Props) {
       }
     }
     window.addEventListener('keydown', onKey)
-    // Android back: history navigation. Push a sentinel and pop
-    // on a popstate so the back button collapses the guide instead
-    // of leaving the feed.
-    const sentinel = { firstRunGuide: true, ts: Date.now() }
     try {
-      window.history.pushState(sentinel, '')
+      window.history.pushState({ firstRunGuide: true, ts: Date.now() }, '')
     } catch {
       // ignore
     }
     function onPop() {
+      closedViaBack = true
       finish(false)
     }
     window.addEventListener('popstate', onPop)
     return () => {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('popstate', onPop)
+      if (!closedViaBack) {
+        try {
+          window.history.back()
+        } catch {
+          // ignore
+        }
+      }
     }
-  }, [stepIndex, finish])
+  }, [guideOpen, finish])
 
   // ── Recompute target rect on step change + on resize / scroll.
   useEffect(() => {
