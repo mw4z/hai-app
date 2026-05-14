@@ -2,12 +2,14 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import type { PlaceCategory, PlaceReportType } from '@prisma/client'
 import { useLanguage } from '@/hooks/useLanguage'
 import { getCategoryMeta } from '@/lib/places/categories'
 import type { ModPlace } from '@/lib/places/serialize'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
+import { buildWhatsAppHref } from '@/lib/phone'
 
 interface PendingClaim {
   id: string
@@ -119,6 +121,7 @@ function Empty({ label }: { label: string }) {
 
 function PlaceRow({ place, onResolve }: { place: ModPlace; onResolve: (id: string) => void }) {
   const { lang } = useLanguage()
+  const router = useRouter()
   const tr = (en: string, ar: string, ur: string) => (lang === 'en' ? en : lang === 'ur' ? ur : ar)
   const cat = getCategoryMeta(place.category)
   const [busy, setBusy] = useState(false)
@@ -136,20 +139,26 @@ function PlaceRow({ place, onResolve }: { place: ModPlace; onResolve: (id: strin
       if (!res.ok) { toast.error(d?.error || 'فشل'); return }
       toast.success(path === 'approve' ? tr('Approved', 'تمت الموافقة', 'منظور') : tr('Rejected', 'تم الرفض', 'مسترد'))
       onResolve(place.id)
+      // Refresh the parent /mod page's SSR data so the directory
+      // pill badge count decrements and any cached lists reflect
+      // the new status without a manual reload.
+      router.refresh()
     } finally { setBusy(false) }
   }
 
+  const whatsappHref = buildWhatsAppHref(place.whatsapp)
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-3.5 space-y-2">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-3.5 space-y-3">
+      {/* Title row */}
       <div className="flex items-start gap-3">
-        <span className="text-2xl">{cat.emoji}</span>
+        <span className="text-2xl flex-shrink-0">{cat.emoji}</span>
         <div className="flex-1 min-w-0">
           <Link href={`/directory/${place.id}`} className="text-sm font-bold text-gray-900 dark:text-white hover:underline">
             {place.name}
           </Link>
-          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             {lang === 'en' ? cat.labelEn : cat.labelAr}
-            {place.addressText ? ` · ${place.addressText}` : ''}
           </p>
           {place.createdByUser && (
             <p className="text-[11px] text-gray-400 mt-0.5">
@@ -158,7 +167,73 @@ function PlaceRow({ place, onResolve }: { place: ModPlace; onResolve: (id: strin
           )}
         </div>
       </div>
-      {place.description && <p className="text-xs text-gray-600 dark:text-gray-400">{place.description.slice(0, 200)}</p>}
+
+      {/* Full description — no slicing. Mods need to read everything
+          the user wrote to decide on approval. */}
+      {place.description && (
+        <p className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-line leading-relaxed border-s-2 border-gray-200 dark:border-gray-700 ps-2.5">
+          {place.description}
+        </p>
+      )}
+
+      {/* Submitted fields — every one the user provided, so the
+          mod can verify and contact-spot-check before approval.
+          Hidden rows just don't render to keep the row compact. */}
+      <div className="space-y-1 text-[12px]">
+        {place.addressText && (
+          <DetailLine icon="📍" label={tr('Address', 'العنوان', 'پتہ')} value={place.addressText} />
+        )}
+        {place.openingHours && (
+          <DetailLine icon="🕒" label={tr('Hours', 'الدوام', 'اوقات')} value={place.openingHours} />
+        )}
+        {place.phone && (
+          <DetailLine
+            icon="📞"
+            label={tr('Phone', 'الجوال', 'فون')}
+            value={place.phone}
+            href={`tel:${place.phone}`}
+          />
+        )}
+        {place.whatsapp && (
+          <DetailLine
+            icon="💬"
+            label={tr('WhatsApp', 'واتساب', 'واٹس ایپ')}
+            value={place.whatsapp}
+            href={whatsappHref ?? undefined}
+            external
+          />
+        )}
+        {place.website && (
+          <DetailLine
+            icon="🌐"
+            label={tr('Website', 'الموقع', 'ویب سائٹ')}
+            value={place.website}
+            href={place.website}
+            external
+            truncate
+          />
+        )}
+        {place.instagram && (
+          <DetailLine
+            icon="📷"
+            label="Instagram"
+            value={place.instagram}
+            truncate
+          />
+        )}
+        {(place.mapUrl || (place.latitude && place.longitude)) && (
+          <DetailLine
+            icon="🗺️"
+            label={tr('Map', 'الخريطة', 'نقشہ')}
+            value={place.mapUrl || `${place.latitude}, ${place.longitude}`}
+            href={place.mapUrl || `https://maps.google.com/?q=${place.latitude},${place.longitude}`}
+            external
+            truncate
+          />
+        )}
+      </div>
+
+      {/* Action buttons */}
       <div className="flex gap-2 pt-1">
         <button
           onClick={() => act('approve', { confidence: 'verified' })}
@@ -189,8 +264,56 @@ function PlaceRow({ place, onResolve }: { place: ModPlace; onResolve: (id: strin
   )
 }
 
+/** Tiny row for a single submitted-field in the mod review card.
+ *  Optional href makes it tappable (call / wa / map). truncate=true
+ *  caps long URLs so they don't blow out the row. */
+function DetailLine({
+  icon,
+  label,
+  value,
+  href,
+  external = false,
+  truncate = false,
+}: {
+  icon: string
+  label: string
+  value: string
+  href?: string
+  external?: boolean
+  truncate?: boolean
+}) {
+  const content = (
+    <span className={`text-gray-700 dark:text-gray-300 ${truncate ? 'truncate' : ''}`} dir={external ? 'ltr' : undefined}>
+      {value}
+    </span>
+  )
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <span className="text-xs flex-shrink-0" aria-hidden>{icon}</span>
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 flex-shrink-0">
+        {label}
+      </span>
+      <span className={`flex-1 min-w-0 ${truncate ? 'truncate' : ''}`}>
+        {href ? (
+          <a
+            href={href}
+            target={external ? '_blank' : undefined}
+            rel={external ? 'noopener noreferrer' : undefined}
+            className="text-primary-600 dark:text-primary-400 hover:underline"
+          >
+            {content}
+          </a>
+        ) : (
+          content
+        )}
+      </span>
+    </div>
+  )
+}
+
 function ClaimRow({ claim, onResolve }: { claim: PendingClaim; onResolve: (id: string) => void }) {
   const { lang } = useLanguage()
+  const router = useRouter()
   const tr = (en: string, ar: string, ur: string) => (lang === 'en' ? en : lang === 'ur' ? ur : ar)
   const cat = getCategoryMeta(claim.place.category)
   const [busy, setBusy] = useState(false)
@@ -208,6 +331,9 @@ function ClaimRow({ claim, onResolve }: { claim: PendingClaim; onResolve: (id: s
       if (!res.ok) { toast.error(d?.error || 'فشل'); return }
       toast.success(path === 'approve' ? tr('Approved', 'تمت الموافقة', 'منظور') : tr('Rejected', 'تم الرفض', 'مسترد'))
       onResolve(claim.id)
+      // Same as PlaceRow — bounce the parent /mod page's SSR data
+      // so the directory pill badge count stays accurate.
+      router.refresh()
     } finally { setBusy(false) }
   }
 

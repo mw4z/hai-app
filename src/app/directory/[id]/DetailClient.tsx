@@ -8,6 +8,7 @@ import type { PublicPlace } from '@/lib/places/serialize'
 import { getCategoryMeta } from '@/lib/places/categories'
 import PlaceStatusBadge from '@/components/places/PlaceStatusBadge'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
+import { buildWhatsAppHref } from '@/lib/phone'
 
 interface Props {
   place: PublicPlace
@@ -80,11 +81,20 @@ export default function DetailClient({ place, isOwner, isCreator }: Props) {
               📞 {tr('Call', 'اتصال', 'کال')}
             </a>
           )}
-          {place.whatsapp && (
-            <a href={`https://wa.me/${place.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/60 text-sm font-semibold text-emerald-700 dark:text-emerald-300 active:scale-95">
-              💬 {tr('WhatsApp', 'واتساب', 'واٹس ایپ')}
-            </a>
-          )}
+          {place.whatsapp && (() => {
+            // Saudi phones can arrive in many shapes (05..., 5...,
+            // +966..., 966..., 00966...). buildWhatsAppHref
+            // normalizes everything to the bare-digit international
+            // form wa.me requires. Hide the button if it can't make
+            // a valid href rather than ship a broken link.
+            const href = buildWhatsAppHref(place.whatsapp)
+            if (!href) return null
+            return (
+              <a href={href} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/60 text-sm font-semibold text-emerald-700 dark:text-emerald-300 active:scale-95">
+                💬 {tr('WhatsApp', 'واتساب', 'واٹس ایپ')}
+              </a>
+            )
+          })()}
           {(place.mapUrl || (place.latitude && place.longitude)) && (
             <a
               href={place.mapUrl || `https://maps.google.com/?q=${place.latitude},${place.longitude}`}
