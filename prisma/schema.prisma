@@ -36,6 +36,7 @@ model Neighborhood {
   emergencyAlerts        EmergencyAlert[]
   emergencyAlertRequests EmergencyAlertRequest[]
   pollRequests           PollRequest[]
+  placeListings          PlaceListing[]
   createdAt DateTime @default(now())
 }
 
@@ -170,6 +171,18 @@ model User {
   // ── Direct Poll creation stays restricted to admin roles.
   submittedPollRequests PollRequest[] @relation("PollRequestSubmitter")
   reviewedPollRequests  PollRequest[] @relation("PollRequestReviewer")
+
+  // ── Neighborhood Directory (دليل الحي) ─────────────────────────
+  // Place submissions are gated by DIRECTORY_ENABLED (server) and
+  // entry points by NEXT_PUBLIC_DIRECTORY_ENABLED (UI). createdByUser
+  // is intentionally NEVER exposed in public API responses — see
+  // src/lib/places/ for the privacy model.
+  placesCreated         PlaceListing[]      @relation("PlacesCreated")
+  placesClaimed         PlaceListing[]      @relation("PlacesClaimed")
+  placesVerified        PlaceListing[]      @relation("PlacesVerified")
+  placeClaimsSubmitted  PlaceClaimRequest[] @relation("PlaceClaimsSubmitted")
+  placeClaimsReviewed   PlaceClaimRequest[] @relation("PlaceClaimsReviewed")
+  placeReportsFiled     PlaceReport[]       @relation("PlaceReportsFiled")
 
   deletedAt        DateTime?     // soft delete — null = active, set = deleted
   createdAt        DateTime      @default(now())
@@ -1549,4 +1562,183 @@ model NotificationPreference {
 
   @@unique([userId, category])
   @@index([userId])
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NEIGHBORHOOD DIRECTORY — دليل الحي
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Persistent directory of fixed local places (pharmacy, supermarket,
+// car wash, etc.). Distinct from Services / Marketplace / Home
+// Businesses, which model PEOPLE / accounts. A PlaceListing models
+// a PLACE. The two are connected through an optional
+// claimedByUserId — a User may claim/manage a PlaceListing, and a
+// claimed user's ServiceItems can be rendered on the place detail.
+//
+// MVP behavior:
+//  - Submissions land in PENDING until a NEIGHBORHOOD_MOD / admin
+//    reviews them (or VISIBLE_UNVERIFIED if the neighborhood has
+//    no active mods — handled at the API layer, not the schema).
+//  - imageUrls is stored but NEVER written by API in MVP. Reserved
+//    for Phase 1.5 image-upload wiring.
+//  - createdByUser is NEVER exposed in public API responses.
+//  - COMMUNITY_VERIFIED is intentionally NOT in this enum; reserved
+//    for Phase 1.5 alongside the PlaceConfirmation model.
+
+enum PlaceCategory {
+  RESTAURANT_CAFE
+  PHARMACY
+  SUPERMARKET
+  CAR_WASH
+  LAUNDRY
+  CLINIC
+  SCHOOL_KINDERGARTEN
+  QURAN_CIRCLE
+  GAS_STATION
+  SHOP_SERVICES
+  GYM_CENTER
+  SALON
+  OTHER
+}
+
+enum PlaceStatus {
+  PENDING               // submitted, awaiting mod review
+  VISIBLE_UNVERIFIED    // visible publicly but flagged "غير مؤكد"
+  MOD_VERIFIED          // mod-confirmed accuracy
+  CLAIMED_BY_OWNER      // owner verified via PlaceClaimRequest
+  REJECTED              // mod rejected submission with reason
+  REMOVED               // mod-removed a previously-visible place
+}
+
+enum PlaceClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum PlaceReportType {
+  WRONG_INFO
+  CLOSED
+  DUPLICATE
+  WRONG_LOCATION
+  WRONG_PHONE
+  SPAM
+  OTHER
+}
+
+model PlaceListing {
+  id              String        @id @default(cuid())
+
+  neighborhoodId  String
+  neighborhood    Neighborhood  @relation(fields: [neighborhoodId], references: [id])
+
+  name            String
+  // NFKC + zero-width strip + lowercase. Written by the API on
+  // create/edit so the dupe-detection index works without a Postgres
+  // extension. See src/lib/places/normalize.ts.
+  nameNormalized  String
+  category        PlaceCategory
+  description     String?
+  phone           String?
+  whatsapp        String?
+  website         String?
+  instagram       String?
+  mapUrl          String?
+  latitude        Float?
+  longitude       Float?
+  addressText     String?
+  openingHours    String?
+
+  // Reserved for Phase 1.5 image-upload wiring. The MVP API
+  // unconditionally strips this from incoming bodies; rows ship
+  // with the [] default. Detail-page rendering already handles
+  // a non-empty array so no template changes will be needed when
+  // we enable the feature.
+  imageUrls       String[]      @default([])
+
+  status          PlaceStatus   @default(PENDING)
+
+  // Submitter — NEVER exposed in public API responses (only mod
+  // detail + self-view-of-mine). See src/lib/places/serialize.ts
+  // for the public-response shape.
+  createdByUserId String?
+  createdByUser   User?         @relation("PlacesCreated", fields: [createdByUserId], references: [id])
+
+  // Approved claimant — visible publicly with limited fields
+  // (id, name, avatarUrl, providerStatus) on the detail page.
+  claimedByUserId String?
+  claimedByUser   User?         @relation("PlacesClaimed", fields: [claimedByUserId], references: [id])
+
+  // Last mod who acted on this place (approve, reject, edit, remove).
+  verifiedByModId String?
+  verifiedByMod   User?         @relation("PlacesVerified", fields: [verifiedByModId], references: [id])
+  verifiedAt      DateTime?
+
+  rejectionReason String?
+
+  claimRequests   PlaceClaimRequest[]
+  reports         PlaceReport[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Browse index (the main /directory query): scope to nbhd +
+  // category + visible statuses.
+  @@index([neighborhoodId, category, status])
+  // Mod-queue index: pending submissions per neighborhood ordered
+  // by creation time.
+  @@index([neighborhoodId, status, createdAt])
+  // Dupe-detection: exact-equality lookup on normalized name +
+  // category within the user's neighborhood.
+  @@index([neighborhoodId, nameNormalized, category])
+  @@index([claimedByUserId])
+  @@index([createdByUserId])
+}
+
+model PlaceClaimRequest {
+  id              String           @id @default(cuid())
+
+  placeId         String
+  place           PlaceListing     @relation(fields: [placeId], references: [id])
+
+  userId          String
+  user            User             @relation("PlaceClaimsSubmitted", fields: [userId], references: [id])
+
+  message         String?
+  // Reserved for Phase 1.5. MVP API strips this; mods review
+  // claims on text-message + provider-status signals only.
+  evidenceUrls    String[]         @default([])
+
+  status          PlaceClaimStatus @default(PENDING)
+
+  reviewedById    String?
+  reviewedBy      User?            @relation("PlaceClaimsReviewed", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  rejectionReason String?
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([placeId, status])
+  @@index([userId, status])
+}
+
+model PlaceReport {
+  id        String          @id @default(cuid())
+
+  placeId   String
+  place     PlaceListing    @relation(fields: [placeId], references: [id])
+
+  userId    String
+  user      User            @relation("PlaceReportsFiled", fields: [userId], references: [id])
+
+  type      PlaceReportType
+  message   String?
+
+  createdAt DateTime        @default(now())
+
+  @@index([placeId])
+  @@index([userId, createdAt])
 }

@@ -1,0 +1,267 @@
+import { PlaceCategory } from '@prisma/client'
+import { isValidSaudiPhone } from '@/lib/phone'
+import { normalizePlaceName } from './normalize'
+
+/**
+ * Reputation threshold for elevated place-creation limits.
+ *
+ *   reputation < 150 → 3 places per rolling 7 days
+ *   reputation ≥ 150 → 7 places per rolling 7 days
+ *
+ * Picked to match the existing "trusted resident" floor used
+ * elsewhere in the codebase (post limits, etc. — see
+ * src/lib/reputation*.ts).
+ */
+export const DIRECTORY_TRUSTED_REPUTATION = 150
+
+export const PLACE_LIMIT_NORMAL = 3
+export const PLACE_LIMIT_TRUSTED = 7
+export const PLACE_LIMIT_WINDOW_MS = 7 * 24 * 3600 * 1000
+
+export const CLAIM_PENDING_MAX = 3
+export const REPORT_DAILY_MAX = 10
+
+const NAME_MIN = 2
+const NAME_MAX = 80
+const DESCRIPTION_MAX = 500
+const ADDRESS_MAX = 200
+const HOURS_MAX = 300
+const MESSAGE_MAX = 500
+
+const SAFE_URL_HOSTS = new Set([
+  'maps.google.com',
+  'goo.gl',
+  'maps.app.goo.gl',
+  'www.google.com',
+  'google.com',
+  'maps.apple.com',
+  'g.co',
+])
+
+/** Validate an https:// URL against a small safelist of map hosts.
+ *  Other origins fall through to a permissive "https://" check so
+ *  social/menu URLs aren't over-blocked at MVP. */
+export function isSafeMapUrl(input: string | null | undefined): boolean {
+  if (!input) return true
+  if (typeof input !== 'string') return false
+  if (input.length > 500) return false
+  try {
+    const u = new URL(input)
+    if (u.protocol !== 'https:') return false
+    return SAFE_URL_HOSTS.has(u.host)
+  } catch {
+    return false
+  }
+}
+
+/** Permissive https-only URL check for website / instagram. */
+export function isSafeHttpsUrl(input: string | null | undefined): boolean {
+  if (!input) return true
+  if (typeof input !== 'string') return false
+  if (input.length > 500) return false
+  try {
+    const u = new URL(input)
+    return u.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+export interface PlaceInput {
+  name?: unknown
+  category?: unknown
+  description?: unknown
+  phone?: unknown
+  whatsapp?: unknown
+  website?: unknown
+  instagram?: unknown
+  mapUrl?: unknown
+  latitude?: unknown
+  longitude?: unknown
+  addressText?: unknown
+  openingHours?: unknown
+}
+
+export interface ValidatedPlace {
+  name: string
+  nameNormalized: string
+  category: PlaceCategory
+  description: string | null
+  phone: string | null
+  whatsapp: string | null
+  website: string | null
+  instagram: string | null
+  mapUrl: string | null
+  latitude: number | null
+  longitude: number | null
+  addressText: string | null
+  openingHours: string | null
+}
+
+export type ValidationOk = { ok: true; value: ValidatedPlace }
+export type ValidationErr = { ok: false; error: string; field?: string }
+
+const VALID_CATEGORIES = new Set<string>(Object.values(PlaceCategory))
+
+/** Validate a place create / edit payload. Returns the cleaned
+ *  shape ready to write, or an error string + offending field.
+ *
+ *  Image URLs are intentionally NOT in PlaceInput — the API strips
+ *  imageUrls before calling this helper. Phase 1.5 will reintroduce
+ *  it through a dedicated upload path. */
+export function validatePlaceInput(input: PlaceInput): ValidationOk | ValidationErr {
+  // ── name ──
+  const rawName = typeof input.name === 'string' ? input.name.trim() : ''
+  if (rawName.length < NAME_MIN) {
+    return { ok: false, error: 'الاسم قصير جداً', field: 'name' }
+  }
+  if (rawName.length > NAME_MAX) {
+    return { ok: false, error: 'الاسم طويل جداً', field: 'name' }
+  }
+  const nameNormalized = normalizePlaceName(rawName)
+  // Catches zero-width-only / whitespace-only bypass — after
+  // normalization there must still be content.
+  if (nameNormalized.length < NAME_MIN) {
+    return { ok: false, error: 'الاسم غير صالح', field: 'name' }
+  }
+
+  // ── category ──
+  if (typeof input.category !== 'string' || !VALID_CATEGORIES.has(input.category)) {
+    return { ok: false, error: 'تصنيف غير صالح', field: 'category' }
+  }
+  const category = input.category as PlaceCategory
+
+  // ── description ──
+  let description: string | null = null
+  if (typeof input.description === 'string') {
+    const d = input.description.trim()
+    if (d.length > DESCRIPTION_MAX) {
+      return { ok: false, error: 'الوصف طويل جداً', field: 'description' }
+    }
+    description = d || null
+  }
+
+  // ── phone / whatsapp (Saudi format optional) ──
+  const phone = optionalSaudiPhone(input.phone)
+  if (phone === false) return { ok: false, error: 'رقم الجوال غير صالح', field: 'phone' }
+  const whatsapp = optionalSaudiPhone(input.whatsapp)
+  if (whatsapp === false) return { ok: false, error: 'رقم واتساب غير صالح', field: 'whatsapp' }
+
+  // ── website / instagram / mapUrl ──
+  let website: string | null = null
+  if (typeof input.website === 'string' && input.website.trim()) {
+    if (!isSafeHttpsUrl(input.website.trim())) {
+      return { ok: false, error: 'الموقع الإلكتروني غير صالح', field: 'website' }
+    }
+    website = input.website.trim()
+  }
+  let instagram: string | null = null
+  if (typeof input.instagram === 'string' && input.instagram.trim()) {
+    const v = input.instagram.trim()
+    if (v.length > 100) {
+      return { ok: false, error: 'رابط إنستقرام غير صالح', field: 'instagram' }
+    }
+    // Allow either a handle (@x / x) or a full https URL.
+    if (v.startsWith('http')) {
+      if (!isSafeHttpsUrl(v)) {
+        return { ok: false, error: 'رابط إنستقرام غير صالح', field: 'instagram' }
+      }
+    }
+    instagram = v
+  }
+  let mapUrl: string | null = null
+  if (typeof input.mapUrl === 'string' && input.mapUrl.trim()) {
+    if (!isSafeMapUrl(input.mapUrl.trim())) {
+      return { ok: false, error: 'رابط الخريطة غير مدعوم', field: 'mapUrl' }
+    }
+    mapUrl = input.mapUrl.trim()
+  }
+
+  // ── coordinates (WGS84) ──
+  let latitude: number | null = null
+  let longitude: number | null = null
+  if (input.latitude !== undefined && input.latitude !== null) {
+    const n = Number(input.latitude)
+    if (!Number.isFinite(n) || n < -90 || n > 90) {
+      return { ok: false, error: 'إحداثيات غير صالحة', field: 'latitude' }
+    }
+    latitude = n
+  }
+  if (input.longitude !== undefined && input.longitude !== null) {
+    const n = Number(input.longitude)
+    if (!Number.isFinite(n) || n < -180 || n > 180) {
+      return { ok: false, error: 'إحداثيات غير صالحة', field: 'longitude' }
+    }
+    longitude = n
+  }
+  // Either both or neither.
+  if ((latitude === null) !== (longitude === null)) {
+    return { ok: false, error: 'إحداثيات غير مكتملة', field: 'latitude' }
+  }
+
+  // ── addressText ──
+  let addressText: string | null = null
+  if (typeof input.addressText === 'string' && input.addressText.trim()) {
+    const v = input.addressText.trim()
+    if (v.length > ADDRESS_MAX) {
+      return { ok: false, error: 'العنوان طويل جداً', field: 'addressText' }
+    }
+    addressText = v
+  }
+
+  // ── openingHours ──
+  let openingHours: string | null = null
+  if (typeof input.openingHours === 'string' && input.openingHours.trim()) {
+    const v = input.openingHours.trim()
+    if (v.length > HOURS_MAX) {
+      return { ok: false, error: 'ساعات العمل طويلة', field: 'openingHours' }
+    }
+    openingHours = v
+  }
+
+  return {
+    ok: true,
+    value: {
+      name: rawName,
+      nameNormalized,
+      category,
+      description,
+      phone,
+      whatsapp,
+      website,
+      instagram,
+      mapUrl,
+      latitude,
+      longitude,
+      addressText,
+      openingHours,
+    },
+  }
+}
+
+/** Validate a claim or report message body. Returns the cleaned
+ *  string (possibly empty) or false if it exceeds the cap. */
+export function validateMessage(input: unknown): string | false | null {
+  if (input === undefined || input === null) return null
+  if (typeof input !== 'string') return false
+  const v = input.trim()
+  if (!v) return null
+  if (v.length > MESSAGE_MAX) return false
+  return v
+}
+
+/** Saudi-phone gate that allows the field to be absent. Returns
+ *  the cleaned phone, null if absent, or false if present-but-bad. */
+function optionalSaudiPhone(input: unknown): string | null | false {
+  if (input === undefined || input === null) return null
+  if (typeof input !== 'string') return false
+  const v = input.trim()
+  if (!v) return null
+  if (!isValidSaudiPhone(v)) return false
+  return v
+}
+
+/** Limit applicable to this user. */
+export function placeLimitForUser(reputation: number): number {
+  return reputation >= DIRECTORY_TRUSTED_REPUTATION ? PLACE_LIMIT_TRUSTED : PLACE_LIMIT_NORMAL
+}

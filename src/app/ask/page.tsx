@@ -26,6 +26,7 @@ import { inferAskCategory } from '@/lib/classify/inferAskCategory'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
 import { uploadFiles } from '@/lib/upload'
+import DirectoryEntryCard from '@/components/places/DirectoryEntryCard'
 
 // Optional category strip — Ask flow excludes COMPETITIONS (admin-only,
 // nothing to ask there) and GENERAL (admin-only fallback). Order
@@ -470,6 +471,11 @@ export default function AskNeighborsPage() {
                   ? 'یا سیدھا لکھنا شروع کریں — ہم زمرہ تجویز کریں گے۔'
                   : 'أو ابدأ بالكتابة وسنقترح القسم تلقائياً.'}
             </p>
+            {/* Directory chip — only renders when
+                NEXT_PUBLIC_DIRECTORY_ENABLED='1'. Inert during pre-launch. */}
+            <div className="mt-3">
+              <DirectoryEntryCard variant="chip" />
+            </div>
           </div>
         ) : (() => {
           const c = ASK_INTENT_CHOICES.find(x => x.key === intentChoice)

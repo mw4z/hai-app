@@ -59,6 +59,14 @@ interface Props {
     recentLogs: any[]
     userReports: any[]
     stats: { activePosts: number; reportedPosts: number; totalUsers: number; myActions: number }
+    // Directory feature flag — server reads DIRECTORY_ENABLED in
+    // mod/page.tsx and passes a boolean here. When true (i.e. mode
+    // is 'admin' or 'on'), a small "دليل الحي" pill links to
+    // /mod/directory. When false, no entry point is shown.
+    directoryEnabled?: boolean
+    // Pending counts for the directory tab badges (only meaningful
+    // when directoryEnabled is true; SSR computes them then).
+    directoryCounts?: { places: number; claims: number; reports: number }
   }
 }
 
@@ -260,6 +268,36 @@ export default function ModDashboard({ data }: Props) {
       <div className="px-4 pt-4">
         <EmergencyCreator />
       </div>
+
+      {/* Directory mod entry — only when DIRECTORY_ENABLED is admin
+          or on. Hidden by default during pre-launch; the link itself
+          would 404 if the server flag flips off mid-session, which
+          is the expected fail-closed behavior. */}
+      {data.directoryEnabled && (
+        <div className="px-4 pt-3">
+          <Link
+            href="/mod/directory"
+            className="flex items-center justify-between gap-3 rounded-2xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/60 px-4 py-3"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-lg" aria-hidden>🏘️</span>
+              <div className="leading-tight">
+                <p className="text-sm font-bold text-primary-900 dark:text-primary-200">
+                  {dn('دليل الحي', 'Neighborhood Directory')}
+                </p>
+                <p className="text-[11px] text-primary-700/80 dark:text-primary-300/70">
+                  {dn('مراجعة الطلبات والإدارة والبلاغات', 'Review submissions, claims & reports')}
+                </p>
+              </div>
+            </div>
+            {data.directoryCounts && (data.directoryCounts.places + data.directoryCounts.claims + data.directoryCounts.reports) > 0 && (
+              <span className="text-[11px] font-bold text-white bg-primary-600 rounded-full px-2 py-0.5">
+                {data.directoryCounts.places + data.directoryCounts.claims + data.directoryCounts.reports}
+              </span>
+            )}
+          </Link>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-2.5 px-4 pt-2 pb-2">

@@ -2,6 +2,9 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import ModDashboard from './ModDashboard'
+import { directoryServerMode } from '@/lib/places/featureFlag'
+import { isDirectoryModerator } from '@/lib/places/isDirectoryModerator'
+import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
 export default async function ModPage() {
   const session = await getSession()
@@ -95,6 +98,28 @@ export default async function ModPage() {
     ]),
   ])
 
+  // Directory feature flag — render the dashboard "دليل الحي" pill
+  // only when the server flag is admin/on AND the user has the
+  // directory mod role. Pending counts are fetched in the same
+  // tick so the badge stays accurate without a client round-trip.
+  const mode = directoryServerMode()
+  const directoryEnabled =
+    isDirectoryModerator(user.role) &&
+    (mode === 'on' || mode === 'admin' || isSuperAdminRole(user.role))
+
+  let directoryCounts = { places: 0, claims: 0, reports: 0 }
+  if (directoryEnabled) {
+    const cross = isSuperAdminRole(user.role) || user.role === 'PLATFORM_MOD'
+    const nbhdFilter = cross ? {} : { neighborhoodId: nbId }
+    const placeNbhdFilter = cross ? {} : { place: { neighborhoodId: nbId } }
+    const [places, claims, reports] = await Promise.all([
+      db.placeListing.count({ where: { status: 'PENDING', ...nbhdFilter } }),
+      db.placeClaimRequest.count({ where: { status: 'PENDING', ...placeNbhdFilter } }),
+      db.placeReport.count({ where: placeNbhdFilter }),
+    ])
+    directoryCounts = { places, claims, reports }
+  }
+
   return (
     <ModDashboard
       data={JSON.parse(JSON.stringify({
@@ -110,6 +135,8 @@ export default async function ModPage() {
           totalUsers: stats[2],
           myActions: stats[3],
         },
+        directoryEnabled,
+        directoryCounts,
       }))}
     />
   )

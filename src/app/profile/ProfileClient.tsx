@@ -21,6 +21,7 @@ import {
 } from 'react-icons/fi'
 import { setSoundsEnabled, playTap } from '@/lib/sound'
 import HaiLoader, { HaiSpinner } from '@/components/HaiLoader'
+import OwnerPlacesSection from '@/components/places/OwnerPlacesSection'
 import { setHapticsEnabled, hapticMedium } from '@/lib/haptic'
 const ImageCropper = lazy(() => import('@/components/ImageCropper'))
 import { DEFAULT_AVATARS, AVATAR_CATEGORIES } from '@/lib/defaultAvatars'
@@ -1322,6 +1323,12 @@ export default function ProfileClient({ user, postCount }: Props) {
           </Link>
         </div>
       )}
+
+      {/* ═══ Places the user manages (directory claims) ═══
+          Self-gated on NEXT_PUBLIC_DIRECTORY_ENABLED — section
+          hides itself entirely when the public flag is off OR the
+          user has no claimed places. Safe to render unconditionally. */}
+      <OwnerPlacesSection />
 
       {/* ═══ Reputation ═══ */}
       <AccordionSection

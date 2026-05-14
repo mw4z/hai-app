@@ -9,6 +9,7 @@ import PollCard from '@/components/PollCard'
 import { HaiSpinner } from '@/components/HaiLoader'
 import EmergencyBanner from '@/components/EmergencyBanner'
 import InviteLeaderboardCard from '@/components/InviteLeaderboardCard'
+import DirectoryEntryCard from '@/components/places/DirectoryEntryCard'
 import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { hapticLight } from '@/lib/haptic'
 import QuickAskSheet from '@/components/QuickAskSheet'
@@ -796,6 +797,18 @@ export default function FeedClient({
 
       {/* Emergency alerts — pinned above everything */}
       <EmergencyBanner />
+
+      {/* Neighborhood Directory CTA — gated entirely on
+          NEXT_PUBLIC_DIRECTORY_ENABLED. When the flag is unset
+          (default), DirectoryEntryCard returns null and this
+          wrapping div renders an empty fragment — no visual
+          residue, no extra spacing. Shown only on the ALL chip
+          so it doesn't clutter category filters. */}
+      {selectedCategory === 'ALL' && (
+        <div className="px-4 pt-3">
+          <DirectoryEntryCard variant="card" />
+        </div>
+      )}
 
       {/* Active polls */}
       {polls.length > 0 && selectedCategory === 'ALL' && (
