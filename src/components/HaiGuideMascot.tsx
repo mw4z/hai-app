@@ -1,36 +1,41 @@
 'use client'
 
 /**
- * HaiGuideMascot — the friendly "مرشد حي" character used in the
- * first-run guide. Pure inline SVG + scoped CSS. No external
- * assets, no animation libraries.
+ * HaiGuideMascot — the friendly "نَبْضي" character used in the
+ * guided tours. Pure inline SVG + scoped CSS, no external assets,
+ * no animation libraries.
  *
- * Design: a little neighborhood character in Hai's visual language.
- *   • body: rounded pin/teardrop shape in the same teal gradient
- *     (#00b894 → #005c48) as the real app icon (public/icon-192.svg)
- *   • house detail: a small 4-pane window on the body, echoing the
- *     "neighborhood" identity
- *   • face: two eyes + soft smile
- *   • two arms — one rests, one waves
- *   • two small feet planted underneath
- *   • subtle teal glow behind everything
+ * Visual language honours the Hai app icon (public/icon-192.svg):
+ *   • teal gradient body (#00d4a8 → #005c48)
+ *   • rounded pin/teardrop silhouette with a small house-window
+ *     detail on the chest
+ *   • simple face — two eyes + a smile
+ *   • two arms (one rests, one waves) and two small feet planted
+ *     under the body
+ *   • soft radial glow halo
  *
- * Idle animations (CSS-only):
- *   • gentle float — whole character lifts a few pixels
- *   • soft glow pulse — radial halo breathes
- *   • blink every ~5s
- *   • the raised arm waves every ~6s
+ * Animation architecture matters here. Earlier revisions had each
+ * body part run its own float animation, which made multi-animation
+ * transforms fight on the same element (e.g. the waving arm tried
+ * to apply both translateY and rotate via two keyframe sets on the
+ * SAME `transform` property — the later declaration wins and the
+ * other animation appears to "skip"). The fix is structural:
  *
- * All animations stop when the user has `prefers-reduced-motion`
- * turned on. The character then renders as a calm static badge.
+ *   • A single outer <g class="hai-mascot__breath"> wraps everything
+ *     and owns the gentle float. Float = translateY, which doesn't
+ *     depend on transform-origin, so this is safe.
+ *   • Inside the breath group, the waving arm has its OWN <g> that
+ *     rotates around a fixed viewBox-coordinate pivot (the shoulder
+ *     where the arm joins the body). This pivot is set in SVG
+ *     viewBox units, which means we must NOT set `transform-box:
+ *     fill-box` on it — fill-box would reinterpret the pivot in
+ *     bbox-local coords and put it far outside the arm, making the
+ *     "hand" orbit a phantom point in mid-air.
+ *   • Eyes use `transform-box: fill-box` so the blink scaleY pivots
+ *     around each eye's own center.
+ *   • Glow uses opacity only — no transform = no pivot worries.
  *
- * Props:
- *   - size:      pixel size of the longer (vertical) dimension
- *                (default 56)
- *   - direction: which way the mascot's wave should bias — 'left'
- *                mirrors the wave to the left side, 'right' keeps
- *                it on the right, 'idle' is the default. Purely
- *                visual hint; the character itself is the same.
+ * Every loop is gated on prefers-reduced-motion.
  */
 export default function HaiGuideMascot({
   size = 56,
@@ -39,7 +44,7 @@ export default function HaiGuideMascot({
   size?: number
   direction?: 'left' | 'right' | 'idle'
 }) {
-  // Aspect ratio = 64 wide / 80 tall, so width scales down.
+  // Aspect ratio = 64 wide / 80 tall.
   const width = Math.round((size * 64) / 80)
   const height = size
 
@@ -65,79 +70,75 @@ export default function HaiGuideMascot({
           </radialGradient>
         </defs>
 
-        {/* Soft glow halo */}
-        <ellipse
-          className="hai-mascot__glow"
-          cx="32" cy="38" rx="30" ry="34"
-          fill="url(#hai-mascot-glow)"
-        />
-
-        {/* Feet — small ovals planted underneath the body. Drawn
-            BEFORE the body so the body overlaps them slightly,
-            making them look like they belong to it. */}
-        <ellipse className="hai-mascot__foot" cx="23" cy="71" rx="5.5" ry="3" fill="#003a2e" />
-        <ellipse className="hai-mascot__foot" cx="41" cy="71" rx="5.5" ry="3" fill="#003a2e" />
-
-        {/* Resting arm — left side. Short rounded cylinder + ball
-            hand. Sits passively. */}
-        <g className="hai-mascot__arm-rest">
-          <rect x="4" y="42" width="10" height="7" rx="3.5" fill="url(#hai-mascot-arm)" />
-          <circle cx="5" cy="45.5" r="4" fill="url(#hai-mascot-arm)" />
-        </g>
-
-        {/* Waving arm — right side. Rotates from the shoulder
-            (the inner end). transform-origin set in CSS. */}
-        <g className="hai-mascot__arm-wave">
-          <rect x="50" y="36" width="10" height="6.5" rx="3.25" fill="url(#hai-mascot-arm)" />
-          <circle cx="60" cy="36.5" r="4" fill="url(#hai-mascot-arm)" />
-        </g>
-
-        {/* Body — rounded pin / teardrop shape. The path is a
-            symmetric curve that's wide at the chest and tucks
-            down toward the feet. Drawn last so it overlaps the
-            arms (shoulders) and feet cleanly. */}
-        <path
-          className="hai-mascot__body"
-          d="M 32 8
-             C 16 8, 8 22, 8 36
-             C 8 52, 18 64, 26 68
-             C 28 70, 36 70, 38 68
-             C 46 64, 56 52, 56 36
-             C 56 22, 48 8, 32 8 Z"
-          fill="url(#hai-mascot-grad)"
-        />
-
-        {/* Top sheen — soft white highlight, like the gloss on
-            the real app icon. */}
-        <path
-          d="M 32 8 C 18 8, 10 20, 10 30 L 54 30 C 54 20, 46 8, 32 8 Z"
-          fill="#ffffff"
-          fillOpacity="0.12"
-        />
-
-        {/* House window detail — a tiny 4-pane window on the
-            character's chest, marking it as a neighborhood
-            resident, not a generic blob. */}
-        <g className="hai-mascot__window" opacity="0.55">
-          <rect x="27" y="50" width="10" height="9" rx="1" fill="#ffffff" fillOpacity="0.18" />
-          <line x1="32" y1="50" x2="32" y2="59" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="0.6" />
-          <line x1="27" y1="54.5" x2="37" y2="54.5" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="0.6" />
-        </g>
-
-        {/* Face — two eyes + a gentle smile. Positioned in the
-            upper third of the body where a face would naturally
-            sit on a pin-shaped character. */}
-        <g className="hai-mascot__face">
-          <circle className="hai-mascot__eye hai-mascot__eye--l" cx="25" cy="30" r="2.6" fill="#ffffff" />
-          <circle className="hai-mascot__eye hai-mascot__eye--r" cx="39" cy="30" r="2.6" fill="#ffffff" />
-          <path
-            className="hai-mascot__smile"
-            d="M 24 39 Q 32 44 40 39"
-            fill="none"
-            stroke="#ffffff"
-            strokeWidth="2.2"
-            strokeLinecap="round"
+        {/* Single breathing group — everything floats together so
+            the waving arm stays attached to its shoulder. */}
+        <g className="hai-mascot__breath">
+          {/* Soft glow halo behind the body */}
+          <ellipse
+            className="hai-mascot__glow"
+            cx="32" cy="38" rx="30" ry="34"
+            fill="url(#hai-mascot-glow)"
           />
+
+          {/* Feet — drawn before the body so the body overlaps them
+              slightly and they look planted underneath. */}
+          <ellipse cx="23" cy="71" rx="5.5" ry="3" fill="#003a2e" />
+          <ellipse cx="41" cy="71" rx="5.5" ry="3" fill="#003a2e" />
+
+          {/* Resting arm (left). Shoulder tucks UNDER the body
+              edge so the arm reads as attached. */}
+          <g>
+            <rect x="3" y="42" width="11" height="7" rx="3.5" fill="url(#hai-mascot-arm)" />
+            <circle cx="4" cy="45.5" r="4" fill="url(#hai-mascot-arm)" />
+          </g>
+
+          {/* Waving arm (right). Rotates around the shoulder pivot
+              at SVG (52, 39) — that's a few pixels inside the body
+              edge so the inner end of the arm is hidden under the
+              body silhouette through the whole rotation. */}
+          <g className="hai-mascot__arm-wave">
+            <rect x="50" y="36" width="11" height="6.5" rx="3.25" fill="url(#hai-mascot-arm)" />
+            <circle cx="60" cy="36.5" r="4" fill="url(#hai-mascot-arm)" />
+          </g>
+
+          {/* Body — drawn last so it overlaps the arms' inner
+              ends + the tops of the feet, hiding the joins. */}
+          <path
+            d="M 32 8
+               C 16 8, 8 22, 8 36
+               C 8 52, 18 64, 26 68
+               C 28 70, 36 70, 38 68
+               C 46 64, 56 52, 56 36
+               C 56 22, 48 8, 32 8 Z"
+            fill="url(#hai-mascot-grad)"
+          />
+
+          {/* Top sheen — soft white highlight on the upper half */}
+          <path
+            d="M 32 8 C 18 8, 10 20, 10 30 L 54 30 C 54 20, 46 8, 32 8 Z"
+            fill="#ffffff"
+            fillOpacity="0.12"
+          />
+
+          {/* House window detail — 4-pane mark on the chest */}
+          <g opacity="0.55">
+            <rect x="27" y="50" width="10" height="9" rx="1" fill="#ffffff" fillOpacity="0.18" />
+            <line x1="32" y1="50" x2="32" y2="59" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="0.6" />
+            <line x1="27" y1="54.5" x2="37" y2="54.5" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="0.6" />
+          </g>
+
+          {/* Face — eyes + smile */}
+          <g>
+            <circle className="hai-mascot__eye" cx="25" cy="30" r="2.6" fill="#ffffff" />
+            <circle className="hai-mascot__eye" cx="39" cy="30" r="2.6" fill="#ffffff" />
+            <path
+              d="M 24 39 Q 32 44 40 39"
+              fill="none"
+              stroke="#ffffff"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+            />
+          </g>
         </g>
       </svg>
 
@@ -152,50 +153,41 @@ export default function HaiGuideMascot({
           overflow: visible;
         }
 
-        /* Whole-character float — animates the SVG root indirectly
-           via the body path; we transform the body + face together
-           so the feet stay planted on the ground while the rest
-           "breathes." */
-        .hai-mascot__body,
-        .hai-mascot__face,
-        .hai-mascot__window,
-        .hai-mascot__arm-rest,
-        .hai-mascot__arm-wave {
-          transform-box: fill-box;
-          transform-origin: center;
+        /* Whole-character breath. translateY only, so no
+           transform-origin / transform-box wrangling needed. */
+        .hai-mascot__breath {
           animation: hai-mascot-float 4s ease-in-out infinite;
         }
 
-        .hai-mascot__glow {
-          transform-box: fill-box;
-          transform-origin: center;
-          animation: hai-mascot-glow 4s ease-in-out infinite;
+        /* Waving arm rotation pivot. DEFAULT transform-box (view-box)
+           keeps the origin in SVG viewBox coords, so (52, 39) is the
+           shoulder where the arm meets the body. Adding fill-box
+           here would re-anchor to the arm's own bbox top-left and
+           the hand would orbit a phantom point in the air. */
+        .hai-mascot__arm-wave {
+          transform-origin: 52px 39px;
+          animation: hai-mascot-wave 6s ease-in-out infinite;
         }
 
+        /* Eye blink pivots around each eye's own centre — that
+           DOES want fill-box so the scaleY collapses the eye in
+           place instead of sliding it. */
         .hai-mascot__eye {
           transform-box: fill-box;
           transform-origin: center;
           animation: hai-mascot-blink 5.2s ease-in-out infinite;
         }
 
-        /* Waving arm pivots from the shoulder (the side of the
-           rectangle nearest the body). transform-origin is set in
-           viewBox coordinates because the SVG uses fill-box for
-           individual <g> elements. */
-        .hai-mascot__arm-wave {
-          transform-origin: 50px 38.5px;
-          animation:
-            hai-mascot-float 4s ease-in-out infinite,
-            hai-mascot-wave 6s ease-in-out infinite;
+        /* Glow halo breathes via opacity — no transform involved. */
+        .hai-mascot__glow {
+          animation: hai-mascot-glow 4s ease-in-out infinite;
         }
 
-        /* When the bubble is on the LEFT side of the target the
-           caller can mirror the waving arm to the left edge by
-           passing direction="left". We don't actually mirror the
-           SVG (would flip text/details); we just amp the wave
-           amplitude so the gesture reads stronger on that side. */
-        .hai-mascot--left .hai-mascot__arm-wave {
-          animation-name: hai-mascot-float, hai-mascot-wave-strong;
+        /* When the caller hints a direction, amp the wave so the
+           gesture reads as a "look this way" cue. */
+        .hai-mascot--left .hai-mascot__arm-wave,
+        .hai-mascot--right .hai-mascot__arm-wave {
+          animation-name: hai-mascot-wave-strong;
         }
 
         @keyframes hai-mascot-float {
@@ -223,15 +215,11 @@ export default function HaiGuideMascot({
           92%           { transform: rotate(-10deg); }
         }
 
-        /* Reduced motion: kill every animation. Static badge. */
         @media (prefers-reduced-motion: reduce) {
-          .hai-mascot__body,
-          .hai-mascot__face,
-          .hai-mascot__window,
-          .hai-mascot__arm-rest,
+          .hai-mascot__breath,
           .hai-mascot__arm-wave,
-          .hai-mascot__glow,
-          .hai-mascot__eye {
+          .hai-mascot__eye,
+          .hai-mascot__glow {
             animation: none !important;
           }
           .hai-mascot__glow {
