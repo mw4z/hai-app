@@ -328,13 +328,17 @@ export default function ContextualGuide({
   const hasUsableRect = !!(targetRect && targetRect.width > 4 && targetRect.height > 4)
   const useCenter = step.position === 'center' || !hasUsableRect
 
+  // Clamp the highlight to the viewport so a target flush against
+  // any screen edge (typical for bottom nav / sticky header) keeps
+  // its green ring fully on-screen.
   const highlight = hasUsableRect && targetRect
-    ? {
-        top: targetRect.top - TARGET_PADDING,
-        left: targetRect.left - TARGET_PADDING,
-        width: targetRect.width + TARGET_PADDING * 2,
-        height: targetRect.height + TARGET_PADDING * 2,
-      }
+    ? (() => {
+        const top = Math.max(0, targetRect.top - TARGET_PADDING)
+        const left = Math.max(0, targetRect.left - TARGET_PADDING)
+        const right = Math.min(window.innerWidth, targetRect.right + TARGET_PADDING)
+        const bottom = Math.min(window.innerHeight, targetRect.bottom + TARGET_PADDING)
+        return { top, left, width: right - left, height: bottom - top }
+      })()
     : null
 
   // ── Bubble + arrow positioning.

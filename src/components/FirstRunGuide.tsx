@@ -284,14 +284,19 @@ export default function FirstRunGuide({ enabled = true }: Props) {
   const hasUsableRect = !!(targetRect && targetRect.width > 4 && targetRect.height > 4)
   const useCenter = step.position === 'center' || !hasUsableRect
 
-  // ── Spotlight geometry.
+  // ── Spotlight geometry. Clamp to the viewport so the bottom nav
+  //    (which sits flush against bottom:0) doesn't end up with its
+  //    green ring + rounded corners painted below the visible area.
+  //    Same for the left/right edges if a target ever stretches to
+  //    the viewport gutter.
   const highlight = hasUsableRect && targetRect
-    ? {
-        top: targetRect.top - TARGET_PADDING,
-        left: targetRect.left - TARGET_PADDING,
-        width: targetRect.width + TARGET_PADDING * 2,
-        height: targetRect.height + TARGET_PADDING * 2,
-      }
+    ? (() => {
+        const top = Math.max(0, targetRect.top - TARGET_PADDING)
+        const left = Math.max(0, targetRect.left - TARGET_PADDING)
+        const right = Math.min(window.innerWidth, targetRect.right + TARGET_PADDING)
+        const bottom = Math.min(window.innerHeight, targetRect.bottom + TARGET_PADDING)
+        return { top, left, width: right - left, height: bottom - top }
+      })()
     : null
 
   // ── Bubble position + arrow position. For centered welcome OR
