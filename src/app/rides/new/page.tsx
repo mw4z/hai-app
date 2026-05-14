@@ -9,6 +9,31 @@ import LocationPicker from '@/components/rides/LocationPicker'
 import RiyalIcon from '@/components/RiyalIcon'
 import { translateApiError } from '@/lib/apiError'
 import { FiNavigation, FiClock, FiFileText, FiPackage, FiUser } from 'react-icons/fi'
+import ContextualGuide from '@/components/ContextualGuide'
+
+const RIDES_GUIDE_STEPS = [
+  {
+    targetSelector: null,
+    title: 'المشاوير والتوصيل',
+    body: 'اطلب مشوار أو توصيل غرض من أهل الحي.',
+    position: 'center' as const,
+    nextLabel: 'التالي',
+  },
+  {
+    targetSelector: '[data-guide="ride-type"]',
+    title: 'اختر النوع',
+    body: 'مشوار لشخص أو توصيل غرض.',
+    position: 'bottom' as const,
+    nextLabel: 'التالي',
+  },
+  {
+    targetSelector: '[data-guide="ride-submit"]',
+    title: 'أرسل الطلب',
+    body: 'تصلك العروض وتختار الأنسب.',
+    position: 'top' as const,
+    nextLabel: 'فهمت',
+  },
+]
 
 interface Location {
   lat: number
@@ -114,7 +139,7 @@ export default function NewRidePage() {
       <div className="flex-1 px-4 py-5 space-y-5">
 
         {/* ── Type toggle: Ride vs Delivery ────────────────────────────────── */}
-        <div>
+        <div data-guide="ride-type">
           <div className="flex gap-2">
             <button
               type="button"
@@ -283,6 +308,7 @@ export default function NewRidePage() {
         {/* ── Submit ───────────────────────────────────────────────────────── */}
         <button
           data-tour="ride-submit"
+          data-guide="ride-submit"
           onClick={handleSubmit}
           disabled={loading || !canSubmit}
           className="w-full bg-primary-600 text-white rounded-xl py-3.5 font-semibold text-sm active:scale-[0.97] transition-transform disabled:opacity-40"
@@ -294,6 +320,7 @@ export default function NewRidePage() {
           )}
         </button>
       </div>
+      <ContextualGuide guideId="rides-new" steps={RIDES_GUIDE_STEPS} />
     </main>
   )
 }

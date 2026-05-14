@@ -27,6 +27,33 @@ import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
 import { uploadFiles } from '@/lib/upload'
 import DirectoryEntryCard from '@/components/places/DirectoryEntryCard'
+import ContextualGuide from '@/components/ContextualGuide'
+
+/** نَبْضي ask-page guide steps. Three short cards: what this
+ *  screen is for, what to type, and what happens after submit. */
+const ASK_GUIDE_STEPS = [
+  {
+    targetSelector: null,
+    title: 'اسأل أهل الحي',
+    body: 'اكتب طلبك أو سؤالك، ونَبْضي يساعدك توصل للقسم المناسب.',
+    position: 'center' as const,
+    nextLabel: 'التالي',
+  },
+  {
+    targetSelector: '[data-guide="ask-text"]',
+    title: 'اكتب بطريقتك',
+    body: 'مثلاً: أبغى سباك، وين صيدلية، أو أفضل مطعم قريب.',
+    position: 'bottom' as const,
+    nextLabel: 'التالي',
+  },
+  {
+    targetSelector: '[data-guide="ask-submit"]',
+    title: 'أرسل الطلب',
+    body: 'بعد الإرسال يظهر لجيرانك في الحي.',
+    position: 'bottom' as const,
+    nextLabel: 'فهمت',
+  },
+]
 
 // Optional category strip — Ask flow excludes COMPETITIONS (admin-only,
 // nothing to ask there) and GENERAL (admin-only fallback). Order
@@ -417,6 +444,7 @@ export default function AskNeighborsPage() {
           {translate('ask_neighbors', lang)}
         </h1>
         <button
+          data-guide="ask-submit"
           onClick={handleSubmit}
           disabled={loading || !text.trim()}
           className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary-600 text-white font-bold text-sm shadow-md active:scale-95 transition-transform disabled:opacity-50 disabled:active:scale-100"
@@ -499,6 +527,7 @@ export default function AskNeighborsPage() {
 
         {/* Big input */}
         <textarea
+          data-guide="ask-text"
           autoFocus={intentChoice !== null}
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -677,6 +706,7 @@ export default function AskNeighborsPage() {
         onCamera={pickFromCamera}
         onGallery={pickFromGallery}
       />
+      <ContextualGuide guideId="ask" steps={ASK_GUIDE_STEPS} />
     </main>
   )
 }

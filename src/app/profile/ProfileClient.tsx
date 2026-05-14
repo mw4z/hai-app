@@ -26,6 +26,32 @@ import { setHapticsEnabled, hapticMedium } from '@/lib/haptic'
 const ImageCropper = lazy(() => import('@/components/ImageCropper'))
 import { DEFAULT_AVATARS, AVATAR_CATEGORIES } from '@/lib/defaultAvatars'
 import { DEFAULT_COVERS } from '@/lib/defaultCovers'
+import ContextualGuide from '@/components/ContextualGuide'
+import GuideRestartSheet from '@/components/GuideRestartSheet'
+
+const PROFILE_GUIDE_STEPS = [
+  {
+    targetSelector: null,
+    title: 'حسابك',
+    body: 'هنا تتابع سمعتك، إعداداتك، وتنبيهاتك.',
+    position: 'center' as const,
+    nextLabel: 'التالي',
+  },
+  {
+    targetSelector: '[data-guide="profile-rep"]',
+    title: 'السمعة والثقة',
+    body: 'كل تفاعل مفيد يرفع ثقتك في الحي.',
+    position: 'top' as const,
+    nextLabel: 'التالي',
+  },
+  {
+    targetSelector: '[data-guide="profile-settings"]',
+    title: 'الإعدادات والمساعدة',
+    body: 'غيّر اللغة، التنبيهات، الخصوصية، أو اطلب الدعم.',
+    position: 'top' as const,
+    nextLabel: 'فهمت',
+  },
+]
 
 type Theme = 'light' | 'dark' | 'system'
 type Language = 'ar' | 'en' | 'ur'
@@ -333,6 +359,7 @@ export default function ProfileClient({ user, postCount }: Props) {
   const [deleteInput, setDeleteInput] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [emergencyRequestOpen, setEmergencyRequestOpen] = useState(false)
+  const [restartSheetOpen, setRestartSheetOpen] = useState(false)
 
   function handleAvatarClick() {
     setShowAvatarPicker(true)
@@ -1331,16 +1358,18 @@ export default function ProfileClient({ user, postCount }: Props) {
       <OwnerPlacesSection />
 
       {/* ═══ Reputation ═══ */}
-      <AccordionSection
-        icon={<FiAward className="w-4 h-4" />}
-        label={t('rep_title')}
-        hint={lang === 'en' ? 'Your standing in the neighborhood' : lang === 'ur' ? 'محلے میں آپ کا مقام' : 'مكانتك في الحي'}
-        sectionKey="reputation"
-        openSection={openSection}
-        setOpenSection={setOpenSection}
-      >
-        <RepSection userId={user.id} reputation={user.reputation} lang={lang} t={t} />
-      </AccordionSection>
+      <div data-guide="profile-rep">
+        <AccordionSection
+          icon={<FiAward className="w-4 h-4" />}
+          label={t('rep_title')}
+          hint={lang === 'en' ? 'Your standing in the neighborhood' : lang === 'ur' ? 'محلے میں آپ کا مقام' : 'مكانتك في الحي'}
+          sectionKey="reputation"
+          openSection={openSection}
+          setOpenSection={setOpenSection}
+        >
+          <RepSection userId={user.id} reputation={user.reputation} lang={lang} t={t} />
+        </AccordionSection>
+      </div>
 
       {/* ═══ Bookmarks ═══ */}
       <div data-tour="profile-bookmarks">
@@ -1426,6 +1455,7 @@ export default function ProfileClient({ user, postCount }: Props) {
       </AccordionSection>
 
       {/* ═══ Settings ═══ */}
+      <div data-guide="profile-settings">
       <AccordionSection
         icon={<FiSettings className="w-4 h-4" />}
         label={t('profile_settings')}
@@ -1529,6 +1559,7 @@ export default function ProfileClient({ user, postCount }: Props) {
       </div>
 
       </AccordionSection>
+      </div>
 
       {/* ═══ Privacy ═══ */}
       <div data-tour="profile-privacy">
@@ -1630,15 +1661,17 @@ export default function ProfileClient({ user, postCount }: Props) {
         </button>
       </div>
 
-      {/* How to use */}
+      {/* Restart نَبْضي guides — replaces the old image-slide
+          tutorial. Opens a small sheet with three options (restart
+          home guide / restart current page guide / re-enable all). */}
       <div>
         <button
-          onClick={() => window.location.href = '/tutorial'}
+          onClick={() => setRestartSheetOpen(true)}
           className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl py-3 px-4 flex items-center gap-2 active:bg-gray-100 dark:active:bg-gray-700 transition-colors"
         >
-          <span className="text-lg">📖</span>
+          <span className="text-lg">🧭</span>
           <span className="text-sm text-gray-600 dark:text-gray-300 font-medium flex-1 text-start">
-            {lang === 'en' ? 'How to use the app' : lang === 'ur' ? 'ایپ کیسے استعمال کریں' : 'كيف تستخدم التطبيق'}
+            {lang === 'en' ? 'Replay app guide' : lang === 'ur' ? 'گائیڈ دوبارہ دکھائیں' : 'إعادة شرح التطبيق'}
           </span>
         </button>
       </div>
@@ -2132,6 +2165,8 @@ export default function ProfileClient({ user, postCount }: Props) {
       )}
 
       {/* BottomNav is mounted globally in src/app/layout.tsx */}
+      <ContextualGuide guideId="profile" steps={PROFILE_GUIDE_STEPS} />
+      <GuideRestartSheet open={restartSheetOpen} onClose={() => setRestartSheetOpen(false)} />
     </div>
   )
 }

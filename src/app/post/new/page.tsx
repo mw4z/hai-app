@@ -18,6 +18,34 @@ import type { PostCategory, PostIntent, MarketplaceType } from '@prisma/client'
 import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { playSuccess, playError } from '@/lib/sound'
 import { FiX } from 'react-icons/fi'
+import ContextualGuide from '@/components/ContextualGuide'
+
+/** نَبْضي post-create guide steps. Mirrors the user spec — three
+ *  short cards: what this screen is for, where to pick a section,
+ *  and how to review-then-publish. */
+const POST_NEW_GUIDE_STEPS = [
+  {
+    targetSelector: null,
+    title: 'انشر في حيّك',
+    body: 'اختر نوع المنشور، واكتب التفاصيل بوضوح.',
+    position: 'center' as const,
+    nextLabel: 'التالي',
+  },
+  {
+    targetSelector: '[data-guide="post-category"]',
+    title: 'اختر القسم المناسب',
+    body: 'السوق، الخدمات، العقار، البلاغات، وغيرها.',
+    position: 'bottom' as const,
+    nextLabel: 'التالي',
+  },
+  {
+    targetSelector: '[data-guide="post-publish"]',
+    title: 'راجع ثم انشر',
+    body: 'تأكد أن المعلومات واضحة قبل النشر.',
+    position: 'bottom' as const,
+    nextLabel: 'فهمت',
+  },
+]
 
 // ── Draft storage ──────────────────────────────────────────────────────
 // Saved to localStorage so the user's work survives closing the page.
@@ -876,6 +904,7 @@ export default function NewPostPage() {
         </h1>
         {step === 'content' && (
           <button
+            data-guide="post-publish"
             onClick={handleSubmit}
             disabled={loading || uploading}
             className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary-600 text-white font-bold text-sm shadow-md active:scale-95 transition-transform disabled:opacity-50 disabled:active:scale-100"
@@ -932,7 +961,7 @@ export default function NewPostPage() {
             LOST_FOUND get an amber ring + warmer surface
             (cat.important). */}
         {step === 'category' && (
-          <div className="space-y-4 pb-24" data-tour="post-categories" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
+          <div className="space-y-4 pb-24" data-tour="post-categories" data-guide="post-category" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
             {/* Top guidance — primary instruction + helper. Larger
                 font for older users; lang switches Arabic/English. */}
             <div className="space-y-1">
@@ -1449,6 +1478,7 @@ export default function NewPostPage() {
         onCamera={pickFromCamera}
         onGallery={pickFromGallery}
       />
+      <ContextualGuide guideId="post-new" steps={POST_NEW_GUIDE_STEPS} />
     </main>
   )
 }
