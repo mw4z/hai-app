@@ -21,8 +21,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json([])
     }
 
+    // Public surface: only items the owner has explicitly chosen
+    // to expose on their profile. The catalog editor for the
+    // owner uses /api/service-items/mine which returns every
+    // item regardless of these flags.
     const items = await db.serviceItem.findMany({
-      where: { userId, active: true },
+      where: { userId, active: true, showOnProfile: true },
       orderBy: { sortOrder: 'asc' },
       select: { id: true, title: true, description: true, price: true, imageUrl: true },
     })
@@ -100,7 +104,7 @@ export async function PATCH(req: NextRequest) {
     let body: any
     try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid request' }, { status: 400 }) }
 
-    const { id, title, description, price, imageUrl, active } = body
+    const { id, title, description, price, imageUrl, active, showOnProfile, showOnPlace } = body
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
     const item = await db.serviceItem.findUnique({ where: { id }, select: { userId: true } })
@@ -117,6 +121,10 @@ export async function PATCH(req: NextRequest) {
     if (price !== undefined) data.price = price
     if (imageUrl !== undefined) data.imageUrl = imageUrl || null
     if (typeof active === 'boolean') data.active = active
+    // Visibility flags — boolean only. Owner toggles where each
+    // item appears (public profile / claimed place / both).
+    if (typeof showOnProfile === 'boolean') data.showOnProfile = showOnProfile
+    if (typeof showOnPlace === 'boolean') data.showOnPlace = showOnPlace
 
     await db.serviceItem.update({ where: { id }, data })
     return NextResponse.json({ success: true })

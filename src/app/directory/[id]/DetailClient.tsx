@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import type { PublicPlace } from '@/lib/places/serialize'
@@ -48,6 +49,7 @@ export default function DetailClient({
   // detail page re-renders the new values without router.refresh().
   const [localPlace, setLocalPlace] = useState<PublicPlace>(serverPlace)
   const place = localPlace
+  const router = useRouter()
   const { lang } = useLanguage()
   const cat = getCategoryMeta(place.category)
   const categoryLabel =
@@ -205,6 +207,38 @@ export default function DetailClient({
               </a>
             )}
           </div>
+        )}
+
+        {/* Owner-only "Edit catalog" banner.
+            Renders above the services list when the viewer is
+            the claimed owner of this place. Copy and CTA shift
+            based on whether they've already added items:
+              - has items: "هذه الخدمات تظهر من كتالوجك …"
+              - empty:     "لم تضف خدمات لهذا المكان بعد."
+            The deep-link carries ?from=place so the catalog
+            editor knows to show its place-aware banner +
+            visibility toggles. */}
+        {isOwner && (
+          <section className="bg-emerald-50 dark:bg-emerald-900/15 border border-emerald-100 dark:border-emerald-900/40 rounded-2xl p-3 flex items-start gap-3">
+            <span className="text-xl flex-shrink-0" aria-hidden>📋</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] text-emerald-900 dark:text-emerald-100 leading-relaxed">
+                {place.ownerServiceItems && place.ownerServiceItems.length > 0
+                  ? 'هذه الخدمات تظهر من كتالوجك كمقدم خدمة.'
+                  : 'لم تضف خدمات لهذا المكان بعد.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push('/profile/catalog?from=place')}
+                className="mt-2 inline-flex items-center gap-1 text-[12px] font-bold text-emerald-700 dark:text-emerald-300 active:scale-95 transition-transform"
+              >
+                {place.ownerServiceItems && place.ownerServiceItems.length > 0
+                  ? 'تعديل الكتالوج'
+                  : 'إضافة خدمات'}
+                <span aria-hidden>←</span>
+              </button>
+            </div>
+          </section>
         )}
 
         {/* Owner's ServiceItems if the place is claimed by a provider */}

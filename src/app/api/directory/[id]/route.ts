@@ -43,7 +43,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
           avatarUrl: true,
           providerStatus: true,
           serviceItems: {
-            where: { active: true },
+            // Public place surface filters by showOnPlace —
+            // matches the SSR detail page and toPublicPlace().
+            where: { active: true, showOnPlace: true },
             orderBy: { sortOrder: 'asc' },
             select: {
               id: true,

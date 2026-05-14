@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { uploadFiles } from '@/lib/upload'
 import { pickImageOrFallback } from '@/lib/imagePicker'
@@ -17,16 +17,28 @@ interface Item {
   description: string | null
   price: number | null
   imageUrl: string | null
+  showOnProfile: boolean
+  showOnPlace: boolean
 }
 
-export default function CatalogClient({ initialItems }: { initialItems: Item[] }) {
+interface Props {
+  initialItems: Item[]
+  /** The directory place this user has claimed, if any. When null,
+   *  the place-visibility toggles are hidden (they'd be inert). */
+  claimedPlace: { id: string; name: string } | null
+}
+
+export default function CatalogClient({ initialItems, claimedPlace }: Props) {
   const { lang } = useLanguage()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const fromPlace = searchParams?.get('from') === 'place'
   const dn = (ar: string, en: string) => lang === 'en' ? en : ar
 
   const [items, setItems] = useState<Item[]>(initialItems)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -61,7 +73,21 @@ export default function CatalogClient({ initialItems }: { initialItems: Item[] }
       })
       if (res.ok) {
         const item = await res.json()
-        setItems(prev => [...prev, item])
+        // Server returns the new item with both flags = true by
+        // default (matches the column default). Normalize the
+        // type so the toggle UI doesn't crash on legacy responses.
+        setItems(prev => [
+          ...prev,
+          {
+            id: item.id,
+            title: item.title,
+            description: item.description ?? null,
+            price: item.price ?? null,
+            imageUrl: item.imageUrl ?? null,
+            showOnProfile: item.showOnProfile ?? true,
+            showOnPlace: item.showOnPlace ?? true,
+          },
+        ])
         resetForm()
         toast.success(dn('تمت الإضافة', 'Added'))
       } else {
@@ -82,11 +108,77 @@ export default function CatalogClient({ initialItems }: { initialItems: Item[] }
     } catch { toast.error('Error') }
   }
 
+  // Per-item visibility toggle — optimistic update + PATCH.
+  // Guards against the "both off" state by silently flipping the
+  // OTHER flag on if the user tries to disable the last one. An
+  // item with both flags off has no surface to render on, which
+  // is just confusing — keep at least one visibility on always.
+  async function toggleVisibility(id: string, field: 'showOnProfile' | 'showOnPlace', next: boolean) {
+    setItems(prev => prev.map(i => {
+      if (i.id !== id) return i
+      const updated = { ...i, [field]: next }
+      // Don't allow both flags off.
+      if (!updated.showOnProfile && !updated.showOnPlace) {
+        const other = field === 'showOnProfile' ? 'showOnPlace' : 'showOnProfile'
+        updated[other] = true
+      }
+      return updated
+    }))
+    // Build the patch from the item's RESOLVED next state so the
+    // "don't both off" guard above is reflected on the server.
+    const updated = items.find(i => i.id === id)
+    if (!updated) return
+    const patch: { showOnProfile?: boolean; showOnPlace?: boolean } = {}
+    patch[field] = next
+    if (field === 'showOnProfile' && !next && !updated.showOnPlace) patch.showOnPlace = true
+    if (field === 'showOnPlace' && !next && !updated.showOnProfile) patch.showOnProfile = true
+    try {
+      await fetch('/api/service-items', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...patch }),
+      })
+    } catch {
+      // Optimistic update stays; toast the user but don't roll
+      // back — they can re-tap if it really failed.
+      toast.error(dn('تعذر الحفظ', 'Save failed'))
+    }
+  }
+
+  // Bulk visibility actions. All three modes leave at least one
+  // surface enabled, so no orphaned items.
+  async function bulkSet(mode: 'place' | 'profile' | 'both') {
+    if (bulkBusy || items.length === 0) return
+    setBulkBusy(true)
+    const target = mode === 'place'
+      ? { showOnProfile: false, showOnPlace: true }
+      : mode === 'profile'
+        ? { showOnProfile: true, showOnPlace: false }
+        : { showOnProfile: true, showOnPlace: true }
+    // Optimistic local update.
+    setItems(prev => prev.map(i => ({ ...i, ...target })))
+    try {
+      await Promise.all(items.map(item =>
+        fetch('/api/service-items', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: item.id, ...target }),
+        }),
+      ))
+      toast.success(dn('تم تحديث الظهور', 'Visibility updated'))
+    } catch {
+      toast.error(dn('تعذر تحديث الكل', 'Bulk update failed'))
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   function resetForm() {
     setTitle(''); setDescription(''); setPrice(''); setImageUrl(''); setShowForm(false)
   }
 
   const atLimit = items.length >= DEFAULT_LIMIT
+  const showPlaceControls = !!claimedPlace
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -108,6 +200,53 @@ export default function CatalogClient({ initialItems }: { initialItems: Item[] }
       </header>
 
       <div className="px-4 py-4 space-y-3">
+
+        {/* Info banner — appears when entering from the place
+            detail page so the user understands the dual-surface
+            model in context. Hidden otherwise to keep the
+            standard catalog flow clean. */}
+        {fromPlace && showPlaceControls && (
+          <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 p-3 text-[12px] text-emerald-800 dark:text-emerald-200 leading-relaxed">
+            كتالوجك يمكن أن يظهر في بروفايلك وصفحة محلك. اختر مكان ظهور كل خدمة.
+          </div>
+        )}
+
+        {/* Bulk actions — only relevant when the user has a
+            claimed place. Single-surface users (profile only)
+            don't need them. */}
+        {showPlaceControls && items.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+              {dn('إجراءات سريعة', 'Bulk actions')}
+            </p>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => bulkSet('place')}
+                className="text-[11px] font-medium py-2 px-1 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 active:scale-[0.97] disabled:opacity-50"
+              >
+                إظهار الكل في صفحة المحل
+              </button>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => bulkSet('profile')}
+                className="text-[11px] font-medium py-2 px-1 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 active:scale-[0.97] disabled:opacity-50"
+              >
+                إظهار الكل في البروفايل
+              </button>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => bulkSet('both')}
+                className="text-[11px] font-medium py-2 px-1 rounded-xl bg-emerald-600 text-white active:scale-[0.97] disabled:opacity-50"
+              >
+                إظهار الكل في الاثنين
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Add Form */}
         {showForm && (
@@ -190,6 +329,38 @@ export default function CatalogClient({ initialItems }: { initialItems: Item[] }
                       className="text-red-400 hover:text-red-500 p-1">
                       <FiTrash2 className="w-3.5 h-3.5" />
                     </button>
+                  </div>
+
+                  {/* Per-item visibility toggles. Two compact rows
+                      with checkbox-style state. The "show on
+                      place" row is hidden for users who don't own
+                      a claimed place — keeps the editor uncluttered
+                      for residents who only have a profile catalog. */}
+                  <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 space-y-1.5">
+                    <label className="flex items-center justify-between gap-2 cursor-pointer">
+                      <span className="text-[10.5px] text-gray-600 dark:text-gray-300">
+                        يظهر في البروفايل
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={item.showOnProfile}
+                        onChange={(e) => toggleVisibility(item.id, 'showOnProfile', e.target.checked)}
+                        className="w-3.5 h-3.5 rounded text-primary-600 focus:ring-primary-500 cursor-pointer"
+                      />
+                    </label>
+                    {showPlaceControls && (
+                      <label className="flex items-center justify-between gap-2 cursor-pointer">
+                        <span className="text-[10.5px] text-gray-600 dark:text-gray-300">
+                          يظهر في صفحة المحل
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={item.showOnPlace}
+                          onChange={(e) => toggleVisibility(item.id, 'showOnPlace', e.target.checked)}
+                          className="w-3.5 h-3.5 rounded text-primary-600 focus:ring-primary-500 cursor-pointer"
+                        />
+                      </label>
+                    )}
                   </div>
                 </div>
               </div>

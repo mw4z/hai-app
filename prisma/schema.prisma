@@ -190,17 +190,26 @@ model User {
 }
 
 model ServiceItem {
-  id          String   @id @default(cuid())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      String
-  title       String                // e.g. "كبسة دجاج"
-  description String?               // optional details
-  price       Int?                  // in SAR, null = "اتصل للسعر"
-  imageUrl    String?               // product/service photo
-  sortOrder   Int      @default(0)  // display order
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  title         String                // e.g. "كبسة دجاج"
+  description   String?               // optional details
+  price         Int?                  // in SAR, null = "اتصل للسعر"
+  imageUrl      String?               // product/service photo
+  sortOrder     Int      @default(0)  // display order
+  active        Boolean  @default(true)
+  // Per-item visibility flags. Default both true so a fresh
+  // catalog item appears everywhere the owner is surfaced —
+  // public profile AND any directory place they've claimed.
+  // The catalog editor (CatalogClient) lets the owner flip
+  // these per item or via bulk actions. The owner sees ALL
+  // their items regardless of these flags; the flags only
+  // gate the PUBLIC surfaces.
+  showOnProfile Boolean  @default(true)
+  showOnPlace   Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([userId, active, sortOrder])
 }

@@ -36,7 +36,11 @@ export default async function PlaceDetailPage({
           avatarUrl: true,
           providerStatus: true,
           serviceItems: {
-            where: { active: true },
+            // Public place surface: only items the owner has
+            // explicitly opted into showing on the place. Their
+            // private catalog editor (CatalogClient) sees every
+            // item regardless of these flags.
+            where: { active: true, showOnPlace: true },
             orderBy: { sortOrder: 'asc' },
             select: {
               id: true, title: true, description: true,

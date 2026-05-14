@@ -53,6 +53,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     select: { id: true },
   })
 
+  // TODO(catalog-safety): when a dedicated claim-revoke path is
+  // added later (or if this remove path ever clears
+  // claimedByUserId), reset the previous owner's ServiceItems
+  // back to showOnProfile=true so a place-only catalog doesn't
+  // get orphaned with both visibility flags off (place page is
+  // gone, profile-only flag was false). Today the remove path
+  // leaves claimedByUserId intact and only flips status to
+  // REMOVED, so the issue doesn't trigger — but capture the
+  // dependency here for the future. Example reset:
+  //   if (place.claimedByUserId) {
+  //     await db.serviceItem.updateMany({
+  //       where: { userId: place.claimedByUserId, showOnProfile: false },
+  //       data: { showOnProfile: true },
+  //     })
+  //   }
+
   await logModAction({
     moderatorId: user.id,
     actionType: 'remove_place',
