@@ -88,6 +88,11 @@ export default function BottomNav({
   }, [userRole])
 
   const isSuperAdmin = userRole === 'SUPER_ADMIN'
+  // Admins / mods skip the resident "suggest a poll" review flow
+  // and post polls directly — the same tertiary entry-sheet link
+  // routes them to /polls/new instead of /polls/request.
+  const isPollAdmin =
+    userRole === 'SUPER_ADMIN' || userRole === 'PLATFORM_MOD' || userRole === 'NEIGHBORHOOD_MOD'
 
   // FAB now opens a 2-option sheet: Post vs Ask neighbors. The split
   // came out of the Phase 3.5 cutover — Ask is its own entry point, not
@@ -358,16 +363,24 @@ export default function BottomNav({
               </button>
             </div>
 
-            {/* Tertiary entry — small link, not a tile. Routes to the
-                resident poll-suggestion form; the form posts to
-                /api/poll-requests, which lands in the mod's review
-                queue. Direct Poll creation stays restricted to admins. */}
+            {/* Tertiary entry — small link, not a tile.
+                Role-aware destination:
+                  - Resident → /polls/request (suggest a poll, mod
+                    reviews before publication).
+                  - Admin / mod → /polls/new (direct poll creation,
+                    no review). Same surface, same affordance —
+                    only the route + label differ. */}
             <button
               type="button"
-              onClick={() => { setShowEntrySheet(false); router.push('/polls/request') }}
+              onClick={() => {
+                setShowEntrySheet(false)
+                router.push(isPollAdmin ? '/polls/new' : '/polls/request')
+              }}
               className="w-full mt-3 py-2 text-xs font-semibold text-primary-600 dark:text-primary-400 active:opacity-70 transition-opacity"
             >
-              💡 {lang === 'en' ? 'Suggest a poll to the mod' : lang === 'ur' ? 'منتظم کو پول تجویز کریں' : 'اقترح استفتاء للمشرف'}
+              {isPollAdmin
+                ? `📊 ${lang === 'en' ? 'Create a poll' : lang === 'ur' ? 'پول بنائیں' : 'إنشاء تصويت'}`
+                : `💡 ${lang === 'en' ? 'Suggest a poll to the mod' : lang === 'ur' ? 'منتظم کو پول تجویز کریں' : 'اقترح استفتاء للمشرف'}`}
             </button>
 
             <button

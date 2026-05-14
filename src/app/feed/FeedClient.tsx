@@ -183,10 +183,10 @@ export default function FeedClient({
   const [openRides, setOpenRides] = useState<any[]>(initialRides)
   const [polls, setPolls] = useState<any[]>(initialPolls)
   const [showFilter, setShowFilter] = useState(false)
-  const [showPollForm, setShowPollForm] = useState(false)
-  const [pollQuestion, setPollQuestion] = useState('')
-  const [pollOptions, setPollOptions] = useState(['', ''])
-  const [pollLoading, setPollLoading] = useState(false)
+  // Poll-creation state (showPollForm / pollQuestion / pollOptions /
+  // pollLoading) was removed when the admin poll form moved to its
+  // own /polls/new page. Surface is now reachable via the BottomNav
+  // "+" entry sheet, same row where residents see "Suggest a poll".
   const isAdmin = ['SUPER_ADMIN', 'PLATFORM_MOD', 'NEIGHBORHOOD_MOD'].includes(user.role || '')
   const [showModBanner, setShowModBanner] = useState(false)
   useEffect(() => {
@@ -738,62 +738,13 @@ export default function FeedClient({
         </div>
       )}
 
-      {/* Admin: Create poll button + form */}
-      {isAdmin && !isReadOnly && (
-        <div className="px-4 pt-3">
-          {!showPollForm ? (
-            <button onClick={() => setShowPollForm(true)}
-              className="w-full flex items-center justify-center gap-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-2xl py-3 text-sm font-medium text-purple-700 dark:text-purple-300 active:scale-[0.98]">
-              📊 {t('poll_create')}
-            </button>
-          ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-purple-200 dark:border-purple-800 p-4 space-y-3 animate-fade-in-up">
-              <h3 className="font-bold text-gray-900 dark:text-white text-sm">📊 {t('poll_create')}</h3>
-              <input type="text" value={pollQuestion} onChange={e => setPollQuestion(e.target.value)}
-                placeholder={lang !== 'en' ? 'ما هو سؤال التصويت؟' : 'What is the poll question?'}
-                className="w-full border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500" />
-              {pollOptions.map((opt, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400 w-5">{i + 1}.</span>
-                  <input type="text" value={opt} onChange={e => { const next = [...pollOptions]; next[i] = e.target.value; setPollOptions(next) }}
-                    placeholder={`${lang !== 'en' ? 'خيار' : 'Option'} ${i + 1}`}
-                    className="flex-1 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-sm bg-transparent text-gray-900 dark:text-white focus:outline-none" />
-                  {pollOptions.length > 2 && (
-                    <button onClick={() => setPollOptions(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 text-xs">✕</button>
-                  )}
-                </div>
-              ))}
-              {pollOptions.length < 6 && (
-                <button onClick={() => setPollOptions(prev => [...prev, ''])} className="text-xs text-purple-600 dark:text-purple-400 font-medium">
-                  {t('poll_add_option')}
-                </button>
-              )}
-              <div className="flex gap-2">
-                <button onClick={async () => {
-                  if (!pollQuestion.trim()) return
-                  const opts = pollOptions.filter(o => o.trim())
-                  if (opts.length < 2) { toast.error(lang === 'en' ? 'Add at least 2 options' : lang === 'ur' ? 'کم از کم 2 اختیارات شامل کریں' : 'أضف خيارين على الأقل'); return }
-                  setPollLoading(true)
-                  try {
-                    const res = await fetch('/api/polls', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: pollQuestion.trim(), options: opts }) })
-                    if (res.ok) {
-                      toast.success(lang === 'en' ? 'Poll published' : lang === 'ur' ? 'ووٹنگ شائع ہو گئی' : 'تم نشر التصويت')
-                      setShowPollForm(false); setPollQuestion(''); setPollOptions(['', ''])
-                      const pRes = await fetch('/api/polls?neighborhood=' + user.neighborhoodId)
-                      if (pRes.ok) setPolls(await pRes.json())
-                    } else { const d = await res.json(); toast.error(d.error) }
-                  } catch { toast.error('Error') }
-                  setPollLoading(false)
-                }} disabled={pollLoading}
-                  className="flex-1 bg-purple-600 text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-40 active:scale-[0.97]">
-                  {pollLoading ? <HaiSpinner /> : t('poll_publish')}
-                </button>
-                <button onClick={() => setShowPollForm(false)} className="px-4 py-2.5 text-sm text-gray-500">{lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء'}</button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Admin poll creator was moved out of the feed. Admins now
+          tap the center "+" button in the BottomNav and pick
+          "📊 إنشاء تصويت" — the same surface where residents see
+          "💡 اقترح استفتاء للمشرف". Role decides the destination:
+          admins → /polls/new (direct publish), residents →
+          /polls/request (mod review). Keeps the feed less cluttered
+          and gives both flows a single, predictable home. */}
 
       {/* Emergency alerts — pinned above everything */}
       <EmergencyBanner />
