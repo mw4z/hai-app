@@ -116,6 +116,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       id: true,
       neighborhoodId: true,
       claimedByUserId: true,
+      createdByUserId: true,
       status: true,
     },
   })
@@ -125,13 +126,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const isMod = isDirectoryModerator(user.role)
   const sameNbhd = place.neighborhoodId === user.neighborhoodId
   const isOwner = place.claimedByUserId === user.id
+  const hasOwner = !!place.claimedByUserId
+  const isCreator = place.createdByUserId === user.id
+  const isAdminScoped =
+    isSuper || (isMod && (user.role === 'PLATFORM_MOD' || sameNbhd))
 
-  // Mod authority requires same-nbhd for NEIGHBORHOOD_MOD; PLATFORM_MOD
-  // and SUPER_ADMIN are cross-neighborhood.
-  const canModEdit =
-    isSuper ||
-    (isMod && (user.role === 'PLATFORM_MOD' || sameNbhd))
-  if (!isOwner && !canModEdit) {
+  // Edit permission model:
+  //  - If the place has a claimed owner, ONLY that owner can edit
+  //    content. Admins step back — they can still moderate (remove,
+  //    reject reports) via the mod surface, but they don't edit a
+  //    business owner's listing once that owner exists.
+  //  - If the place is unclaimed, admins / mods of the nbhd / and
+  //    the original creator can curate (add photos, fix typos).
+  //  - Owner always passes regardless of whether they're also a
+  //    mod or the creator — same effective gate either way.
+  const allowed = isOwner || (!hasOwner && (isCreator || isAdminScoped))
+  if (!allowed) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
 
@@ -178,8 +188,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     updates.imageUrls = sanitizeImageUrls(raw.imageUrls)
   }
 
-  // Mod-only edits.
-  if (canModEdit) {
+  // Mod-only field edits (name / category / lat / lng / addressText /
+  // mapUrl). Even owners can't change these — they require admin
+  // review. Use the same admin gate computed at the top.
+  if (isAdminScoped) {
     if (raw.name !== undefined) {
       const v = typeof raw.name === 'string' ? raw.name.trim() : ''
       if (v.length < 2 || v.length > 80) {
@@ -242,9 +254,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     },
   })
 
-  // Audit: log mod edits. Owner edits don't go to ModActionLog —
-  // those are normal user actions on their own record.
-  if (canModEdit && !isOwner) {
+  // Audit: log mod edits. Owner / creator edits don't go to
+  // ModActionLog — those are normal user actions on their own
+  // record. Only fires when a mod or admin actually changed
+  // something on a place they don't own.
+  if (isAdminScoped && !isOwner && !isCreator) {
     await logModAction({
       moderatorId: user.id,
       actionType: 'edit_place',

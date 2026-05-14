@@ -15,13 +15,17 @@ interface Props {
   place: PublicPlace
   isOwner: boolean
   isCreator: boolean
+  /** Whether the viewer is allowed to add/remove photos on this
+   *  place. Mirrors the PATCH route: claimed owner always;
+   *  creator + admins/mods only when no one has claimed yet. */
+  canEditPhotos: boolean
 }
 
 /** Public detail page. Renders the place's identity, contact
  *  buttons, optional map link, owner's ServiceItems if applicable,
  *  and the claim / report actions. createdByUser is NEVER shown
  *  here — only a generic "أضافه أحد سكان الحي" attribution. */
-export default function DetailClient({ place, isOwner, isCreator }: Props) {
+export default function DetailClient({ place, isOwner, isCreator, canEditPhotos }: Props) {
   const { lang } = useLanguage()
   const cat = getCategoryMeta(place.category)
   const categoryLabel =
@@ -164,25 +168,39 @@ export default function DetailClient({ place, isOwner, isCreator }: Props) {
           </section>
         )}
 
-        {/* Owner controls — the claimed owner gets an inline
-            "edit photos" affordance. Other limited-field edits
-            (description / contact / hours) are deferred until
-            we have a fuller edit form; the PATCH API already
-            accepts them so we can wire the UI later without a
-            schema change. */}
-        {isOwner && (
-          <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-900/20 p-3 space-y-2">
-            <p className="text-xs text-emerald-800 dark:text-emerald-200 font-semibold">
-              ✓ {tr(
-                'You manage this place',
-                'أنت تدير هذا المكان',
-                'آپ اس جگہ کا انتظام کرتے ہیں',
-              )}
+        {/* Edit-photos affordance.
+            Visible to anyone the PATCH route would accept:
+              - claimed owner (always)
+              - creator while the place is unclaimed
+              - mods of this nbhd / PLATFORM_MOD / SUPER_ADMIN
+                while the place is unclaimed
+            The header label adapts so each role sees the right
+            context: claimed owner gets the "you manage this
+            place" badge; admins / creators get a more neutral
+            "manage photos" framing. */}
+        {canEditPhotos && (
+          <div className={`rounded-2xl border p-3 space-y-2 ${
+            isOwner
+              ? 'border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-900/20'
+              : 'border-sky-200 dark:border-sky-800/60 bg-sky-50 dark:bg-sky-900/20'
+          }`}>
+            <p className={`text-xs font-semibold ${
+              isOwner
+                ? 'text-emerald-800 dark:text-emerald-200'
+                : 'text-sky-800 dark:text-sky-200'
+            }`}>
+              {isOwner
+                ? `✓ ${tr('You manage this place', 'أنت تدير هذا المكان', 'آپ اس جگہ کا انتظام کرتے ہیں')}`
+                : isCreator
+                  ? `📝 ${tr('You added this place', 'أضفت هذا المكان', 'آپ نے یہ جگہ شامل کی')}`
+                  : `🛠️ ${tr('Admin tools', 'أدوات المشرف', 'ایڈمن ٹولز')}`}
             </p>
             <button
               type="button"
               onClick={() => setPhotoEditOpen(true)}
-              className="w-full py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold active:scale-95 transition-transform"
+              className={`w-full py-2 rounded-xl text-white text-xs font-semibold active:scale-95 transition-transform ${
+                isOwner ? 'bg-emerald-600' : 'bg-sky-600'
+              }`}
             >
               📷 {tr(
                 displayImageUrls.length > 0 ? 'Edit photos' : 'Add photos',
@@ -220,10 +238,11 @@ export default function DetailClient({ place, isOwner, isCreator }: Props) {
         {reportOpen && (
           <ReportSheet placeId={place.id} onClose={() => setReportOpen(false)} />
         )}
-        {/* Photo-edit sheet — claimed owner only. onSaved updates
-            the local override so the strip reflects the new list
-            without waiting on a route refresh. */}
-        {isOwner && (
+        {/* Photo-edit sheet — mounted for any allowed editor
+            (claimed owner, creator pre-claim, mod-of-nbhd / admin
+            pre-claim). onSaved updates the local override so the
+            strip reflects the new list without a route refresh. */}
+        {canEditPhotos && (
           <EditPhotosSheet
             placeId={place.id}
             initialUrls={displayImageUrls}

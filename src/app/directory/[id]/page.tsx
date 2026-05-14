@@ -57,6 +57,16 @@ export default async function PlaceDetailPage({
   const isOwner = place.claimedByUserId === user.id
   const isPubliclyVisible = (PUBLIC_PLACE_STATUSES as string[]).includes(place.status)
 
+  // Photo-edit gate — mirrors the PATCH route exactly:
+  //   - owner exists → ONLY the owner edits. Admins step back
+  //                    (they still moderate via /mod/directory).
+  //   - no owner yet → creator + admins can curate.
+  const hasOwner = !!place.claimedByUserId
+  const isAdminScoped =
+    isSuper || (isMod && (user.role === 'PLATFORM_MOD' || sameNbhd))
+  const canEditPhotos =
+    isOwner || (!hasOwner && (isCreator || isAdminScoped))
+
   // Visibility:
   //  - Publicly-visible places are readable cross-neighborhood
   //    (matches /api/directory GET — anyone can browse another
@@ -77,6 +87,7 @@ export default async function PlaceDetailPage({
       place={toPublicPlace(place)}
       isOwner={isOwner}
       isCreator={isCreator}
+      canEditPhotos={canEditPhotos}
     />
   )
 }
