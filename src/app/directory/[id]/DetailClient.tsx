@@ -7,6 +7,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import type { PublicPlace } from '@/lib/places/serialize'
 import { getCategoryMeta } from '@/lib/places/categories'
 import PlaceStatusBadge from '@/components/places/PlaceStatusBadge'
+import DirectoryHeader from '@/components/places/DirectoryHeader'
 
 interface Props {
   place: PublicPlace
@@ -32,10 +33,9 @@ export default function DetailClient({ place, isOwner, isCreator }: Props) {
 
   return (
     <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-gray-900">
+      <DirectoryHeader title={place.name} backHref="/directory" />
       <div className="max-w-[640px] mx-auto px-4 py-4 space-y-4">
-        <Link href="/directory" className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
-          {lang !== 'en' ? '→' : '←'} {tr('Back', 'رجوع', 'واپس')}
-        </Link>
+        {/* Back link removed — DirectoryHeader provides the back button */}
 
         <header className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-2">
           <div className="flex items-start gap-3">

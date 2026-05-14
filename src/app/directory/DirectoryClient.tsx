@@ -7,6 +7,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import type { PublicPlace } from '@/lib/places/serialize'
 import PlaceCard from '@/components/places/PlaceCard'
 import CategoryChips from '@/components/places/CategoryChips'
+import DirectoryHeader from '@/components/places/DirectoryHeader'
 
 interface Props {
   initialPlaces: PublicPlace[]
@@ -61,11 +62,9 @@ export default function DirectoryClient({ initialPlaces }: Props) {
 
   return (
     <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-gray-900">
+      <DirectoryHeader title={headerTitle} backHref="/feed" />
       <div className="max-w-[640px] mx-auto px-4 py-4 space-y-4">
-        <header className="space-y-1 pt-2">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">{headerTitle}</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{headerSubtitle}</p>
-        </header>
+        <p className="text-sm text-gray-500 dark:text-gray-400 pt-1">{headerSubtitle}</p>
 
         <div className="flex items-center gap-2">
           <div className="flex-1">

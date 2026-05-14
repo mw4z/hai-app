@@ -7,6 +7,7 @@ import type { PlaceCategory, PlaceReportType } from '@prisma/client'
 import { useLanguage } from '@/hooks/useLanguage'
 import { getCategoryMeta } from '@/lib/places/categories'
 import type { ModPlace } from '@/lib/places/serialize'
+import DirectoryHeader from '@/components/places/DirectoryHeader'
 
 interface PendingClaim {
   id: string
@@ -46,15 +47,11 @@ export default function ModDirectoryClient({ data }: Props) {
 
   return (
     <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-gray-900">
+      <DirectoryHeader
+        title={tr('Directory review', 'دليل الحي — مراجعة', 'ڈائریکٹری جائزہ')}
+        backHref="/mod"
+      />
       <div className="max-w-[760px] mx-auto px-4 py-4 space-y-4">
-        <Link href="/mod" className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
-          {lang !== 'en' ? '→' : '←'} {tr('Mod dashboard', 'لوحة الإشراف', 'موڈ ڈیش بورڈ')}
-        </Link>
-        <header>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-            {tr('Directory review', 'دليل الحي — مراجعة', 'ڈائریکٹری جائزہ')}
-          </h1>
-        </header>
 
         <div className="flex gap-2 overflow-x-auto pb-1">
           <TabBtn active={tab === 'places'}  onClick={() => setTab('places')}  label={tr('Pending places', 'طلبات الدليل', 'زیر التواء جگہیں')}  count={pendingPlaces.length} />

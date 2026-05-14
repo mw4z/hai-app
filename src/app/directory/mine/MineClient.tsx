@@ -6,6 +6,7 @@ import type { PlaceCategory } from '@prisma/client'
 import { useLanguage } from '@/hooks/useLanguage'
 import type { PublicPlace } from '@/lib/places/serialize'
 import PlaceCard from '@/components/places/PlaceCard'
+import DirectoryHeader from '@/components/places/DirectoryHeader'
 
 interface PendingClaim {
   id: string
@@ -36,13 +37,11 @@ export default function MineClient({ created, claimed, pendingClaims }: Props) {
 
   return (
     <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-gray-900">
+      <DirectoryHeader
+        title={tr('My places', 'أماكني', 'میری جگہیں')}
+        backHref="/directory"
+      />
       <div className="max-w-[640px] mx-auto px-4 py-4 space-y-4">
-        <Link href="/directory" className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
-          {lang !== 'en' ? '→' : '←'} {tr('Back', 'رجوع', 'واپس')}
-        </Link>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-          {tr('My places', 'أماكني', 'میری جگہیں')}
-        </h1>
 
         <div className="flex gap-2 overflow-x-auto pb-1">
           {tabs.map((t) => (

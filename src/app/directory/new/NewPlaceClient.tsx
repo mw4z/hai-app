@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import type { PlaceCategory } from '@prisma/client'
 import { useLanguage } from '@/hooks/useLanguage'
 import { PLACE_CATEGORIES } from '@/lib/places/categories'
+import DirectoryHeader from '@/components/places/DirectoryHeader'
 
 /** Submit form for /directory/new. MVP — no image upload (Phase 1.5).
  *  Owner-editable subset post-claim mirrors this same field list
@@ -72,22 +73,18 @@ export default function NewPlaceClient() {
 
   return (
     <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-gray-900">
+      <DirectoryHeader
+        title={tr('Add a place', 'إضافة مكان', 'جگہ شامل کریں')}
+        backHref="/directory"
+      />
       <div className="max-w-[640px] mx-auto px-4 py-4 space-y-3">
-        <Link href="/directory" className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
-          {lang !== 'en' ? '→' : '←'} {tr('Back', 'رجوع', 'واپس')}
-        </Link>
-        <header className="space-y-1">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-            {tr('Add a place', 'إضافة مكان', 'جگہ شامل کریں')}
-          </h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {tr(
-              'Your submission will be reviewed by a moderator before appearing in the directory.',
-              'سيتم مراجعة طلبك من المشرف قبل ظهوره في الدليل.',
-              'آپ کی درخواست کا جائزہ موڈریٹر لے گا۔',
-            )}
-          </p>
-        </header>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {tr(
+            'Your submission will be reviewed by a moderator before appearing in the directory.',
+            'سيتم مراجعة طلبك من المشرف قبل ظهوره في الدليل.',
+            'آپ کی درخواست کا جائزہ موڈریٹر لے گا۔',
+          )}
+        </p>
 
         <Field label={tr('Name', 'الاسم', 'نام')}>
           <input
