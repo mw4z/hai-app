@@ -8,6 +8,7 @@ import type { PlaceCategory } from '@prisma/client'
 import { useLanguage } from '@/hooks/useLanguage'
 import { PLACE_CATEGORIES } from '@/lib/places/categories'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
+import OpeningHoursPicker from '@/components/places/OpeningHoursPicker'
 import { uploadFiles } from '@/lib/upload'
 
 const MAX_IMAGES = 5
@@ -169,9 +170,12 @@ export default function NewPlaceClient() {
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} rows={3} className="input-field resize-none" />
         </Field>
 
-        <Field label={tr('Opening hours (optional)', 'ساعات العمل (اختياري)', 'اوقات کار (اختیاری)')}>
-          <input value={openingHours} onChange={(e) => setOpeningHours(e.target.value)} maxLength={300} className="input-field" />
-        </Field>
+        <div>
+          <span className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+            🕒 {tr('Opening hours (optional)', 'ساعات العمل (اختياري)', 'اوقات کار (اختیاری)')}
+          </span>
+          <OpeningHoursPicker value={openingHours} onChange={setOpeningHours} />
+        </div>
 
         {/* Image picker — up to 5 photos. Uploaded on submit. */}
         <div>
