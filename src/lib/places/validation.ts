@@ -54,6 +54,30 @@ export function isSafeMapUrl(input: string | null | undefined): boolean {
   }
 }
 
+/** Sanitize an imageUrls array for write paths. Drops anything
+ *  that doesn't look like a real https blob URL; caps the count
+ *  at 5 (same as posts). Returns the cleaned list — never throws.
+ *
+ *  Callers should pair this with the existing upload pipeline
+ *  (uploadFiles → /api/upload) which validates the file BEFORE
+ *  it ever produces one of these URLs, so by the time bytes
+ *  arrive here the only realistic shapes are Vercel-Blob hosts
+ *  or the /uploads/* fallback. */
+export const MAX_PLACE_IMAGES = 5
+export function sanitizeImageUrls(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  const cleaned: string[] = []
+  for (const u of raw) {
+    if (typeof u !== 'string') continue
+    const v = u.trim()
+    if (!v || v.length > 500) continue
+    if (!v.startsWith('https://') && !v.startsWith('/uploads/')) continue
+    cleaned.push(v)
+    if (cleaned.length >= MAX_PLACE_IMAGES) break
+  }
+  return cleaned
+}
+
 /** Permissive https-only URL check for website / instagram. */
 export function isSafeHttpsUrl(input: string | null | undefined): boolean {
   if (!input) return true

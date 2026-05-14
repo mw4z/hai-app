@@ -74,6 +74,32 @@ export default function DetailClient({ place, isOwner, isCreator }: Props) {
           </p>
         </header>
 
+        {/* Image strip — only renders when the place has photos.
+            Horizontal scroll keeps the page flowing on narrow
+            screens; each image opens in a new tab on tap for a
+            full-size view. */}
+        {place.imageUrls && place.imageUrls.length > 0 && (
+          <div className="-mx-4 px-4 overflow-x-auto">
+            <div className="flex gap-2">
+              {place.imageUrls.map((url, i) => (
+                <a
+                  key={i}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-shrink-0 block"
+                >
+                  <img
+                    src={url}
+                    alt=""
+                    className="h-44 w-auto rounded-2xl object-cover border border-gray-200 dark:border-gray-700"
+                  />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Contact + map row */}
         <div className="grid grid-cols-2 gap-2">
           {place.phone && (

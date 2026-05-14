@@ -4,7 +4,7 @@ import { getSession } from '@/lib/auth'
 import { PlaceCategory, type Prisma } from '@prisma/client'
 import { gatePublicRoute } from '@/lib/places/routeGate'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
-import { validatePlaceInput, placeLimitForUser, PLACE_LIMIT_WINDOW_MS } from '@/lib/places/validation'
+import { validatePlaceInput, placeLimitForUser, PLACE_LIMIT_WINDOW_MS, sanitizeImageUrls } from '@/lib/places/validation'
 import { toPublicPlace } from '@/lib/places/serialize'
 import { PUBLIC_PLACE_STATUSES } from '@/lib/places/statusBadge'
 
@@ -207,7 +207,11 @@ export async function POST(req: NextRequest) {
       longitude: v.value.longitude,
       addressText: v.value.addressText,
       openingHours: v.value.openingHours,
-      // imageUrls left at default [] — write-disabled in MVP.
+      // Image URLs accepted from the composer. The /api/upload
+      // endpoint validates each file's MIME + size BEFORE handing
+      // back a URL, so by the time bytes reach this row we just
+      // need to cap the array count + reject non-https junk.
+      imageUrls: sanitizeImageUrls((raw as { imageUrls?: unknown }).imageUrls),
       status: 'PENDING',
       createdByUserId: user.id,
     },

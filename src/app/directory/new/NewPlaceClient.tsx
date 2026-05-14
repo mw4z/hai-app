@@ -1,13 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import toast from 'react-hot-toast'
+import { FiX } from 'react-icons/fi'
 import type { PlaceCategory } from '@prisma/client'
 import { useLanguage } from '@/hooks/useLanguage'
 import { PLACE_CATEGORIES } from '@/lib/places/categories'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
+import { uploadFiles } from '@/lib/upload'
+
+const MAX_IMAGES = 5
 
 /** Submit form for /directory/new. MVP — no image upload (Phase 1.5).
  *  Owner-editable subset post-claim mirrors this same field list
@@ -26,8 +29,32 @@ export default function NewPlaceClient() {
   const [openingHours, setOpeningHours] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  // Image picker state — uploaded on submit, same pattern as the
+  // post composer. We hold the raw File + a blob preview URL so
+  // the picker shows thumbnails before they leave the device.
+  const [images, setImages] = useState<{ file: File; preview: string }[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const tr = (en: string, ar: string, ur: string) =>
     lang === 'en' ? en : lang === 'ur' ? ur : ar
+
+  function pickImages(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    const remaining = MAX_IMAGES - images.length
+    for (const file of files.slice(0, remaining)) {
+      if (file.size > 10 * 1024 * 1024) { toast.error(tr('Image too large', 'حجم الصورة كبير', 'تصویر بہت بڑی')); continue }
+      if (!file.type.startsWith('image/')) { toast.error(tr('Image only', 'صور فقط', 'صرف تصاویر')); continue }
+      const preview = URL.createObjectURL(file)
+      setImages((prev) => [...prev, { file, preview }])
+    }
+  }
+  function removeImage(i: number) {
+    setImages((prev) => {
+      URL.revokeObjectURL(prev[i].preview)
+      return prev.filter((_, j) => j !== i)
+    })
+  }
 
   async function submit() {
     if (submitting) return
@@ -37,6 +64,20 @@ export default function NewPlaceClient() {
     }
     setSubmitting(true)
     try {
+      // Upload images first if any were picked. Existing
+      // /api/upload validates MIME + size + multipart shape before
+      // returning the array of public URLs. Failure here aborts
+      // submit so we don't post a row with broken/missing media.
+      let imageUrls: string[] = []
+      if (images.length > 0) {
+        try {
+          imageUrls = await uploadFiles(images.map((i) => i.file))
+        } catch (err: any) {
+          toast.error(err?.message || tr('Image upload failed', 'فشل رفع الصور', 'تصاویر اپ لوڈ ناکام'))
+          setSubmitting(false)
+          return
+        }
+      }
       const res = await fetch('/api/directory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48,6 +89,7 @@ export default function NewPlaceClient() {
           mapUrl: mapUrl || undefined,
           description: description || undefined,
           openingHours: openingHours || undefined,
+          imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
         }),
       })
       const d = await res.json().catch(() => ({}))
@@ -131,6 +173,52 @@ export default function NewPlaceClient() {
           <input value={openingHours} onChange={(e) => setOpeningHours(e.target.value)} maxLength={300} className="input-field" />
         </Field>
 
+        {/* Image picker — up to 5 photos. Uploaded on submit. */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[12px] font-medium text-gray-600 dark:text-gray-400">
+              📷 {tr('Photos (optional)', 'الصور (اختياري)', 'تصاویر (اختیاری)')}
+            </span>
+            <span className="text-[11px] text-gray-400">{images.length}/{MAX_IMAGES}</span>
+          </div>
+          {images.length > 0 && (
+            <div className="flex gap-2 mb-2 overflow-x-auto">
+              {images.map((img, i) => (
+                <div key={i} className="relative flex-shrink-0">
+                  <img src={img.preview} alt="" className="w-20 h-20 object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    aria-label={tr('Remove photo', 'إزالة الصورة', 'تصویر ہٹائیں')}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                  >
+                    <FiX className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {images.length < MAX_IMAGES && (
+            <>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-3 text-sm text-gray-400 cursor-pointer hover:border-primary-300 hover:text-primary-500 transition-colors"
+              >
+                + {tr('Choose photos', 'اختر صور', 'تصاویر منتخب کریں')}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                onChange={pickImages}
+                className="hidden"
+              />
+            </>
+          )}
+        </div>
+
         <button
           onClick={submit}
           disabled={submitting}
@@ -140,14 +228,6 @@ export default function NewPlaceClient() {
             ? tr('Submitting…', 'جاري الإرسال…', 'بھیج رہا ہے…')
             : tr('Submit for review', 'إرسال للمراجعة', 'جائزے کیلئے بھیجیں')}
         </button>
-
-        <p className="text-[11px] text-gray-400 text-center mt-2">
-          {tr(
-            'Images can be added by a moderator after approval.',
-            'يمكن للمشرف إضافة الصور بعد الموافقة.',
-            'موڈریٹر منظوری کے بعد تصاویر شامل کر سکتا ہے۔',
-          )}
-        </p>
       </div>
     </main>
   )

@@ -5,7 +5,7 @@ import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { gatePublicRoute } from '@/lib/places/routeGate'
 import { isDirectoryModerator } from '@/lib/places/isDirectoryModerator'
 import { isValidSaudiPhone } from '@/lib/phone'
-import { isSafeHttpsUrl, isSafeMapUrl } from '@/lib/places/validation'
+import { isSafeHttpsUrl, isSafeMapUrl, sanitizeImageUrls } from '@/lib/places/validation'
 import { toPublicPlace } from '@/lib/places/serialize'
 import { PUBLIC_PLACE_STATUSES } from '@/lib/places/statusBadge'
 import { logModAction } from '@/lib/modAudit'
@@ -170,6 +170,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     updates.openingHours = v || null
   }
 
+  // Images — owner-editable. The sanitizer caps at MAX_PLACE_IMAGES
+  // and rejects non-https junk, so passing whatever the client sent
+  // is safe. Files are already validated upstream at /api/upload
+  // before they produce a URL.
+  if (raw.imageUrls !== undefined) {
+    updates.imageUrls = sanitizeImageUrls(raw.imageUrls)
+  }
+
   // Mod-only edits.
   if (canModEdit) {
     if (raw.name !== undefined) {
@@ -219,9 +227,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       updates.category = raw.category
     }
   }
-
-  // imageUrls is unconditionally stripped — MVP write-disabled.
-  delete updates.imageUrls
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ ok: true, place: null })
