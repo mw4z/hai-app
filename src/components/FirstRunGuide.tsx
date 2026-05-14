@@ -276,10 +276,16 @@ export default function FirstRunGuide({ enabled = true }: Props) {
   const step = STEPS[stepIndex]
   const isLast = stepIndex === STEPS.length - 1
   const isFirst = stepIndex === 0
-  const useCenter = step.position === 'center' || !targetRect
+  // A target rect with tiny dimensions means the element is in the
+  // DOM but invisible (e.g. HomeActionCard returned null because
+  // the user already dismissed it, leaving an empty wrapper div).
+  // Treat that as "no target" and fall back to the centered bubble
+  // so we never paint a spotlight at the wrong place.
+  const hasUsableRect = !!(targetRect && targetRect.width > 4 && targetRect.height > 4)
+  const useCenter = step.position === 'center' || !hasUsableRect
 
   // ── Spotlight geometry.
-  const highlight = targetRect
+  const highlight = hasUsableRect && targetRect
     ? {
         top: targetRect.top - TARGET_PADDING,
         left: targetRect.left - TARGET_PADDING,
@@ -288,10 +294,14 @@ export default function FirstRunGuide({ enabled = true }: Props) {
       }
     : null
 
-  // ── Bubble position. For centered welcome OR missing target, sit
-  //    in the middle. Otherwise anchor above or below the spotlight
-  //    based on which side has more room.
+  // ── Bubble position + arrow position. For centered welcome OR
+  //    missing/zero-size target, the bubble sits dead center with
+  //    no arrow. Otherwise anchor above or below the spotlight and
+  //    compute an arrow x-offset that lines up with the target's
+  //    horizontal center (clamped within the bubble's edges so it
+  //    doesn't fly off the rounded corners).
   let bubbleStyle: React.CSSProperties
+  let arrow: { side: 'top' | 'bottom'; left: number } | null = null
   if (useCenter) {
     bubbleStyle = {
       position: 'fixed',
@@ -327,6 +337,15 @@ export default function FirstRunGuide({ enabled = true }: Props) {
       width,
       zIndex: 10002,
     }
+    // Arrow x is the target's centre, clamped 20px in from each
+    // edge of the bubble so it always sits on the bubble's flat
+    // surface (not on a corner).
+    const targetCenterX = targetRect!.left + targetRect!.width / 2
+    const arrowLeft = Math.max(20, Math.min(width - 20, targetCenterX - left))
+    // Arrow side is the OPPOSITE side of where the bubble lives.
+    // Bubble below target → arrow on the bubble's TOP edge pointing
+    // up at the spotlight. Bubble above → arrow on BOTTOM edge.
+    arrow = { side: place === 'bottom' ? 'top' : 'bottom', left: arrowLeft }
   }
 
   const totalSteps = STEPS.length
@@ -394,9 +413,33 @@ export default function FirstRunGuide({ enabled = true }: Props) {
           so SRs read the title + body via aria-labelledby. */}
       <div
         style={bubbleStyle}
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-4 border border-emerald-100 dark:border-emerald-900/50"
+        className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-4 border border-emerald-100 dark:border-emerald-900/50"
         dir="rtl"
       >
+        {/* Solid brand-colored triangle pointing at the spotlight.
+            Single triangle instead of the bordered double-layer
+            trick — the latter fights dark mode because the inner
+            tip color has to match the bubble bg. Brand emerald
+            reads as the "guide is pointing here" cue regardless
+            of theme. Hidden on the centered welcome step. */}
+        {arrow && (
+          <span
+            aria-hidden
+            className="absolute pointer-events-none"
+            style={{
+              left: arrow.left,
+              [arrow.side === 'top' ? 'top' : 'bottom']: -10,
+              transform: 'translateX(-50%)',
+              width: 0,
+              height: 0,
+              borderLeft: '10px solid transparent',
+              borderRight: '10px solid transparent',
+              ...(arrow.side === 'top'
+                ? { borderBottom: '10px solid #00b894' }
+                : { borderTop: '10px solid #00b894' }),
+            }}
+          />
+        )}
         {/* Header — mascot + brand label + progress */}
         <div className="flex items-center gap-3 mb-3">
           <HaiGuideMascot size={48} direction={step.mascotDirection} />
