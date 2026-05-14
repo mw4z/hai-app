@@ -73,16 +73,18 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   //  - SUPER_ADMIN sees everything.
   //  - PLATFORM_MOD sees everything (cross-neighborhood).
   //  - NEIGHBORHOOD_MOD sees within their nbhd only.
-  //  - Creator / claimed owner see their own row.
-  //  - Anyone else needs the row to be publicly-visible AND in
-  //    their neighborhood.
+  //  - Creator / claimed owner see their own row regardless of status.
+  //  - Anyone else can read a publicly-visible place from ANY
+  //    neighborhood — same cross-nbhd browse pattern as
+  //    /api/directory list. Writes (claim, report, PATCH) stay
+  //    locked to the user's own neighborhood independently.
   const allowed =
     isSuper ||
     (isMod && user.role === 'PLATFORM_MOD') ||
     (isMod && user.role === 'NEIGHBORHOOD_MOD' && sameNbhd) ||
     isCreator ||
     isOwner ||
-    (isPubliclyVisible && sameNbhd)
+    isPubliclyVisible
   if (!allowed) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
   return NextResponse.json({ place: toPublicPlace(place) })

@@ -754,10 +754,16 @@ export default function FeedClient({
           (default), DirectoryEntryCard returns null and this
           wrapping div renders an empty fragment — no visual
           residue, no extra spacing. Shown only on the ALL chip
-          so it doesn't clutter category filters. */}
+          so it doesn't clutter category filters.
+          When the feed is in cross-neighborhood browse mode,
+          forward the same nbhd id to /directory so the link
+          stays in browse context. */}
       {selectedCategory === 'ALL' && (
         <div className="px-4 pt-3">
-          <DirectoryEntryCard variant="card" />
+          <DirectoryEntryCard
+            variant="card"
+            browseNeighborhoodId={isReadOnly ? browseNeighborhood?.id ?? null : null}
+          />
         </div>
       )}
 

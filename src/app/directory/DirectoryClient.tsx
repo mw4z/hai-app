@@ -11,14 +11,24 @@ import DirectoryHeader from '@/components/places/DirectoryHeader'
 
 interface Props {
   initialPlaces: PublicPlace[]
+  /** True when the user is browsing another neighborhood's
+   *  directory (via ?neighborhood=<id>). Hides the "Add a place"
+   *  affordance and shows a banner. Server enforces the
+   *  write-side restriction independently. */
+  isReadOnly?: boolean
+  browseNeighborhood?: { id: string; name: string; nameEn: string | null } | null
 }
 
 /** Directory list client. Server seeds with the first 30 visible
- *  places in the user's neighborhood; this component handles
- *  search-as-you-type + category filter. For non-empty filters
- *  we hit /api/directory so the result respects the same
- *  visibility + permission rules as the SSR slice. */
-export default function DirectoryClient({ initialPlaces }: Props) {
+ *  places in the active neighborhood (user's own or the browsed
+ *  one); this component handles search-as-you-type + category
+ *  filter. For non-empty filters we hit /api/directory with the
+ *  same `?neighborhood=` so the API returns the right slice. */
+export default function DirectoryClient({
+  initialPlaces,
+  isReadOnly = false,
+  browseNeighborhood = null,
+}: Props) {
   const { lang } = useLanguage()
   const [q, setQ] = useState('')
   const [category, setCategory] = useState<PlaceCategory | null>(null)
@@ -37,6 +47,12 @@ export default function DirectoryClient({ initialPlaces }: Props) {
     const params = new URLSearchParams()
     if (q) params.set('q', q)
     if (category) params.set('category', category)
+    // Carry browse-mode neighborhood through to the API so filtered
+    // refetches stay scoped to the same neighborhood the SSR list
+    // landed on.
+    if (isReadOnly && browseNeighborhood?.id) {
+      params.set('neighborhood', browseNeighborhood.id)
+    }
     fetch(`/api/directory?${params.toString()}`)
       .then((r) => r.json())
       .then((d) => {
@@ -46,7 +62,7 @@ export default function DirectoryClient({ initialPlaces }: Props) {
       .catch(() => {})
       .finally(() => { if (!aborted) setLoading(false) })
     return () => { aborted = true }
-  }, [q, category, initialPlaces])
+  }, [q, category, initialPlaces, isReadOnly, browseNeighborhood?.id])
 
   const empty = !loading && places.length === 0
   const headerTitle =
@@ -62,8 +78,25 @@ export default function DirectoryClient({ initialPlaces }: Props) {
 
   return (
     <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-gray-900">
-      <DirectoryHeader title={headerTitle} backHref="/feed" />
+      <DirectoryHeader
+        title={headerTitle}
+        backHref={isReadOnly ? `/feed?neighborhood=${browseNeighborhood?.id ?? ''}` : '/feed'}
+      />
       <div className="max-w-[640px] mx-auto px-4 py-4 space-y-4">
+        {/* Browse-mode banner — tells the user they're viewing
+            another neighborhood's directory in read-only mode.
+            Mirrors the same affordance the feed uses on the
+            equivalent state. */}
+        {isReadOnly && browseNeighborhood && (
+          <div className="rounded-2xl bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800/60 px-3 py-2.5 text-[12px] text-sky-800 dark:text-sky-200">
+            {lang === 'en'
+              ? `Browsing ${browseNeighborhood.nameEn ?? browseNeighborhood.name} — read only`
+              : lang === 'ur'
+                ? `${browseNeighborhood.name} براؤز کر رہے ہیں — صرف پڑھنے کیلئے`
+                : `تتصفّح دليل حي ${browseNeighborhood.name} — قراءة فقط`}
+          </div>
+        )}
+
         <p className="text-sm text-gray-500 dark:text-gray-400 pt-1">{headerSubtitle}</p>
 
         <div className="flex items-center gap-2">
@@ -76,12 +109,17 @@ export default function DirectoryClient({ initialPlaces }: Props) {
               className="w-full px-4 py-3 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-[15px] focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
-          <Link
-            href="/directory/new"
-            className="flex-shrink-0 px-4 py-3 rounded-2xl bg-primary-600 text-white text-sm font-semibold active:scale-95 transition-transform"
-          >
-            +
-          </Link>
+          {/* Hide "Add a place" when browsing another neighborhood —
+              you can only submit to your own. Server enforces this
+              independently. */}
+          {!isReadOnly && (
+            <Link
+              href="/directory/new"
+              className="flex-shrink-0 px-4 py-3 rounded-2xl bg-primary-600 text-white text-sm font-semibold active:scale-95 transition-transform"
+            >
+              +
+            </Link>
+          )}
         </div>
 
         <CategoryChips selected={category} onSelect={setCategory} />
@@ -98,14 +136,18 @@ export default function DirectoryClient({ initialPlaces }: Props) {
             <p className="text-gray-500 dark:text-gray-400 text-sm">
               {q || category
                 ? (lang === 'en' ? 'No matching places.' : 'لا توجد أماكن مطابقة.')
-                : (lang === 'en' ? 'No places yet — be the first to add one.' : 'لا توجد أماكن بعد — كن أول من يضيف.')}
+                : isReadOnly
+                  ? (lang === 'en' ? 'No places in this neighborhood yet.' : 'لا توجد أماكن في هذا الحي بعد.')
+                  : (lang === 'en' ? 'No places yet — be the first to add one.' : 'لا توجد أماكن بعد — كن أول من يضيف.')}
             </p>
-            <Link
-              href="/directory/new"
-              className="inline-block mt-4 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-semibold active:scale-95"
-            >
-              {lang === 'en' ? 'Add a place' : 'إضافة مكان'}
-            </Link>
+            {!isReadOnly && (
+              <Link
+                href="/directory/new"
+                className="inline-block mt-4 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-semibold active:scale-95"
+              >
+                {lang === 'en' ? 'Add a place' : 'إضافة مكان'}
+              </Link>
+            )}
           </div>
         ) : (
           <div className="space-y-2.5 pb-8">

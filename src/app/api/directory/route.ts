@@ -42,11 +42,14 @@ export async function GET(req: NextRequest) {
   if (gate) return gate
 
   const url = req.nextUrl
-  const isSuper = isSuperAdminRole(user.role)
+  // Any authenticated user may read another neighborhood's directory
+  // by passing ?neighborhood=<id> — matches the cross-neighborhood
+  // browse pattern used by /api/feed. Writes (POST below) stay locked
+  // to user.neighborhoodId, so cross-nbhd is read-only at the API
+  // surface regardless of which UI hits this endpoint.
+  const queryNbhd = url.searchParams.get('neighborhood')
   const targetNeighborhoodId =
-    isSuper && url.searchParams.get('neighborhood')
-      ? String(url.searchParams.get('neighborhood'))
-      : user.neighborhoodId
+    (queryNbhd && queryNbhd.length > 0 ? queryNbhd : user.neighborhoodId)
   if (!targetNeighborhoodId) {
     return NextResponse.json({ places: [] })
   }

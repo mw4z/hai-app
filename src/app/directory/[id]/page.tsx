@@ -57,13 +57,19 @@ export default async function PlaceDetailPage({
   const isOwner = place.claimedByUserId === user.id
   const isPubliclyVisible = (PUBLIC_PLACE_STATUSES as string[]).includes(place.status)
 
+  // Visibility:
+  //  - Publicly-visible places are readable cross-neighborhood
+  //    (matches /api/directory GET — anyone can browse another
+  //    neighborhood's directory, only writes are locked).
+  //  - PENDING / REJECTED / REMOVED stay scoped: creator, owner,
+  //    mod-of-that-nbhd, PLATFORM_MOD, SUPER_ADMIN.
   const allowed =
     isSuper ||
     (isMod && user.role === 'PLATFORM_MOD') ||
     (isMod && user.role === 'NEIGHBORHOOD_MOD' && sameNbhd) ||
     isCreator ||
     isOwner ||
-    (isPubliclyVisible && sameNbhd)
+    isPubliclyVisible
   if (!allowed) notFound()
 
   return (
