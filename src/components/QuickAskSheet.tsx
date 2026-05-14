@@ -330,7 +330,7 @@ export default function QuickAskSheet({
         <div className="px-4 pt-2 pb-8">
 
           {/* Suggestion chips */}
-          <p className="text-xs text-gray-400 mb-2">اختر من الشائع أو اكتب طلبك:</p>
+          <p className="text-xs text-gray-400 mb-2">وش تبحث عنه؟ اختر من الشائع أو اكتب بكلماتك:</p>
           <div className="flex flex-wrap gap-2 mb-4">
             {SUGGESTIONS.map(s => (
               <button

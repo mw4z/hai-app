@@ -20,6 +20,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import type { TranslationKey } from '@/lib/i18n'
 import { fullName } from '@/lib/displayName'
 import HighlightsSection, { type HighlightItemPayload } from '@/components/HighlightsSection'
+import HomeActionCard from '@/components/feed/HomeActionCard'
 
 // v2 filter chips — REQUESTS is a special intent-based chip (not a
 // PostCategory value) elevated to position 2 to surface request
@@ -748,6 +749,13 @@ export default function FeedClient({
 
       {/* Emergency alerts — pinned above everything */}
       <EmergencyBanner />
+
+      {/* Quick-start action grid. Pure UI helper: 4 buttons that
+          route to existing pages so a first-time user doesn't have
+          to learn the category taxonomy to do anything. Hidden on
+          cross-neighborhood browse (read-only mode) and once the
+          user dismisses it (versioned localStorage, permanent at v1). */}
+      {!isReadOnly && <HomeActionCard />}
 
       {/* Neighborhood Directory CTA — gated entirely on
           NEXT_PUBLIC_DIRECTORY_ENABLED. When the flag is unset
