@@ -163,7 +163,8 @@ export default function OpeningHoursPicker({ value, onChange }: Props) {
                 value={openTime}
                 onChange={(e) => setOpenTime(e.target.value)}
                 dir="ltr"
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                style={{ textAlign: 'center' }}
+                className="w-full px-2 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </label>
             <label className="block">
@@ -175,7 +176,8 @@ export default function OpeningHoursPicker({ value, onChange }: Props) {
                 value={closeTime}
                 onChange={(e) => setCloseTime(e.target.value)}
                 dir="ltr"
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                style={{ textAlign: 'center' }}
+                className="w-full px-2 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </label>
           </div>
@@ -203,27 +205,28 @@ export default function OpeningHoursPicker({ value, onChange }: Props) {
                 </button>
               </div>
             </div>
-            {/* Fixed 7-column grid — guarantees all 7 days fit on
-                one line even on a 360px phone. Short abbreviations
-                ("سبت / أحد / إثن / ثلا / أرب / خمس / جمع") instead
-                of full names so the chips stay readable + uniform.
-                The full day name shows up in the live preview line
-                below for confirmation. */}
-            <div className="grid grid-cols-7 gap-1">
+            {/* Flex-wrap layout so we can show the FULL day name
+                ("السبت / الأحد / الإثنين / الثلاثاء / الأربعاء /
+                الخميس / الجمعة") instead of the previous cryptic
+                3-char abbreviations. On narrow phones the row
+                wraps to a second line; on tablets all 7 chips
+                fit on one row. Each chip sizes to its own text so
+                wider words like "الأربعاء" don't crowd the
+                shorter ones. */}
+            <div className="flex flex-wrap gap-1.5">
               {DAYS.map((d) => {
                 const active = days.includes(d.index)
-                const label =
-                  lang === 'en' ? d.shortEn : lang === 'ur' ? d.shortUr : d.shortAr
+                const label = lang === 'en' ? d.en : lang === 'ur' ? d.ur : d.ar
                 return (
                   <button
                     key={d.index}
                     type="button"
                     onClick={() => toggleDay(d.index)}
-                    aria-label={lang === 'en' ? d.en : lang === 'ur' ? d.ur : d.ar}
-                    className={`py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
+                    aria-label={label}
+                    className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors ${
                       active
                         ? 'bg-primary-600 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                     }`}
                   >
                     {label}
