@@ -185,7 +185,7 @@ export default function GuideRestartSheet({
           إعادة شرح التطبيق
         </h2>
         <p className="text-[12px] text-gray-500 dark:text-gray-400 mb-4">
-          اختر اللي تبي حيّان يشرحه لك من جديد.
+          اختر اللي تبي مرشد حي يشرحه لك من جديد.
         </p>
 
         <div className="space-y-2">
@@ -200,7 +200,7 @@ export default function GuideRestartSheet({
                 شرح الصفحة الرئيسية
               </span>
               <span className="block text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                نعيدك للرئيسية ويبدأ حيّان من البداية.
+                نعيدك للرئيسية ويبدأ مرشد حي من البداية.
               </span>
             </span>
           </button>
@@ -232,7 +232,7 @@ export default function GuideRestartSheet({
                 إظهار كل الإرشادات مرة ثانية
               </span>
               <span className="block text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">
-                نعيد تفعيل كل إرشادات حيّان على هذا الجهاز.
+                نعيد تفعيل كل إرشادات مرشد حي على هذا الجهاز.
               </span>
             </span>
           </button>

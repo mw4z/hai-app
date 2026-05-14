@@ -465,7 +465,7 @@ export default function ContextualGuide({
           <HaiGuideMascot size={48} direction="idle" />
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 leading-tight">
-              حيّان
+              مرشد حي
             </p>
             <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
               {stepIndex + 1} / {totalSteps}
