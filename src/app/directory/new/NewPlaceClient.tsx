@@ -28,6 +28,11 @@ export default function NewPlaceClient() {
   const [mapUrl, setMapUrl] = useState('')
   const [description, setDescription] = useState('')
   const [openingHours, setOpeningHours] = useState('')
+  const [website, setWebsite] = useState('')
+  const [instagram, setInstagram] = useState('')
+  const [snapchat, setSnapchat] = useState('')
+  const [tiktok, setTiktok] = useState('')
+  const [twitter, setTwitter] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   // "I'm the owner" toggle — if true, we submit a claim request
@@ -95,6 +100,11 @@ export default function NewPlaceClient() {
           mapUrl: mapUrl || undefined,
           description: description || undefined,
           openingHours: openingHours || undefined,
+          website: website || undefined,
+          instagram: instagram || undefined,
+          snapchat: snapchat || undefined,
+          tiktok: tiktok || undefined,
+          x: twitter || undefined,
           imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
           // Owner-claim payload — API picks these up and creates
           // a PlaceClaimRequest alongside the place so the mod
@@ -179,6 +189,46 @@ export default function NewPlaceClient() {
         <Field label={tr('Description (optional)', 'الوصف (اختياري)', 'تفصیل (اختیاری)')}>
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} rows={3} className="input-field resize-none" />
         </Field>
+
+        <Field label={tr('Website (optional)', 'الموقع (اختياري)', 'ویب سائٹ (اختیاری)')}>
+          <input value={website} onChange={(e) => setWebsite(e.target.value)} dir="ltr" placeholder="https://" className="input-field" />
+        </Field>
+
+        <div>
+          <span className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+            {tr('Social handles (optional)', 'حسابات التواصل (اختياري)', 'سوشل ہینڈلز (اختیاری)')}
+          </span>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              value={instagram}
+              onChange={(e) => setInstagram(e.target.value)}
+              dir="ltr"
+              placeholder="📷 Instagram @handle"
+              className="input-field"
+            />
+            <input
+              value={snapchat}
+              onChange={(e) => setSnapchat(e.target.value)}
+              dir="ltr"
+              placeholder="👻 Snapchat @handle"
+              className="input-field"
+            />
+            <input
+              value={tiktok}
+              onChange={(e) => setTiktok(e.target.value)}
+              dir="ltr"
+              placeholder="🎵 TikTok @handle"
+              className="input-field"
+            />
+            <input
+              value={twitter}
+              onChange={(e) => setTwitter(e.target.value)}
+              dir="ltr"
+              placeholder="✕ X / Twitter @handle"
+              className="input-field"
+            />
+          </div>
+        </div>
 
         <div>
           <span className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1.5">

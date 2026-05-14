@@ -171,9 +171,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (v && !isSafeHttpsUrl(v)) return NextResponse.json({ error: 'الموقع الإلكتروني غير صالح' }, { status: 400 })
     updates.website = v || null
   }
-  if (raw.instagram !== undefined) {
-    const v = typeof raw.instagram === 'string' ? raw.instagram.trim().slice(0, 100) : ''
-    updates.instagram = v || null
+  // Social handles — same shape, same gate, four platforms.
+  // Each accepts either a bare handle ("@hai") or an https URL.
+  for (const key of ['instagram', 'snapchat', 'tiktok', 'x'] as const) {
+    if (raw[key] !== undefined) {
+      const v = typeof raw[key] === 'string' ? (raw[key] as string).trim().slice(0, 200) : ''
+      updates[key] = v || null
+    }
   }
   if (raw.openingHours !== undefined) {
     const v = typeof raw.openingHours === 'string' ? raw.openingHours.trim().slice(0, 300) : ''

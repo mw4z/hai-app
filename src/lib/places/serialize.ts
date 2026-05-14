@@ -23,6 +23,9 @@ export interface PublicPlace {
   whatsapp: string | null
   website: string | null
   instagram: string | null
+  snapchat: string | null
+  tiktok: string | null
+  x: string | null
   mapUrl: string | null
   latitude: number | null
   longitude: number | null
@@ -95,6 +98,9 @@ export function toPublicPlace(place: PlaceWithRelations): PublicPlace {
     whatsapp: place.whatsapp,
     website: place.website,
     instagram: place.instagram,
+    snapchat: place.snapchat,
+    tiktok: place.tiktok,
+    x: place.x,
     mapUrl: place.mapUrl,
     latitude: place.latitude,
     longitude: place.longitude,

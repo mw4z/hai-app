@@ -172,6 +172,41 @@ export default function DetailClient({
           )}
         </div>
 
+        {/* Social links row — only renders the platforms that
+            actually have a value. Each is a tiny pill so up to four
+            of them fit on a single line on phone widths. The handle
+            is normalized to a real URL; bare @handles get expanded
+            to the platform's own profile path. */}
+        {(place.website || place.instagram || place.snapchat || place.tiktok || place.x) && (
+          <div className="flex flex-wrap gap-2">
+            {place.website && (
+              <a href={place.website} target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-700 dark:text-gray-200 active:scale-95">
+                🌐 {tr('Website', 'الموقع', 'ویب سائٹ')}
+              </a>
+            )}
+            {place.instagram && (
+              <a href={socialHref('instagram', place.instagram)} target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-xl bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800/60 text-xs font-medium text-pink-700 dark:text-pink-300 active:scale-95">
+                📷 Instagram
+              </a>
+            )}
+            {place.snapchat && (
+              <a href={socialHref('snapchat', place.snapchat)} target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/60 text-xs font-medium text-yellow-800 dark:text-yellow-300 active:scale-95">
+                👻 Snapchat
+              </a>
+            )}
+            {place.tiktok && (
+              <a href={socialHref('tiktok', place.tiktok)} target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-700/40 border border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-800 dark:text-gray-200 active:scale-95">
+                🎵 TikTok
+              </a>
+            )}
+            {place.x && (
+              <a href={socialHref('x', place.x)} target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-700/40 border border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-800 dark:text-gray-200 active:scale-95">
+                ✕ X
+              </a>
+            )}
+          </div>
+        )}
+
         {/* Owner's ServiceItems if the place is claimed by a provider */}
         {place.ownerServiceItems && place.ownerServiceItems.length > 0 && (
           <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-2.5">
@@ -431,6 +466,23 @@ function ReportSheet({ placeId, onClose }: { placeId: string; onClose: () => voi
       </button>
     </SheetShell>
   )
+}
+
+/** Normalize a stored social value into a clickable URL. Owners
+ *  can store either a full https URL or a bare handle ("@hai",
+ *  "hai"). We never assume a bare value is safe to embed in a path
+ *  blindly — we strip leading @ and pass through encodeURIComponent
+ *  so weird characters can't break out of the URL. */
+function socialHref(platform: 'instagram' | 'snapchat' | 'tiktok' | 'x', raw: string): string {
+  const v = raw.trim()
+  if (v.startsWith('http://') || v.startsWith('https://')) return v
+  const handle = encodeURIComponent(v.replace(/^@+/, ''))
+  switch (platform) {
+    case 'instagram': return `https://instagram.com/${handle}`
+    case 'snapchat':  return `https://snapchat.com/add/${handle}`
+    case 'tiktok':    return `https://tiktok.com/@${handle}`
+    case 'x':         return `https://x.com/${handle}`
+  }
 }
 
 function SheetShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {

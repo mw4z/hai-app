@@ -4,7 +4,9 @@ import { useState } from 'react'
 import toast from 'react-hot-toast'
 import type { PlaceCategory } from '@prisma/client'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { PLACE_CATEGORIES } from '@/lib/places/categories'
+import OpeningHoursPicker from '@/components/places/OpeningHoursPicker'
 import type { PublicPlace } from '@/lib/places/serialize'
 
 interface Props {
@@ -53,9 +55,17 @@ export default function EditPlaceInfoSheet({
   const [whatsapp, setWhatsapp] = useState(place.whatsapp ?? '')
   const [website, setWebsite] = useState(place.website ?? '')
   const [instagram, setInstagram] = useState(place.instagram ?? '')
+  const [snapchat, setSnapchat] = useState(place.snapchat ?? '')
+  const [tiktok, setTiktok] = useState(place.tiktok ?? '')
+  const [twitter, setTwitter] = useState(place.x ?? '')
   const [description, setDescription] = useState(place.description ?? '')
   const [openingHours, setOpeningHours] = useState(place.openingHours ?? '')
   const [saving, setSaving] = useState(false)
+
+  // Freeze background scroll while the sheet is open. Same shared
+  // hook used by ImageLightbox / AttachmentMenu so behavior is
+  // consistent across every modal surface in the app.
+  useBodyScrollLock(open)
 
   if (!open) return null
 
@@ -77,6 +87,9 @@ export default function EditPlaceInfoSheet({
       if (whatsapp !== (place.whatsapp ?? '')) body.whatsapp = whatsapp
       if (website !== (place.website ?? '')) body.website = website
       if (instagram !== (place.instagram ?? '')) body.instagram = instagram
+      if (snapchat !== (place.snapchat ?? '')) body.snapchat = snapchat
+      if (tiktok !== (place.tiktok ?? '')) body.tiktok = tiktok
+      if (twitter !== (place.x ?? '')) body.x = twitter
       if (description !== (place.description ?? '')) body.description = description
       if (openingHours !== (place.openingHours ?? '')) body.openingHours = openingHours
 
@@ -106,6 +119,9 @@ export default function EditPlaceInfoSheet({
         whatsapp: 'whatsapp' in body ? (whatsapp || null) : place.whatsapp,
         website: 'website' in body ? (website || null) : place.website,
         instagram: 'instagram' in body ? (instagram || null) : place.instagram,
+        snapchat: 'snapchat' in body ? (snapchat || null) : place.snapchat,
+        tiktok: 'tiktok' in body ? (tiktok || null) : place.tiktok,
+        x: 'x' in body ? (twitter || null) : place.x,
         description: 'description' in body ? (description || null) : place.description,
         openingHours: 'openingHours' in body ? (openingHours || null) : place.openingHours,
       })
@@ -178,13 +194,44 @@ export default function EditPlaceInfoSheet({
           </Field>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <Field label={tr('Website', 'الموقع', 'ویب سائٹ')}>
-            <input value={website} onChange={(e) => setWebsite(e.target.value)} dir="ltr" placeholder="https://" className="input-field" />
-          </Field>
-          <Field label="Instagram">
-            <input value={instagram} onChange={(e) => setInstagram(e.target.value)} dir="ltr" placeholder="@handle" className="input-field" />
-          </Field>
+        <Field label={tr('Website', 'الموقع', 'ویب سائٹ')}>
+          <input value={website} onChange={(e) => setWebsite(e.target.value)} dir="ltr" placeholder="https://" className="input-field" />
+        </Field>
+
+        <div>
+          <span className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">
+            {tr('Social handles', 'حسابات التواصل', 'سوشل ہینڈلز')}
+          </span>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              value={instagram}
+              onChange={(e) => setInstagram(e.target.value)}
+              dir="ltr"
+              placeholder="📷 Instagram @handle"
+              className="input-field"
+            />
+            <input
+              value={snapchat}
+              onChange={(e) => setSnapchat(e.target.value)}
+              dir="ltr"
+              placeholder="👻 Snapchat @handle"
+              className="input-field"
+            />
+            <input
+              value={tiktok}
+              onChange={(e) => setTiktok(e.target.value)}
+              dir="ltr"
+              placeholder="🎵 TikTok @handle"
+              className="input-field"
+            />
+            <input
+              value={twitter}
+              onChange={(e) => setTwitter(e.target.value)}
+              dir="ltr"
+              placeholder="✕ X / Twitter @handle"
+              className="input-field"
+            />
+          </div>
         </div>
 
         <Field label={tr('Description', 'الوصف', 'تفصیل')}>
@@ -197,15 +244,12 @@ export default function EditPlaceInfoSheet({
           />
         </Field>
 
-        <Field label={tr('Opening hours', 'ساعات العمل', 'اوقات کار')}>
-          <input
-            value={openingHours}
-            onChange={(e) => setOpeningHours(e.target.value)}
-            maxLength={300}
-            placeholder={tr('e.g. Daily 9 AM - 10 PM', 'مثال: يومياً 9 ص - 10 م', 'مثلاً: روزانہ 9 ص - 10 ش')}
-            className="input-field"
-          />
-        </Field>
+        <div>
+          <span className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">
+            🕒 {tr('Opening hours', 'ساعات العمل', 'اوقات کار')}
+          </span>
+          <OpeningHoursPicker value={openingHours} onChange={setOpeningHours} />
+        </div>
 
         <div className="flex gap-2 pt-2 sticky bottom-0 bg-white dark:bg-gray-800 pb-1">
           <button

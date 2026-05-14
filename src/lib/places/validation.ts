@@ -99,6 +99,9 @@ export interface PlaceInput {
   whatsapp?: unknown
   website?: unknown
   instagram?: unknown
+  snapchat?: unknown
+  tiktok?: unknown
+  x?: unknown
   mapUrl?: unknown
   latitude?: unknown
   longitude?: unknown
@@ -115,6 +118,9 @@ export interface ValidatedPlace {
   whatsapp: string | null
   website: string | null
   instagram: string | null
+  snapchat: string | null
+  tiktok: string | null
+  x: string | null
   mapUrl: string | null
   latitude: number | null
   longitude: number | null
@@ -179,20 +185,35 @@ export function validatePlaceInput(input: PlaceInput): ValidationOk | Validation
     }
     website = input.website.trim()
   }
-  let instagram: string | null = null
-  if (typeof input.instagram === 'string' && input.instagram.trim()) {
-    const v = input.instagram.trim()
-    if (v.length > 100) {
-      return { ok: false, error: 'رابط إنستقرام غير صالح', field: 'instagram' }
+  // Social handle gate — shared for instagram / snapchat / tiktok /
+  // x. Accepts either a bare handle ("@hai") or a full https URL.
+  // Anything else (http://, javascript:, mailto:) is rejected.
+  const socialField = (raw: unknown, fieldName: string): string | null | ValidationErr => {
+    if (typeof raw !== 'string' || !raw.trim()) return null
+    const v = raw.trim()
+    if (v.length > 200) {
+      return { ok: false, error: 'رابط الحساب غير صالح', field: fieldName }
     }
-    // Allow either a handle (@x / x) or a full https URL.
-    if (v.startsWith('http')) {
-      if (!isSafeHttpsUrl(v)) {
-        return { ok: false, error: 'رابط إنستقرام غير صالح', field: 'instagram' }
-      }
+    if (v.startsWith('http') && !isSafeHttpsUrl(v)) {
+      return { ok: false, error: 'رابط الحساب غير صالح', field: fieldName }
     }
-    instagram = v
+    return v
   }
+  const instagramRes = socialField(input.instagram, 'instagram')
+  if (instagramRes && typeof instagramRes === 'object' && 'ok' in instagramRes) return instagramRes
+  const instagram = (instagramRes as string | null) ?? null
+
+  const snapchatRes = socialField(input.snapchat, 'snapchat')
+  if (snapchatRes && typeof snapchatRes === 'object' && 'ok' in snapchatRes) return snapchatRes
+  const snapchat = (snapchatRes as string | null) ?? null
+
+  const tiktokRes = socialField(input.tiktok, 'tiktok')
+  if (tiktokRes && typeof tiktokRes === 'object' && 'ok' in tiktokRes) return tiktokRes
+  const tiktok = (tiktokRes as string | null) ?? null
+
+  const xRes = socialField(input.x, 'x')
+  if (xRes && typeof xRes === 'object' && 'ok' in xRes) return xRes
+  const x = (xRes as string | null) ?? null
   let mapUrl: string | null = null
   if (typeof input.mapUrl === 'string' && input.mapUrl.trim()) {
     if (!isSafeMapUrl(input.mapUrl.trim())) {
@@ -254,6 +275,9 @@ export function validatePlaceInput(input: PlaceInput): ValidationOk | Validation
       whatsapp,
       website,
       instagram,
+      snapchat,
+      tiktok,
+      x,
       mapUrl,
       latitude,
       longitude,

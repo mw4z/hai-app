@@ -1644,7 +1644,16 @@ model PlaceListing {
   phone           String?
   whatsapp        String?
   website         String?
+  // Social handles — keep one column per platform to match the
+  // User.providerStatus model (User.socialLinks is JSON for
+  // historical reasons; new tables use explicit columns so we
+  // can index / migrate per platform if needed). Stored as the
+  // raw handle ("@hai") or a full https:// URL; the renderer
+  // builds the right deep-link.
   instagram       String?
+  snapchat        String?
+  tiktok          String?
+  x               String?  // X / Twitter
   mapUrl          String?
   latitude        Float?
   longitude       Float?

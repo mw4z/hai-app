@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { FiX, FiPlus } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { uploadFiles } from '@/lib/upload'
 
 const MAX_IMAGES = 5
@@ -47,6 +48,13 @@ export default function EditPhotosSheet({
   const [pendingFiles, setPendingFiles] = useState<{ file: File; preview: string }[]>([])
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Freeze background scroll while the sheet is open. Shared hook
+  // already used by ImageLightbox + AttachmentMenu — sets
+  // html.overflow:hidden + body.position:fixed for the lock's
+  // lifetime so the page underneath can't be panned while the
+  // sheet sits on top.
+  useBodyScrollLock(open)
 
   const tr = (en: string, ar: string, ur: string) =>
     lang === 'en' ? en : lang === 'ur' ? ur : ar
