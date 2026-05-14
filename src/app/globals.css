@@ -604,6 +604,19 @@ html.dark::before {
 html:has(.hai-screen) {
   --hai-safe-top-bg: var(--hai-bg);
 }
+/* Same idea for Neighborhood Directory pages. The wrappers use
+   bg-gray-50 (light) / bg-gray-900 (dark) for a slightly recessed
+   feel vs the white card surfaces inside; without this override
+   the safe-area cover paints --hai-surface-1 (white / #101619)
+   and reads as a lighter band above the gray page below — the
+   "header doesn't match" symptom on /directory, /directory/[id],
+   /directory/new, /directory/mine, and /mod/directory. */
+html:has(.hai-directory-screen) {
+  --hai-safe-top-bg: rgb(249 250 251); /* gray-50 */
+}
+html.dark:has(.hai-directory-screen) {
+  --hai-safe-top-bg: rgb(17 24 39); /* gray-900 */
+}
 /* Safe-area cover is now rendered as #__hai_safe_top in layout.tsx —
    a real DOM node paints reliably across WKWebView versions. */
 .sticky.top-0 {

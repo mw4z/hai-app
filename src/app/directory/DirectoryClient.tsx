@@ -60,7 +60,7 @@ export default function DirectoryClient({ initialPlaces }: Props) {
     lang === 'en' ? "What are you looking for?" : lang === 'ur' ? 'کیا ڈھونڈ رہے ہیں؟' : 'وش تدور عليه؟'
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-[640px] mx-auto px-4 py-4 space-y-4">
         <header className="space-y-1 pt-2">
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">{headerTitle}</h1>

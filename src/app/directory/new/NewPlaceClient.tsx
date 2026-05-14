@@ -71,7 +71,7 @@ export default function NewPlaceClient() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-[640px] mx-auto px-4 py-4 space-y-3">
         <Link href="/directory" className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
           {lang !== 'en' ? '→' : '←'} {tr('Back', 'رجوع', 'واپس')}
