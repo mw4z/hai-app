@@ -35,7 +35,7 @@ const ASK_GUIDE_STEPS = [
   {
     targetSelector: null,
     title: 'اسأل أهل الحي',
-    body: 'اكتب طلبك أو سؤالك، ونَبْضي يساعدك توصل للقسم المناسب.',
+    body: 'اكتب طلبك أو سؤالك، وحيّان يساعدك توصل للقسم المناسب.',
     position: 'center' as const,
     nextLabel: 'التالي',
   },

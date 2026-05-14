@@ -8,6 +8,31 @@ import type { PublicPlace } from '@/lib/places/serialize'
 import PlaceCard from '@/components/places/PlaceCard'
 import CategoryChips from '@/components/places/CategoryChips'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
+import ContextualGuide from '@/components/ContextualGuide'
+
+const DIRECTORY_GUIDE_STEPS = [
+  {
+    targetSelector: null,
+    title: 'دليل الحي',
+    body: 'هنا تلقى الأماكن والخدمات الثابتة داخل حيّك.',
+    position: 'center' as const,
+    nextLabel: 'التالي',
+  },
+  {
+    targetSelector: '[data-guide="dir-search"]',
+    title: 'ابحث بسرعة',
+    body: 'صيدلية، مطعم، مغسلة، عيادة، أو محل قريب.',
+    position: 'bottom' as const,
+    nextLabel: 'التالي',
+  },
+  {
+    targetSelector: '[data-guide="dir-add"]',
+    title: 'أضف مكان',
+    body: 'إذا تعرف مكان مفيد، أضفه ويراجعه المشرف.',
+    position: 'bottom' as const,
+    nextLabel: 'فهمت',
+  },
+]
 
 interface Props {
   initialPlaces: PublicPlace[]
@@ -115,6 +140,7 @@ export default function DirectoryClient({
           {!isReadOnly && (
             <Link
               href="/directory/new"
+              data-guide="dir-add"
               className="flex-shrink-0 px-4 py-3 rounded-2xl bg-primary-600 text-white text-sm font-semibold active:scale-95 transition-transform"
             >
               +
@@ -122,7 +148,9 @@ export default function DirectoryClient({
           )}
         </div>
 
-        <CategoryChips selected={category} onSelect={setCategory} />
+        <div data-guide="dir-search">
+          <CategoryChips selected={category} onSelect={setCategory} />
+        </div>
 
         {loading && (
           <p className="text-center text-xs text-gray-400 py-2">
@@ -155,6 +183,16 @@ export default function DirectoryClient({
           </div>
         )}
       </div>
+      {/* Directory guide — only mount in own-neighborhood mode.
+          The page itself is server-gated by directoryServerMode(),
+          so reaching DirectoryClient already implies the directory
+          is accessible. Read-only browse hides the "Add a place"
+          affordance, so step 3 would dead-end there — skip the
+          whole tour in browse mode instead. No directory flags
+          are flipped or exposed here. */}
+      {!isReadOnly && (
+        <ContextualGuide guideId="directory" steps={DIRECTORY_GUIDE_STEPS} />
+      )}
     </main>
   )
 }

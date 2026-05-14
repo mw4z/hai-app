@@ -23,6 +23,31 @@ import ImageLightbox from '@/components/ImageLightbox'
 import ReportUserSheet from '@/components/ReportUserSheet'
 import { showApiError } from '@/lib/apiError'
 import { fullName } from '@/lib/displayName'
+import ContextualGuide from '@/components/ContextualGuide'
+
+const CHAT_GUIDE_STEPS = [
+  {
+    targetSelector: null,
+    title: 'المحادثة',
+    body: 'تواصل مع الطرف الآخر بأمان داخل التطبيق.',
+    position: 'center' as const,
+    nextLabel: 'التالي',
+  },
+  {
+    targetSelector: '[data-guide="chat-input"]',
+    title: 'اكتب رسالتك',
+    body: 'تقدر ترسل نص، موقع، صورة أو جهة اتصال حسب المتاح.',
+    position: 'top' as const,
+    nextLabel: 'التالي',
+  },
+  {
+    targetSelector: '[data-guide="chat-close"]',
+    title: 'أنهِ التعامل',
+    body: 'بعد الاتفاق، أغلق المحادثة وقيّم التجربة.',
+    position: 'bottom' as const,
+    nextLabel: 'فهمت',
+  },
+]
 
 interface ReplyTo {
   id: string
@@ -1290,7 +1315,7 @@ export default function ChatClient({
           <FiFlag className="w-[18px] h-[18px] text-gray-500 dark:text-gray-400" />
         </button>
         {!closed && (
-          <button data-tour="chat-close" onClick={closeThread}
+          <button data-tour="chat-close" data-guide="chat-close" onClick={closeThread}
             className="text-xs text-red-500 dark:text-red-400 flex items-center gap-1 px-3 py-1.5 rounded-full bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors font-medium">
             <FiX className="w-3.5 h-3.5" />{t('thread_close')}
           </button>
@@ -1781,6 +1806,7 @@ export default function ChatClient({
                   push the send button off the visible edge of the screen on
                   some Android devices (Samsung curved screens reported it). */}
               <input ref={textInputRef} type="text" value={text} onChange={e => setText(e.target.value)}
+                data-guide="chat-input"
                 placeholder={t('thread_placeholder')}
                 className="flex-1 min-w-0 bg-white/10 dark:bg-white/10 rounded-full px-4 py-2.5 text-[15px] text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-400/40 focus:border-primary-400/30 transition-shadow"
                 maxLength={1000} />
@@ -2240,6 +2266,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
           )
         })()}
       </div>
+      <ContextualGuide guideId="chat" steps={CHAT_GUIDE_STEPS} />
     </div>
   )
 }

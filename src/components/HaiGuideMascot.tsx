@@ -166,7 +166,7 @@ export default function HaiGuideMascot({
            the hand would orbit a phantom point in the air. */
         .hai-mascot__arm-wave {
           transform-origin: 52px 39px;
-          animation: hai-mascot-wave 6s ease-in-out infinite;
+          animation: hai-mascot-wave 3.8s ease-in-out infinite;
         }
 
         /* Eye blink pivots around each eye's own centre — that
@@ -190,29 +190,46 @@ export default function HaiGuideMascot({
           animation-name: hai-mascot-wave-strong;
         }
 
+        /* Float: bigger amplitude so the breathing is actually
+           visible at 48px. Was -2px which was almost imperceptible
+           on bright backgrounds. */
         @keyframes hai-mascot-float {
           0%, 100% { transform: translateY(0); }
-          50%      { transform: translateY(-2px); }
+          50%      { transform: translateY(-5px); }
         }
+        /* Glow: wider opacity range so the halo clearly pulses. */
         @keyframes hai-mascot-glow {
-          0%, 100% { opacity: 0.7; }
+          0%, 100% { opacity: 0.5; }
           50%      { opacity: 1; }
         }
+        /* Blink: occupy a slightly longer keyframe band so the
+           eyes visibly close instead of disappearing for one
+           frame. */
         @keyframes hai-mascot-blink {
-          0%, 92%, 100% { transform: scaleY(1); }
-          94%, 98%      { transform: scaleY(0.1); }
+          0%, 88%, 100% { transform: scaleY(1); }
+          92%, 97%      { transform: scaleY(0.08); }
         }
+        /* Wave: larger angles, more swings per cycle, and the
+           "wave window" now spans roughly 40% of the cycle so
+           the gesture is clearly readable instead of a brief
+           twitch. */
         @keyframes hai-mascot-wave {
-          0%, 70%, 100% { transform: rotate(0deg); }
-          78%           { transform: rotate(-22deg); }
-          86%           { transform: rotate(14deg); }
-          92%           { transform: rotate(-8deg); }
+          0%, 55%, 100% { transform: rotate(0deg); }
+          63%           { transform: rotate(-32deg); }
+          71%           { transform: rotate(22deg); }
+          79%           { transform: rotate(-18deg); }
+          87%           { transform: rotate(12deg); }
+          93%           { transform: rotate(-4deg); }
         }
+        /* Directional variant — even larger swings to act as a
+           "look this way" cue when the bubble points at a target
+           offscreen-ish. */
         @keyframes hai-mascot-wave-strong {
-          0%, 65%, 100% { transform: rotate(0deg); }
-          75%           { transform: rotate(-32deg); }
-          85%           { transform: rotate(18deg); }
-          92%           { transform: rotate(-10deg); }
+          0%, 50%, 100% { transform: rotate(0deg); }
+          60%           { transform: rotate(-42deg); }
+          70%           { transform: rotate(28deg); }
+          80%           { transform: rotate(-20deg); }
+          88%           { transform: rotate(14deg); }
         }
 
         @media (prefers-reduced-motion: reduce) {

@@ -36,11 +36,18 @@ const PATH_TO_GUIDE: { match: string; guideId: string }[] = [
   { match: '/post/new', guideId: 'post-new' },
   { match: '/rides/new', guideId: 'rides-new' },
   { match: '/profile', guideId: 'profile' },
+  // Order matters — '/threads/[id]' must be matched before '/threads'.
+  { match: '/threads/', guideId: 'chat' },
+  { match: '/directory', guideId: 'directory' },
 ]
 
 const FIRST_RUN_KEY = 'hai:first-run-guide-v1'
 const GLOBAL_KILL_KEY = 'hai:context-guides-disabled-v1'
 const CTX_GUIDE_PREFIX = 'hai:context-guide:'
+// HomeActionCard has its own dismiss key. When the user replays the
+// feed tour we want the action card back too — otherwise step 2
+// ("ابدأ من هنا") points at a card that isn't on the page.
+const HOME_ACTION_CARD_KEY = 'hai:home-action-card-dismissed-v1'
 
 function detectGuideForPath(pathname: string | null): string | null {
   if (!pathname) return null
@@ -98,6 +105,10 @@ export default function GuideRestartSheet({
   function restartFeed() {
     try {
       localStorage.removeItem(FIRST_RUN_KEY)
+      // Bring the HomeActionCard back so step 2 of the feed tour
+      // has its real spotlight target instead of falling through
+      // to a centered bubble.
+      localStorage.removeItem(HOME_ACTION_CARD_KEY)
     } catch {
       // ignore
     }
@@ -134,6 +145,9 @@ export default function GuideRestartSheet({
     try {
       localStorage.removeItem(GLOBAL_KILL_KEY)
       localStorage.removeItem(FIRST_RUN_KEY)
+      // Bring the HomeActionCard back too — it's part of the
+      // "first-time experience" the user is asking to see again.
+      localStorage.removeItem(HOME_ACTION_CARD_KEY)
     } catch {
       // ignore
     }
@@ -171,7 +185,7 @@ export default function GuideRestartSheet({
           إعادة شرح التطبيق
         </h2>
         <p className="text-[12px] text-gray-500 dark:text-gray-400 mb-4">
-          اختر اللي تبي نَبْضي يشرحه لك من جديد.
+          اختر اللي تبي حيّان يشرحه لك من جديد.
         </p>
 
         <div className="space-y-2">
@@ -186,7 +200,7 @@ export default function GuideRestartSheet({
                 شرح الصفحة الرئيسية
               </span>
               <span className="block text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                نعيدك للرئيسية ويبدأ نَبْضي من البداية.
+                نعيدك للرئيسية ويبدأ حيّان من البداية.
               </span>
             </span>
           </button>
@@ -218,7 +232,7 @@ export default function GuideRestartSheet({
                 إظهار كل الإرشادات مرة ثانية
               </span>
               <span className="block text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">
-                نعيد تفعيل كل إرشادات نَبْضي على هذا الجهاز.
+                نعيد تفعيل كل إرشادات حيّان على هذا الجهاز.
               </span>
             </span>
           </button>
