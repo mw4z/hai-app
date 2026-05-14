@@ -65,16 +65,17 @@ interface Props {
 }
 
 const GLOBAL_KILL_KEY = 'hai:context-guides-disabled-v1'
+// The recent-guide throttle was retired — first at 90s (too aggressive),
+// then dialed down to 8s (still tripping up intentional navigation
+// between guided pages — user reported /post/new and /threads/[id]
+// tours "not working"). With per-guide localStorage keys, a one-time
+// auto-start gate, and the "تخطي كل الإرشادات" kill switch already
+// in place, an additional cooldown only ever produced silent
+// surprises. Page navigations now fire their guide immediately.
+//
+// We keep LAST_SHOWN_KEY as a no-op writer for forward compatibility
+// in case a future diagnostic wants to observe firing cadence.
 const LAST_SHOWN_KEY = 'hai:context-guide:last-shown'
-// Original plan called for a 90s rolling window. That turned out
-// to be too aggressive in practice — a user finishing the feed
-// tour and immediately navigating to /directory got silently
-// blocked for over a minute. Real-world rapid navigation that
-// would feel spammy happens in the ~5s window, not 90. Keep a
-// tiny buffer to absorb the case of an auto-redirect between
-// guided pages, but let intentional navigation fire immediately.
-const THROTTLE_WINDOW_MS = 8_000
-const THROTTLE_DEFER_MS = 3_000
 
 const BUBBLE_WIDTH = 320
 const BUBBLE_HEIGHT_ESTIMATE = 230
@@ -126,18 +127,6 @@ export default function ContextualGuide({
       } catch {
         // localStorage unavailable — show the guide; better than
         // silently skipping for users in private mode.
-      }
-
-      // Throttle: if another contextual guide was shown in the
-      // last 90s, defer this one for another 10s to avoid stacking.
-      try {
-        const last = Number(sessionStorage.getItem(LAST_SHOWN_KEY) || '0')
-        if (Number.isFinite(last) && last > 0 && Date.now() - last < THROTTLE_WINDOW_MS) {
-          timer = setTimeout(tryStart, THROTTLE_DEFER_MS)
-          return
-        }
-      } catch {
-        // sessionStorage unavailable — proceed without throttle
       }
 
       // Don't sit on top of an emergency / warning banner.
