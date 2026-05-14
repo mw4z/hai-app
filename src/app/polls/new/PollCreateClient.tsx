@@ -81,7 +81,13 @@ export default function PollCreateClient() {
         className="fixed top-0 left-0 right-0 z-30 pointer-events-none bg-gray-50 dark:bg-gray-900"
         style={{ height: 'env(safe-area-inset-top, 0px)' }}
       />
-      <header className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur border-b border-gray-200/60 dark:border-gray-700/60">
+      {/* Header is fully opaque (no /95 + backdrop-blur). Same
+          rationale as DirectoryHeader: the translucent + blur
+          combo produced a visibly darker tone than the
+          surrounding solid bg-gray-900, so the bar read as a
+          separate band on dark mode. Solid bg matches the
+          page wrapper and the safe-area cover above. */}
+      <header className="sticky top-0 z-30 bg-gray-50 dark:bg-gray-900 border-b border-gray-200/60 dark:border-gray-700/60">
         <div className="max-w-[640px] mx-auto px-3 py-2.5 flex items-center gap-2">
           <button
             type="button"
