@@ -66,8 +66,15 @@ interface Props {
 
 const GLOBAL_KILL_KEY = 'hai:context-guides-disabled-v1'
 const LAST_SHOWN_KEY = 'hai:context-guide:last-shown'
-const THROTTLE_WINDOW_MS = 90_000
-const THROTTLE_DEFER_MS = 10_000
+// Original plan called for a 90s rolling window. That turned out
+// to be too aggressive in practice — a user finishing the feed
+// tour and immediately navigating to /directory got silently
+// blocked for over a minute. Real-world rapid navigation that
+// would feel spammy happens in the ~5s window, not 90. Keep a
+// tiny buffer to absorb the case of an auto-redirect between
+// guided pages, but let intentional navigation fire immediately.
+const THROTTLE_WINDOW_MS = 8_000
+const THROTTLE_DEFER_MS = 3_000
 
 const BUBBLE_WIDTH = 320
 const BUBBLE_HEIGHT_ESTIMATE = 230
