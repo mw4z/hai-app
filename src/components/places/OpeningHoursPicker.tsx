@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useLanguage } from '@/hooks/useLanguage'
+import { FiPlus, FiX } from 'react-icons/fi'
 
 /**
  * Opening hours picker for places.
@@ -12,9 +13,12 @@ import { useLanguage } from '@/hooks/useLanguage'
  *      - 8 ص - 11 م يومياً
  *      - 9 ص - 10 م (السبت - الخميس)
  *      - 5 م - 11 م يومياً
- *  2. Custom — expandable card with two HTML5 time inputs and a
- *     7-chip day picker. Default is "all 7 days"; the user can
- *     toggle days off if the shop is closed any day.
+ *      - "صباحاً ومساءً" preset for the common Saudi split-shift case
+ *  2. Custom — expandable card. The user can have up to 3 SHIFTS
+ *     per place (most common in KSA: morning + evening, with a
+ *     siesta gap; a few places do 3 distinct shifts). Each shift
+ *     has its own Open/Close pair. The 7-chip day picker is shared
+ *     across all shifts — same days open in every shift.
  *
  * Output is a single human-readable Arabic string written back to
  * the parent via onChange. Schema-wise this is still PlaceListing.
@@ -37,26 +41,26 @@ interface DayMeta {
   ar: string
   en: string
   ur: string
-  /** Short label used in the compact 7-column chip row. Full
-   *  Arabic names like الأربعاء are too wide to fit 7-across on
-   *  a phone — they wrap onto multiple lines and look messy. */
-  shortAr: string
-  shortEn: string
-  shortUr: string
 }
 
 const DAYS: DayMeta[] = [
-  { index: 0, ar: 'السبت',    en: 'Sat', ur: 'سنیچر',    shortAr: 'سبت', shortEn: 'Sat', shortUr: 'سنیچر' },
-  { index: 1, ar: 'الأحد',    en: 'Sun', ur: 'اتوار',    shortAr: 'أحد', shortEn: 'Sun', shortUr: 'اتوار' },
-  { index: 2, ar: 'الإثنين',  en: 'Mon', ur: 'پیر',      shortAr: 'إثن', shortEn: 'Mon', shortUr: 'پیر' },
-  { index: 3, ar: 'الثلاثاء', en: 'Tue', ur: 'منگل',     shortAr: 'ثلا', shortEn: 'Tue', shortUr: 'منگل' },
-  { index: 4, ar: 'الأربعاء', en: 'Wed', ur: 'بدھ',      shortAr: 'أرب', shortEn: 'Wed', shortUr: 'بدھ' },
-  { index: 5, ar: 'الخميس',  en: 'Thu', ur: 'جمعرات',   shortAr: 'خمس', shortEn: 'Thu', shortUr: 'جمعرات' },
-  { index: 6, ar: 'الجمعة',  en: 'Fri', ur: 'جمعہ',     shortAr: 'جمع', shortEn: 'Fri', shortUr: 'جمعہ' },
+  { index: 0, ar: 'السبت',    en: 'Sat', ur: 'سنیچر' },
+  { index: 1, ar: 'الأحد',    en: 'Sun', ur: 'اتوار' },
+  { index: 2, ar: 'الإثنين',  en: 'Mon', ur: 'پیر' },
+  { index: 3, ar: 'الثلاثاء', en: 'Tue', ur: 'منگل' },
+  { index: 4, ar: 'الأربعاء', en: 'Wed', ur: 'بدھ' },
+  { index: 5, ar: 'الخميس',  en: 'Thu', ur: 'جمعرات' },
+  { index: 6, ar: 'الجمعة',  en: 'Fri', ur: 'جمعہ' },
 ]
 
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
 const SAT_TO_THU = [0, 1, 2, 3, 4, 5]
+const MAX_SHIFTS = 3
+
+interface Shift {
+  open: string
+  close: string
+}
 
 export default function OpeningHoursPicker({ value, onChange }: Props) {
   const { lang } = useLanguage()
@@ -65,8 +69,10 @@ export default function OpeningHoursPicker({ value, onChange }: Props) {
 
   // Custom-mode state.
   const [mode, setMode] = useState<'preset' | 'custom' | 'closed'>('preset')
-  const [openTime, setOpenTime] = useState('09:00')
-  const [closeTime, setCloseTime] = useState('22:00')
+  // Multi-shift state. First shift defaults to a typical 9 AM - 10
+  // PM range; the user adds a second shift (e.g. evening-only after
+  // siesta) by tapping "+ إضافة فترة".
+  const [shifts, setShifts] = useState<Shift[]>([{ open: '09:00', close: '22:00' }])
   const [days, setDays] = useState<number[]>(ALL_DAYS)
 
   // Echo the current value back to the parent whenever the
@@ -74,9 +80,9 @@ export default function OpeningHoursPicker({ value, onChange }: Props) {
   // onChange so it doesn't depend on this effect.
   useEffect(() => {
     if (mode !== 'custom') return
-    onChange(formatCustom(openTime, closeTime, days, lang as 'ar' | 'en' | 'ur'))
+    onChange(formatCustom(shifts, days, lang as 'ar' | 'en' | 'ur'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, openTime, closeTime, days])
+  }, [mode, shifts, days])
 
   function applyPreset(preset: string) {
     setMode('preset')
@@ -87,6 +93,26 @@ export default function OpeningHoursPicker({ value, onChange }: Props) {
     setDays((prev) =>
       prev.includes(idx) ? prev.filter((d) => d !== idx) : [...prev, idx].sort((a, b) => a - b),
     )
+  }
+
+  function updateShift(i: number, patch: Partial<Shift>) {
+    setShifts((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)))
+  }
+
+  function addShift() {
+    if (shifts.length >= MAX_SHIFTS) return
+    // Sensible default: start the new shift right after the
+    // previous one ended, with a 4-hour duration. Better UX than
+    // dropping the user into 09:00-22:00 again.
+    const last = shifts[shifts.length - 1]
+    const nextOpen = addHours(last.close, 1)
+    const nextClose = addHours(nextOpen, 4)
+    setShifts((prev) => [...prev, { open: nextOpen, close: nextClose }])
+  }
+
+  function removeShift(i: number) {
+    if (shifts.length <= 1) return
+    setShifts((prev) => prev.filter((_, idx) => idx !== i))
   }
 
   // Trilingual preset labels — computed once per language so the
@@ -111,6 +137,15 @@ export default function OpeningHoursPicker({ value, onChange }: Props) {
       key: 'evening-5-11',
       label: tr('Evenings 5 - 11 PM', 'يومياً 5 - 11 م', 'روزانہ 5 - 11 ش'),
       emoji: '🌙',
+    },
+    {
+      key: 'split-9-1-5-11',
+      label: tr(
+        'Daily 9 AM - 1 PM, 5 - 11 PM',
+        'يومياً 9 ص - 1 م، 5 - 11 م',
+        'روزانہ 9 ص - 1 ش، 5 - 11 ش',
+      ),
+      emoji: '🌗',
     },
   ]
 
@@ -150,36 +185,82 @@ export default function OpeningHoursPicker({ value, onChange }: Props) {
         </button>
       </div>
 
-      {/* Custom mode — two time inputs + day toggles. */}
+      {/* Custom mode — multi-shift time picker + day toggles. */}
       {mode === 'custom' && (
         <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block">
-              <span className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">
-                {tr('Opens', 'يفتح', 'کھلتا ہے')}
-              </span>
-              <input
-                type="time"
-                value={openTime}
-                onChange={(e) => setOpenTime(e.target.value)}
-                dir="ltr"
-                style={{ textAlign: 'center' }}
-                className="w-full px-2 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-            </label>
-            <label className="block">
-              <span className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">
-                {tr('Closes', 'يغلق', 'بند ہوتا ہے')}
-              </span>
-              <input
-                type="time"
-                value={closeTime}
-                onChange={(e) => setCloseTime(e.target.value)}
-                dir="ltr"
-                style={{ textAlign: 'center' }}
-                className="w-full px-2 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-            </label>
+          {/* Shifts list. Each shift = one open/close pair in its
+              own small block. Multiple shifts cover the very common
+              KSA pattern of morning + evening operations split by a
+              siesta gap. */}
+          <div className="space-y-2.5">
+            {shifts.map((shift, i) => (
+              <div
+                key={i}
+                className="relative rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-2.5"
+              >
+                {shifts.length > 1 && (
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400">
+                      {tr(`Shift ${i + 1}`, `الفترة ${i + 1}`, `شفٹ ${i + 1}`)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeShift(i)}
+                      aria-label={tr('Remove shift', 'إزالة الفترة', 'شفٹ ہٹائیں')}
+                      className="w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 flex items-center justify-center active:scale-95"
+                    >
+                      <FiX className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+                {/* Time inputs side-by-side. Each input is wrapped
+                    in a dir="ltr" label so iOS WKWebView's native
+                    time picker renders its HH:MM AM/PM chunks in
+                    LTR layout regardless of the page's RTL parent
+                    direction — previously the rendered text drifted
+                    past the bordered input edge in RTL pages. */}
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block" dir="ltr">
+                    <span className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1 text-start" dir="rtl">
+                      {tr('Opens', 'يفتح', 'کھلتا ہے')}
+                    </span>
+                    <input
+                      type="time"
+                      value={shift.open}
+                      onChange={(e) => updateShift(i, { open: e.target.value })}
+                      style={{ textAlign: 'center', minWidth: '6.5rem' }}
+                      className="w-full px-2 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </label>
+                  <label className="block" dir="ltr">
+                    <span className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1 text-start" dir="rtl">
+                      {tr('Closes', 'يغلق', 'بند ہوتا ہے')}
+                    </span>
+                    <input
+                      type="time"
+                      value={shift.close}
+                      onChange={(e) => updateShift(i, { close: e.target.value })}
+                      style={{ textAlign: 'center', minWidth: '6.5rem' }}
+                      className="w-full px-2 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </label>
+                </div>
+              </div>
+            ))}
+
+            {/* "Add another shift" — appears only while we're under
+                the cap. Adds a new shift starting 1h after the last
+                one closed, lasting 4h by default. */}
+            {shifts.length < MAX_SHIFTS && (
+              <button
+                type="button"
+                onClick={addShift}
+                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 text-[12px] font-semibold text-gray-500 dark:text-gray-400 active:scale-[0.98] transition-transform"
+              >
+                <FiPlus className="w-3.5 h-3.5" />
+                {tr('Add another shift', 'إضافة فترة', 'مزید شفٹ شامل کریں')}
+              </button>
+            )}
           </div>
 
           <div>
@@ -205,14 +286,7 @@ export default function OpeningHoursPicker({ value, onChange }: Props) {
                 </button>
               </div>
             </div>
-            {/* Flex-wrap layout so we can show the FULL day name
-                ("السبت / الأحد / الإثنين / الثلاثاء / الأربعاء /
-                الخميس / الجمعة") instead of the previous cryptic
-                3-char abbreviations. On narrow phones the row
-                wraps to a second line; on tablets all 7 chips
-                fit on one row. Each chip sizes to its own text so
-                wider words like "الأربعاء" don't crowd the
-                shorter ones. */}
+            {/* Flex-wrap layout with full day names. */}
             <div className="flex flex-wrap gap-1.5">
               {DAYS.map((d) => {
                 const active = days.includes(d.index)
@@ -245,7 +319,7 @@ export default function OpeningHoursPicker({ value, onChange }: Props) {
           {days.length > 0 && (
             <p className="text-[11px] text-gray-500 dark:text-gray-400 px-1 leading-snug">
               <span className="font-semibold">{tr('Preview:', 'معاينة:', 'پیش نظارہ:')}</span>{' '}
-              {formatCustom(openTime, closeTime, days, lang as 'ar' | 'en' | 'ur')}
+              {formatCustom(shifts, days, lang as 'ar' | 'en' | 'ur')}
             </p>
           )}
         </div>
@@ -265,24 +339,40 @@ export default function OpeningHoursPicker({ value, onChange }: Props) {
   )
 }
 
+/** Add `hours` to an "HH:MM" string, wrapping around midnight. */
+function addHours(time: string, hours: number): string {
+  const [hStr, mStr] = (time || '00:00').split(':')
+  const h = parseInt(hStr, 10) || 0
+  const m = parseInt(mStr, 10) || 0
+  const total = (h * 60 + m + hours * 60 + 24 * 60) % (24 * 60)
+  const hh = Math.floor(total / 60).toString().padStart(2, '0')
+  const mm = (total % 60).toString().padStart(2, '0')
+  return `${hh}:${mm}`
+}
+
 /** Build the human-readable string saved to PlaceListing.openingHours.
- *  Smart formatting:
- *    - 7/7 days → "يومياً 9:00 ص - 10:00 م"
- *    - Sat-Thu  → "السبت - الخميس 9:00 ص - 10:00 م"
- *    - Other contiguous range → "السبت - الأربعاء ..."
- *    - Non-contiguous → list with commas */
+ *
+ *  Output shape:
+ *   - One shift, 7 days: "يومياً 9:00 ص - 10:00 م"
+ *   - One shift, Sat-Thu: "السبت - الخميس 9:00 ص - 10:00 م"
+ *   - Two shifts: "يومياً 9 ص - 1 م، 5 - 11 م"  (Arabic comma
+ *     between ranges; day prefix appears once at the front)
+ */
 function formatCustom(
-  open: string,
-  close: string,
+  shifts: Shift[],
   days: number[],
   lang: 'ar' | 'en' | 'ur',
 ): string {
-  if (days.length === 0) return ''
+  if (days.length === 0 || shifts.length === 0) return ''
   const sorted = [...days].sort((a, b) => a - b)
-  const openLabel = formatTime(open, lang)
-  const closeLabel = formatTime(close, lang)
   const dayPart = formatDays(sorted, lang)
-  return `${dayPart} ${openLabel} - ${closeLabel}`
+  const shiftSeparator = lang === 'en' ? ', ' : '، '
+  const shiftParts = shifts.map((s) => {
+    const o = formatTime(s.open, lang)
+    const c = formatTime(s.close, lang)
+    return `${o} - ${c}`
+  })
+  return `${dayPart} ${shiftParts.join(shiftSeparator)}`
 }
 
 function formatTime(time: string, lang: 'ar' | 'en' | 'ur'): string {
