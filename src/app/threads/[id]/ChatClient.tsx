@@ -23,31 +23,14 @@ import ImageLightbox from '@/components/ImageLightbox'
 import ReportUserSheet from '@/components/ReportUserSheet'
 import { showApiError } from '@/lib/apiError'
 import { fullName } from '@/lib/displayName'
-import ContextualGuide from '@/components/ContextualGuide'
-
-const CHAT_GUIDE_STEPS = [
-  {
-    targetSelector: null,
-    title: 'المحادثة',
-    body: 'تواصل مع الطرف الآخر بأمان داخل التطبيق.',
-    position: 'center' as const,
-    nextLabel: 'التالي',
-  },
-  {
-    targetSelector: '[data-guide="chat-input"]',
-    title: 'اكتب رسالتك',
-    body: 'تقدر ترسل نص، موقع، صورة أو جهة اتصال حسب المتاح.',
-    position: 'top' as const,
-    nextLabel: 'التالي',
-  },
-  {
-    targetSelector: '[data-guide="chat-close"]',
-    title: 'أنهِ التعامل',
-    body: 'بعد الاتفاق، أغلق المحادثة وقيّم التجربة.',
-    position: 'bottom' as const,
-    nextLabel: 'فهمت',
-  },
-]
+// Chat-page contextual tour was removed after user report ("DM
+// chats are broke after we added the tour"). Chats are time-
+// sensitive — users open them to send a message right now, not
+// to be tutored — and the overlay's full-screen wrapper was
+// catching pointer events that the chat surface needs.
+// Markers (data-guide="chat-input" / data-guide="chat-close")
+// stay on the elements for forward compatibility; only the
+// auto-mounted overlay is gone.
 
 interface ReplyTo {
   id: string
@@ -2266,7 +2249,6 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
           )
         })()}
       </div>
-      <ContextualGuide guideId="chat" steps={CHAT_GUIDE_STEPS} />
     </div>
   )
 }

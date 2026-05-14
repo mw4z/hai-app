@@ -36,8 +36,9 @@ const PATH_TO_GUIDE: { match: string; guideId: string }[] = [
   { match: '/post/new', guideId: 'post-new' },
   { match: '/rides/new', guideId: 'rides-new' },
   { match: '/profile', guideId: 'profile' },
-  // Order matters — '/threads/[id]' must be matched before '/threads'.
-  { match: '/threads/', guideId: 'chat' },
+  // /threads/[id] intentionally not registered — the chat-page
+  // tour was removed; "شرح هذه الصفحة" from a chat should fall
+  // through to the "لا يوجد شرح مخصص" toast.
   { match: '/directory', guideId: 'directory' },
 ]
 
