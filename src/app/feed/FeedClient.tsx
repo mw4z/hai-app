@@ -21,6 +21,7 @@ import type { TranslationKey } from '@/lib/i18n'
 import { fullName } from '@/lib/displayName'
 import HighlightsSection, { type HighlightItemPayload } from '@/components/HighlightsSection'
 import HomeActionCard from '@/components/feed/HomeActionCard'
+import FirstRunGuide from '@/components/FirstRunGuide'
 
 // v2 filter chips — REQUESTS is a special intent-based chip (not a
 // PostCategory value) elevated to position 2 to surface request
@@ -663,6 +664,7 @@ export default function FeedClient({
               display: block (see useLayoutEffect in QuickAskSheet). */}
           <button
             data-tour="new-post"
+            data-firstrun="post"
             type="button"
             onClick={() => {
               // Order matters on iOS:
@@ -754,8 +756,14 @@ export default function FeedClient({
           route to existing pages so a first-time user doesn't have
           to learn the category taxonomy to do anything. Hidden on
           cross-neighborhood browse (read-only mode) and once the
-          user dismisses it (versioned localStorage, permanent at v1). */}
-      {!isReadOnly && <HomeActionCard />}
+          user dismisses it (versioned localStorage, permanent at v1).
+          The data-firstrun marker is the spotlight target for step
+          2 of the FirstRunGuide. */}
+      {!isReadOnly && (
+        <div data-firstrun="home-actions">
+          <HomeActionCard />
+        </div>
+      )}
 
       {/* Neighborhood Directory CTA — gated entirely on
           NEXT_PUBLIC_DIRECTORY_ENABLED. When the flag is unset
@@ -886,6 +894,12 @@ export default function FeedClient({
       </div>{/* /hai-app-shell__scroll */}
 
       {/* BottomNav is mounted globally in src/app/layout.tsx */}
+
+      {/* First-run guided tour — مرشد حي. Self-mounts once per
+          device (localStorage hai:first-run-guide-v1), suppressed
+          on cross-neighborhood browse, defers paint while an
+          EmergencyBanner is on screen. */}
+      <FirstRunGuide enabled={!isReadOnly} />
 
       {/* Pre-mount QuickAskSheet so the keyboard rises the same frame
           the user taps the search bar — see commit notes. The sheet

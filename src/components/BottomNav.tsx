@@ -172,6 +172,7 @@ export default function BottomNav({
 
   return (
     <nav
+      data-firstrun="bottom-nav"
       className="fixed bottom-0 right-0 left-0 z-10"
       style={{
         // Full-width background on tablets/iPad so the tab bar spans
