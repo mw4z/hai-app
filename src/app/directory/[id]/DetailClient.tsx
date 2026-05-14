@@ -8,6 +8,7 @@ import type { PublicPlace } from '@/lib/places/serialize'
 import { getCategoryMeta } from '@/lib/places/categories'
 import PlaceStatusBadge from '@/components/places/PlaceStatusBadge'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
+import EditPhotosSheet from '@/components/places/EditPhotosSheet'
 import { buildWhatsAppHref } from '@/lib/phone'
 
 interface Props {
@@ -28,6 +29,12 @@ export default function DetailClient({ place, isOwner, isCreator }: Props) {
 
   const [reportOpen, setReportOpen] = useState(false)
   const [claimOpen, setClaimOpen] = useState(false)
+  const [photoEditOpen, setPhotoEditOpen] = useState(false)
+  // Local override for imageUrls so the EditPhotosSheet save can
+  // reflect immediately without a router.refresh(). Falls back
+  // to the server-rendered list when null.
+  const [localImageUrls, setLocalImageUrls] = useState<string[] | null>(null)
+  const displayImageUrls = localImageUrls ?? place.imageUrls
 
   const tr = (en: string, ar: string, ur: string) =>
     lang === 'en' ? en : lang === 'ur' ? ur : ar
@@ -78,10 +85,10 @@ export default function DetailClient({ place, isOwner, isCreator }: Props) {
             Horizontal scroll keeps the page flowing on narrow
             screens; each image opens in a new tab on tap for a
             full-size view. */}
-        {place.imageUrls && place.imageUrls.length > 0 && (
+        {displayImageUrls && displayImageUrls.length > 0 && (
           <div className="-mx-4 px-4 overflow-x-auto">
             <div className="flex gap-2">
-              {place.imageUrls.map((url, i) => (
+              {displayImageUrls.map((url, i) => (
                 <a
                   key={i}
                   href={url}
@@ -157,14 +164,32 @@ export default function DetailClient({ place, isOwner, isCreator }: Props) {
           </section>
         )}
 
-        {/* Owner controls (limited-field edit deferred to a follow-up form) */}
+        {/* Owner controls — the claimed owner gets an inline
+            "edit photos" affordance. Other limited-field edits
+            (description / contact / hours) are deferred until
+            we have a fuller edit form; the PATCH API already
+            accepts them so we can wire the UI later without a
+            schema change. */}
         {isOwner && (
-          <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-900/20 p-3 text-xs text-emerald-700 dark:text-emerald-300">
-            {tr(
-              'You manage this place. Editing tools are coming soon.',
-              'أنت تدير هذا المكان. أدوات التحرير ستتوفر قريباً.',
-              'آپ اس جگہ کا انتظام کرتے ہیں۔ ترمیم کے ٹولز جلد دستیاب ہوں گے۔',
-            )}
+          <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-900/20 p-3 space-y-2">
+            <p className="text-xs text-emerald-800 dark:text-emerald-200 font-semibold">
+              ✓ {tr(
+                'You manage this place',
+                'أنت تدير هذا المكان',
+                'آپ اس جگہ کا انتظام کرتے ہیں',
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={() => setPhotoEditOpen(true)}
+              className="w-full py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold active:scale-95 transition-transform"
+            >
+              📷 {tr(
+                displayImageUrls.length > 0 ? 'Edit photos' : 'Add photos',
+                displayImageUrls.length > 0 ? 'تعديل الصور' : 'إضافة صور',
+                displayImageUrls.length > 0 ? 'تصاویر ترمیم کریں' : 'تصاویر شامل کریں',
+              )}
+            </button>
           </div>
         )}
 
@@ -188,12 +213,27 @@ export default function DetailClient({ place, isOwner, isCreator }: Props) {
           </button>
         </div>
 
-        {/* Claim / report sheets are wired up in Stage D */}
+        {/* Claim / report sheets */}
         {claimOpen && (
           <ClaimSheet placeId={place.id} onClose={() => setClaimOpen(false)} />
         )}
         {reportOpen && (
           <ReportSheet placeId={place.id} onClose={() => setReportOpen(false)} />
+        )}
+        {/* Photo-edit sheet — claimed owner only. onSaved updates
+            the local override so the strip reflects the new list
+            without waiting on a route refresh. */}
+        {isOwner && (
+          <EditPhotosSheet
+            placeId={place.id}
+            initialUrls={displayImageUrls}
+            open={photoEditOpen}
+            onClose={() => setPhotoEditOpen(false)}
+            onSaved={(urls) => {
+              setLocalImageUrls(urls)
+              setPhotoEditOpen(false)
+            }}
+          />
         )}
       </div>
     </main>
