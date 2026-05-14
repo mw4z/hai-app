@@ -37,17 +37,22 @@ interface DayMeta {
   ar: string
   en: string
   ur: string
-  short: string
+  /** Short label used in the compact 7-column chip row. Full
+   *  Arabic names like الأربعاء are too wide to fit 7-across on
+   *  a phone — they wrap onto multiple lines and look messy. */
+  shortAr: string
+  shortEn: string
+  shortUr: string
 }
 
 const DAYS: DayMeta[] = [
-  { index: 0, ar: 'السبت',   en: 'Sat', ur: 'سنیچر',     short: 'س' },
-  { index: 1, ar: 'الأحد',   en: 'Sun', ur: 'اتوار',     short: 'ح' },
-  { index: 2, ar: 'الإثنين', en: 'Mon', ur: 'پیر',       short: 'ن' },
-  { index: 3, ar: 'الثلاثاء',en: 'Tue', ur: 'منگل',      short: 'ث' },
-  { index: 4, ar: 'الأربعاء',en: 'Wed', ur: 'بدھ',       short: 'ر' },
-  { index: 5, ar: 'الخميس', en: 'Thu', ur: 'جمعرات',    short: 'خ' },
-  { index: 6, ar: 'الجمعة', en: 'Fri', ur: 'جمعہ',      short: 'ج' },
+  { index: 0, ar: 'السبت',    en: 'Sat', ur: 'سنیچر',    shortAr: 'سبت', shortEn: 'Sat', shortUr: 'سنیچر' },
+  { index: 1, ar: 'الأحد',    en: 'Sun', ur: 'اتوار',    shortAr: 'أحد', shortEn: 'Sun', shortUr: 'اتوار' },
+  { index: 2, ar: 'الإثنين',  en: 'Mon', ur: 'پیر',      shortAr: 'إثن', shortEn: 'Mon', shortUr: 'پیر' },
+  { index: 3, ar: 'الثلاثاء', en: 'Tue', ur: 'منگل',     shortAr: 'ثلا', shortEn: 'Tue', shortUr: 'منگل' },
+  { index: 4, ar: 'الأربعاء', en: 'Wed', ur: 'بدھ',      shortAr: 'أرب', shortEn: 'Wed', shortUr: 'بدھ' },
+  { index: 5, ar: 'الخميس',  en: 'Thu', ur: 'جمعرات',   shortAr: 'خمس', shortEn: 'Thu', shortUr: 'جمعرات' },
+  { index: 6, ar: 'الجمعة',  en: 'Fri', ur: 'جمعہ',     shortAr: 'جمع', shortEn: 'Fri', shortUr: 'جمعہ' },
 ]
 
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
@@ -198,21 +203,30 @@ export default function OpeningHoursPicker({ value, onChange }: Props) {
                 </button>
               </div>
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            {/* Fixed 7-column grid — guarantees all 7 days fit on
+                one line even on a 360px phone. Short abbreviations
+                ("سبت / أحد / إثن / ثلا / أرب / خمس / جمع") instead
+                of full names so the chips stay readable + uniform.
+                The full day name shows up in the live preview line
+                below for confirmation. */}
+            <div className="grid grid-cols-7 gap-1">
               {DAYS.map((d) => {
                 const active = days.includes(d.index)
+                const label =
+                  lang === 'en' ? d.shortEn : lang === 'ur' ? d.shortUr : d.shortAr
                 return (
                   <button
                     key={d.index}
                     type="button"
                     onClick={() => toggleDay(d.index)}
-                    className={`px-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+                    aria-label={lang === 'en' ? d.en : lang === 'ur' ? d.ur : d.ar}
+                    className={`py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
                       active
                         ? 'bg-primary-600 text-white'
                         : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                     }`}
                   >
-                    {lang === 'en' ? d.en : lang === 'ur' ? d.ur : d.ar}
+                    {label}
                   </button>
                 )
               })}
