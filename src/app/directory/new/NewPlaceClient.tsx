@@ -34,6 +34,12 @@ export default function NewPlaceClient() {
   const [tiktok, setTiktok] = useState('')
   const [twitter, setTwitter] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // 0..100 while images are uploading; null when no upload in
+  // flight. Drives the per-thumbnail progress bar overlay so the
+  // user can see the upload is still working (avoids the "looks
+  // like it errored, then suddenly succeeds" anti-pattern on
+  // slow networks).
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
 
   // "I'm the owner" toggle — if true, we submit a claim request
   // alongside the place create so the mod reviews both at once.
@@ -82,8 +88,14 @@ export default function NewPlaceClient() {
       let imageUrls: string[] = []
       if (images.length > 0) {
         try {
-          imageUrls = await uploadFiles(images.map((i) => i.file))
+          setUploadProgress(0)
+          imageUrls = await uploadFiles(
+            images.map((i) => i.file),
+            { onProgress: (pct) => setUploadProgress(pct) },
+          )
+          setUploadProgress(null)
         } catch (err: any) {
+          setUploadProgress(null)
           toast.error(err?.message || tr('Image upload failed', 'فشل رفع الصور', 'تصاویر اپ لوڈ ناکام'))
           setSubmitting(false)
           return
@@ -250,14 +262,39 @@ export default function NewPlaceClient() {
               {images.map((img, i) => (
                 <div key={i} className="relative flex-shrink-0">
                   <img src={img.preview} alt="" className="w-20 h-20 object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(i)}
-                    aria-label={tr('Remove photo', 'إزالة الصورة', 'تصویر ہٹائیں')}
-                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
-                  >
-                    <FiX className="w-3 h-3" />
-                  </button>
+                  {/* Upload-progress overlay. Renders only while
+                      uploadProgress is a number (i.e. an upload
+                      is in flight). All thumbnails share the same
+                      overall % — the network request is a single
+                      multipart POST so per-file % isn't a real
+                      thing the transport gives us. */}
+                  {uploadProgress !== null && (
+                    <>
+                      <div className="absolute inset-0 rounded-xl bg-black/55 flex items-center justify-center text-[11px] font-bold text-white">
+                        {uploadProgress}%
+                      </div>
+                      <div className="absolute bottom-0 inset-x-0 h-1 bg-black/30 rounded-b-xl overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-400 transition-[width] duration-150"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </>
+                  )}
+                  {/* Remove button hidden while uploading — tapping
+                      it mid-flight would leave the in-flight request
+                      orphaned and the thumbnail gone before the
+                      response lands. */}
+                  {uploadProgress === null && (
+                    <button
+                      type="button"
+                      onClick={() => removeImage(i)}
+                      aria-label={tr('Remove photo', 'إزالة الصورة', 'تصویر ہٹائیں')}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                    >
+                      <FiX className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

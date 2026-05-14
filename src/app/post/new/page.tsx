@@ -416,6 +416,10 @@ export default function NewPostPage() {
   const [price, setPrice] = useState('')
   const [images, setImages] = useState<{ file: File; preview: string; url?: string }[]>([])
   const [uploading, setUploading] = useState(false)
+  // 0..100 while the image upload is in flight. Drives the per-
+  // thumbnail progress overlay so users on slow networks see the
+  // upload is still working and don't bail prematurely.
+  const [imageUploadProgress, setImageUploadProgress] = useState<number | null>(null)
   // PDF attachment — single document up to 25MB. Upload kicks off
   // the moment the user picks the file (NOT on submit), so by the
   // time they tap Publish the URL is already cached and submit is
@@ -678,13 +682,18 @@ export default function NewPostPage() {
   async function uploadImages(): Promise<string[] | null> {
     if (images.length === 0) return []
     setUploading(true)
+    setImageUploadProgress(0)
     try {
-      return await uploadFiles(images.map(img => img.file))
+      return await uploadFiles(
+        images.map(img => img.file),
+        { onProgress: (pct) => setImageUploadProgress(pct) },
+      )
     } catch (err: any) {
       toast.error(err?.message || 'فشل رفع الصور')
       return null
     } finally {
       setUploading(false)
+      setImageUploadProgress(null)
     }
   }
 
@@ -1245,11 +1254,29 @@ export default function NewPostPage() {
                   {images.map((img, i) => (
                     <div key={i} className="relative flex-shrink-0">
                       <img src={img.preview} alt="" className="w-20 h-20 object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(i)}
-                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
-                      >✕</button>
+                      {/* Upload-progress overlay — shared overall
+                          percent across thumbnails since the upload
+                          is a single multipart POST. */}
+                      {imageUploadProgress !== null && (
+                        <>
+                          <div className="absolute inset-0 rounded-xl bg-black/55 flex items-center justify-center text-[11px] font-bold text-white">
+                            {imageUploadProgress}%
+                          </div>
+                          <div className="absolute bottom-0 inset-x-0 h-1 bg-black/30 rounded-b-xl overflow-hidden">
+                            <div
+                              className="h-full bg-emerald-400 transition-[width] duration-150"
+                              style={{ width: `${imageUploadProgress}%` }}
+                            />
+                          </div>
+                        </>
+                      )}
+                      {imageUploadProgress === null && (
+                        <button
+                          type="button"
+                          onClick={() => removeImage(i)}
+                          className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                        >✕</button>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -55,22 +55,68 @@ function compressImage(file: File): Promise<File> {
 
 /**
  * Compress images then upload via single POST to server → Blob.
+ *
+ * Optional `onProgress` callback fires with a 0..100 percent while
+ * the multipart body is being sent. We use XMLHttpRequest under the
+ * hood (not fetch) because fetch has no upload-progress hook in any
+ * shipping browser — the Streams-based Request body API still
+ * doesn't surface upload progress on iOS Safari / Android WebView /
+ * Capacitor as of 2026-05. XHR's `upload.onprogress` works
+ * everywhere.
+ *
+ * The percent is OVERALL — the request body is a single multipart
+ * upload of all images concatenated, so a "per-file" percent isn't
+ * a thing the network actually emits. Callers that want per-
+ * thumbnail bars can just bind the same overall percent to every
+ * thumbnail; that already matches user perception (all uploading
+ * together, all done together).
  */
-export async function uploadFiles(files: File[]): Promise<string[]> {
+export async function uploadFiles(
+  files: File[],
+  opts?: { onProgress?: (percent: number) => void },
+): Promise<string[]> {
   // Compress all images in parallel
   const compressed = await Promise.all(files.map(f => compressImage(f)))
 
   const formData = new FormData()
   for (const file of compressed) formData.append('images', file)
 
-  const res = await fetch('/api/upload', { method: 'POST', body: formData })
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}))
-    throw new Error(d.error || 'فشل رفع الصور')
-  }
-
-  const data = await res.json()
-  return data.urls || []
+  return new Promise<string[]>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', '/api/upload')
+    // Progress tick while the body uploads.
+    xhr.upload.onprogress = (ev) => {
+      if (!opts?.onProgress) return
+      if (!ev.lengthComputable) return
+      const pct = Math.max(0, Math.min(100, Math.round((ev.loaded / ev.total) * 100)))
+      try { opts.onProgress(pct) } catch {}
+    }
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        let msg = 'فشل رفع الصور'
+        try {
+          const d = JSON.parse(xhr.responseText || '{}')
+          if (d?.error) msg = d.error
+        } catch {}
+        reject(new Error(msg))
+        return
+      }
+      try {
+        const data = JSON.parse(xhr.responseText || '{}')
+        // Snap the bar to 100% once the server has fully replied —
+        // upload.onprogress only ticks while bytes are flowing, so
+        // the user might see it stall at 95% for a moment while the
+        // server finishes writing to Blob. Push it home explicitly.
+        try { opts?.onProgress?.(100) } catch {}
+        resolve(data?.urls || [])
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error('فشل رفع الصور'))
+      }
+    }
+    xhr.onerror = () => reject(new Error('فشل رفع الصور'))
+    xhr.onabort = () => reject(new Error('تم إلغاء الرفع'))
+    xhr.send(formData)
+  })
 }
 
 /**

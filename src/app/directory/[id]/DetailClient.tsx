@@ -162,16 +162,41 @@ export default function DetailClient({
               </a>
             )
           })()}
-          {(place.mapUrl || (place.latitude && place.longitude)) && (
-            <a
-              href={place.mapUrl || `https://maps.google.com/?q=${place.latitude},${place.longitude}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="col-span-2 flex items-center justify-center gap-2 py-3 rounded-2xl bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800/60 text-sm font-semibold text-sky-700 dark:text-sky-300 active:scale-95"
-            >
-              🗺️ {tr('Open map', 'فتح الخريطة', 'نقشہ کھولیں')}
-            </a>
-          )}
+          {(place.mapUrl || (place.latitude && place.longitude)) && (() => {
+            const url = place.mapUrl || `https://maps.google.com/?q=${place.latitude},${place.longitude}`
+            return (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={async (e) => {
+                  // Native bug fix: on Capacitor Android the bare
+                  // <a target="_blank"> tries to navigate WITHIN the
+                  // WebView (which is bound to app.hai-app.net), and
+                  // Capacitor's errorPath:'offline.html' kicks in
+                  // when the cross-origin load gets blocked — user
+                  // saw "no connection" instead of the map. Same
+                  // pattern PdfTile uses: intercept the tap on
+                  // native, hand the URL to @capacitor/browser so
+                  // it opens in a Custom Tab / SFSafariViewController
+                  // overlay on top of the app. Web falls through to
+                  // the default new-tab behaviour.
+                  if (typeof window === 'undefined') return
+                  if (!window.Capacitor?.isNativePlatform()) return
+                  e.preventDefault()
+                  try {
+                    const { Browser } = await import('@capacitor/browser')
+                    await Browser.open({ url, presentationStyle: 'popover' })
+                  } catch {
+                    try { window.open(url, '_blank', 'noopener,noreferrer') } catch {}
+                  }
+                }}
+                className="col-span-2 flex items-center justify-center gap-2 py-3 rounded-2xl bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800/60 text-sm font-semibold text-sky-700 dark:text-sky-300 active:scale-95"
+              >
+                🗺️ {tr('Open map', 'فتح الخريطة', 'نقشہ کھولیں')}
+              </a>
+            )
+          })()}
         </div>
 
         {/* Social links row — only renders the platforms that
