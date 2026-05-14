@@ -132,15 +132,21 @@ export default function EditPlaceInfoSheet({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={onClose}>
+      {/* Three-row flex column: pinned header (drag handle + title),
+          scrollable form, pinned footer (Save / Cancel). The footer
+          is OUTSIDE the scroll region so Android's variable viewport
+          (URL bar collapse, keyboard) can't shove it around. */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[520px] max-h-[88vh] overflow-y-auto bg-white dark:bg-gray-800 rounded-t-3xl p-4 space-y-3"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+        className="w-full max-w-[520px] max-h-[88vh] flex flex-col bg-white dark:bg-gray-800 rounded-t-3xl"
       >
-        <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-1" />
-        <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-          ✏️ {tr('Edit info', 'تعديل المعلومات', 'معلومات ترمیم')}
-        </h3>
+        <div className="px-4 pt-3 pb-2 flex-shrink-0">
+          <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-2" />
+          <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+            ✏️ {tr('Edit info', 'تعديل المعلومات', 'معلومات ترمیم')}
+          </h3>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-3">
 
         {canEditSensitive && (
           <>
@@ -251,7 +257,15 @@ export default function EditPlaceInfoSheet({
           <OpeningHoursPicker value={openingHours} onChange={setOpeningHours} />
         </div>
 
-        <div className="flex gap-2 pt-2 sticky bottom-0 bg-white dark:bg-gray-800 pb-1">
+        </div>
+        {/* Pinned footer — flex-shrink-0 keeps it OUT of the scroll
+            region so it can't move when the keyboard or URL bar
+            toggles. Safe-area padding lives here (not on the scroll
+            container) so the inset sits below the buttons. */}
+        <div
+          className="flex-shrink-0 flex gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-b-3xl"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}
+        >
           <button
             type="button"
             onClick={save}

@@ -143,16 +143,19 @@ export default function EditPhotosSheet({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[480px] bg-white dark:bg-gray-800 rounded-t-3xl p-4 space-y-3"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+        className="w-full max-w-[480px] max-h-[88vh] flex flex-col bg-white dark:bg-gray-800 rounded-t-3xl"
       >
-        <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-2" />
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-            📷 {tr('Edit photos', 'تعديل الصور', 'تصاویر ترمیم کریں')}
-          </h3>
-          <span className="text-[11px] text-gray-400">{totalCount}/{MAX_IMAGES}</span>
+        <div className="px-4 pt-3 pb-2 flex-shrink-0">
+          <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-2" />
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+              📷 {tr('Edit photos', 'تعديل الصور', 'تصاویر ترمیم کریں')}
+            </h3>
+            <span className="text-[11px] text-gray-400">{totalCount}/{MAX_IMAGES}</span>
+          </div>
         </div>
+        {/* Scrollable middle region — pending list grows here. */}
+        <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-3">
 
         {totalCount === 0 ? (
           <p className="text-center text-xs text-gray-400 py-6">
@@ -211,8 +214,13 @@ export default function EditPhotosSheet({
           onChange={pickFiles}
           className="hidden"
         />
-
-        <div className="flex gap-2 pt-1">
+        </div>
+        {/* Pinned footer — stays put while Android collapses its URL
+            bar or the photo list grows past the viewport. */}
+        <div
+          className="flex-shrink-0 flex gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-b-3xl"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}
+        >
           <button
             type="button"
             onClick={save}
