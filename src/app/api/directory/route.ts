@@ -222,5 +222,43 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  return NextResponse.json({ ok: true, place: toPublicPlace(place) })
+  // ── Owner-claim-on-submit ─────────────────────────────────────
+  // If the submitter says "I'm the owner of this place" + provides
+  // some proof text, we create a PlaceClaimRequest in the same
+  // request so the mod can review BOTH the place AND the claim in
+  // one go. Without this, an owner submitting their own business
+  // had to file the place, wait for approval, then come back and
+  // file a claim separately — two reviews for what's really one
+  // decision.
+  //
+  // Proof text isn't structurally validated server-side beyond
+  // length — it's a free-form message for the mod to read ("هذا
+  // محل أبي، تواصل معي على نفس رقم الجوال للتأكيد"). Phase 1.5
+  // can add evidence image uploads.
+  const claimAsOwner = (raw as { claimAsOwner?: unknown }).claimAsOwner === true
+  if (claimAsOwner) {
+    const proofRaw = (raw as { ownerProof?: unknown }).ownerProof
+    const proof = typeof proofRaw === 'string' ? proofRaw.trim().slice(0, 500) : ''
+    try {
+      await db.placeClaimRequest.create({
+        data: {
+          placeId: place.id,
+          userId: user.id,
+          message: proof || null,
+        },
+        select: { id: true },
+      })
+    } catch (err) {
+      // Don't fail the whole submission if the claim insert errors
+      // (e.g. the user already has too many open claims). The place
+      // is created; user can file the claim manually later.
+      console.error('[POST /api/directory] claim-on-submit failed:', err)
+    }
+  }
+
+  return NextResponse.json({
+    ok: true,
+    place: toPublicPlace(place),
+    claimSubmitted: claimAsOwner,
+  })
 }

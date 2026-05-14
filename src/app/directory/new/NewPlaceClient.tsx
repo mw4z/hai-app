@@ -30,6 +30,11 @@ export default function NewPlaceClient() {
   const [openingHours, setOpeningHours] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  // "I'm the owner" toggle — if true, we submit a claim request
+  // alongside the place create so the mod reviews both at once.
+  const [claimAsOwner, setClaimAsOwner] = useState(false)
+  const [ownerProof, setOwnerProof] = useState('')
+
   // Image picker state — uploaded on submit, same pattern as the
   // post composer. We hold the raw File + a blob preview URL so
   // the picker shows thumbnails before they leave the device.
@@ -91,6 +96,11 @@ export default function NewPlaceClient() {
           description: description || undefined,
           openingHours: openingHours || undefined,
           imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+          // Owner-claim payload — API picks these up and creates
+          // a PlaceClaimRequest alongside the place so the mod
+          // can review both in one go.
+          claimAsOwner: claimAsOwner || undefined,
+          ownerProof: claimAsOwner && ownerProof.trim() ? ownerProof.trim() : undefined,
         }),
       })
       const d = await res.json().catch(() => ({}))
@@ -223,6 +233,62 @@ export default function NewPlaceClient() {
           )}
         </div>
 
+        {/* "I'm the owner" affordance. Toggling this on tells the
+            mod to evaluate this submission as both a place add AND
+            a claim — same person, one decision, one review.
+            Without this, owners had to submit, wait for approval,
+            then file a separate claim request — two reviews for
+            what's effectively one event. */}
+        <div className="rounded-2xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 p-3 space-y-2">
+          <label className="flex items-start gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={claimAsOwner}
+              onChange={(e) => setClaimAsOwner(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-amber-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+            />
+            <div className="flex-1 leading-tight">
+              <p className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                🏪 {tr(
+                  'I am the owner of this place',
+                  'أنا صاحب هذا المكان',
+                  'میں اس جگہ کا مالک ہوں',
+                )}
+              </p>
+              <p className="text-[11px] text-amber-700/80 dark:text-amber-300/70 mt-0.5">
+                {tr(
+                  "The moderator will review your ownership claim together with the place. Approval means you'll manage this listing.",
+                  'سيراجع المشرف طلب الإدارة مع المكان معاً. الموافقة تعني أنك ستدير هذه الصفحة.',
+                  'موڈریٹر آپ کے انتظام کا دعوی جگہ کے ساتھ جائزہ لے گا۔',
+                )}
+              </p>
+            </div>
+          </label>
+          {claimAsOwner && (
+            <div className="pt-1">
+              <span className="block text-[11px] font-medium text-amber-800 dark:text-amber-200 mb-1">
+                {tr(
+                  'Proof of ownership (helps the moderator verify)',
+                  'إثبات الملكية (يساعد المشرف في التحقق)',
+                  'ملکیت کا ثبوت',
+                )}
+              </span>
+              <textarea
+                value={ownerProof}
+                onChange={(e) => setOwnerProof(e.target.value)}
+                rows={3}
+                maxLength={500}
+                placeholder={tr(
+                  'e.g. The phone number above is mine — call to confirm.',
+                  'مثال: رقم الجوال أعلاه لي — اتصلوا للتأكيد.',
+                  'مثلاً: اوپر دیا گیا فون نمبر میرا ہے۔',
+                )}
+                className="w-full p-2.5 rounded-xl bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800/60 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              />
+            </div>
+          )}
+        </div>
+
         <button
           onClick={submit}
           disabled={submitting}
@@ -230,7 +296,9 @@ export default function NewPlaceClient() {
         >
           {submitting
             ? tr('Submitting…', 'جاري الإرسال…', 'بھیج رہا ہے…')
-            : tr('Submit for review', 'إرسال للمراجعة', 'جائزے کیلئے بھیجیں')}
+            : claimAsOwner
+              ? tr('Submit + claim ownership', 'إرسال مع طلب الإدارة', 'بھیجیں + ملکیت دعوی')
+              : tr('Submit for review', 'إرسال للمراجعة', 'جائزے کیلئے بھیجیں')}
         </button>
       </div>
     </main>

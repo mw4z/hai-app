@@ -9,23 +9,45 @@ import { getCategoryMeta } from '@/lib/places/categories'
 import PlaceStatusBadge from '@/components/places/PlaceStatusBadge'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
 import EditPhotosSheet from '@/components/places/EditPhotosSheet'
+import EditPlaceInfoSheet from '@/components/places/EditPlaceInfoSheet'
+import ImageLightbox from '@/components/ImageLightbox'
 import { buildWhatsAppHref } from '@/lib/phone'
 
 interface Props {
   place: PublicPlace
   isOwner: boolean
   isCreator: boolean
-  /** Whether the viewer is allowed to add/remove photos on this
-   *  place. Mirrors the PATCH route: claimed owner always;
-   *  creator + admins/mods only when no one has claimed yet. */
+  /** Whether the viewer can add/remove photos. Mirrors the PATCH
+   *  route: claimed owner always; creator + admins/mods only when
+   *  no one has claimed yet. */
   canEditPhotos: boolean
+  /** Whether the viewer can edit the regular owner-editable text
+   *  fields (description, phone, whatsapp, website, instagram,
+   *  openingHours). Same gate as canEditPhotos. */
+  canEditInfo: boolean
+  /** Whether the viewer can also edit the SENSITIVE identity
+   *  fields (name / category / addressText / mapUrl). Admin
+   *  pre-claim only. */
+  canEditSensitive: boolean
 }
 
 /** Public detail page. Renders the place's identity, contact
  *  buttons, optional map link, owner's ServiceItems if applicable,
  *  and the claim / report actions. createdByUser is NEVER shown
  *  here — only a generic "أضافه أحد سكان الحي" attribution. */
-export default function DetailClient({ place, isOwner, isCreator, canEditPhotos }: Props) {
+export default function DetailClient({
+  place: serverPlace,
+  isOwner,
+  isCreator,
+  canEditPhotos,
+  canEditInfo,
+  canEditSensitive,
+}: Props) {
+  // Place data + local override. The text-edit sheet patches
+  // individual fields; we merge them into a local copy so the
+  // detail page re-renders the new values without router.refresh().
+  const [localPlace, setLocalPlace] = useState<PublicPlace>(serverPlace)
+  const place = localPlace
   const { lang } = useLanguage()
   const cat = getCategoryMeta(place.category)
   const categoryLabel =
@@ -34,6 +56,13 @@ export default function DetailClient({ place, isOwner, isCreator, canEditPhotos 
   const [reportOpen, setReportOpen] = useState(false)
   const [claimOpen, setClaimOpen] = useState(false)
   const [photoEditOpen, setPhotoEditOpen] = useState(false)
+  const [infoEditOpen, setInfoEditOpen] = useState(false)
+  // Lightbox: index of the photo the user tapped (null = closed).
+  // Using the shared ImageLightbox keeps photos in-app — tapping
+  // opens the same gesture-driven viewer the chat + post detail
+  // surfaces use, instead of bouncing to the system browser via
+  // target="_blank".
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   // Local override for imageUrls so the EditPhotosSheet save can
   // reflect immediately without a router.refresh(). Falls back
   // to the server-rendered list when null.
@@ -93,19 +122,18 @@ export default function DetailClient({ place, isOwner, isCreator, canEditPhotos 
           <div className="-mx-4 px-4 overflow-x-auto">
             <div className="flex gap-2">
               {displayImageUrls.map((url, i) => (
-                <a
+                <button
                   key={i}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-shrink-0 block"
+                  type="button"
+                  onClick={() => setLightboxIndex(i)}
+                  className="flex-shrink-0 block active:scale-[0.98] transition-transform"
                 >
                   <img
                     src={url}
                     alt=""
                     className="h-44 w-auto rounded-2xl object-cover border border-gray-200 dark:border-gray-700"
                   />
-                </a>
+                </button>
               ))}
             </div>
           </div>
@@ -178,7 +206,7 @@ export default function DetailClient({ place, isOwner, isCreator, canEditPhotos 
             context: claimed owner gets the "you manage this
             place" badge; admins / creators get a more neutral
             "manage photos" framing. */}
-        {canEditPhotos && (
+        {(canEditPhotos || canEditInfo) && (
           <div className={`rounded-2xl border p-3 space-y-2 ${
             isOwner
               ? 'border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-900/20'
@@ -195,19 +223,34 @@ export default function DetailClient({ place, isOwner, isCreator, canEditPhotos 
                   ? `📝 ${tr('You added this place', 'أضفت هذا المكان', 'آپ نے یہ جگہ شامل کی')}`
                   : `🛠️ ${tr('Admin tools', 'أدوات المشرف', 'ایڈمن ٹولز')}`}
             </p>
-            <button
-              type="button"
-              onClick={() => setPhotoEditOpen(true)}
-              className={`w-full py-2 rounded-xl text-white text-xs font-semibold active:scale-95 transition-transform ${
-                isOwner ? 'bg-emerald-600' : 'bg-sky-600'
-              }`}
-            >
-              📷 {tr(
-                displayImageUrls.length > 0 ? 'Edit photos' : 'Add photos',
-                displayImageUrls.length > 0 ? 'تعديل الصور' : 'إضافة صور',
-                displayImageUrls.length > 0 ? 'تصاویر ترمیم کریں' : 'تصاویر شامل کریں',
+            <div className="grid grid-cols-2 gap-2">
+              {canEditPhotos && (
+                <button
+                  type="button"
+                  onClick={() => setPhotoEditOpen(true)}
+                  className={`py-2 rounded-xl text-white text-xs font-semibold active:scale-95 transition-transform ${
+                    isOwner ? 'bg-emerald-600' : 'bg-sky-600'
+                  }`}
+                >
+                  📷 {tr(
+                    displayImageUrls.length > 0 ? 'Edit photos' : 'Add photos',
+                    displayImageUrls.length > 0 ? 'تعديل الصور' : 'إضافة صور',
+                    displayImageUrls.length > 0 ? 'تصاویر ترمیم کریں' : 'تصاویر شامل کریں',
+                  )}
+                </button>
               )}
-            </button>
+              {canEditInfo && (
+                <button
+                  type="button"
+                  onClick={() => setInfoEditOpen(true)}
+                  className={`py-2 rounded-xl text-white text-xs font-semibold active:scale-95 transition-transform ${
+                    isOwner ? 'bg-emerald-600' : 'bg-sky-600'
+                  }`}
+                >
+                  ✏️ {tr('Edit info', 'تعديل المعلومات', 'معلومات ترمیم')}
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -254,7 +297,34 @@ export default function DetailClient({ place, isOwner, isCreator, canEditPhotos 
             }}
           />
         )}
+        {canEditInfo && (
+          <EditPlaceInfoSheet
+            place={place}
+            canEditSensitive={canEditSensitive}
+            open={infoEditOpen}
+            onClose={() => setInfoEditOpen(false)}
+            onSaved={(diff) => {
+              // Merge the patched fields into the local place so the
+              // detail page re-renders without a route refresh.
+              setLocalPlace((prev) => ({ ...prev, ...diff }))
+              setInfoEditOpen(false)
+            }}
+          />
+        )}
       </div>
+      {/* In-app image viewer. Same lightbox the chat / post detail
+          surfaces use — swipe down to close, pinch / double-tap
+          zoom, horizontal swipe between photos. Replaces the
+          previous `target=_blank` anchors that kicked the user
+          out to Safari / Chrome on Capacitor native. */}
+      {displayImageUrls.length > 0 && (
+        <ImageLightbox
+          images={displayImageUrls}
+          initialIndex={lightboxIndex ?? 0}
+          open={lightboxIndex !== null}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
     </main>
   )
 }

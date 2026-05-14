@@ -188,10 +188,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     updates.imageUrls = sanitizeImageUrls(raw.imageUrls)
   }
 
-  // Mod-only field edits (name / category / lat / lng / addressText /
-  // mapUrl). Even owners can't change these — they require admin
-  // review. Use the same admin gate computed at the top.
-  if (isAdminScoped) {
+  // Sensitive field edits (name / category / lat / lng / addressText /
+  // mapUrl). Admin-only AND only while the place is unclaimed —
+  // once an owner exists, even admins step back from changing the
+  // listing's identity. To re-attribute a claimed place an admin
+  // must first revoke the claim (or remove the place entirely).
+  if (isAdminScoped && !hasOwner) {
     if (raw.name !== undefined) {
       const v = typeof raw.name === 'string' ? raw.name.trim() : ''
       if (v.length < 2 || v.length > 80) {

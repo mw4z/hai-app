@@ -57,15 +57,21 @@ export default async function PlaceDetailPage({
   const isOwner = place.claimedByUserId === user.id
   const isPubliclyVisible = (PUBLIC_PLACE_STATUSES as string[]).includes(place.status)
 
-  // Photo-edit gate — mirrors the PATCH route exactly:
-  //   - owner exists → ONLY the owner edits. Admins step back
-  //                    (they still moderate via /mod/directory).
-  //   - no owner yet → creator + admins can curate.
+  // Edit gates — mirror the PATCH route exactly:
+  //   canEditPhotos / canEditOwnerFields:
+  //     owner exists → ONLY the owner edits.
+  //     no owner    → creator + admins/mods-of-this-nbhd curate.
+  //   canEditSensitive (name / category / addressText / mapUrl):
+  //     admin pre-claim only. Once a place has an owner, the
+  //     identity fields are LOCKED — re-attributing a claimed
+  //     listing requires revoking the claim first.
   const hasOwner = !!place.claimedByUserId
   const isAdminScoped =
     isSuper || (isMod && (user.role === 'PLATFORM_MOD' || sameNbhd))
-  const canEditPhotos =
+  const canEditOwnerFields =
     isOwner || (!hasOwner && (isCreator || isAdminScoped))
+  const canEditPhotos = canEditOwnerFields
+  const canEditSensitive = isAdminScoped && !hasOwner
 
   // Visibility:
   //  - Publicly-visible places are readable cross-neighborhood
@@ -88,6 +94,8 @@ export default async function PlaceDetailPage({
       isOwner={isOwner}
       isCreator={isCreator}
       canEditPhotos={canEditPhotos}
+      canEditInfo={canEditOwnerFields}
+      canEditSensitive={canEditSensitive}
     />
   )
 }
