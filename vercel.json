@@ -32,6 +32,10 @@
     {
       "path": "/api/cron/close-idle-threads",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-pdfs",
+      "schedule": "0 4 * * *"
     }
   ]
 }

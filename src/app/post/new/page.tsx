@@ -1323,6 +1323,18 @@ export default function NewPostPage() {
                     <span>+ {lang === 'en' ? 'Choose PDF' : lang === 'ur' ? 'PDF منتخب کریں' : 'اختر ملف PDF'}</span>
                   </button>
                   <input ref={pdfInputRef} type="file" accept="application/pdf" onChange={handlePdfSelect} className="hidden" />
+                  {/* Retention notice — the cleanup-pdfs cron deletes
+                      attachments after 30 days. Surfacing this in the
+                      composer so users don't expect indefinite storage
+                      (and so neighborhood flyers / weekly offers aren't
+                      mistaken for permanent archives). */}
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1.5 px-1 leading-snug">
+                    {lang === 'en'
+                      ? 'PDFs are kept for 30 days, then auto-deleted to save storage.'
+                      : lang === 'ur'
+                        ? 'PDFs 30 دن تک محفوظ رہتی ہیں، پھر خود بخود حذف ہو جاتی ہیں۔'
+                        : 'تُحفظ الملفات لمدة 30 يوماً ثم تُحذف تلقائياً.'}
+                  </p>
                 </>
               )}
             </div>
