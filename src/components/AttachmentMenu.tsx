@@ -123,9 +123,9 @@ export default function AttachmentMenu({
             icon: '📄',
             title: tr('Document', 'مستند PDF', 'PDF دستاویز'),
             subtitle: tr(
-              'Attach a PDF (max 25MB)',
-              'إرفاق ملف PDF (أقصى 25 ميقا)',
-              'PDF منسلک کریں (زیادہ سے زیادہ 25MB)',
+              'Attach a PDF (max 50MB)',
+              'إرفاق ملف PDF (أقصى 50 ميقا)',
+              'PDF منسلک کریں (زیادہ سے زیادہ 50MB)',
             ),
             tint: 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300',
           },

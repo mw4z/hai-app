@@ -38,9 +38,11 @@ import { getSession } from '@/lib/auth'
  * which only runs on case A. handleUpload's internal token validation
  * handles case B.
  */
-export const maxDuration = 30
+// 300s — Vercel's default function timeout; covers the longest
+// realistic upload-completed webhook callback for a 50MB document.
+export const maxDuration = 300
 
-const MAX_BYTES = 25 * 1024 * 1024 // 25MB
+const MAX_BYTES = 50 * 1024 * 1024 // 50MB — matches the client-side cap; Vercel Blob handles up to 5GB
 const ALLOWED = ['application/pdf']
 
 export async function POST(req: NextRequest) {

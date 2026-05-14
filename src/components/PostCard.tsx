@@ -1749,7 +1749,7 @@ export default function PostCard({
           e.currentTarget.value = ''
           if (!file) return
           if (file.type !== 'application/pdf') { toast.error(lang === 'en' ? 'Only PDF files' : 'فقط ملفات PDF'); return }
-          if (file.size > 25 * 1024 * 1024) { toast.error(lang === 'en' ? 'PDF too large (max 25MB)' : 'حجم الملف كبير'); return }
+          if (file.size > 50 * 1024 * 1024) { toast.error(lang === 'en' ? 'PDF too large (max 50MB)' : 'حجم الملف كبير'); return }
           // Upload on pick — comment submit reads the cached URL.
           setCommentPdf({ url: null, name: file.name, size: file.size, uploading: true, percent: 0, stage: 'scanning' })
           try {
@@ -1777,7 +1777,7 @@ export default function PostCard({
           e.currentTarget.value = ''
           if (!file) return
           if (file.type !== 'application/pdf') { toast.error(lang === 'en' ? 'Only PDF files' : 'فقط ملفات PDF'); return }
-          if (file.size > 25 * 1024 * 1024) { toast.error(lang === 'en' ? 'PDF too large (max 25MB)' : 'حجم الملف كبير'); return }
+          if (file.size > 50 * 1024 * 1024) { toast.error(lang === 'en' ? 'PDF too large (max 50MB)' : 'حجم الملف كبير'); return }
           setReplyPdf({ url: null, name: file.name, size: file.size, uploading: true, percent: 0, stage: 'scanning' })
           try {
             const result = await uploadPdf(file, {

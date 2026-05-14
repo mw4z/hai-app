@@ -93,8 +93,15 @@ export async function uploadFiles(files: File[]): Promise<string[]> {
  * client emits a progress event (currently fires at file-bytes
  * boundaries; not a smooth percent — but enough for "still working").
  */
-const MAX_PDF_BYTES = 25 * 1024 * 1024
-const PDF_UPLOAD_TIMEOUT_MS = 120_000
+// 50MB matches the cap users see in everyday messaging apps
+// (WhatsApp document attachments). Vercel Blob itself handles up to
+// 5GB; this is purely a UX cap to keep upload times sane.
+const MAX_PDF_BYTES = 50 * 1024 * 1024
+// 50MB on a slow 4G link can take 80-120s. Bumped from 120s to 300s
+// so a legitimate slow-cellular upload doesn't time out mid-transfer.
+// 300s is also Vercel's new default function timeout, so this matches
+// the platform.
+const PDF_UPLOAD_TIMEOUT_MS = 300_000
 
 /**
  * Stages of the PDF pipeline. Surfaced via uploadPdf's onStage
@@ -483,7 +490,7 @@ export async function uploadPdf(
     throw new Error('فقط ملفات PDF')
   }
   if (file.size > MAX_PDF_BYTES) {
-    throw new Error('حجم الملف كبير (أقصى 25 ميقا)')
+    throw new Error('حجم الملف كبير (أقصى 50 ميقا)')
   }
 
   // Pipeline timing — these logs land in the browser DevTools

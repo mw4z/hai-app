@@ -535,8 +535,8 @@ export default function NewPostPage() {
       toast.error(lang === 'en' ? 'Only PDF files' : lang === 'ur' ? 'صرف PDF فائلیں' : 'فقط ملفات PDF')
       return
     }
-    if (file.size > 25 * 1024 * 1024) {
-      toast.error(lang === 'en' ? 'PDF too large (max 25MB)' : lang === 'ur' ? 'PDF بہت بڑی ہے (زیادہ سے زیادہ 25MB)' : 'حجم الملف كبير (أقصى 25 ميقا)')
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error(lang === 'en' ? 'PDF too large (max 50MB)' : lang === 'ur' ? 'PDF بہت بڑی ہے (زیادہ سے زیادہ 50MB)' : 'حجم الملف كبير (أقصى 50 ميقا)')
       return
     }
 

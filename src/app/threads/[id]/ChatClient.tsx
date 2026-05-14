@@ -843,7 +843,7 @@ export default function ChatClient({
   async function sendPdf(file: File) {
     if (sendingImage) return // reuse the existing "uploading" lock
     if (file.type !== 'application/pdf') { toast.error(lang === 'en' ? 'PDF only' : 'PDF فقط'); return }
-    if (file.size > 25 * 1024 * 1024) { toast.error(lang === 'en' ? 'Max 25MB' : 'الحد الأقصى 25 ميقا'); return }
+    if (file.size > 50 * 1024 * 1024) { toast.error(lang === 'en' ? 'Max 50MB' : 'الحد الأقصى 50 ميقا'); return }
     const replyId = replyingTo?.id || null
     setReplyingTo(null)
     setSendingImage(true)
