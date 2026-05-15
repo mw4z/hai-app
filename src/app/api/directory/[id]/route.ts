@@ -186,6 +186,35 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     updates.openingHours = v || null
   }
 
+  // Manual status pill — owner (and admin/mod via the same gate
+  // above) can override the auto open/closed indicator.
+  // - Empty string clears the override.
+  // - Cap at 60 chars to keep the pill UI sane.
+  // - manualStatusUntil is independent: pass null to clear, an
+  //   ISO 8601 string to set. Past timestamps are accepted and
+  //   ignored at render time (no DB write during read).
+  if (raw.manualStatus !== undefined) {
+    const v = typeof raw.manualStatus === 'string' ? raw.manualStatus.trim().slice(0, 60) : ''
+    updates.manualStatus = v || null
+    // If the override is being cleared, also wipe the timer to
+    // avoid stale "until" values pointing at a non-existent
+    // status.
+    if (!v) updates.manualStatusUntil = null
+  }
+  if (raw.manualStatusUntil !== undefined) {
+    if (raw.manualStatusUntil === null || raw.manualStatusUntil === '') {
+      updates.manualStatusUntil = null
+    } else if (typeof raw.manualStatusUntil === 'string') {
+      const d = new Date(raw.manualStatusUntil)
+      if (Number.isNaN(d.getTime())) {
+        return NextResponse.json({ error: 'تاريخ غير صالح' }, { status: 400 })
+      }
+      updates.manualStatusUntil = d
+    } else {
+      return NextResponse.json({ error: 'تاريخ غير صالح' }, { status: 400 })
+    }
+  }
+
   // Images — owner-editable. The sanitizer caps at MAX_PLACE_IMAGES
   // and rejects non-https junk, so passing whatever the client sent
   // is safe. Files are already validated upstream at /api/upload

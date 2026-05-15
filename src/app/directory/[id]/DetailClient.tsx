@@ -8,6 +8,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import type { PublicPlace } from '@/lib/places/serialize'
 import { getCategoryMeta } from '@/lib/places/categories'
 import PlaceStatusBadge from '@/components/places/PlaceStatusBadge'
+import PlacePill from '@/components/places/PlacePill'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
 import EditPhotosSheet from '@/components/places/EditPhotosSheet'
 import EditPlaceInfoSheet from '@/components/places/EditPlaceInfoSheet'
@@ -88,7 +89,10 @@ export default function DetailClient({
                 <h1 className="text-lg font-bold text-gray-900 dark:text-white flex-1">{place.name}</h1>
                 <PlaceStatusBadge status={place.status} />
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{categoryLabel}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-xs text-gray-500 dark:text-gray-400">{categoryLabel}</p>
+                <PlacePill place={place} size="md" />
+              </div>
             </div>
           </div>
 

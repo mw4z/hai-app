@@ -60,6 +60,26 @@ export default function EditPlaceInfoSheet({
   const [twitter, setTwitter] = useState(place.x ?? '')
   const [description, setDescription] = useState(place.description ?? '')
   const [openingHours, setOpeningHours] = useState(place.openingHours ?? '')
+
+  // Manual status pill. Three discrete states the editor cares
+  // about:
+  //   - "" (empty)         → no override; auto pill from openingHours
+  //   - one of MANUAL_STATUS_PRESETS → owner picked a preset
+  //   - any other string   → owner used the "custom" option
+  // The "until" picker is rendered as a yyyy-mm-dd <input> in the
+  // local timezone; on save we ISO-stringify it for the API.
+  const [manualStatus, setManualStatus] = useState(place.manualStatus ?? '')
+  const [manualStatusUntil, setManualStatusUntil] = useState(() => {
+    if (!place.manualStatusUntil) return ''
+    const d = new Date(place.manualStatusUntil)
+    if (Number.isNaN(d.getTime())) return ''
+    // <input type="date"> wants YYYY-MM-DD in local time.
+    const y = d.getFullYear().toString().padStart(4, '0')
+    const m = (d.getMonth() + 1).toString().padStart(2, '0')
+    const day = d.getDate().toString().padStart(2, '0')
+    return `${y}-${m}-${day}`
+  })
+
   const [saving, setSaving] = useState(false)
 
   // Freeze background scroll while the sheet is open. Same shared
@@ -93,6 +113,29 @@ export default function EditPlaceInfoSheet({
       if (description !== (place.description ?? '')) body.description = description
       if (openingHours !== (place.openingHours ?? '')) body.openingHours = openingHours
 
+      // Manual status diff. Send both fields when either has
+      // changed so the server's "clearing manualStatus also
+      // wipes manualStatusUntil" rule doesn't fight us. When
+      // the editor clears the status, we send manualStatusUntil
+      // = null too (clean slate).
+      const initialManualStatus = place.manualStatus ?? ''
+      const initialUntil = place.manualStatusUntil
+        ? new Date(place.manualStatusUntil).toISOString().slice(0, 10)
+        : ''
+      if (manualStatus !== initialManualStatus || manualStatusUntil !== initialUntil) {
+        body.manualStatus = manualStatus
+        if (!manualStatus) {
+          body.manualStatusUntil = null
+        } else if (manualStatusUntil) {
+          // Treat the date as end-of-day local time so "set until
+          // Sunday" means "expires after Sunday is over".
+          const d = new Date(`${manualStatusUntil}T23:59:59`)
+          body.manualStatusUntil = Number.isNaN(d.getTime()) ? null : d.toISOString()
+        } else {
+          body.manualStatusUntil = null
+        }
+      }
+
       if (Object.keys(body).length === 0) {
         toast(tr('No changes', 'لا توجد تعديلات', 'کوئی تبدیلیاں نہیں'))
         onClose()
@@ -124,6 +167,10 @@ export default function EditPlaceInfoSheet({
         x: 'x' in body ? (twitter || null) : place.x,
         description: 'description' in body ? (description || null) : place.description,
         openingHours: 'openingHours' in body ? (openingHours || null) : place.openingHours,
+        manualStatus: 'manualStatus' in body ? (manualStatus || null) : place.manualStatus,
+        manualStatusUntil: 'manualStatusUntil' in body
+          ? (body.manualStatusUntil as string | null)
+          : place.manualStatusUntil,
       })
     } finally {
       setSaving(false)
@@ -257,6 +304,18 @@ export default function EditPlaceInfoSheet({
           <OpeningHoursPicker value={openingHours} onChange={setOpeningHours} />
         </div>
 
+        {/* Manual status pill editor. Overrides the auto open/
+            closed pill when set. Picking the first option clears
+            both manualStatus and manualStatusUntil; the rest pre-
+            fill manualStatus with the picked label. "حالة مخصصة"
+            reveals a small text input for owner-supplied text. */}
+        <ManualStatusSection
+          status={manualStatus}
+          setStatus={setManualStatus}
+          until={manualStatusUntil}
+          setUntil={setManualStatusUntil}
+        />
+
         </div>
         {/* Pinned footer — flex-shrink-0 keeps it OUT of the scroll
             region so it can't move when the keyboard or URL bar
@@ -295,5 +354,112 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</span>
       {children}
     </label>
+  )
+}
+
+/** Preset status options. The first option, when picked, clears
+ *  both manualStatus and manualStatusUntil (auto pill returns).
+ *  The last option ("حالة مخصصة") reveals a freeform text input
+ *  capped at 60 chars. */
+const MANUAL_STATUS_PRESETS: string[] = [
+  'خارج الخدمة مؤقتًا',
+  'تحت الصيانة',
+  'إجازة مؤقتة',
+  'مزدحم الآن',
+  'مغلق نهائيًا',
+]
+
+function ManualStatusSection({
+  status,
+  setStatus,
+  until,
+  setUntil,
+}: {
+  status: string
+  setStatus: (s: string) => void
+  until: string
+  setUntil: (s: string) => void
+}) {
+  // Determine the current "mode" the picker is in by matching the
+  // saved value against the presets. Anything that doesn't match
+  // and isn't empty is treated as the "custom" mode.
+  const isAuto = status === ''
+  const isPreset = MANUAL_STATUS_PRESETS.includes(status)
+  const isCustom = !isAuto && !isPreset
+
+  return (
+    <div>
+      <span className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+        🚦 حالة المكان
+      </span>
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          onClick={() => { setStatus(''); setUntil('') }}
+          className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors ${
+            isAuto
+              ? 'bg-primary-600 text-white'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+          }`}
+        >
+          تلقائي حسب ساعات العمل
+        </button>
+        {MANUAL_STATUS_PRESETS.map((label) => {
+          const active = status === label
+          return (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setStatus(label)}
+              className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors ${
+                active
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              {label}
+            </button>
+          )
+        })}
+        <button
+          type="button"
+          onClick={() => { if (!isCustom) setStatus(' ') }}
+          className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors ${
+            isCustom
+              ? 'bg-amber-500 text-white'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+          }`}
+        >
+          حالة مخصصة
+        </button>
+      </div>
+
+      {isCustom && (
+        <input
+          autoFocus
+          value={status}
+          onChange={(e) => setStatus(e.target.value.slice(0, 60))}
+          maxLength={60}
+          placeholder="اكتب الحالة (60 حرف كحد أقصى)"
+          className="input-field mt-2 text-sm"
+        />
+      )}
+
+      {!isAuto && (
+        <div className="mt-2">
+          <label className="block">
+            <span className="block text-[10.5px] text-gray-500 dark:text-gray-400 mb-1">
+              اختياري — يلغى تلقائياً بعد هذا التاريخ
+            </span>
+            <input
+              type="date"
+              value={until}
+              onChange={(e) => setUntil(e.target.value)}
+              className="input-field text-sm"
+            />
+          </label>
+        </div>
+      )}
+    </div>
   )
 }

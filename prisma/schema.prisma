@@ -1669,6 +1669,21 @@ model PlaceListing {
   addressText     String?
   openingHours    String?
 
+  // Owner-editable status pill. Overrides the auto open/closed
+  // pill (derived from openingHours + Asia/Riyadh wall clock)
+  // whenever set. Predefined option list lives in the UI; the
+  // column itself is just a freeform string (≤60 chars validated
+  // server-side) so future presets can ship without a migration.
+  // Examples: "خارج الخدمة مؤقتًا", "تحت الصيانة", "مزدحم الآن",
+  // "مغلق نهائيًا", or any custom owner-supplied text.
+  manualStatus      String?
+  // Optional auto-clear date. When set AND the timestamp is in
+  // the past, readers ignore manualStatus and fall back to the
+  // auto pill. We do NOT write to the DB during render to clear
+  // expired values — the next PATCH from the owner or a future
+  // batch can clean those up. Lazy by design.
+  manualStatusUntil DateTime?
+
   // Reserved for Phase 1.5 image-upload wiring. The MVP API
   // unconditionally strips this from incoming bodies; rows ship
   // with the [] default. Detail-page rendering already handles

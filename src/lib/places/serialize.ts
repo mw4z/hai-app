@@ -31,6 +31,12 @@ export interface PublicPlace {
   longitude: number | null
   addressText: string | null
   openingHours: string | null
+  /** Owner-editable status override; null = use auto pill from
+   *  openingHours. Shown verbatim when active. */
+  manualStatus: string | null
+  /** ISO timestamp. When set AND in the past, readers ignore
+   *  manualStatus and fall back to the auto pill. */
+  manualStatusUntil: string | null
   imageUrls: string[]
   addedByCommunity: boolean
   claimedByUser: PublicClaimedUser | null
@@ -106,6 +112,10 @@ export function toPublicPlace(place: PlaceWithRelations): PublicPlace {
     longitude: place.longitude,
     addressText: place.addressText,
     openingHours: place.openingHours,
+    manualStatus: place.manualStatus,
+    manualStatusUntil: place.manualStatusUntil
+      ? place.manualStatusUntil.toISOString()
+      : null,
     imageUrls: place.imageUrls,
     addedByCommunity: !!place.createdByUserId,
     claimedByUser,

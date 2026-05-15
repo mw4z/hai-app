@@ -5,6 +5,7 @@ import type { PublicPlace } from '@/lib/places/serialize'
 import { useLanguage } from '@/hooks/useLanguage'
 import { getCategoryMeta } from '@/lib/places/categories'
 import PlaceStatusBadge from './PlaceStatusBadge'
+import PlacePill from './PlacePill'
 
 /** Card used in /directory and /directory/mine. Renders the
  *  category emoji + name + short address + status badge with
@@ -33,6 +34,12 @@ export default function PlaceCard({ place }: { place: PublicPlace }) {
             {categoryLabel}
             {place.addressText ? ` · ${place.addressText}` : ''}
           </p>
+          {/* Live open/closed (or owner override) pill. Hides
+              itself when the place has no parseable hours AND
+              no manual override. */}
+          <div className="mt-1">
+            <PlacePill place={place} size="sm" />
+          </div>
           <div className="flex items-center gap-3 mt-1.5 text-[12px] text-gray-500 dark:text-gray-400">
             {place.phone && <span dir="ltr">📞 {place.phone}</span>}
             {place.whatsapp && <span dir="ltr">💬 {place.whatsapp}</span>}
