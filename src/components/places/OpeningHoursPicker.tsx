@@ -213,44 +213,45 @@ export default function OpeningHoursPicker({ value, onChange }: Props) {
                     </button>
                   </div>
                 )}
-                {/* Two compact pill-style time inputs on ONE row,
-                    each tagged with its caption inline so the
-                    "يفتح / يغلق" label sits on the same line as
-                    the chunk it controls. Inline labels eliminate
-                    the vertical "label + input" stack that was
-                    crowding the row before. Each input is the
-                    minimum viable width (5rem) so the iOS native
-                    HH:MM chunks have room to render without
-                    touching the neighbour's edge. */}
-                <div className="flex items-center gap-2 flex-wrap" dir="rtl">
-                  <label className="flex items-center gap-1.5 flex-1 min-w-0">
-                    <span className="text-[11px] font-medium text-gray-600 dark:text-gray-400 flex-shrink-0">
+                {/* Stacked layout per input — caption sits ABOVE
+                    its time input. The earlier inline attempt put
+                    the captions on the same row as the inputs and
+                    on narrow widths they collided / clipped. Now
+                    each input owns a full grid column and the
+                    caption has its own line above. Each input is
+                    still wrapped in a dir="ltr" parent so iOS
+                    WKWebView's native time-chunk renderer uses an
+                    LTR layout for "HH:MM AM/PM" regardless of the
+                    page's RTL direction. */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">
                       {tr('Opens', 'يفتح', 'کھلتا ہے')}
                     </span>
-                    <span dir="ltr" className="flex-1 min-w-0">
+                    <div dir="ltr">
                       <input
                         type="time"
                         value={shift.open}
                         onChange={(e) => updateShift(i, { open: e.target.value })}
                         style={{ textAlign: 'center' }}
-                        className="w-full min-w-0 px-1 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-[12px] focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        className="w-full px-1 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary-500"
                       />
-                    </span>
-                  </label>
-                  <label className="flex items-center gap-1.5 flex-1 min-w-0">
-                    <span className="text-[11px] font-medium text-gray-600 dark:text-gray-400 flex-shrink-0">
+                    </div>
+                  </div>
+                  <div>
+                    <span className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">
                       {tr('Closes', 'يغلق', 'بند ہوتا ہے')}
                     </span>
-                    <span dir="ltr" className="flex-1 min-w-0">
+                    <div dir="ltr">
                       <input
                         type="time"
                         value={shift.close}
                         onChange={(e) => updateShift(i, { close: e.target.value })}
                         style={{ textAlign: 'center' }}
-                        className="w-full min-w-0 px-1 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-[12px] focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        className="w-full px-1 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary-500"
                       />
-                    </span>
-                  </label>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
