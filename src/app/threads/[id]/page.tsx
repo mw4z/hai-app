@@ -40,7 +40,7 @@ export default async function ThreadPage({ params }: { params: { id: string } })
     }),
     db.user.findUnique({
       where: { id: session.userId },
-      select: { neighborhoodId: true },
+      select: { neighborhoodId: true, role: true },
     }),
   ])
 
@@ -91,6 +91,7 @@ export default async function ThreadPage({ params }: { params: { id: string } })
       threadId={params.id}
       currentUserId={session.userId}
       currentUserNeighborhoodId={currentUser?.neighborhoodId || null}
+      currentUserRole={currentUser?.role || null}
       other={JSON.parse(JSON.stringify(other))}
       initialMessages={JSON.parse(JSON.stringify(messages))}
       isClosed={thread.status === 'CLOSED'}

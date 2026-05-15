@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiBell, FiBellOff, FiImage, FiUser, FiPaperclip } from 'react-icons/fi'
 import AttachmentMenu from './AttachmentMenu'
+import PlacePickerSheet from './places/PlacePickerSheet'
+import { canAttachDirectoryPlace } from '@/lib/places/canAttachPlace'
 import SubtypeChip from './posts/SubtypeChip'
 import { uploadFiles, uploadPdf, uploadStageLabel, type UploadStage } from '@/lib/upload'
 import { playSend, playReaction, playDelete } from '@/lib/sound'
@@ -21,6 +23,7 @@ import { buildDisplayTitle } from '@/lib/posts/displayTitle'
 import { useAttachContact } from '@/hooks/useAttachContact'
 import ImageLightbox from './ImageLightbox'
 import SmartText from './SmartText'
+import SmartTextWithPlacePreviews from './SmartTextWithPlacePreviews'
 import ReportUserSheet from './ReportUserSheet'
 import SocialChips from './SocialChips'
 import { showApiError } from '@/lib/apiError'
@@ -458,6 +461,10 @@ export default function PostCard({
   // the menu's image / contact / location handlers know where to
   // route the picked content.
   const [showAttachMenu, setShowAttachMenu] = useState<null | 'comment' | 'reply'>(null)
+  // Place picker — tracks which composer (comment vs reply) asked
+  // to attach so the link goes into the right text state.
+  const [placePickerFor, setPlacePickerFor] = useState<null | 'comment' | 'reply'>(null)
+  const canAttachPlace = canAttachDirectoryPlace(currentUserRole)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editCommentBody, setEditCommentBody] = useState('')
   const [bookmarked, setBookmarked] = useState(initialBookmarked)
@@ -1361,7 +1368,7 @@ export default function PostCard({
               bodyExpanded ? '' : 'line-clamp-5'
             }`}
           >
-            <SmartText text={displayBody} />
+            <SmartTextWithPlacePreviews text={displayBody} />
           </p>
           {bodyOverflows && (
             <button
@@ -1734,8 +1741,41 @@ export default function PostCard({
           if (showAttachMenu === 'comment') commentPdfInputRef.current?.click()
           else if (showAttachMenu === 'reply') replyPdfInputRef.current?.click()
         }}
+        onPickPlace={
+          canAttachPlace
+            ? () => {
+                // Remember which composer asked, then open the
+                // picker. The menu auto-closes (wrap() inside
+                // AttachmentMenu) so we just stash the target.
+                if (showAttachMenu) setPlacePickerFor(showAttachMenu)
+              }
+            : undefined
+        }
         variant="comment"
       />
+      {canAttachPlace && (
+        <PlacePickerSheet
+          open={placePickerFor !== null}
+          onClose={() => setPlacePickerFor(null)}
+          onSelect={(place) => {
+            const link = `/directory/${place.id}`
+            const target = placePickerFor
+            if (target === 'comment') {
+              setCommentText((prev) => {
+                if (!prev) return link
+                if (prev.includes(link)) return prev
+                return `${prev.trimEnd()}\n${link}`
+              })
+            } else if (target === 'reply') {
+              setReplyText((prev) => {
+                if (!prev) return link
+                if (prev.includes(link)) return prev
+                return `${prev.trimEnd()}\n${link}`
+              })
+            }
+          }}
+        />
+      )}
       {/* Hidden file inputs that back the AttachmentMenu "Document"
           row. Two separate inputs because the top-level comment
           composer and the reply composer hold independent state. */}
@@ -1894,7 +1934,7 @@ export default function PostCard({
                               const displayBody = showTx && tx?.body ? tx.body : c.body
                               return (
                                 <p className="hai-comment__text selectable-text">
-                                  <SmartText text={displayBody} />
+                                  <SmartTextWithPlacePreviews text={displayBody} />
                                   {c.editedAt && <span className="hai-meta hai-comment__edited"> {lang === 'en' ? '(edited)' : '(معدّل)'}</span>}
                                 </p>
                               )
@@ -1998,7 +2038,7 @@ export default function PostCard({
                                 const displayBody = showTx && tx?.body ? tx.body : reply.body
                                 return (
                                   <p className="hai-comment__text selectable-text">
-                                    <SmartText text={displayBody} />
+                                    <SmartTextWithPlacePreviews text={displayBody} />
                                   </p>
                                 )
                               })()}

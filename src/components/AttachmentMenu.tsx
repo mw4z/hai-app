@@ -16,6 +16,11 @@ interface Props {
    *  the fourth menu option. Surfaces that don't yet handle PDFs
    *  (legacy callers) omit this prop and the row simply doesn't render. */
   onPickDocument?: () => void
+  /** Optional — when provided, a "Directory place" row is rendered.
+   *  Callers gate visibility themselves via canAttachDirectoryPlace()
+   *  so residents only see this option when the directory is
+   *  publicly enabled; mods/admin always see it for testing. */
+  onPickPlace?: () => void
   /**
    * Visual variant. 'chat' renders on a dark/translucent input area
    * (the ChatClient composer) so the menu uses a brighter elevated
@@ -47,6 +52,7 @@ export default function AttachmentMenu({
   onPickContact,
   onPickLocation,
   onPickDocument,
+  onPickPlace,
   variant = 'chat',
 }: Props) {
   const { lang } = useLanguage()
@@ -128,6 +134,23 @@ export default function AttachmentMenu({
               'PDF منسلک کریں (زیادہ سے زیادہ 50MB)',
             ),
             tint: 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300',
+          },
+        ]
+      : []),
+    // Directory-place row — caller controls visibility (residents
+    // only see it when NEXT_PUBLIC_DIRECTORY_ENABLED=1; mods/admin
+    // always see it). The menu itself doesn't import the flag —
+    // keeps the component dumb and the gate centralized in the
+    // caller.
+    ...(onPickPlace
+      ? [
+          {
+            key: 'place',
+            onClick: wrap(onPickPlace),
+            icon: '🏷️',
+            title: 'مكان من دليل الحي',
+            subtitle: 'إرفاق مكان من دليل الحي',
+            tint: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
           },
         ]
       : []),

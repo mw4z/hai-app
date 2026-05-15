@@ -19,6 +19,8 @@ import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { playSuccess, playError } from '@/lib/sound'
 import { FiX } from 'react-icons/fi'
 import ContextualGuide from '@/components/ContextualGuide'
+import PlacePickerSheet from '@/components/places/PlacePickerSheet'
+import { directoryUIVisible } from '@/lib/places/featureFlag'
 
 /** نَبْضي post-create guide steps. Mirrors the user spec — three
  *  short cards: what this screen is for, where to pick a section,
@@ -420,6 +422,11 @@ export default function NewPostPage() {
   // thumbnail progress overlay so users on slow networks see the
   // upload is still working and don't bail prematurely.
   const [imageUploadProgress, setImageUploadProgress] = useState<number | null>(null)
+  // Directory place attach. Residents see it only when the
+  // directory is publicly enabled; mods/admin always see it for
+  // testing (isAdminLike).
+  const [placePickerOpen, setPlacePickerOpen] = useState(false)
+  const canAttachPlaceInPost = isAdminLike || directoryUIVisible()
   // PDF attachment — single document up to 25MB. Upload kicks off
   // the moment the user picks the file (NOT on submit), so by the
   // time they tap Publish the URL is already cached and submit is
@@ -1297,6 +1304,28 @@ export default function NewPostPage() {
               )}
             </div>
 
+            {/* Directory place attach — inserts a relative
+                /directory/<id> link into the body. The published
+                PostCard renders SmartTextWithPlacePreviews which
+                detects the link and shows a compact PlacePreviewCard
+                below the body. Gated on canAttachPlaceInPost so
+                residents only see it when the directory is
+                publicly enabled; mods/admin always see it. */}
+            {canAttachPlaceInPost && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5 mb-2">
+                  🏷️ {lang === 'en' ? 'Attach a directory place (optional)' : 'إرفاق مكان من دليل الحي (اختياري)'}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setPlacePickerOpen(true)}
+                  className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-emerald-200 dark:border-emerald-800/50 rounded-xl py-3 text-sm text-emerald-700 dark:text-emerald-300 hover:border-emerald-300 transition-colors"
+                >
+                  + {lang === 'en' ? 'Pick a place' : 'اختر مكان من الدليل'}
+                </button>
+              </div>
+            )}
+
             {/* PDF attachment — single optional document, max 25MB.
                 Real-world fit: real-estate floor plans, service price
                 lists, event flyers, restaurant menus. Tile uses the
@@ -1511,6 +1540,20 @@ export default function NewPostPage() {
         onCamera={pickFromCamera}
         onGallery={pickFromGallery}
       />
+      {canAttachPlaceInPost && (
+        <PlacePickerSheet
+          open={placePickerOpen}
+          onClose={() => setPlacePickerOpen(false)}
+          onSelect={(place) => {
+            const link = `/directory/${place.id}`
+            setBody((prev) => {
+              if (!prev) return link
+              if (prev.includes(link)) return prev
+              return `${prev.trimEnd()}\n${link}`
+            })
+          }}
+        />
+      )}
       <ContextualGuide guideId="post-new" steps={POST_NEW_GUIDE_STEPS} />
     </main>
   )

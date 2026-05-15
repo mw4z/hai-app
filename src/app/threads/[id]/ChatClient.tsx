@@ -19,6 +19,9 @@ import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import { useAttachContact } from '@/hooks/useAttachContact'
 import { playSend } from '@/lib/sound'
 import SmartText from '@/components/SmartText'
+import SmartTextWithPlacePreviews from '@/components/SmartTextWithPlacePreviews'
+import PlacePickerSheet from '@/components/places/PlacePickerSheet'
+import { canAttachDirectoryPlace } from '@/lib/places/canAttachPlace'
 import ImageLightbox from '@/components/ImageLightbox'
 import ReportUserSheet from '@/components/ReportUserSheet'
 import { showApiError } from '@/lib/apiError'
@@ -191,6 +194,7 @@ export default function ChatClient({
   threadId,
   currentUserId,
   currentUserNeighborhoodId,
+  currentUserRole,
   other,
   initialMessages,
   isClosed = false,
@@ -199,6 +203,7 @@ export default function ChatClient({
   threadId: string
   currentUserId: string
   currentUserNeighborhoodId: string | null
+  currentUserRole?: string | null
   other: { id: string; name: string | null; lastName?: string | null; avatarUrl: string | null; role?: string | null; neighborhoodId?: string | null }
   initialMessages: Msg[]
   isClosed?: boolean
@@ -434,6 +439,12 @@ export default function ChatClient({
   const [selectedMsg, setSelectedMsg] = useState<string | null>(null)
   const [showLocationConfirm, setShowLocationConfirm] = useState(false)
   const [showAttachMenu, setShowAttachMenu] = useState(false)
+  // Place picker — opened from AttachmentMenu when the user chooses
+  // "مكان من دليل الحي". Gated on canAttachDirectoryPlace(role) so
+  // residents only see the row when the directory is publicly
+  // enabled; mods/admin always see it for testing.
+  const [showPlacePicker, setShowPlacePicker] = useState(false)
+  const canAttachPlace = canAttachDirectoryPlace(currentUserRole ?? null)
   const [showWallpaperPicker, setShowWallpaperPicker] = useState(false)
   const [wallpaperId, setWallpaperId] = useState(() => {
     try { return localStorage.getItem('hai_chat_wallpaper') || 'default' } catch { return 'default' }
@@ -1673,6 +1684,7 @@ export default function ChatClient({
         }}
         onPickLocation={() => setShowLocationConfirm(true)}
         onPickDocument={() => pdfInputRef.current?.click()}
+        onPickPlace={canAttachPlace ? () => setShowPlacePicker(true) : undefined}
         variant="chat"
       />
       {/* Hidden PDF input — opened by the AttachmentMenu's
@@ -1689,6 +1701,25 @@ export default function ChatClient({
           // value reset is handled inside sendPdf's finally block
         }}
       />
+      {/* Directory place picker — opened from the attachment menu.
+          On select we insert a relative /directory/<id> link into
+          the message text. SmartTextWithPlacePreviews renders a
+          PlacePreviewCard under the bubble once sent. */}
+      {canAttachPlace && (
+        <PlacePickerSheet
+          open={showPlacePicker}
+          onClose={() => setShowPlacePicker(false)}
+          onSelect={(place) => {
+            const link = `/directory/${place.id}`
+            setText((prev) => {
+              if (!prev) return link
+              if (prev.includes(link)) return prev
+              return `${prev.trimEnd()}\n${link}`
+            })
+            try { textInputRef.current?.focus() } catch {}
+          }}
+        />
+      )}
       {showLocationConfirm && (
         <>
           <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowLocationConfirm(false)} />
@@ -2230,7 +2261,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
               </div>
             ) : (
               <p className="text-[15px] leading-relaxed selectable-text">
-                <SmartText text={msg.text || ''} variant={isMe ? 'onGreen' : 'light'} />
+                <SmartTextWithPlacePreviews text={msg.text || ''} variant={isMe ? 'onGreen' : 'light'} />
                 {msg.edited && (
                   <span className={`text-[10px] italic ml-1 ${isMe ? 'text-primary-200' : 'text-gray-400 dark:text-gray-500'}`}>
                     {lang === 'en' ? '(edited)' : '(معدّل)'}
