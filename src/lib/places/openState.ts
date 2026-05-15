@@ -260,15 +260,29 @@ export function parseOpeningHours(raw: string): ParsedHours | null {
 
 const SOON_WINDOW_MIN = 30
 
-/** Convert a Date to Asia/Riyadh wall-clock components (no DST). */
+/** Convert a Date to Asia/Riyadh wall-clock components (no DST).
+ *
+ *  Riyadh is UTC+3 year-round. To read the Riyadh wall clock for
+ *  a given moment, we shift the absolute timestamp by +3h and
+ *  then read it with the getUTC* accessors — those bypass the
+ *  device's local timezone entirely.
+ *
+ *  Why this matters: the earlier version of this function tried
+ *  to "normalize via getTimezoneOffset()" first and ended up off
+ *  by 3 hours on the most common case (a KSA device, offset =
+ *  -180 min). At 3:38 AM KSA, the buggy math produced 0:38, which
+ *  fell inside any overnight shift's close-window (e.g. a place
+ *  open 10 AM → 2 AM showed "مفتوح" at 3:38 AM). Fix is to drop
+ *  getTimezoneOffset entirely — the local timezone is irrelevant
+ *  to the question "what time is it in Riyadh right now".
+ */
 function riyadhParts(now: Date): { dayOfWeekSat0: number; minutes: number } {
-  // Riyadh is UTC+3 year-round.
-  const utc = now.getTime() + now.getTimezoneOffset() * 60_000
-  const ksa = new Date(utc + 3 * 60 * 60 * 1000)
-  // JS Date.getDay(): 0=Sun … 6=Sat. Saudi week: 0=Sat … 6=Fri.
-  const jsDay = ksa.getUTCDay() // 0=Sun
-  const dayOfWeekSat0 = jsDay === 6 ? 0 : jsDay + 1 // Sat→0, Sun→1, …, Fri→6
-  const minutes = ksa.getUTCHours() * 60 + ksa.getUTCMinutes()
+  const RIYADH_OFFSET_MS = 3 * 60 * 60 * 1000
+  const shifted = new Date(now.getTime() + RIYADH_OFFSET_MS)
+  // JS Date.getUTCDay(): 0=Sun … 6=Sat. Saudi week: 0=Sat … 6=Fri.
+  const jsDay = shifted.getUTCDay()
+  const dayOfWeekSat0 = jsDay === 6 ? 0 : jsDay + 1
+  const minutes = shifted.getUTCHours() * 60 + shifted.getUTCMinutes()
   return { dayOfWeekSat0, minutes }
 }
 

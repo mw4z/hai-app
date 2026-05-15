@@ -85,6 +85,43 @@ test('computePlacePill — "مغلق نهائيًا" tones as danger', () => {
   assert.equal(pill?.tone, 'manual-danger')
 })
 
+test('computePlacePill — overnight shift, 3:38 AM Riyadh → closed (regression)', () => {
+  // User report: a place open "10 ص - 2 ص" (10 AM - 2 AM next
+  // morning, every day) was showing "مفتوح" at 3:38 AM KSA.
+  // Earlier riyadhParts() used getTimezoneOffset() and ended up
+  // off by 3 hours on KSA devices — 3:38 AM internally became
+  // 0:38 AM, which fell inside the carry-over window of the
+  // overnight shift. The fix shifts the absolute timestamp by
+  // +3h and reads UTC components directly; this test pins it.
+  const ksa338am = new Date('2026-05-15T00:38:00Z') // = 03:38 KSA
+  const pill = computePlacePill(
+    {
+      openingHours: 'يومياً 10 ص - 2 ص',
+      manualStatus: null,
+      manualStatusUntil: null,
+    },
+    ksa338am,
+  )
+  assert.equal(pill?.label, 'مغلق')
+  assert.equal(pill?.tone, 'closed')
+})
+
+test('computePlacePill — overnight shift, 1:00 AM Riyadh → open', () => {
+  // The other half of the overnight-shift guarantee: at 1 AM
+  // KSA we ARE still inside the 10 AM - 2 AM window from the
+  // previous day's opening, so the pill must read مفتوح.
+  const ksa100am = new Date('2026-05-15T22:00:00Z') // 22:00 UTC = 01:00 KSA next day
+  const pill = computePlacePill(
+    {
+      openingHours: 'يومياً 10 ص - 2 ص',
+      manualStatus: null,
+      manualStatusUntil: null,
+    },
+    ksa100am,
+  )
+  assert.equal(pill?.label, 'مفتوح')
+})
+
 test('computePlacePill — unparseable hours + no override → no pill', () => {
   assert.equal(
     computePlacePill({
