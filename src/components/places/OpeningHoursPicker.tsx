@@ -213,36 +213,43 @@ export default function OpeningHoursPicker({ value, onChange }: Props) {
                     </button>
                   </div>
                 )}
-                {/* Time inputs side-by-side. Each input is wrapped
-                    in a dir="ltr" label so iOS WKWebView's native
-                    time picker renders its HH:MM AM/PM chunks in
-                    LTR layout regardless of the page's RTL parent
-                    direction — previously the rendered text drifted
-                    past the bordered input edge in RTL pages. */}
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="block" dir="ltr">
-                    <span className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1 text-start" dir="rtl">
+                {/* Two compact pill-style time inputs on ONE row,
+                    each tagged with its caption inline so the
+                    "يفتح / يغلق" label sits on the same line as
+                    the chunk it controls. Inline labels eliminate
+                    the vertical "label + input" stack that was
+                    crowding the row before. Each input is the
+                    minimum viable width (5rem) so the iOS native
+                    HH:MM chunks have room to render without
+                    touching the neighbour's edge. */}
+                <div className="flex items-center gap-2 flex-wrap" dir="rtl">
+                  <label className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <span className="text-[11px] font-medium text-gray-600 dark:text-gray-400 flex-shrink-0">
                       {tr('Opens', 'يفتح', 'کھلتا ہے')}
                     </span>
-                    <input
-                      type="time"
-                      value={shift.open}
-                      onChange={(e) => updateShift(i, { open: e.target.value })}
-                      style={{ textAlign: 'center', minWidth: '6.5rem' }}
-                      className="w-full px-2 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
+                    <span dir="ltr" className="flex-1 min-w-0">
+                      <input
+                        type="time"
+                        value={shift.open}
+                        onChange={(e) => updateShift(i, { open: e.target.value })}
+                        style={{ textAlign: 'center' }}
+                        className="w-full min-w-0 px-1 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-[12px] focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </span>
                   </label>
-                  <label className="block" dir="ltr">
-                    <span className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1 text-start" dir="rtl">
+                  <label className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <span className="text-[11px] font-medium text-gray-600 dark:text-gray-400 flex-shrink-0">
                       {tr('Closes', 'يغلق', 'بند ہوتا ہے')}
                     </span>
-                    <input
-                      type="time"
-                      value={shift.close}
-                      onChange={(e) => updateShift(i, { close: e.target.value })}
-                      style={{ textAlign: 'center', minWidth: '6.5rem' }}
-                      className="w-full px-2 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
+                    <span dir="ltr" className="flex-1 min-w-0">
+                      <input
+                        type="time"
+                        value={shift.close}
+                        onChange={(e) => updateShift(i, { close: e.target.value })}
+                        style={{ textAlign: 'center' }}
+                        className="w-full min-w-0 px-1 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-[12px] focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </span>
                   </label>
                 </div>
               </div>
