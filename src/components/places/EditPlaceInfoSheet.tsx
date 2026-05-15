@@ -447,17 +447,35 @@ function ManualStatusSection({
 
       {!isAuto && (
         <div className="mt-2">
-          <label className="block">
-            <span className="block text-[10.5px] text-gray-500 dark:text-gray-400 mb-1">
-              اختياري — يلغى تلقائياً بعد هذا التاريخ
-            </span>
+          <span className="block text-[10.5px] text-gray-500 dark:text-gray-400 mb-1">
+            اختياري — يلغى تلقائياً بعد هذا التاريخ
+          </span>
+          {/* Compact date input — the global input-field utility
+              renders an oversized control here, and iOS WKWebView
+              expands <input type="date"> further on RTL pages.
+              Force tight sizing + a dir="ltr" wrapper so the
+              native chunks render left-to-right inside a phone-
+              friendly width. Inline-block (not full-width) since
+              the date itself is only ~7 chars; no point spanning
+              the whole sheet. */}
+          <div dir="ltr" className="inline-block">
             <input
               type="date"
               value={until}
               onChange={(e) => setUntil(e.target.value)}
-              className="input-field text-sm"
+              style={{ textAlign: 'center' }}
+              className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
-          </label>
+          </div>
+          {until && (
+            <button
+              type="button"
+              onClick={() => setUntil('')}
+              className="ms-2 text-[11px] text-gray-400 dark:text-gray-500 underline decoration-dotted"
+            >
+              مسح
+            </button>
+          )}
         </div>
       )}
     </div>
