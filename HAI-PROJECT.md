@@ -1,8 +1,10 @@
 # Hai (حي) — Neighborhood Social Platform
 
-A structured, neighborhood-based community platform for Saudi Arabia. Built as a better alternative to unorganized WhatsApp groups — organized by district, reputation-driven, and trilingual (Arabic + English + Urdu).
+A structured, neighborhood-based community platform for Saudi Arabia. Built as a better alternative to unorganized WhatsApp groups — organized by district, reputation-driven, trilingual (Arabic + English + Urdu), and shipped as a real mobile app via Capacitor (iOS App Store + Google Play).
 
-**Target Cities**: Mecca, Jeddah, Riyadh
+**Target Cities**: Mecca, Jeddah, Riyadh (KSA — production hosted on Vercel, app gated to KSA installs).
+
+**Current Release**: iOS `1.1.6 (50)` · Android `1.1.6 (51)`.
 
 ---
 
@@ -11,16 +13,43 @@ A structured, neighborhood-based community platform for Saudi Arabia. Built as a
 | Layer | Technology |
 |-------|-----------|
 | Frontend | Next.js 14 (App Router), React 18, TailwindCSS |
-| Backend | Next.js API Routes (TypeScript) |
-| Database | PostgreSQL + Prisma 7 ORM (PrismaPg adapter) |
-| Auth | JWT (jose) + SMS OTP (Unifonic) |
-| Maps | MapLibre GL + MapTiler (geocoding & tiles) + Photon (search fallback) |
-| File Storage | Local filesystem (`/public/uploads`) |
-| i18n | Custom trilingual system (AR/EN/UR) with cookie-based SSR |
-| Location | Browser Geolocation API + polygon-based neighborhood detection |
-| PWA | Web App Manifest, standalone mode, RTL Arabic-first |
-| Logging | Structured console logger (src/lib/logger.ts) |
-| Safety | Error boundaries, try/catch on all API routes |
+| Backend | Next.js API Routes (TypeScript), Vercel Functions |
+| Database | Supabase Postgres + Prisma 7 ORM (PrismaPg adapter) |
+| Auth | JWT (jose, 7-day) + SMS OTP via Twilio Verify (KSA-scoped) |
+| Mobile | Capacitor 8 (iOS + Android) wrapping the live web app at `https://app.hai-app.net` |
+| Push | FCM v1 + direct APNs HTTP/2 (no Firebase APNs proxy); collapse-id replacement on delete |
+| File Storage | Vercel Blob (public + private) |
+| Maps | MapLibre GL + MapTiler tiles + OSM Nominatim search |
+| i18n | Custom trilingual system (AR/EN/UR), cookie-based SSR |
+| Location | Capacitor Geolocation + browser fallback, polygon-based neighborhood detection (Balady) |
+| PWA | Web App Manifest, standalone, RTL Arabic-first, offline fallback page |
+| Logging | Structured console logger (`src/lib/logger.ts`) |
+| Hosting | Vercel (production, preview deploys) |
+| iOS CI | Codemagic → TestFlight → App Store Connect |
+| Android CI | Local gradle (`./gradlew bundleRelease`) → Play Console |
+
+---
+
+## Mobile (Capacitor)
+
+The web app is the source of truth. Capacitor wraps it as a native app — no parallel mobile codebase. The wrapper serves `https://app.hai-app.net` and falls back to a bundled `offline.html` on cold-start network failure.
+
+| Native concern | How it's handled |
+|---|---|
+| Status bar / notch | Native launch storyboard "حي" → JS `<AppSplash>` hand-off, body background matches webview background (no seam) |
+| Push | `@capacitor/push-notifications` (FCM + APNs); foreground forward via `notifyListeners`, native AppDelegate cleans delivered notifications when content is deleted |
+| Geolocation | `@capacitor/geolocation` for neighborhood detect + ride pickup; web fallback for browsers |
+| Camera / images | `@capacitor/camera` + `react-easy-crop` for upload + crop; HEIC accepted on iOS |
+| Contacts | Custom `hai-contacts` Capacitor plugin (vendored under `plugins/hai-contacts`) for the "attach contact" sheet |
+| Haptics | `@capacitor/haptics` (6 patterns) |
+| Filesystem | `@capacitor/filesystem` for local cache |
+| Browser | `@capacitor/browser` for external links (in-app webview, not Safari/Chrome) |
+| Sharing | `@capacitor/share` for native share sheet |
+| Splash | `@capacitor/splash-screen` (hidden immediately — JS `AppSplash` is the real splash) |
+
+iOS-specific extras (`ios/App/App/`):
+- `Info.plist` has `UIBackgroundModes: [remote-notification]` so silent pushes wake the app.
+- `AppDelegate.swift` handles incoming pushes: forwards alerts to JS via `plugin.notifyListeners`, and natively removes delivered notifications when a `cleanup=true` push arrives — works even when JS is suspended (background).
 
 ---
 
@@ -29,733 +58,667 @@ A structured, neighborhood-based community platform for Saudi Arabia. Built as a
 ```
 Hai - Project/
 ├── src/
-│   ├── app/                          # Next.js App Route
- (25 page routes)
-│   │   ├── layout.tsx                # Root layout (fonts, providers, theme, tour)
-│   │   ├── page.tsx                  # Landing page
-│   │   ├── globals.css               # Global styles + dark mode vars
-│   │   ├── login/page.tsx            # Phone login
-│   │   ├── register/page.tsx         # Phone registration
-│   │   ├── verify/page.tsx           # OTP verification
-│   │   ├── onboarding/page.tsx       # First-time setup (name, gender, location)
-│   │   ├── feed/                     # Main neighborhood feed
-│   │   │   ├── page.tsx              # Server component
-│   │   │   └── FeedClient.tsx        # Client: posts, categories, filters, auto-refresh
-│   │   ├── market/page.tsx           # Marketplace view
-│   │   ├── services/page.tsx         # Services view
-│   │   ├── post/
-│   │   │   ├── new/page.tsx          # Create new post
-│   │   │   └── [id]/pay/page.tsx     # Payment page (placeholder)
-│   │   ├── threads/
-│   │   │   ├── page.tsx              # DM threads list
-│   │   │   └── [id]/page.tsx         # Individual chat
-│   │   ├── rides/
-│   │   │   ├── page.tsx              # Ride requests landing
-│   │   │   ├── new/page.tsx          # Create ride request
-│   │   │   └── [id]/
-│   │   │       ├── page.tsx          # Ride detail (server)
-│   │   │       └── RideDetailClient.tsx  # Phase-based ride UI
-│   │   ├── notifications/page.tsx    # Notification center (swipe-to-delete)
-│   │   ├── profile/
-│   │   │   ├── page.tsx              # User profile (server)
-│   │   │   ├── ProfileClient.tsx     # Profile UI (accordion sections)
-│   │   │   ├── edit/page.tsx         # Profile edit
-│   │   │   └── change-neighborhood/  # GPS-based neighborhood change
-│   │   ├── admin/
-│   │   │   ├── page.tsx              # Admin page (server)
-│   │   │   └── AdminClient.tsx       # Admin dashboard (client)
-│   │   ├── mod/
-│   │   │   ├── page.tsx              # Mod dashboard (server)
-│   │   │   └── ModDashboard.tsx      # Reports, hidden, banned, activity tabs
-│   │   ├── contests/page.tsx         # Contests & prizes (coming soon)
-│   │   ├── neighborhood-reports/     # Reports to neighborhood admin
-│   │   ├── support/                  # Support tickets to developer
-│   │   ├── terms/page.tsx            # Terms of service
-│   │   ├── privacy/page.tsx          # Privacy policy
-│   │   ├── error.tsx                 # Route-level error recovery
-│   │   ├── global-error.tsx          # Root error boundary
-│   │   ├── not-found.tsx             # 404 page
-│   │   ├── loading.tsx               # Global loading spinner
-│   │   └── api/                      # 65+ API endpoints (see below)
-│   ├── components/
-│   │   ├── PostCard.tsx              # Post card with reactions, comments, DM, edit/delete
-│   │   ├── PollCard.tsx              # Poll voting with animated bars & reactions
-│   │   ├── BottomNav.tsx             # Bottom navigation bar (5 tabs + badges)
-│   │   ├── BackButton.tsx            # Uniform RTL-aware back button
-│   │   ├── SwipeToDelete.tsx         # 3-phase swipe animation with haptic
-│   │   ├── PullToRefresh.tsx         # Pull-to-refresh (guards map picker overlay)
-│   │   ├── Tour.tsx                  # Multi-flow onboarding tour (5 flows, retry logic)
-│   │   ├── AppSplash.tsx             # Splash screen (zoom-in dismiss, once per install)
-│   │   ├── ErrorBoundary.tsx         # React error boundary with recovery UI
-│   │   ├── ArrivalAlert.tsx          # Global ride arrival/selection alert overlay
-│   │   ├── EmojiPickerWrapper.tsx    # Emoji reaction picker
-│   │   ├── QuickAskSheet.tsx         # Quick post creation sheet
-│   │   ├── RepToast.tsx              # Reputation change toast
-│   │   ├── RiyalIcon.tsx             # Official Saudi Riyal SVG symbol (SAMA)
-│   │   ├── UserBadge.tsx             # Verification check + tier label (separated)
-│   │   └── rides/
-│   │       ├── LocationPicker.tsx    # GPS pickup + search dropoff (MapTiler/Photon)
-│   │       ├── openMapPicker.ts      # Vanilla JS fullscreen map picker (no React)
-│   │       ├── MapPicker.tsx          # React map picker (deprecated)
-│   │       ├── OfferCard.tsx         # Driver offer display card
-│   │       ├── StatusBadge.tsx       # Ride status badge
-│   │       └── Timeline.tsx          # Ride event timeline
-│   ├── hooks/
-│   │   ├── useLanguage.tsx           # Trilingual translation hook + LangProvider
-│   │   ├── useAutoRefresh.ts         # Poll at intervals, pause on tab hide
-│   │   ├── useGPSLocation.ts         # GPS location with confidence scoring
-│   │   └── useRidePoll.ts            # Poll ride status every 3s, stop on terminal
+│   ├── app/                                   # Next.js App Router
+│   │   ├── layout.tsx                         # Root layout (theme, lang, providers, BottomNav, push reg)
+│   │   ├── template.tsx                       # Route-transition wrapper
+│   │   ├── page.tsx                           # Landing page
+│   │   ├── error.tsx / global-error.tsx       # Error boundaries
+│   │   ├── loading.tsx                        # Global loading
+│   │   ├── globals.css                        # Tokens + dark mode + RTL helpers
+│   │   │
+│   │   ├── login / register / verify /        # Auth flow
+│   │   │   onboarding / verify-location
+│   │   ├── tutorial/                          # First-time slides
+│   │   ├── feed/                              # Main neighborhood feed (FeedClient)
+│   │   ├── market/                            # Marketplace (server-rendered)
+│   │   ├── services/                          # Redirect → market?tab=SERVICES
+│   │   ├── ask/                               # Quick-ask compose page
+│   │   ├── post/new + post/[id]/pay           # Compose + boost
+│   │   ├── threads/ + threads/[id]/           # DM list + chat
+│   │   ├── rides/ + rides/new + rides/[id]/   # Rides surface (rides + delivery)
+│   │   ├── notifications/                     # Bell tray
+│   │   ├── profile/                           # Profile (accordion)
+│   │   │   ├── edit / catalog /               # Sub-pages (all SSR'd)
+│   │   │   │   change-neighborhood
+│   │   ├── admin/                             # Admin dashboard (SSR'd overview)
+│   │   ├── mod/                               # Neighborhood-mod dashboard (SSR'd)
+│   │   ├── contests/                          # "Coming soon" (static)
+│   │   ├── neighborhood-reports/              # Report to your nbhd admin
+│   │   ├── support/                           # Support ticket to dev
+│   │   ├── child-safety/                      # KSA / store compliance page
+│   │   ├── privacy / terms /                  # Legal pages
+│   │   ├── i/[code]/                          # Invite landing
+│   │   └── api/                               # 123 API endpoints (see below)
+│   │
+│   ├── components/                            # Shared UI
+│   │   ├── PostCard / PollCard / BottomNav
+│   │   ├── EmergencyBanner / ArrivalAlert
+│   │   ├── PushRegistration / CapacitorBridge
+│   │   ├── ConfirmProvider / PullToRefresh / SwipeBack
+│   │   ├── HighlightsSection / InviteLeaderboardCard
+│   │   ├── ContactChip / LocationChip / SmartText
+│   │   ├── AttachmentMenu / QuickAskSheet
+│   │   ├── rides/  (LocationPicker, MapPicker, OfferCard, StatusBadge, Timeline)
+│   │   └── …
+│   │
+│   ├── hooks/   useLanguage · useAutoRefresh · useGPSLocation · useRidePoll · useDragToDismiss · useBodyScrollLock · …
+│   │
 │   └── lib/
-│       ├── i18n.ts                   # 426+ trilingual translation keys (AR/EN/UR)
-│       ├── auth.ts                   # JWT + session management
-│       ├── db.ts                     # Prisma client initialization
-│       ├── sms.ts                    # OTP generation + Unifonic SMS
-│       ├── notifications.ts          # Notification creation with prefs
-│       ├── reputation.ts             # Server-side rep with anti-gaming
-│       ├── reputation-levels.ts      # Client-safe rep levels & benefits
-│       ├── user-badge.ts             # Badge logic (account type + rep), trilingual
-│       ├── haptic.ts                 # 6 haptic patterns (light/medium/heavy/success/error/warning)
-│       ├── thread-rules.ts           # DM eligibility rules
-│       ├── validation.ts             # Content + image validation
-│       ├── logger.ts                 # Structured console logger
-│       ├── api-handler.ts            # API wrapper (try/catch, Prisma errors, auth)
-│       ├── env-check.ts              # Environment variable safety checks
-│       ├── safe-fetch.ts             # Frontend fetch wrapper + debounce
-│       ├── arrival-alert.ts          # Sound + vibration for ride alerts
-│       ├── blocks.ts                 # User block helper (bidirectional filter)
-│       ├── capabilities.ts           # Plan-based limits + entitlements (FREE/PREMIUM)
-│       ├── usage.ts                  # Centralized usage tracking
-│       ├── mod-safety.ts             # Mod probation, conflict detection, escalation
-│       ├── mod-allocation.ts         # Dynamic mod capacity per neighborhood
-│       ├── seed-service.ts           # Auto-seed sample content
-│       ├── location/
-│       │   ├── index.ts              # Location detection exports
-│       │   ├── types.ts              # Location types
-│       │   ├── polygon.ts            # Point-in-polygon algorithm
-│       │   ├── web-collector.ts      # GPS sample collection
-│       │   └── shared-decision.ts    # Best-sample decision logic
-│       └── rides/
-│           ├── state-machine.ts      # 11-state ride state machine
-│           ├── distance.ts           # Haversine distance calculations
-│           ├── pricing.ts            # Ride pricing logic
-│           ├── events.ts             # Ride event audit trail
-│           └── notify.ts             # Ride notification dispatch
+│       ├── i18n.ts                            # 600+ trilingual keys (AR/EN/UR)
+│       ├── auth.ts                            # JWT (7-day) + session
+│       ├── db.ts                              # Prisma client (Pg adapter)
+│       ├── sms.ts                             # Twilio Verify
+│       ├── apns.ts                            # Direct APNs HTTP/2 sender
+│       ├── notifications.ts                   # In-app + push fan-out + cleanup
+│       ├── pushMeta.ts                        # ContentRef + collapse-id helpers
+│       ├── reputation.ts / reputation-levels.ts
+│       ├── user-badge.ts / displayName.ts
+│       ├── haptic.ts / sound.ts
+│       ├── thread-rules.ts                    # DM eligibility
+│       ├── validation.ts / profanityFilter.ts
+│       ├── logger.ts / api-handler.ts / env-check.ts
+│       ├── safe-fetch.ts / network.ts         # Offline-aware fetch + banner
+│       ├── arrival-alert.ts                   # Sound + vibration for rides
+│       ├── blocks.ts                          # Bidirectional user blocks
+│       ├── capabilities.ts / usage.ts         # Plan limits + tracking
+│       ├── mod-safety.ts / mod-allocation.ts
+│       ├── seed-service.ts                    # Auto-seed sample content
+│       ├── adminDashboard.ts                  # Shared admin overview query (page + API)
+│       ├── highlights.ts                      # Feed highlights bundle
+│       ├── postExpiry.ts                      # Auto-archive rules
+│       ├── posts/classify.ts                  # Category classifier (v2)
+│       ├── location/                          # Polygon detect + sample picking
+│       └── rides/                             # State machine + pricing + events
+│
+├── plugins/hai-contacts/                      # Custom Capacitor plugin (vendored)
+├── ios/App/                                   # Xcode project (Codemagic builds this)
+├── android/                                   # Android Studio project (local gradle)
+├── capacitor.config.ts                        # Capacitor wrapper config
+├── codemagic.yaml                             # iOS-only CI to TestFlight
 ├── prisma/
-│   ├── schema.prisma                 # 34 database models
-│   └── seed.ts                       # Database seeding
-├── scripts/
-│   └── fetch-boundaries.ts          # Fetch neighborhood polygons from Balady API
-├── public/
-│   ├── manifest.json                 # PWA manifest (AR, RTL, standalone)
-│   ├── icon-192.svg                  # App icon
-│   ├── icon-512.svg                  # Splash icon
-│   └── uploads/                      # User-uploaded images
-├── next.config.js
-├── tailwind.config.ts
-├── tsconfig.json
-└── package.json
+│   ├── schema.prisma                          # 54 database models
+│   ├── migrations/                            # Manual — Vercel build does NOT migrate
+│   └── seed.ts
+├── scripts/                                   # Mockups, fonts, screenshots, seeders
+└── public/                                    # PWA assets, icons, screenshots, store screenshots
 ```
 
 ---
 
-## API Endpoints (56 total)
+## API Endpoints (123 total)
 
 ### Authentication (4)
 | Method | Route | Purpose |
 |--------|-------|---------|
-| POST | `/api/auth/send-otp` | Send 6-digit OTP to Saudi phone (rate: 3/10min, 5/hr) |
-| POST | `/api/auth/verify-otp` | Verify OTP, create JWT session (30-day), brute-force protected |
-| POST | `/api/auth/complete-profile` | Set name, gender, accountType, neighborhood |
-| POST | `/api/auth/logout` | Delete session cookie |
+| POST | `/api/auth/send-otp` | Send OTP via Twilio Verify (Saudi-phone validation, rate-limited) |
+| POST | `/api/auth/verify-otp` | Verify OTP, mint 7-day JWT cookie |
+| POST | `/api/auth/complete-profile` | Set name, gender, accountType, neighborhood (GPS-matched) |
+| POST | `/api/auth/logout` | Clear session cookie |
 
-### Posts & Feed (8)
+### Posts & Feed (10)
 | Method | Route | Purpose |
 |--------|-------|---------|
-| GET | `/api/posts` | Get paginated feed (20/page) with scoring |
-| POST | `/api/posts` | Create post (title, body, category, price, images) |
-| GET/PUT/DELETE | `/api/posts/[id]` | Get, update, or delete a post |
-| GET | `/api/feed` | Scored feed with dedup + commercial balance |
-| POST | `/api/posts/[id]/react` | Add/update/remove emoji reaction |
-| GET/POST | `/api/posts/[id]/comments` | Get threaded comments / add comment (rate: 10/min) |
-| POST | `/api/posts/[id]/activate` | Activate paid post |
-| POST | `/api/posts/report` | Report post (auto-hide at threshold) |
+| GET/POST | `/api/posts` | Paginated feed (20/page, scored) / create post |
+| GET/PUT/DELETE | `/api/posts/[id]` | Single post CRUD |
+| POST | `/api/posts/[id]/activate` | Activate paid/boost |
+| POST | `/api/posts/[id]/react` | Add/remove emoji reaction |
+| GET/POST | `/api/posts/[id]/comments` | Threaded comments |
+| DELETE | `/api/posts/[id]/comments/[commentId]` | Delete comment (with OS push cleanup) |
+| POST | `/api/posts/[id]/bookmark` | Toggle bookmark |
+| POST | `/api/posts/[id]/subscribe` | Toggle post-subscription (notify on new comments) |
+| PATCH | `/api/posts/[id]/category` | Admin re-categorize |
+| GET | `/api/feed` | Scored feed (dedup + commercial balance + request-boost) |
+| POST | `/api/posts/report` | Report a post |
 
 ### Comments (1)
-| Method | Route | Purpose |
-|--------|-------|---------|
-| POST | `/api/comments/[id]/like` | Toggle like on comment (+2 rep) |
+| POST `/api/comments/[id]/like` | Toggle like (+rep, anti-gaming applied) |
 
 ### Polls & Voting (5)
-| Method | Route | Purpose |
-|--------|-------|---------|
-| GET/POST | `/api/polls` | List / create polls (admin-only creation) |
-| GET/PUT/DELETE | `/api/polls/[id]` | Get, update, or delete poll |
-| POST | `/api/polls/[id]/vote` | Cast vote on poll option |
-| POST | `/api/polls/[id]/react` | React to poll with emoji |
-| GET/POST | `/api/polls/[id]/comments` | Get / add poll comments |
+| GET/POST `/api/polls` · GET/PUT/DELETE `/api/polls/[id]` · POST `/api/polls/[id]/vote` · POST `/api/polls/[id]/react` · GET/POST `/api/polls/[id]/comments` |
 
-### Rides System (10)
+### Rides + Delivery (12)
+RideRequest rows carry `type: 'RIDE' | 'DELIVERY'` so delivery and rideshare share the same surface.
+
 | Method | Route | Purpose |
 |--------|-------|---------|
-| GET/POST | `/api/rides` | List ride requests / create new ride request |
-| GET/PUT | `/api/rides/[id]` | Get ride details / update ride |
-| GET | `/api/rides/mine` | Get user's rides (as requester or driver) |
-| GET/POST | `/api/rides/[id]/offers` | List offers / submit driver offer |
-| POST | `/api/rides/[id]/select` | Requester selects a driver offer |
+| GET/POST | `/api/rides` | List (filter by `type`) / create |
+| GET/PUT | `/api/rides/[id]` | Get / update |
+| GET | `/api/rides/mine` | My requests + offers |
+| GET/POST | `/api/rides/[id]/offers` | List / submit offer |
+| POST | `/api/rides/[id]/select` | Requester picks an offer |
+| POST | `/api/rides/[id]/reject-offer` | Requester rejects an offer |
 | POST | `/api/rides/[id]/confirm` | Confirm arrival / pickup / dropoff |
-| POST | `/api/rides/[id]/messages` | Send in-ride chat message |
-| POST | `/api/rides/[id]/status` | Update ride status (cancel, dispute, etc.) |
-| POST | `/api/rides/[id]/rate` | Rate driver or requester after trip |
-| GET/POST | `/api/rides/[id]/poll` | Poll ride status (+ inline timeout handling) |
+| POST | `/api/rides/[id]/messages` | In-ride chat |
+| POST | `/api/rides/[id]/status` | Cancel / dispute / status transitions |
+| POST | `/api/rides/[id]/rate` | Rate driver or requester |
+| GET/POST | `/api/rides/[id]/poll` | Inline status poll + timeout handling |
 
-### Threads / DMs (5)
-| Method | Route | Purpose |
-|--------|-------|---------|
-| GET/POST | `/api/threads` | List user's threads / create or get existing |
-| GET/PUT | `/api/threads/[id]` | Get thread / update thread |
-| GET/POST | `/api/threads/[id]/messages` | Get messages (max 100) / send text or location |
-| POST | `/api/threads/[id]/close` | Close thread + rep award |
-| POST | `/api/threads/[id]/rate` | Rate participant (weighted by rater rep) |
+### Threads / DMs (8)
+| GET/POST `/api/threads` · GET/POST `/api/threads/[id]/messages` · DELETE/PATCH `/api/threads/[id]/messages/[msgId]` (delete for me / everyone, edit) · POST `/api/threads/[id]/messages/[msgId]/react` · POST `/api/threads/[id]/messages/[msgId]/report` · POST `/api/threads/[id]/close` · POST `/api/threads/[id]/rate` |
 
-### Notifications (5)
-| Method | Route | Purpose |
-|--------|-------|---------|
-| GET | `/api/notifications` | Get paginated notifications (20/page) |
-| POST | `/api/notifications/read` | Mark as read |
-| POST | `/api/notifications/delete` | Delete a notification |
-| GET | `/api/notifications/unread` | Get unread counts (messages vs other) |
-| PATCH | `/api/notifications/settings` | Update notification preferences |
+### Notifications (8) — In-app + Push
+| GET/POST/DELETE `/api/notifications` · POST `/api/notifications/read` · POST `/api/notifications/delete` · GET `/api/notifications/unread` · GET `/api/notifications/active-refs` · GET/PATCH `/api/notifications/preferences` · GET/PATCH `/api/notifications/preset` · GET/PATCH `/api/notifications/quiet-hours` · PATCH `/api/notifications/settings` (legacy) |
 
-### Profile & Account (10)
-| Method | Route | Purpose |
-|--------|-------|---------|
-| GET/PATCH | `/api/profile` | Get / update profile (name, avatar, cover, email, bio, service info) |
-| GET | `/api/profile/reputation` | Get rep score + recent activity log |
-| GET | `/api/profile/rep-check` | Get current rep total (for toast) |
-| POST | `/api/profile/verify-provider` | Request provider verification |
-| POST | `/api/profile/change-neighborhood` | Change neighborhood (GPS-only, 2 free/month) |
-| POST | `/api/profile/change-phone` | Change phone with OTP verification |
-| POST | `/api/profile/send-email-verify` | Send email verification code |
-| POST | `/api/profile/verify-email` | Verify email with 6-digit code |
-| DELETE | `/api/account/delete` | Self-service account deletion (soft delete + anonymize) |
-| GET | `/api/legal` | Legal URLs (privacy, terms, support, data deletion) |
+### Push Devices (1)
+| POST `/api/devices/register` | Register/refresh FCM or APNs token |
 
-### Service Catalog (3)
-| Method | Route | Purpose |
-|--------|-------|---------|
-| GET/POST/PATCH/DELETE | `/api/service-items` | CRUD for provider catalog items |
-| GET | `/api/service-items/mine` | Get own catalog items (for management) |
+### Emergency Alerts (6)
+| GET `/api/emergency/active` · POST `/api/emergency/create` (mod) · POST `/api/emergency/[id]/dismiss` · POST `/api/emergency/[id]/revoke` · POST `/api/emergency/request` (resident → mod) · GET `/api/emergency/requests/mine` |
 
-### User Safety (2)
-| Method | Route | Purpose |
-|--------|-------|---------|
-| POST/DELETE/GET | `/api/users/block` | Block, unblock, list blocked users |
+### Invites (6)
+| GET `/api/invites/my-code` · GET `/api/invites/preview` · POST `/api/invites/redeem` · GET `/api/invites/leaderboard` · GET `/api/invites/chain` |
 
-### Neighborhoods & Cities (2)
-| Method | Route | Purpose |
-|--------|-------|---------|
-| POST | `/api/neighborhoods/detect` | Detect neighborhood from GPS (polygon matching) |
-| GET | `/api/cities` | List all cities with neighborhoods |
+### Profile & Account (12)
+| GET/PATCH `/api/profile` · PATCH `/api/profile/language` · POST `/api/profile/change-neighborhood` · POST `/api/profile/change-phone` · POST `/api/profile/send-email-verify` · POST `/api/profile/verify-email` · POST `/api/profile/verify-provider` · POST `/api/profile/verify-address` · GET `/api/profile/reputation` · GET `/api/profile/rep-check` · DELETE `/api/account/delete` (+ `/send-otp`) · GET `/api/legal` |
+
+### Provider (1)
+| POST `/api/provider/apply` |
+
+### Service Catalog (2)
+| GET/POST/PATCH/DELETE `/api/service-items` · GET `/api/service-items/mine` |
+
+### Bookmarks (1)
+| GET/POST `/api/bookmarks` |
+
+### Users (5)
+| GET `/api/users/[id]/profile` · GET `/api/users/[id]/status` · POST `/api/users/[id]/report` · POST/DELETE/GET `/api/users/block` · PATCH `/api/users/privacy` |
+
+### Geographic (3)
+| POST `/api/neighborhoods/detect` · GET `/api/neighborhoods/all` · GET `/api/cities` |
 
 ### Community & Support (4)
-| Method | Route | Purpose |
-|--------|-------|---------|
-| GET/POST | `/api/mod-request` | Check status / apply for neighborhood mod |
-| POST | `/api/neighborhood-report` | Report to neighborhood admin |
-| POST | `/api/neighborhood-admin` | Admin responses to reports |
-| POST | `/api/support` | Submit support ticket to developer |
+| GET/POST `/api/mod-request` · POST `/api/neighborhood-report` · POST `/api/neighborhood-admin` · POST `/api/support` |
 
-### Admin (8)
-| Method | Route | Purpose |
-|--------|-------|---------|
-| GET | `/api/admin/dashboard` | Admin stats overview |
-| POST | `/api/admin/action` | Moderation actions (hide, ban, role change, plan change, etc.) |
-| GET | `/api/admin/lists` | Filterable lists (posts, users, reports, mod requests) |
-| POST | `/api/admin/moderate` | Post moderation |
-| POST | `/api/admin/escalate` | Mod escalation to platform admins |
-| GET/POST | `/api/admin/neighborhood-requests` | Manage neighborhood transfer approvals |
-| POST | `/api/admin/seed` | Seed demo data |
+### Admin (15)
+| GET `/api/admin/dashboard` · POST `/api/admin/action` · GET `/api/admin/lists` · POST `/api/admin/moderate` · POST `/api/admin/escalate` · GET/POST `/api/admin/neighborhood-requests` · POST `/api/admin/seed` (+ `/clear` `/generate` `/stats`) · GET `/api/admin/mods` + `/api/admin/mods/[id]` · POST `/api/admin/user-reports/[id]` · POST `/api/admin/emergency-requests/[id]/approve` + `/reject` · GET `/api/admin/debug-location` |
+
+### Cron (7)
+| `/api/cron/rides` (timeouts) · `/api/cron/process-notifs` (batch push) · `/api/cron/archive-posts` · `/api/cron/close-idle-threads` · `/api/cron/expire-alerts` · `/api/cron/mod-lifecycle` · `/api/cron/reward-invites` · `/api/cron/weekly-digest` |
+
+### Debug / Internal (5)
+| `/api/debug/whoami` · `/api/debug/push-status` · `/api/debug/push-test` · `/api/debug/fcm-check` · `/api/debug/revoke-notifs` (notification-cleanup self-test for SUPER_ADMIN) · `/api/ping` (offline-page liveness) |
 
 ### Utilities (2)
-| Method | Route | Purpose |
-|--------|-------|---------|
-| POST | `/api/upload` | Upload images (max 5MB, 5 files, magic byte validation) |
-| POST | `/api/cron/rides` | Ride timeout handling (confirm, no-show, auto-complete, expiry) |
+| POST `/api/upload` (Vercel Blob, magic-byte validated) · POST `/api/translate` |
+
+### Highlights (1)
+| GET `/api/highlights` |
 
 ---
 
-## Database Models (34 models)
+## Database Models (54)
 
 ### User & Auth
-- **User** — id, phone, name, lastName, email, emailVerified, gender (MALE/FEMALE/UNSPECIFIED), avatarUrl, coverUrl, reputation, role, status, accountType, plan (FREE/PREMIUM), neighborhoodId, bio, serviceDescription, serviceAddress, serviceLat/Lng, modApprovedAt, deletedAt, notification prefs (comments/reactions/replies/lookingFor/messages/rides/system), driverRatingAvg, driverTripsCount, driverCancelCount
-- **OtpCode** — id, code, expiresAt, attempts, userId
+- **User** — phone, name, lastName, gender, avatar/coverUrl, reputation, role, status, accountType, providerStatus, plan, neighborhoodId, addressVerified, bio, service\*, modStatus, modActionsCount, modReportCount, lastModActionAt, driverRatingAvg, driverTripsCount, driverCancelCount, **language** (`ar`/`en`/`ur`, used by push localization), showReadReceipts, showGender, deletedAt, isSeed, …
+- **OtpCode** — phone-scoped Twilio Verify codes
 
 ### Geographic
-- **City** — id, name, nameEn
-- **Neighborhood** — id, name, nameEn, lat, lng, boundary (GeoJSON polygon), bbox, source (balady/community), baladyId, cityId
-- **Compound** — id, name, type (APARTMENT/VILLA_COMPOUND/MIXED)
+- **City** · **Neighborhood** (Balady polygon + bbox, source: balady/community) · **Compound** (APARTMENT / VILLA_COMPOUND / MIXED)
 
-### Content
-- **Post** — id, title, body, category, status, price, imageUrls[], isPaid, isPinned, isFeatured, coordinationMode, reportCount, expiresAt, editedAt
-- **Comment** — id, body, authorId, postId, parentId (threaded replies)
-- **CommentLike** — id, userId, commentId
-- **Reaction** — id, emoji, userId, postId (1 per user per post)
-- **Report** — id, reason, reporterId, postId, status
+### Posts (with `PostCategory` v2)
+- **Post** — title, body, **category** (v2 enum, see below), **intent** (OFFER / REQUEST / NORMAL), **priority** (LOW / NORMAL / HIGH / CRITICAL), **audience** (ALL / WOMEN / MEN), **marketplaceType** (SELL / BUY / JOB, MARKETPLACE-only), status (PENDING_AI / ACTIVE / IN_PROGRESS / HIDDEN / REMOVED / EXPIRED / ARCHIVED), price, imageUrls, isPaid, isPinned, isFeatured, isHighlighted, coordinationMode, reportCount, expiresAt, editedAt, activeThreadId
+- **Comment** (threaded, with `parentId`) · **CommentLike** · **Reaction** · **Bookmark** · **PostSubscription** · **Report** · **UserReport** (account-level user reports with reporter/reportedUser scoping for mods)
 
-### Polls & Voting
-- **Poll** — id, question, options[], authorId, neighborhoodId, expiresAt
-- **PollVote** — id, pollId, optionIndex, voterId
-- **PollComment** — id, body, pollId, authorId
-- **PollReaction** — id, emoji, pollId, userId
+### Polls
+- **Poll** · **PollVote** · **PollComment** · **PollReaction**
 
-### Rides System
-- **RideRequest** — id, pickupLat/Lng, pickupAddress, dropoffLat/Lng, dropoffAddress, status (11 states), requesterId, notes, expiresAt
-- **RideOffer** — id, rideRequestId, driverId, price, arrivalMinutes, message, status
-- **Trip** — id, rideRequestId, driverId, riderId, status, startedAt, completedAt
-- **RideRating** — id, tripId, raterId, ratedId, score, comment
-- **RideDispute** — id, tripId, raisedById, reason, status, resolution
-- **RideEvent** — id, rideRequestId, action, actorId, details, createdAt
-- **RideMessage** — id, rideRequestId, senderId, body, type (TEXT/LOCATION/IMAGE), imageUrl, lat, lng, createdAt
+### Rides + Delivery
+- **RideRequest** — pickup/dropoff GPS + address + area, `status` (11-state enum), `type: 'RIDE' | 'DELIVERY'`, `itemDescription` (delivery only), `isImmediate`, `scheduledAt`, `notes`, `estimatedMinPrice`/`estimatedMaxPrice`, `expiresAt`
+- **RideOffer** (status enum) · **Trip** · **RideRating** · **RideDispute** · **RideEvent** (audit) · **RideMessage**
 
-### Communication
-- **Thread** — id, user1Id, user2Id, postId, status (OPEN/CLOSED), coordinationMode
-- **Message** — id, text, type (TEXT/LOCATION/IMAGE), lat, lng, imageUrl, senderId, threadId
-- **Notification** — id, type, title, titleEn, body, bodyEn, read, userId, actorId, postId, threadId, action
+### Threads
+- **Thread** (user1, user2, postId, status OPEN/CLOSED/ARCHIVED, coordinationMode) · **Message** (TEXT / LOCATION / IMAGE / CONTACT, with `deliveredAt`/`readAt`, `hiddenBy` for delete-for-me)
+
+### Notifications + Push
+- **Notification** (in-app bell row) · **DeviceToken** (platform: ios/android/web, FCM or APNs token + status) · **NotifPreference** (per-type fan-out toggles) · **NotifJob** (durable retry queue for batched pushes) · **NotificationPreference** (legacy) · **DigestLog** (weekly digest dedup)
 
 ### Reputation & Moderation
-- **ReputationLog** — id, userId, action, points, fromUserId, postId
-- **ModerationLog** — id, adminId, action, targetType, targetId, reason, details
-- **ModRequest** — id, userId, neighborhoodId, reason, status, reviewedBy
-- **VerificationRequest** — id, userId, businessName, description, status, reviewedBy
+- **ReputationLog** (rep deltas, anti-gaming) · **ModerationLog** (admin action audit) · **ModActionLog** (per-mod rate-limit + history) · **ModRequest** · **VerificationRequest** · **NeighborhoodReport** · **SupportTicket**
+
+### Emergency Alerts
+- **EmergencyAlert** (mod-issued, severity, expiresAt) · **EmergencyAlertDismissal** (per-user dismiss) · **EmergencyAlertRequest** (resident → mod request to escalate)
+
+### Invites
+- **InviteCode** (per-user, capped redemptions) · **InviteRedemption** · **InviteFraudSignal**
 
 ### Neighborhood Management
-- **NeighborhoodChangeRequest** — id, userId, from/to neighborhoodId, reason, status
-- **NeighborhoodChangeLog** — id, userId, from/to neighborhoodId, changedBy
-- **NeighborhoodReport** — id, userId, neighborhoodId, body, imageUrls, status, adminReply
+- **NeighborhoodChangeRequest** · **NeighborhoodChangeLog**
 
-### Service Providers
-- **ServiceItem** — id, userId, title, description, price, imageUrl, sortOrder, active
+### Service Providers + Catalog
+- **ServiceItem** (per-provider catalog row, image + price + sortOrder + active)
 
-### User Safety
-- **UserBlock** — id, blockerId, blockedId (unique pair, bidirectional filtering)
+### Safety
+- **UserBlock** (bidirectional pair)
 
-### Monetization (Internal)
-- **UsageCounter** — id, userId, feature, count, windowStart (daily/permanent)
-- **PlanChangeLog** — id, userId, previousPlan, newPlan, changedBy, reason
+### Monetization (internal-only)
+- **UsageCounter** · **PlanChangeLog** · **Payment** (Moyasar IDs reserved)
 
-### Support
-- **SupportTicket** — id, userId, subject, body, imageUrls, status, adminReply
-
-### B2B (Compounds)
-- **Announcement** — id, title, body, compoundId
-- **MaintenanceRequest** — id, title, body, status, priority, compoundId, userId
-- **Payment** — id, amount, currency, status, moyasarId, userId, postId
+### B2B (Compounds — early)
+- **Announcement** · **MaintenanceRequest**
 
 ---
 
-## Post Categories (13)
+## Post Categories (v2)
 
-| Key | Arabic | English | Icon | Threadable |
-|-----|--------|---------|------|------------|
-| ALERT | تنبيه أمني أو عام | Security Alert | 🔔 | No |
-| NEIGHBORHOOD_ISSUE | مشكلة في الحي | Neighborhood Issue | ⚠️ | No |
-| LOST_FOUND | مفقودات أو موجودات | Lost & Found | 🔍 | No |
-| LOOKING_FOR | أبحث عن... | Looking For | 🔎 | Yes |
-| RIDE_REQUEST | طلب مشوار | Ride Request | 🚗 | Yes |
-| MARKETPLACE | بيع / شراء | Buy / Sell | 🛒 | Yes |
-| FOOD_HOME | الأسر المنتجة | Home Food | 🍱 | Yes |
-| REAL_ESTATE | عقارات | Real Estate | 🏠 | Yes |
-| SERVICES | خدمة | Services | 🔧 | Yes |
-| MOSQUE | إعلان مسجد | Mosque | 🕌 | No |
-| EVENTS | فعاليات | Events | 🎉 | No |
-| CONTESTS | مسابقات وجوائز | Contests & Prizes | 🏆 | No (admin-only, coming soon) |
-| GENERAL | عام | General | 💬 | No |
+The v2 system splits the old single `PostCategory` into three orthogonal dimensions: `category` (what kind of content), `intent` (offering vs requesting), and `audience` (who it's for). The feed UI shows category chips plus a special "REQUESTS" chip that selects by intent across all categories.
+
+### `PostCategory` (10 values)
+
+| Key | Arabic | English | Notes |
+|-----|--------|---------|-------|
+| HOME_BUSINESSES | الأسر المنتجة | Home Businesses | (was `FOOD_HOME`) |
+| MARKETPLACE | سوق الحي | Marketplace | Uses `marketplaceType` (SELL/BUY/JOB) |
+| SERVICES | خدمات | Services | |
+| RIDES | مشاوير | Rides | (was `RIDE_REQUEST` + intent=REQUEST) |
+| REAL_ESTATE | عقارات | Real Estate | |
+| LOST_FOUND | مفقودات | Lost & Found | priority=HIGH |
+| NEIGHBORHOOD_REPORTS | بلاغات الحي | Neighborhood Reports | absorbs old `ALERT` + `NEIGHBORHOOD_ISSUE`, priority=HIGH |
+| EVENTS | فعاليات ومناسبات | Events & Occasions | absorbs old `MOSQUE` + `EID_RAMADAN` |
+| COMPETITIONS | مسابقات وجوائز | Contests & Prizes | (was `CONTESTS`) admin-create only |
+| GENERAL | عام | General | hidden admin fallback |
+
+### `PostIntent` (3)
+`OFFER` (default for sell-side categories), `REQUEST` (the user is asking — "أبحث عن…"), `NORMAL` (informational).
+
+### `PostAudience` (3)
+`ALL`, `WOMEN` (was `WOMEN_ONLY` category — now an axis), `MEN`. Male viewers don't see `WOMEN` posts.
+
+### `PostPriority` (4)
+`LOW`, `NORMAL`, `HIGH` (LOST_FOUND, NEIGHBORHOOD_REPORTS), `CRITICAL` (emergency-class, bypasses category filters).
+
+### `MarketplaceType` (3, MARKETPLACE-only)
+`SELL` (default), `BUY`, `JOB`.
 
 ---
 
-## Ride System (Community Coordination)
+## Rides + Delivery (Community Coordination)
 
 ### State Machine (11 states)
 ```
-RIDE_OPEN → RIDE_OFFERED → RIDE_ACCEPTED → RIDE_DRIVER_EN_ROUTE →
+RIDE_OPEN → RIDE_SELECTED → RIDE_CONFIRMED → RIDE_EN_ROUTE →
 RIDE_ARRIVED → RIDE_IN_PROGRESS → RIDE_PENDING_COMPLETION → RIDE_COMPLETED
                                                           ↗
-Side states: RIDE_CANCELLED, RIDE_EXPIRED, RIDE_DISPUTED
+Side states: RIDE_CANCELLED · RIDE_EXPIRED · RIDE_DISPUTED
 ```
 
-### Ride Flow
-1. Requester creates ride request (pickup GPS + dropoff search/map)
-2. Drivers see request and submit offers (arrival time + optional message)
-3. Requester reviews offers and selects one → both notified
-4. Driver confirms departure → Google Maps opens to pickup
-5. Driver arrives → requester notified
-6. Driver starts trip → Google Maps opens to dropoff
-7. Requester confirms completion (or auto-completes after timeout)
-8. Both parties rate each other
+### Type Split
+RideRequest carries `type: 'RIDE' | 'DELIVERY'`. The rides dashboard has a sub-filter under the "all" tab so the two surfaces don't mix. Delivery rows additionally carry `itemDescription`.
+
+### Flow
+1. Requester creates request (pickup GPS + dropoff search/map). Delivery adds an item description.
+2. Drivers see open requests, submit offers (arrival ETA + optional message + counter-price).
+3. Requester selects an offer → both notified (push + in-app).
+4. Driver confirms en-route → external maps deep link to pickup.
+5. Driver arrives → requester notified.
+6. Driver starts trip → external maps deep link to dropoff.
+7. Requester confirms completion (or auto-completes after timeout).
+8. Both rate each other; rep deltas applied.
 
 ### Key Features
-- **Offers appear in feed** as regular posts (category: RIDE_REQUEST)
-- **In-ride chat** anchored at bottom, dark mode trip UI
-- **Google Maps integration** opens navigation on status change buttons
-- **Inline timeout handling** via poll endpoint (no external cron needed)
-- **Cancel penalties** after agreement stage
-- **Dispute system** with admin resolution
-- **Notifications** at every status transition for both parties
+- **Cross-list in feed**: open DELIVERY requests surface in the REQUESTS / RIDES / ALL feed chips as a slim strip (tap → `/rides/[id]`).
+- **In-ride chat** anchored at bottom, dark-mode trip UI.
+- **Inline timeout handling** via poll endpoint (no external cron required for short timers; longer ones use `/api/cron/rides`).
+- **Cancel penalties** after agreement stage (-15 rep).
+- **Dispute system** with admin resolution.
+- **Global ArrivalAlert overlay** — sound + vibration + full-screen card when the driver arrives or an offer is accepted, works from any page.
 
 ### Location Picker
-- GPS auto-detect for pickup
-- MapTiler geocoding + Photon fallback for dropoff search
-- Vanilla JS fullscreen map picker (bypasses React to prevent re-render crashes)
-- `data-overlay="true"` attribute prevents PullToRefresh from triggering
+- GPS auto-detect (Capacitor on native, browser on web).
+- MapTiler tiles + Nominatim search.
+- Fullscreen map picker uses `data-overlay="true"` so PullToRefresh doesn't fire on map drag.
 
 ---
 
-## User Roles (5-level hierarchy)
+## User Roles
 
 | Role | Scope | Can Do |
 |------|-------|--------|
-| RESIDENT | Own neighborhood | Post, comment, react, report, DM, ride requests |
-| NEIGHBORHOOD_MOD | Assigned neighborhood | + hide/restore posts, temp ban users |
+| RESIDENT | Own neighborhood | Post, comment, react, report, DM, ride/delivery, bookmark, subscribe |
+| NEIGHBORHOOD_MOD | Assigned neighborhood | + hide/restore posts, temp-ban users, issue emergency alerts |
 | COMPOUND_ADMIN | Assigned compound | Manage compound announcements & maintenance |
 | PLATFORM_MOD | All neighborhoods | + remove posts, global ban |
-| SUPER_ADMIN | Entire platform | + change roles, delete users, approve mods, create polls |
+| SUPER_ADMIN | Entire platform | + role changes, plan changes, delete users, approve mods, create polls, view debug diagnostics |
 
-**Becoming a Mod**: Residents with 7+ day account and 20+ reputation can apply via profile. SUPER_ADMIN approves/rejects.
+**Becoming a mod**: 7+ day account, 20+ reputation. Apply via profile. Auto-approval if neighborhood has 0 mods and applicant has 50+ rep + 14+ day account.
 
 ---
 
 ## Reputation System
 
-### Tiers & Benefits
+### Tiers
 
-| Tier | Points | Visual | Daily Posts | Report Weight | Feed Boost | Rating Weight |
-|------|--------|--------|-------------|---------------|------------|---------------|
-| New (جديد) | 0-49 | gray pill | 3 | 1.0x | 0 | 1.0x |
-| Active (نشط) | 50-149 | blue pill | 5 | 1.0x | 1.2 | 1.0x |
-| Trusted (موثوق) | 150-399 | green pill | 8 | 1.2x | 1.5 | 1.1x |
-| Distinguished (عضو مميز) | 400+ | amber pill | 12 | 1.4x | 1.8 | 1.2x |
+| Tier | Points | Pill | Daily Posts | Report Weight | Feed Boost | Rating Weight |
+|------|--------|------|-------------|---------------|------------|---------------|
+| New (جديد) | 0-49 | gray | 3 | 1.0× | 0 | 1.0× |
+| Active (نشط) | 50-149 | blue | 5 | 1.0× | 1.2 | 1.0× |
+| Trusted (موثوق) | 150-399 | green | 8 | 1.2× | 1.5 | 1.1× |
+| Distinguished (مميز) | 400+ | amber | 12 | 1.4× | 1.8 | 1.2× |
 
-Visual: verification ✓ (blue, inline with name) is separate from tier pill (below name, next to timestamp).
+### Point Awards (rebalanced)
 
-### Point Awards (Rebalanced)
-
-| Action | Points | Notes |
-|--------|--------|-------|
-| Ride completed | +12 | Real trust signal |
-| Service completed | +10 | Via thread completion |
-| Positive rating | +6 | Weighted by rater |
-| Comment liked | +1 | Minor signal |
+| Action | Δ | Notes |
+|--------|---|-------|
+| Ride/Delivery completed | +12 | Real trust signal |
+| Service completed (via thread close) | +10 | |
+| Positive rating | +6 | Weighted by rater rep |
+| Comment liked | +1 | Minor |
 | Reaction received | 0 | Removed — too easy to farm |
-| Report confirmed | -20 | Post auto-hidden |
+| Report confirmed against you | -20 | Auto-hide |
 | Spam detected | -30 | Duplicate content |
 | Negative rating | -10 | Weighted |
-| Ride cancel after agreement | -15 | Penalty for late cancellation |
+| Ride cancel after agreement | -15 | |
 
-### Anti-Gaming
-- **Pair limit**: Max 2 interactions between same 2 users/day
-- **Daily cap**: Max 12 positive points/day
-- **Diminishing returns**: Per action type per day — first 3 full, next 3 half, then 0
-- **New user weight**: Accounts < 7 days give 0.5x points
-- **Feed boost**: Deterministic per tier (not formula), subtle — content quality matters more
-- **Report system**: Weighted threshold (4.0 points) instead of fixed count
+### Anti-gaming
+Pair cap (2/day per pair), daily total cap (12), diminishing returns (3 full → 3 half → 0), new-user 0.5× weight, report threshold weighted (4.0).
 
 ---
 
-## Badge & Identity System
+## Badges & Identity
 
-### Inline with Name (Identity)
-| Badge | Condition | Visual |
-|-------|-----------|--------|
-| Blue ✓ | VERIFIED_PROVIDER | Blue SVG checkmark (X/Twitter style) |
-| 🛠 | SERVICE_PROVIDER | Emoji only (no check) |
-| 🏅 | NEIGHBORHOOD_MOD | Medal emoji |
-| 👑 | SUPER_ADMIN | Crown emoji |
+**Inline with name** (identity): blue ✓ (VERIFIED_PROVIDER), 🛠 (SERVICE_PROVIDER), 🏅 (NEIGHBORHOOD_MOD), 👑 (SUPER_ADMIN).
 
-### Below Name (Reputation Tier)
-| Tier | Visual | Color |
-|------|--------|-------|
-| جديد / New | Pill label | Gray |
-| نشط / Active | Pill label | Blue |
-| موثوق / Trusted | Pill label | Green |
-| عضو مميز / Distinguished | Pill label | Amber |
+**Below name** (tier pill): gray/blue/green/amber per reputation tier.
 
-### Boosted Content
-| Label | Usage |
-|-------|-------|
-| بارز / Featured | Subtle gray pill next to timestamp on boosted posts |
+**Boosted content**: subtle "**بارز** / Featured" pill next to timestamp on boosted/featured posts. Distinct from the reputation "مميز" tier.
 
 ---
 
-## Thread / DM System
+## Threads / DMs
 
-### Eligible Categories
-SERVICES, LOOKING_FOR, RIDE_REQUEST, MARKETPLACE, FOOD_HOME, REAL_ESTATE
+### Eligible categories
+SERVICES, MARKETPLACE, RIDES (replaces old RIDE_REQUEST), REAL_ESTATE, HOME_BUSINESSES, plus any post with `intent=REQUEST`.
 
-### Coordination Modes
-- **OPEN**: Multiple threads per post (marketplace, services)
-- **EXCLUSIVE**: One active thread (ride requests — first come, first served)
+### Coordination modes
+- **OPEN** — multiple parallel threads (marketplace, services, home_businesses)
+- **EXCLUSIVE** — single active thread (rides — first-come, first-served)
 
 ### Lifecycle
-1. User taps DM on eligible post → thread created
-2. Exchange TEXT or LOCATION messages
-3. Either user closes thread
-4. Post author rates helper (positive/neutral/negative)
-5. Helper receives reputation based on rating (weighted)
+DM → exchange (TEXT / LOCATION / IMAGE / CONTACT) → close → rating → rep delta.
+
+### Recent features
+- WhatsApp-style sent/delivered/read check marks in the threads list + chat.
+- Per-message react & report.
+- Edit / delete-for-me / delete-for-everyone (with OS-level push notification cleanup on both devices).
+- Glass UI chat surface with dark-mode parity.
+- Contact + Location attachment chips (custom Capacitor plugin for native contacts).
+- Profanity filter applied on send.
+- Read-receipt opt-out (`User.showReadReceipts`).
 
 ---
 
-## Poll / Voting System
+## Polls / Voting
 
-- **Admin-only creation**: Only SUPER_ADMIN and NEIGHBORHOOD_MOD can create polls
-- **Animated percentage bars** with real-time vote tracking
-- **Emoji reactions** (👍❤️😂🙏) on polls
-- **Inline comments** with author delete
-- **Dark mode compatible** bars (blue-tinted for visibility)
-- **Vote signature tracking** for real-time UI updates without refetch
-- Polls appear in the main feed alongside regular posts
+- Admin-only creation (SUPER_ADMIN, NEIGHBORHOOD_MOD).
+- Animated percentage bars, real-time vote tracking.
+- Emoji reactions on polls.
+- Inline comments with author delete.
+- Polls render in the feed alongside posts.
 
 ---
 
 ## Feed & Real-Time Updates
 
-### Scoring Algorithm
+### Scoring (server-side, cached 60s per `neighborhood:category:gender` combo)
 ```
-score = (50 + engagement + typeBoost + repBoost) / (hoursAgo + 2)
+score = (50 + engagement + typeBoost + intentBoost(REQUEST) + repBoost) / (hoursAgo + 2)
 ```
-- **engagement**: reactions + comments * 2
-- **typeBoost**: alerts & issues get +20, looking_for +10
-- **repBoost**: `log2(authorRep + 1) * 0.4`
-- **Deduplication**: Max 2 posts per author in feed
-- **Commercial balance**: Marketplace/services capped at 30% of feed
+Pinned/featured get score `999999`/`999998`. Anti-domination caps consecutive same-author posts at 2. Commercial-balance caps MARKETPLACE/HOME_BUSINESSES/REAL_ESTATE/SERVICES at ~30% of the visible window.
 
-### Auto-Refresh Polling
-| Feature | Interval | Notes |
-|---------|----------|-------|
-| Feed | 5 seconds | Pauses on tab hide, resumes on focus |
-| Notifications | 5 seconds | Badge counts in bottom nav |
-| Ride status | 3 seconds | Stops on terminal states |
-| Threads | 10 seconds | Message polling |
+### REQUEST visibility experiment (`NEXT_PUBLIC_REQUEST_BOOST`)
+- +10 score bump on `intent=REQUEST` posts.
+- Soft guarantee: if the first 5 feed slots have no REQUEST, splice the top-ranked one into position 4 (with cookie dedup to prevent loops).
+- "Recent activity" dot on the REQUESTS chip when any REQUEST is < 6 hours old.
 
-### Slide-in Animations
-New posts entering the feed use slide-in motion (not static append).
+### SSR-first
+Every page that renders content fetches it server-side in the App Router server component and passes initial data to a thin client component. No `useEffect` → fetch → setState pattern; content is on screen from first paint. The 30s background refresh keeps things current silently.
+
+### Cross-list strips
+- Open DELIVERY ride requests (top 3) shown in the REQUESTS / RIDES / ALL chips.
+- Active polls.
+- Emergency alerts banner (mod-issued, severity-coloured).
+- Invite leaderboard card (when ≥2 inviters exist in the neighborhood).
 
 ---
 
-## Profile Page (Accordion Layout)
+## Notifications
 
-Organized with collapsible accordion sections to reduce clutter:
+### In-app (bell tray)
+- SSR'd notification list, 50 most recent.
+- Marked read on open.
+- DMs no longer mirrored into the bell (thread list is the canonical surface).
+- Per-user preferences: presets (URGENT_ONLY / BALANCED / EVERYTHING / MANUAL) + quiet hours + per-type toggles.
 
-**Always visible:**
-- Header (cover photo, avatar, name, badge, neighborhood)
-- Stats bar (reputation points, posts count, join year)
+### Push (mobile)
+Full chain: **FCM v1** for Android + **direct APNs HTTP/2** for iOS (no Firebase APNs proxy). Tokens registered via `/api/devices/register` on app start, deduped by token.
 
-**Quick links (above accordion):**
-- Mod Dashboard card (mods only, links to `/mod`)
-- Service Catalog card (providers only, links to `/profile/catalog`)
+| Capability | How it works |
+|---|---|
+| Batched sending | `/api/cron/process-notifs` drains `NotifJob` rows every minute; kick endpoint triggers immediate send on hot path |
+| Per-instance collapse-id | `post:<id>` / `comment:<id>` / `message:<id>` / `rideRequest:<id>` — replaces banner cleanly instead of stacking |
+| Localized copy | `User.language` joined on token lookup; per-recipient AR/EN/UR copy |
+| Cleanup on delete | When a user deletes their content, a cleanup alert push with the same collapse-id arrives ("🗑️ deleted a message") and replaces the original banner; iOS AppDelegate also natively removes delivered notifications via `removeDeliveredNotifications(withIdentifiers:)` |
+| Foreground forwarding | iOS AppDelegate calls `plugin.notifyListeners("pushNotificationReceived")` so the JS bridge sees pushes even when the app is foregrounded |
+| Diagnostics | `/api/debug/revoke-notifs` self-test endpoint + a SUPER_ADMIN diagnostic panel in profile (List / Send alert / Send cleanup / Sweep / Self-test) |
 
-**Collapsible sections (one open at a time):**
-1. **Reputation** — tier progress bar with color, recent activity, tips
-2. **Bio / About** — free-text bio (300 chars) + service description/location (providers)
-3. **Account** — name (letters only), phone, email (with verification), change neighborhood
-4. **Settings** — language (AR/EN/UR), theme (light/dark/system)
-5. **Notifications** — 7 toggles in 4 groups with icons and descriptions
-6. **Help & More** — mod request, terms/privacy, restart tour, neighborhood reports, app support
+### Global overlays
+- **Emergency banner** (high/medium severity, pulse animation).
+- **ArrivalAlert** — full-screen sound + vibration overlay for ride status changes.
 
-**Always visible at bottom:**
-- Admin Control Panel button (admin roles only)
-- Logout button
-- Delete Account link (App Store/Google Play compliance)
+---
+
+## Emergency Alerts
+
+Mod-issued alerts that pop on top of the feed for everyone in the neighborhood.
+- Severities: critical (red pulse) / warning (amber pulse) / info.
+- Per-user dismiss.
+- `EmergencyAlertRequest` lets residents request the mod issue an alert; mod approves/rejects.
+- Auto-expires (`expiresAt`) via `/api/cron/expire-alerts`.
+
+---
+
+## Invites & Growth
+
+- Each user gets a unique invite code (`InviteCode`).
+- Sharing surface in profile + landing page; redemption at `/i/[code]`.
+- Per-neighborhood + global leaderboards (`InviteLeaderboardCard` in feed when ≥2 inviters).
+- Anti-fraud: `InviteFraudSignal` rows flag suspicious chains.
+- Rewards processed by `/api/cron/reward-invites`.
+
+---
+
+## Profile Page (Accordion)
+
+**Always visible**
+- Header (cover + avatar + name + badge + neighborhood + tier pill).
+- Stats (reputation, posts, join year).
+
+**Quick links**
+- Mod Dashboard (mods only).
+- Service Catalog (providers only).
+
+**Collapsible (one open at a time)**
+1. Reputation — tier progress + recent activity + tips.
+2. Bio / About — service description + map (providers).
+3. Account — name, phone (with OTP change), email (with verification), neighborhood (GPS-only change, capped per month).
+4. Settings — language (AR/EN/UR — also PATCHes `User.language` for push), theme (light/dark/system), privacy (showReadReceipts, showGender).
+5. Notifications — presets + per-type toggles + quiet hours.
+6. Help & More — mod request, terms/privacy, restart tour, neighborhood reports, app support, child-safety.
+
+**Bottom**
+- Admin Control Panel (admin roles).
+- Logout.
+- Delete Account (App Store / Play compliance — soft delete + anonymize).
+- SUPER_ADMIN-only: push-notification diagnostic panel.
 
 ---
 
 ## Onboarding Tour (5 Flows)
 
 | Flow | Steps | Trigger |
-|------|-------|---------|
-| Global | 3 (welcome, create post, interact) | Auto on first feed visit |
-| Ride Create | 3 (pickup, dropoff, submit) | Auto on `/rides/new` |
-| Ride Detail | 3 (offers, select, status) | Auto on ride detail |
-| Post Create | 3 (category, content, images) | Auto on `/post/new` |
-| Chat | 3 (messages, location, close) | Auto on thread |
+|---|---|---|
+| Global | 3 (welcome, create, interact) | First feed visit |
+| Ride Create | 3 (pickup, dropoff, submit) | `/rides/new` |
+| Ride Detail | 3 (offers, select, status) | `/rides/[id]` |
+| Post Create | 3 (category, content, images) | `/post/new` |
+| Chat | 3 (messages, location, close) | `/threads/[id]` |
 
-- SVG mask overlay with green glow border, smart tooltip positioning
-- **Retry logic**: Waits up to 2.5s for elements to render before skipping
-- **Skip loop prevention**: Ends tour if all steps are missing
-- localStorage per flow (each shows once), all reset on new account creation
-- Can be restarted from profile settings
-
-## Splash Screen
-
-- Shows once per install (localStorage)
-- Icon + brand + loading dots animation
-- Dismiss: zoom-in + fade (450ms linear)
-- Auto-dismiss after content loads (min 1.8s, max 3s)
-
-## Landing Page
-
-- Rotating tagline: 5 phrases per language, cycling every 2s
-- Language switcher: العربية / English / اردو (on landing, login, register)
-- Copy: "اعرف جيرانك، وخلّ جيرانك يعرفونك"
+SVG mask overlay, smart tooltip positioning, retry-up-to-2.5s before skipping a missing target, localStorage per flow, all reset on new-account creation, restartable from profile.
 
 ---
 
-## Notification System
+## Splash + Landing + Tutorial
 
-- **Swipe-to-delete** with 3-phase animation (swiping → deleting → gone) + haptic feedback
-- **RTL-aware**: Arabic swipes left-to-right, English right-to-left
-- **Unread badges** on bottom nav (messages count separate from other notifications)
-- **7 notification controls** in 4 groups: Posts (💬😊↩️), Messages (✉️), Rides (🚗), Neighborhood/System (🔎🔔)
-- **Ride notifications** at every status transition for both parties
-- **Global arrival alert**: Full-screen overlay + sound + vibration when driver arrives or offer accepted (works on any page, polls every 8s)
+- **Splash** — native launch storyboard → JS `<AppSplash>` zoom-fade dismiss, once per install.
+- **Landing** — rotating taglines (5/lang, 2s cycle), trilingual switcher, "اعرف جيرانك" copy.
+- **Tutorial** — 4-slide first-run flow (feed, ride, chat, profile) using the same phone mockups as the website + App Store screenshots.
+
+---
+
+## Notification System (in-app side, swipe gestures)
+
+- Swipe-to-delete with 3-phase animation + haptic.
+- RTL-aware swipe direction.
+- Unread badges on bottom-nav (messages count separate from other notifs).
+- 7 controls in 4 groups: Posts · Messages · Rides · Neighborhood/System.
 
 ---
 
 ## Support & Reports
 
-### Support Tickets (to app developer)
-- Available to all users except SUPER_ADMIN
-- Subject, body, image uploads
-- Admin reply system
-- Accessible from profile → Help & More
-
-### Neighborhood Reports (to neighborhood admin)
-- Available to RESIDENT users only
-- Report or suggestion to neighborhood moderator
-- Body, image uploads, admin reply
-- Accessible from profile → Help & More
-
-### Mod Request System
-- Residents with 7+ days and 20+ rep can apply
-- Requires written reason (min 10 chars)
-- Status tracking: pending → approved/rejected
-- SUPER_ADMIN reviews via admin dashboard
-- **Auto-approval**: If neighborhood has 0 mods + user has 50+ rep + 14+ day account
-- **Dynamic allocation**: Mod capacity scales with neighborhood activity (LOW: 1, MEDIUM: 2-3, HIGH: 3-5)
-- Feed banner: "حيّك يحتاج مشرف" when neighborhood has no active mods (shows 3 times, dismissable)
-
-### Mod Safety Layer
-- **Probation**: First 48h — cannot permanently ban or remove posts
-- **Permanent scope**: NEIGHBORHOOD_MOD can never ban_user, remove_post, or delete_user
-- **Rate limiting**: Max 15 actions/hour
-- **Conflict of interest**: Blocked if mod owns post, has recent chat with author, commented, is competitor, or reported the post
-- **Escalation**: Mods can escalate to platform admins when blocked by conflict (max 5/hour, no duplicates)
-- **Rep rewards**: +1-2 per valid action, daily cap 10, only if post has reports
-- **Mod dashboard**: `/mod` with reports queue, hidden posts, banned users, activity log
+| Channel | Audience | UI |
+|---|---|---|
+| Neighborhood Reports | Residents → their nbhd mod | `/neighborhood-reports` |
+| Support Tickets | All users → SUPER_ADMIN | `/support` |
+| Mod Requests | Residents → SUPER_ADMIN | Profile → Help & More |
+| User Reports | Any user → mods | "Report user" sheet on profile / chat |
+| Emergency Request | Resident → nbhd mod | `EmergencyRequestSheet` |
 
 ---
 
-## Haptic Feedback
+## Mod System
 
-6 vibration patterns using the Vibration API:
-| Pattern | Duration | Usage |
-|---------|----------|-------|
-| Light | 10ms | Button taps, tour navigation |
-| Medium | 25ms | Reactions, voting |
-| Heavy | 50ms | Important actions |
-| Success | 10-30-10ms | Completion events |
-| Error | 30-50-30ms | Error feedback |
-| Warning | 20-30-20ms | Caution actions |
+### Permissions
+- Auto-approval: 0 active mods in nbhd + 50+ rep + 14+ day account.
+- Dynamic capacity by activity (LOW: 1, MEDIUM: 2–3, HIGH: 3–5).
+- Feed banner "حيّك يحتاج مشرف" when nbhd has none (3-show cap, dismissable).
+
+### Safety
+- 48h probation — no permanent ban, no remove_post.
+- NEIGHBORHOOD_MOD never bans / removes / deletes globally.
+- Rate limit: 15 actions/hour.
+- Conflict of interest blocks: own post, recent chat, prior comment, competitor, prior report on same post.
+- Escalation channel to PLATFORM_MOD/SUPER_ADMIN (max 5/hour, no dupes).
+- `ModActionLog` audit + `modStatus` lifecycle (ACTIVE / UNDER_REVIEW / INACTIVE / SUSPENDED), surfaced on the admin dashboard's "mod-health" panel.
+
+---
+
+## Haptic Feedback (6 patterns)
+Light (10ms) · Medium (25ms) · Heavy (50ms) · Success · Error · Warning. Capacitor Haptics on native, Vibration API fallback on web.
 
 ---
 
 ## Neighborhood Detection
 
-1. Browser Geolocation API collects multiple GPS samples
-2. Best sample selected by accuracy + confidence
-3. Point-in-polygon ray-casting algorithm tests against Balady boundary polygons
-4. Returns neighborhood + confidence level (HIGH/MEDIUM/LOW)
-5. Fallback: manual selection from sorted list (nearest first)
+1. Capacitor / browser geolocation collects multiple samples.
+2. Best sample picked by accuracy + confidence.
+3. Point-in-polygon ray-cast against Balady boundary polygons.
+4. Returns neighborhood + confidence (HIGH / MEDIUM / LOW).
+5. Fallback: manual selection sorted by distance.
 
-**Data source**: Balady government API (`umaps.balady.gov.sa`) + community-defined polygons
+Source: Balady government API (`umaps.balady.gov.sa`) + a few community-defined polygons for missing districts.
 
 ---
 
-## Internationalization (Trilingual)
+## Internationalization
 
-- **426+ translation keys** in `src/lib/i18n.ts`
-- **3 languages**: Arabic (primary), English, Urdu
-- Cookie-based language switching (`hai_language`)
-- SSR-compatible via `LangProvider` context
-- RTL layout for Arabic & Urdu, LTR for English
-- Every UI string has `ar`, `en`, and `ur` values
-- User badges and reputation levels are trilingual
+- 600+ trilingual keys in `src/lib/i18n.ts`.
+- AR (primary), EN, UR.
+- Cookie + `User.language` column. Cookie is the SSR-time source; the column is what the push pipeline joins for localized notification copy.
+- `LangProvider` context, server-applied `html lang` / `dir` for no-flash.
+- RTL for AR/UR, LTR for EN.
 
 ---
 
 ## Dark Mode
 
-- CSS class-based (`dark:` Tailwind variants)
-- 3 options: Light / Dark / System
-- Stored in `localStorage` (`hai_theme`)
-- Inline script in `<head>` prevents flash of wrong theme
-- Custom CSS variables for both modes in `globals.css`
+- Class-based (`dark:` Tailwind).
+- Three options: Light / Dark / System.
+- Cookie-primary (`hai_theme`) + localStorage fallback.
+- Inline head script applies the class before paint to avoid theme-flash.
+- iOS WKWebView meta-color-scheme synced so the keyboard appearance matches.
 
 ---
 
 ## Security
 
-### Authentication
-- SMS OTP: 6-digit, 10-min expiry, Saudi phone validation (accepts 05xx or 5xx)
-- Rate limiting: 3 OTPs/10min, 5/hour per phone
-- Brute force: 5 failed attempts → 15-min lockout
-- JWT: 30-day, httpOnly, secure, SameSite=lax cookies
+### Auth
+- Twilio Verify for OTP (KSA-scoped phone validation).
+- JWT 7-day, httpOnly, Secure, SameSite=Lax cookie.
+- Rate limit: 3 OTPs/10min, 5/hour per phone.
+- Brute-force: 5 failures → 15-min lockout.
 
 ### Content
-- Input validation (length, real text, excessive repetition)
-- Image magic byte verification (JPEG/PNG/WebP only)
-- Duplicate post detection (last 3 hours)
-- Post cooldown: 60 seconds between posts
-- Upload rate limit: 10 files/minute
+- Validation (length, real-text heuristic, repetition).
+- Profanity filter (`src/lib/profanityFilter.ts`).
+- Magic-byte image validation (JPEG/PNG/WebP/HEIC).
+- Duplicate post detect (3-hour window).
+- Post cooldown (60s).
+- Upload rate limit (10 files/min).
 
-### Admin
-- Role hierarchy enforced (mods can't affect higher roles)
-- SUPER_ADMIN can't be banned/deleted
-- All admin actions logged in ModerationLog
-- Neighborhood mods scoped to their neighborhood only
-- `getActorRole()` checks participant roles before admin role (prevents 409 errors)
+### Admin / Mod
+- Role hierarchy enforced — mods can't affect higher roles, SUPER_ADMIN immutable.
+- All admin actions in `ModerationLog`.
+- Neighborhood mods scoped to their nbhd.
+- `getActorRole()` checks participant role before admin role to prevent 409s.
+
+### Capacitor
+- `cleartext: false` everywhere — HTTPS only.
+- `allowMixedContent: false` on Android.
+- Custom user-agent `HaiNativeApp` so the server can tell native from web.
 
 ---
 
 ## Service Provider Catalog
 
-- Providers can add up to 3 items (FREE) / 20 (PREMIUM)
-- Each item: title, description, price, photo
-- 2-column grid display in profile popup
-- Tap item → bottom sheet detail with "تواصل لطلب الخدمة" CTA → opens thread
-- Management page at `/profile/catalog`
+- Up to 3 items on FREE / 20 on PREMIUM.
+- Title, description, price, photo.
+- 2-column grid in profile popup.
+- Tap → bottom sheet → "تواصل لطلب الخدمة" → opens thread.
+- Managed at `/profile/catalog` (SSR'd).
 
 ---
 
-## User Safety & Compliance (App Store Ready)
+## User Safety & Compliance
 
-| Feature | Status |
-|---------|--------|
-| Report posts | ✅ Auto-moderation with rep-based thresholds |
-| Block users | ✅ Bidirectional filtering (feed, threads, thread creation) |
-| Account deletion | ✅ Self-service soft delete + data anonymization |
-| Privacy policy | ✅ Bilingual page at `/privacy` |
-| Terms of service | ✅ Bilingual page at `/terms` |
+| Item | Status |
+|---|---|
+| Report posts | ✅ Auto-moderation, rep-weighted threshold |
+| Report users | ✅ Account-level (`UserReport`, mod-scoped) |
+| Block users | ✅ Bidirectional filter (feed, threads, thread creation) |
+| Account deletion | ✅ Self-service soft delete + anonymize + OTP-gated |
+| Privacy policy | ✅ `/privacy` (trilingual) |
+| Terms of service | ✅ `/terms` (trilingual) |
+| Child safety | ✅ `/child-safety` (trilingual, App Store / KSA-compliant disclosure) |
 | Legal endpoint | ✅ `GET /api/legal` |
-| Rate limiting | ✅ Posts, reports, uploads, mod actions, OTP |
-| Content validation | ✅ Length, real text, duplicate detection |
-| Image validation | ✅ Magic byte verification (JPEG/PNG/WebP) |
-| Gender option | ✅ Male / Female / Prefer not to say |
+| Rate limiting | ✅ Posts, reports, uploads, mod actions, OTP, ride offers |
+| Content validation | ✅ Length, real text, duplicate, profanity |
+| Image validation | ✅ Magic-byte (JPEG/PNG/WebP/HEIC) |
+| Gender selection | ✅ Male / Female / Prefer not to say |
 
 ---
 
-## Monetization Foundation (Internal Only)
+## Monetization (foundation, internal-only — no upsell UI yet)
 
 | Component | Description |
-|-----------|-------------|
-| `user.plan` | FREE (default) or PREMIUM — never shown in UI |
-| `capabilities.ts` | Centralized limits + boolean entitlements |
-| `UsageCounter` | Per-user, per-feature, per-time-window tracking |
-| `PlanChangeLog` | Audit trail for every plan change |
-| Limit messages | Neutral: "وصلت الحد الأقصى حالياً" — never "upgrade" |
-| Admin action | `change_plan` with full audit |
+|---|---|
+| `user.plan` | FREE (default) / PREMIUM — never shown in UI |
+| `capabilities.ts` | Centralized limits + entitlements |
+| `UsageCounter` | Per-user / per-feature / per-window |
+| `PlanChangeLog` | Audit trail |
+| Limit messages | Neutral: "وصلت الحد الأقصى" — never "upgrade" |
+| Admin action | `change_plan` with audit |
 
-### FREE vs PREMIUM Limits
-
+### FREE vs PREMIUM
 | Feature | FREE | PREMIUM |
 |---------|------|---------|
 | Posts/day | 3 | 10 |
@@ -763,8 +726,8 @@ Organized with collapsible accordion sections to reduce clutter:
 | Catalog items | 3 | 20 |
 | Threads/day | 6 | 50 |
 | Uploads/day | 7 | 30 |
-| Feed boost | 1.0x | 1.3x |
-| Feature listings | No | Yes |
+| Feed boost | 1.0× | 1.3× |
+| Featured listings | No | Yes |
 | Priority search | No | Yes |
 | Reorder catalog | No | Yes |
 | Boost posts | No | Yes |
@@ -780,26 +743,48 @@ Organized with collapsible accordion sections to reduce clutter:
   "display": "standalone",
   "lang": "ar",
   "dir": "rtl",
-  "theme_color": "#15803d",
+  "theme_color": "#006d57",
   "categories": ["social", "lifestyle"]
 }
 ```
 
-## App Icon
-
-Minimal geometric design: 1 center circle (hub) + 3 outer circles (neighbors) in equilateral triangle on `#15803d` green. Same SVG used for PWA icon (192/512), splash screen, and landing page.
+Offline fallback page (`public/offline.html`) — Capacitor `errorPath` serves it on cold-start network failure; the page polls `/api/ping` and reloads when connectivity returns.
 
 ---
 
 ## Environment Variables
 
 ```env
-DATABASE_URL=postgresql://user:pass@host:5432/hai_db
+# DB
+DATABASE_URL=postgresql://...@aws-...pooler.supabase.com:6543/postgres?pgbouncer=true
+DIRECT_URL=postgresql://...@aws-...pooler.supabase.com:5432/postgres
+
+# Auth
 JWT_SECRET=<secure-random-string>
-UNIFONIC_APP_SID=<unifonic-api-key>
-UNIFONIC_SENDER_ID=Hai
-NEXT_PUBLIC_APP_URL=https://your-domain.com
-OTP_EXPIRY_MINUTES=10
+
+# Twilio Verify
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_VERIFY_SERVICE_SID=...
+
+# Push — APNs (direct HTTP/2)
+APNS_KEY_ID=...
+APNS_TEAM_ID=...
+APNS_BUNDLE_ID=com.hai.app
+APNS_PRIVATE_KEY=<base64 .p8 contents>
+
+# Push — FCM v1
+FCM_PROJECT_ID=...
+FCM_SERVICE_ACCOUNT=<base64 service-account.json>
+
+# Storage
+BLOB_READ_WRITE_TOKEN=...
+
+# Hosting
+NEXT_PUBLIC_BASE_URL=https://app.hai-app.net
+
+# Experiments
+NEXT_PUBLIC_REQUEST_BOOST=1     # set to 0 to disable the request-boost set
 ```
 
 ---
@@ -807,71 +792,80 @@ OTP_EXPIRY_MINUTES=10
 ## Scripts
 
 ```bash
-npm run dev          # Start dev server
-npm run build        # Production build
-npm run start        # Start production server
-npm run lint         # Run ESLint
-npx prisma db push   # Apply schema changes
-npx prisma studio    # Visual DB explorer
-npx prisma generate  # Generate Prisma client
-npx tsx scripts/fetch-boundaries.ts  # Import neighborhood polygons from Balady
+npm run dev              # Next.js dev server (port 3001)
+npm run build            # Production build (prisma generate && next build)
+npm run start            # Production server
+npm run lint             # ESLint
+
+npx prisma migrate dev   # Schema change → migration
+npx prisma studio        # Visual DB explorer
+
+# Capacitor
+npx cap sync ios         # Push web assets to iOS project
+npx cap sync android     # Push web assets to Android project
+npx cap open ios         # Open Xcode
+npx cap open android     # Open Android Studio
+
+# Android AAB (local — Codemagic is iOS-only)
+export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
+cd android && ./gradlew bundleRelease
+# Output: android/app/build/outputs/bundle/release/app-release.aab
+
+# iOS release: pushed via Codemagic (codemagic.yaml) → TestFlight → App Store
+
+# Mockups + screenshots
+node scripts/mockup-screenshots.mjs           # 4 website phone mockups (dark + light)
+node scripts/style-screenshots.mjs            # Play Store branded marketing screenshots
+node scripts/store-screenshots-tutorial.mjs   # App Store (1284×2778) + Play (1080×1920) frames
+node scripts/generate-feature-graphic.mjs     # Play Store feature graphic
+node scripts/generate-icons.mjs               # All icon sizes
 ```
 
 ---
 
-## Dependencies
+## Dependencies (key)
 
 ### Production
-- `next` 14.2.4 — React framework
-- `react` / `react-dom` ^18 — UI library
-- `@prisma/client` ^7.5.0 — ORM
-- `@prisma/adapter-pg` ^7.5.0 — PostgreSQL adapter
-- `pg` ^8.20.0 — PostgreSQL driver
-- `jose` ^5.6.3 — JWT signing/verification
-- `bcryptjs` ^2.4.3 — Password hashing
-- `react-hot-toast` ^2.4.1 — Toast notifications
-- `react-icons` ^5.2.1 — Icon library (Feather Icons)
-- `@emoji-mart/react` ^1.1.1 — Emoji picker
-- `@emoji-mart/data` ^1.2.1 — Emoji data
-- `maplibre-gl` ^5.21.1 — Map rendering
+- `next@14.2.4` · `react@18`
+- `@prisma/client@7.5` · `@prisma/adapter-pg` · `pg@8`
+- `jose@5.6` (JWT) · `bcryptjs`
+- `@vercel/blob` — image storage
+- `maplibre-gl` — map rendering
+- `react-easy-crop` — image crop UI
+- `nodemailer` — email verification
+- `react-hot-toast` · `react-icons` · `@emoji-mart/react` + `@emoji-mart/data`
+- `@capacitor/core@8` + plugins: `android`, `ios`, `cli`, `app`, `browser`, `camera`, `filesystem`, `geolocation`, `haptics`, `keyboard`, `push-notifications`, `share`, `splash-screen`, `status-bar`
+- `@capacitor-community/contacts@7` · `hai-contacts` (vendored, custom)
+- `next-pwa@5.6`
 
 ### Dev
-- `typescript` ^5 — Type safety
-- `tailwindcss` ^3.4 — Utility CSS
-- `prisma` ^7.5.0 — ORM CLI
-- `tsx` ^4.21.0 — TypeScript execution
-- `@types/react` / `@types/node` — Type definitions
+- `typescript@5` · `tailwindcss@3.4`
+- `prisma@7.5` · `tsx@4`
+- `sharp@0.34` (image processing for screenshot pipelines)
+- `opentype.js` (font helpers for marketing scripts)
+- `patch-package` (vendor patches for native plugins)
 
 ---
 
-## Pre-Launch Checklist
+## Deployment Pipeline
 
-### Critical (Blocking)
-- [ ] Cloud PostgreSQL (Neon / Supabase / AWS RDS)
-- [ ] Cloud image storage (S3 / Cloudinary)
-- [ ] Real SMS credentials (Unifonic production key)
-- [ ] Rotate JWT secret + DB password
-- [ ] Security headers (CSP, HSTS, X-Frame-Options)
-- [ ] Deploy to Vercel / cloud hosting
-- [ ] Capacitor wrapper for iOS App Store & Google Play
+| Surface | Path |
+|---|---|
+| Web app | `git push main` → Vercel auto-deploys |
+| iOS | Codemagic detects push → builds IPA → uploads to TestFlight → manual promote to App Store Connect |
+| Android AAB | Bump `versionCode` in `android/app/build.gradle` → local `./gradlew bundleRelease` → upload to Play Console |
+| DB migrations | **Manual** — Vercel build does NOT run `prisma migrate deploy`. Apply migrations directly to Supabase via SQL editor or `npx prisma migrate deploy` from a machine with valid creds, then `prisma migrate resolve --applied <name>` if you used the SQL editor. Prefer explicit `select` over `include` in server components so a schema-ahead-of-DB state degrades to a smaller query instead of 500-ing |
 
-### Important
-- [ ] Moyasar payment integration
-- [ ] Error tracking (Sentry)
-- [ ] Analytics (PostHog / Mixpanel)
-- [ ] Service worker for offline support
-- [ ] WebSocket for real-time (replace polling)
-- [ ] Redis-based rate limiting
-- [ ] CI/CD pipeline
-- [ ] Prisma migrations (replace db push)
+---
 
-### Nice to Have
-- [ ] Image moderation AI
-- [ ] Push notifications (FCM / APNs)
-- [ ] Post detail page (`/post/[id]`)
-- [ ] Search functionality
-- [ ] Structured logging (Winston / Pino)
-- [ ] Load testing
+## Architecture Decisions Worth Knowing
+
+- **Capacitor wraps the live web app, not a static bundle** — `server.url` points at `https://app.hai-app.net`. The `webDir` is only used for the offline-fallback page. One codebase, no separate mobile build pipeline beyond the platform shells.
+- **Push is direct, not through Firebase APNs** — `src/lib/apns.ts` opens its own HTTP/2 connection. This avoids the silent-throttle and stale-delivery issues with the Firebase APNs proxy, at the cost of managing the .p8 cert ourselves.
+- **Cleanup-via-collapse-id, not silent push** — when a user deletes content, we send a regular *alert* push with the same `apns-collapse-id` / FCM `tag`, plus a `cleanup: 'true'` data field. iOS replaces the banner; the AppDelegate also natively removes delivered notifications. This sidesteps Apple's silent-push throttling.
+- **SSR-first** — pages fetch their data in the server component and pass it to client components as initial props. No `useEffect` → fetch → setState patterns. Background polling stays for freshness, but content is there on first paint.
+- **Manual Prisma migrations** — Vercel build runs `prisma generate && next build`, not `migrate deploy`. Migrations get applied to Supabase by hand. Use explicit `select` so missing columns don't 500 the page.
+- **Trilingual at the schema layer** — `User.language` is joined on push-token lookups so each recipient sees a banner in their own language without round-tripping through the client.
 
 ---
 

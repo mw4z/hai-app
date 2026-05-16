@@ -383,7 +383,7 @@
      cards still read as elevated against the body. Same material
      system as the previous WhatsApp charcoal pass, just shifted
      closer to black per user feedback ("more darker black"). */
-  --hai-bg:          #000000;   /* page — true black (OLED-friendly) */
+  --hai-bg:          #19232a;   /* page — matches directory band tone */
   --hai-surface-1:   #101619;   /* card / header / bottom nav */
   --hai-surface-2:   #19232a;   /* input / nested panel */
   --hai-surface-3:   #27323a;   /* pressed / selected on surface-1 */

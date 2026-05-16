@@ -172,7 +172,7 @@ export default function RootLayout({
           minWidth: '100%', minHeight: '100%',
           zIndex: 99999,
           background: serverIsDark
-            ? 'radial-gradient(ellipse at 50% 42%, #101619 0%, #070b0d 40%, #000000 100%)'
+            ? 'radial-gradient(ellipse at 50% 42%, #101619 0%, #131c22 40%, #19232a 100%)'
             : 'radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #e0f7f2 40%, #fff 100%)',
         }} />
         <script dangerouslySetInnerHTML={{ __html: `
@@ -180,7 +180,7 @@ export default function RootLayout({
             var d = document.documentElement.classList.contains('dark');
             if (d) {
               var el = document.getElementById('__hai_preload');
-              if (el) el.style.background = 'radial-gradient(ellipse at 50% 42%, #101619 0%, #070b0d 40%, #000000 100%)';
+              if (el) el.style.background = 'radial-gradient(ellipse at 50% 42%, #101619 0%, #131c22 40%, #19232a 100%)';
             }
           })();
         `}} />
