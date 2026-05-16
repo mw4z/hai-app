@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { FiArrowLeft, FiArrowRight } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
@@ -26,6 +27,20 @@ export default function DirectoryHeader({ title, backHref }: Props) {
   }
 
   const ArrowIcon = lang === 'en' ? FiArrowLeft : FiArrowRight
+
+  // Toggle a body class so html / body bg flips to the directory
+  // page color while this header is mounted. JS-based instead of
+  // CSS :has() because older iOS WKWebView builds didn't honor
+  // :has() and the user kept seeing black rubber-band overscroll
+  // + a black band under the iOS status bar (where body's
+  // padding-top reserves space and gets painted with body bg).
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    document.documentElement.classList.add('hai-route-directory')
+    return () => {
+      document.documentElement.classList.remove('hai-route-directory')
+    }
+  }, [])
 
   return (
     <>

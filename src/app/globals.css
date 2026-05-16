@@ -549,21 +549,25 @@ html {
 /* ── Overscroll bg per directory route ─────────────────────────
    The directory pages render their <main> with bg-gray-50 /
    dark:bg-gray-900 (#f9fafb / #111827), but the global html bg
-   is pure black (#000000 from --hai-bg) so iOS rubber-band
-   overscroll exposes a black band at the top and bottom of the
-   list. Override the html background on those routes only —
-   :has(.hai-directory-screen) matches when any descendant of
-   html carries the directory-page wrapper class, leaving every
-   other page untouched. */
-html:has(.hai-directory-screen),
-html:has(.hai-directory-screen) body {
-  background-color: #f9fafb;
+   is pure black (#000000 from --hai-bg) and body bg is
+   var(--bg) too — so iOS rubber-band overscroll AND the safe-
+   area-inset padding region both show a black band against the
+   directory's gray-900 content.
+
+   DirectoryHeader toggles the `.hai-route-directory` class on
+   <html> while mounted (JS-based instead of CSS :has() — older
+   iOS WKWebView builds in the wild don't honor :has() reliably).
+   Marked !important so the early `.dark body { background-color:
+   var(--bg) }` rule above can't win the cascade. */
+html.hai-route-directory,
+html.hai-route-directory body {
+  background-color: #f9fafb !important;
 }
-.dark html:has(.hai-directory-screen),
-.dark html:has(.hai-directory-screen) body,
-html.dark:has(.hai-directory-screen),
-html.dark:has(.hai-directory-screen) body {
-  background-color: #111827;
+.dark html.hai-route-directory,
+.dark html.hai-route-directory body,
+html.dark.hai-route-directory,
+html.dark.hai-route-directory body {
+  background-color: #111827 !important;
 }
 
 /* ── iOS safe area — universal approach ──────────────────────── */
