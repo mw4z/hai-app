@@ -60,7 +60,7 @@ input, textarea, [contenteditable="true"] {
    --hai-bg / --hai-surface-* so pages that still use these aliases
    feel like the same material system. */
 .dark {
-  --bg:             #19232a;   /* page (matches --hai-bg) */
+  --bg:             #000000;   /* page (matches --hai-bg) */
   --surface:        #101619;   /* card (matches --hai-surface-1) */
   --surface-alt:    #19232a;   /* panel (matches --hai-surface-2) */
   --text:           #e9edef;
@@ -460,8 +460,8 @@ body {
   position: relative;
 }
 .dark body {
-  background-color: #19232a;
-  background-color: var(--bg, #19232a);
+  background-color: #000000;
+  background-color: var(--bg, #000000);
   color: #e9edef;
   color: var(--text, #e9edef);
 }
@@ -542,8 +542,8 @@ html {
   background-color: #ffffff;
 }
 .dark html, html.dark {
-  background-color: #19232a;              /* concrete fallback — matches --hai-bg */
-  background-color: var(--hai-bg, #19232a);
+  background-color: #000000;              /* concrete fallback — true-black page */
+  background-color: var(--hai-bg, #000000);
 }
 
 /* ── Directory route bg overrides ──────────────────────────────

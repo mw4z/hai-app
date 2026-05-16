@@ -59,18 +59,18 @@ export default function DirectoryHeader({ title, backHref }: Props) {
            That lets a super admin live-tweak the band color from the
            in-app picker without redeploying. */
         html.dark, .dark html {
-          --hai-safe-top-bg: var(--hai-directory-band, #19232a);
-          background-color: var(--hai-directory-band, #19232a) !important;
+          --hai-safe-top-bg: var(--hai-directory-band, #101619);
+          background-color: var(--hai-directory-band, #101619) !important;
         }
         html.dark body, .dark html body {
-          background-color: var(--hai-directory-band, #19232a) !important;
+          background-color: var(--hai-directory-band, #101619) !important;
         }
         .hai-directory-safe-cover {
           background-color: #f9fafb;
         }
         html.dark .hai-directory-safe-cover,
         .dark html .hai-directory-safe-cover {
-          background-color: var(--hai-directory-band, #19232a) !important;
+          background-color: var(--hai-directory-band, #101619) !important;
         }
       `}</style>
       {/* Safe-area cover. The global html::before paints the

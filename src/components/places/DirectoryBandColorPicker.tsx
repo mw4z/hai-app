@@ -46,7 +46,7 @@ function applyToDocument(hex: string) {
 export default function DirectoryBandColorPicker() {
   const [role, setRole] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
-  const [current, setCurrent] = useState<string>('#19232a')
+  const [current, setCurrent] = useState<string>('#101619')
   const [customHex, setCustomHex] = useState<string>('')
 
   // Mount: load saved color + check role.
@@ -57,7 +57,7 @@ export default function DirectoryBandColorPicker() {
         setCurrent(saved)
         applyToDocument(saved)
       } else {
-        applyToDocument('#19232a')
+        applyToDocument('#101619')
       }
     } catch {
       // ignore
@@ -81,8 +81,8 @@ export default function DirectoryBandColorPicker() {
   }
 
   function reset() {
-    setCurrent('#19232a')
-    applyToDocument('#19232a')
+    setCurrent('#101619')
+    applyToDocument('#101619')
     try {
       localStorage.removeItem(STORAGE_KEY)
     } catch {
@@ -189,7 +189,7 @@ export default function DirectoryBandColorPicker() {
                   type="text"
                   value={customHex}
                   onChange={(e) => setCustomHex(e.target.value)}
-                  placeholder="#19232a"
+                  placeholder="#101619"
                   dir="ltr"
                   className="flex-1 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-500"
                   maxLength={7}
@@ -215,7 +215,7 @@ export default function DirectoryBandColorPicker() {
               onClick={reset}
               className="w-full text-[12px] font-medium text-gray-500 dark:text-gray-400 py-2 active:scale-95 transition-transform"
             >
-              إعادة للافتراضي (#19232a)
+              إعادة للافتراضي (#101619)
             </button>
           </div>
         </div>

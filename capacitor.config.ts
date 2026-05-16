@@ -26,10 +26,10 @@ const config: CapacitorConfig = {
     // anything; without it, a MITM on public WiFi could inject scripts
     // or images by intercepting the HTTP fallback path.
     allowMixedContent: false,
-    // Matches --hai-bg in dark mode (src/app/design-tokens.css)
-    // so the native Android window behind the webview is the same
-    // as the app body (no seam in the safe-area / notch).
-    backgroundColor: '#19232a',
+    // Matches --hai-bg in dark mode (src/app/design-tokens.css) —
+    // true black so the native Android window behind the webview is
+    // the same as the app body (no seam in the safe-area / notch).
+    backgroundColor: '#000000',
   },
   plugins: {
     SplashScreen: {
