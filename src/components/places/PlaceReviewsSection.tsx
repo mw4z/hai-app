@@ -65,6 +65,9 @@ interface Props {
   /** Caller-side computed: is the viewer the claimed owner of
    *  this place? Drives owner-reply affordances. */
   isOwner: boolean
+  /** Caller-side computed: did the viewer originally add this
+   *  place? Drives the "you added this — can't review" hint. */
+  isCreator: boolean
   /** Caller-side computed: can the viewer submit a review at
    *  all? False for owner / creator / cross-nbhd residents. */
   canReview: boolean
@@ -88,6 +91,7 @@ export default function PlaceReviewsSection({
   initialAvg,
   initialCount,
   isOwner,
+  isCreator,
   canReview,
 }: Props) {
   const [avg, setAvg] = useState(initialAvg)
@@ -180,6 +184,20 @@ export default function PlaceReviewsSection({
           </button>
         )}
       </div>
+
+      {/* "Why can't I review?" hint — shown to the people whose
+          button was hidden so the absence isn't a silent mystery.
+          Owner / creator self-block is per spec (a business owner
+          could otherwise pre-rate their own place). The hint reads
+          softer for owners (positive identity) vs creators (just
+          neutral fact). */}
+      {!canReview && (isOwner || isCreator) && (
+        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3 text-[12px] text-gray-600 dark:text-gray-300 leading-relaxed">
+          {isOwner
+            ? '✓ أنت صاحب هذا المكان — لا يمكنك تقييم مكانك.'
+            : '📝 أنت من أضاف هذا المكان — لا يمكنك تقييم مكان أضفته.'}
+        </div>
+      )}
 
       {/* Status banner for the caller's own non-visible review. */}
       {mine && mine.status === 'HIDDEN_BY_MOD' && (

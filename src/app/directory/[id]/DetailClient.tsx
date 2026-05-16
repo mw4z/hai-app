@@ -306,6 +306,7 @@ export default function DetailClient({
           initialAvg={place.ratingAvg}
           initialCount={place.ratingCount}
           isOwner={isOwner}
+          isCreator={isCreator}
           canReview={!isOwner && !isCreator}
         />
 
