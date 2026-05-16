@@ -61,6 +61,29 @@ class MainViewController: CAPBridgeViewController {
             webView.scrollView.alwaysBounceHorizontal = false
             webView.scrollView.bouncesZoom = false
 
+            // WebView + scroll view background — what iOS exposes
+            // during rubber-band overscroll past the top or bottom
+            // of the page. Without this, the bounce region paints
+            // WKWebView's default (black on iOS dark mode)
+            // regardless of html/body CSS, because the exposed area
+            // isn't part of the document. Match dark-mode --hai-bg
+            // from src/app/design-tokens.css (#19232a). Light mode
+            // stays white.
+            let darkBg = UIColor(red: 0x19/255.0,
+                                 green: 0x23/255.0,
+                                 blue: 0x2A/255.0,
+                                 alpha: 1.0)
+            if #available(iOS 13.0, *) {
+                let dynamicBg = UIColor { trait in
+                    trait.userInterfaceStyle == .dark ? darkBg : .white
+                }
+                webView.backgroundColor = dynamicBg
+                webView.scrollView.backgroundColor = dynamicBg
+            } else {
+                webView.backgroundColor = darkBg
+                webView.scrollView.backgroundColor = darkBg
+            }
+
             // Native iOS edge-swipe back/forward. WKWebView uses the
             // exact same gesture recognizer Safari does: the page
             // tracks the finger 1:1 from the left edge, a snapshot of
