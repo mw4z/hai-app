@@ -60,7 +60,7 @@ input, textarea, [contenteditable="true"] {
    --hai-bg / --hai-surface-* so pages that still use these aliases
    feel like the same material system. */
 .dark {
-  --bg:             #000000;   /* page (matches --hai-bg) */
+  --bg:             #19232a;   /* page (matches --hai-bg) */
   --surface:        #101619;   /* card (matches --hai-surface-1) */
   --surface-alt:    #19232a;   /* panel (matches --hai-surface-2) */
   --text:           #e9edef;
