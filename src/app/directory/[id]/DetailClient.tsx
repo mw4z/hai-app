@@ -9,6 +9,7 @@ import type { PublicPlace } from '@/lib/places/serialize'
 import { getCategoryMeta } from '@/lib/places/categories'
 import PlaceStatusBadge from '@/components/places/PlaceStatusBadge'
 import PlacePill from '@/components/places/PlacePill'
+import PlaceReviewsSection from '@/components/places/PlaceReviewsSection'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
 import EditPhotosSheet from '@/components/places/EditPhotosSheet'
 import EditPlaceInfoSheet from '@/components/places/EditPlaceInfoSheet'
@@ -293,6 +294,20 @@ export default function DetailClient({
             </ul>
           </section>
         )}
+
+        {/* تقييمات أهل الحي — directory-scoped reviews + stars.
+            Self-fetches via /api/directory/[id]/reviews. The
+            canReview gate is best-effort (server is authoritative);
+            owner / creator are blocked client-side so the CTA
+            doesn't tempt them, while cross-nbhd attempts are
+            rejected server-side with a toast. */}
+        <PlaceReviewsSection
+          placeId={place.id}
+          initialAvg={place.ratingAvg}
+          initialCount={place.ratingCount}
+          isOwner={isOwner}
+          canReview={!isOwner && !isCreator}
+        />
 
         {/* Edit-photos affordance.
             Visible to anyone the PATCH route would accept:

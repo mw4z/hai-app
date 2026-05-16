@@ -183,6 +183,8 @@ model User {
   placeClaimsSubmitted  PlaceClaimRequest[] @relation("PlaceClaimsSubmitted")
   placeClaimsReviewed   PlaceClaimRequest[] @relation("PlaceClaimsReviewed")
   placeReportsFiled     PlaceReport[]       @relation("PlaceReportsFiled")
+  placeReviewsAuthored  PlaceReview[]       @relation("PlaceReviewsAuthored")
+  placeReviewsReplied   PlaceReview[]       @relation("PlaceReviewsReplied")
 
   deletedAt        DateTime?     // soft delete — null = active, set = deleted
   createdAt        DateTime      @default(now())
@@ -1637,6 +1639,12 @@ enum PlaceReportType {
   OTHER
 }
 
+enum PlaceReviewStatus {
+  VISIBLE
+  HIDDEN_BY_MOD
+  DELETED_BY_USER
+}
+
 model PlaceListing {
   id              String        @id @default(cuid())
 
@@ -1713,6 +1721,15 @@ model PlaceListing {
 
   claimRequests   PlaceClaimRequest[]
   reports         PlaceReport[]
+  reviews         PlaceReview[]
+
+  // Denormalized review summary. Recomputed inside the same
+  // transaction as every review mutation (create / update /
+  // delete / mod-hide) by recalcPlaceRating(); VISIBLE-only.
+  // Avg rounded to one decimal (e.g. 4.3). Defaults to 0 / 0
+  // so a place with no reviews renders cleanly without a JOIN.
+  ratingAvg       Float         @default(0)
+  ratingCount     Int           @default(0)
 
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -1773,5 +1790,45 @@ model PlaceReport {
   createdAt DateTime        @default(now())
 
   @@index([placeId])
+  @@index([userId, createdAt])
+}
+
+// ── Directory reviews ─────────────────────────────────────────
+// 1–5 star rating + optional comment from a neighborhood
+// resident. One review per (place, user) — POST upserts the
+// existing row. Claimed owner can REPLY (single reply, capped
+// at 500 chars, snapshot of the replier in ownerReplyByUserId);
+// owner CANNOT edit / hide / delete the review itself. Mods can
+// hide a review (status flips to HIDDEN_BY_MOD); the user can
+// soft-delete their own review (status = DELETED_BY_USER).
+// Hidden + deleted rows stay in the table so a hidden-then-
+// recreated review can't dodge moderation via the upsert path.
+// Aggregates live on PlaceListing.ratingAvg / ratingCount,
+// recomputed inside the same transaction as every mutation by
+// recalcPlaceRating(); VISIBLE-only.
+model PlaceReview {
+  id                 String            @id @default(cuid())
+
+  placeId            String
+  place              PlaceListing      @relation(fields: [placeId], references: [id])
+
+  userId             String
+  user               User              @relation("PlaceReviewsAuthored", fields: [userId], references: [id])
+
+  rating             Int                                                                  // 1..5, server-validated
+  body               String?                                                              // max 500 chars
+
+  ownerReplyBody     String?                                                              // max 500 chars
+  ownerReplyByUserId String?
+  ownerReplyByUser   User?             @relation("PlaceReviewsReplied", fields: [ownerReplyByUserId], references: [id])
+  ownerReplyAt       DateTime?
+
+  status             PlaceReviewStatus @default(VISIBLE)
+
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@unique([placeId, userId])
+  @@index([placeId, status, createdAt])
   @@index([userId, createdAt])
 }

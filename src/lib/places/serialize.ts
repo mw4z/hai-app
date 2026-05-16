@@ -37,6 +37,10 @@ export interface PublicPlace {
   /** ISO timestamp. When set AND in the past, readers ignore
    *  manualStatus and fall back to the auto pill. */
   manualStatusUntil: string | null
+  /** Denormalized review summary — averaged from VISIBLE
+   *  reviews only, one decimal. 0 / 0 when no reviews. */
+  ratingAvg: number
+  ratingCount: number
   imageUrls: string[]
   addedByCommunity: boolean
   claimedByUser: PublicClaimedUser | null
@@ -116,6 +120,8 @@ export function toPublicPlace(place: PlaceWithRelations): PublicPlace {
     manualStatusUntil: place.manualStatusUntil
       ? place.manualStatusUntil.toISOString()
       : null,
+    ratingAvg: place.ratingAvg,
+    ratingCount: place.ratingCount,
     imageUrls: place.imageUrls,
     addedByCommunity: !!place.createdByUserId,
     claimedByUser,

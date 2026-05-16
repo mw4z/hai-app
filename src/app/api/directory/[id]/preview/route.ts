@@ -54,6 +54,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       openingHours: true,
       manualStatus: true,
       manualStatusUntil: true,
+      ratingAvg: true,
+      ratingCount: true,
       createdByUserId: true,
       claimedByUserId: true,
       claimedByUser: {
@@ -106,6 +108,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     manualStatusUntil: place.manualStatusUntil
       ? place.manualStatusUntil.toISOString()
       : null,
+    ratingAvg: place.ratingAvg,
+    ratingCount: place.ratingCount,
     addedByCommunity: !!place.createdByUserId,
     claimedByUser: place.claimedByUser
       ? {

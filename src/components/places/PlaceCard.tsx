@@ -34,6 +34,20 @@ export default function PlaceCard({ place }: { place: PublicPlace }) {
             {categoryLabel}
             {place.addressText ? ` · ${place.addressText}` : ''}
           </p>
+          {/* Compact review summary — same denormalized numbers
+              the detail page renders. Hidden when there are no
+              reviews yet, replaced with a softer label so
+              fresh places don't look broken. */}
+          <p className="text-[11.5px] text-gray-500 dark:text-gray-400 mt-0.5">
+            {place.ratingCount > 0 ? (
+              <>
+                <span aria-hidden>★</span> <span dir="ltr">{place.ratingAvg.toFixed(1)}</span>
+                <span> · {place.ratingCount} تقييم</span>
+              </>
+            ) : (
+              <>بدون تقييمات بعد</>
+            )}
+          </p>
           {/* Live open/closed (or owner override) pill. Hides
               itself when the place has no parseable hours AND
               no manual override. */}
