@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { FiArrowLeft, FiArrowRight } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import DirectoryBandColorPicker from './DirectoryBandColorPicker'
 
 interface Props {
   title: string
@@ -52,24 +53,24 @@ export default function DirectoryHeader({ title, backHref }: Props) {
         html body {
           background-color: #f9fafb !important;
         }
+        /* Dark-mode band color is now driven by --hai-directory-band
+           (set on documentElement.style by DirectoryBandColorPicker
+           — falls back to #101619 when no picker selection exists).
+           That lets a super admin live-tweak the band color from the
+           in-app picker without redeploying. */
         html.dark, .dark html {
-          --hai-safe-top-bg: #101619;
-          background-color: #101619 !important;
+          --hai-safe-top-bg: var(--hai-directory-band, #101619);
+          background-color: var(--hai-directory-band, #101619) !important;
         }
         html.dark body, .dark html body {
-          background-color: #101619 !important;
+          background-color: var(--hai-directory-band, #101619) !important;
         }
-        /* Safe-area cover div — Tailwind's bg-gray-50 was getting
-           overridden by the global .dark .bg-gray-50 rule to
-           var(--surface-alt) = #19232a, which still read as
-           black on phones. Force the requested #101619 here in
-           dark mode; keep gray-50 in light mode. */
         .hai-directory-safe-cover {
           background-color: #f9fafb;
         }
         html.dark .hai-directory-safe-cover,
         .dark html .hai-directory-safe-cover {
-          background-color: #101619 !important;
+          background-color: var(--hai-directory-band, #101619) !important;
         }
       `}</style>
       {/* Safe-area cover. The global html::before paints the
@@ -106,6 +107,13 @@ export default function DirectoryHeader({ title, backHref }: Props) {
           </h1>
         </div>
       </header>
+      {/* Super-admin only — renders a floating swatch button that
+          opens a color picker for the band color. Self-gates on
+          the user's role (returns null for non-admins). Reads its
+          last selection from localStorage on mount and writes
+          --hai-directory-band on documentElement.style; the inline
+          <style> above consumes that variable. */}
+      <DirectoryBandColorPicker />
     </>
   )
 }
