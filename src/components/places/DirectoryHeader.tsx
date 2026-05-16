@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { FiArrowLeft, FiArrowRight } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
@@ -28,30 +27,46 @@ export default function DirectoryHeader({ title, backHref }: Props) {
 
   const ArrowIcon = lang === 'en' ? FiArrowLeft : FiArrowRight
 
-  // Toggle a body class so html / body bg flips to the directory
-  // page color while this header is mounted. JS-based instead of
-  // CSS :has() because older iOS WKWebView builds didn't honor
-  // :has() and the user kept seeing black rubber-band overscroll
-  // + a black band under the iOS status bar (where body's
-  // padding-top reserves space and gets painted with body bg).
-  useEffect(() => {
-    if (typeof document === 'undefined') return
-    document.documentElement.classList.add('hai-route-directory')
-    return () => {
-      document.documentElement.classList.remove('hai-route-directory')
-    }
-  }, [])
-
   return (
     <>
+      {/* Global bg overrides scoped to the directory routes.
+          Three previous attempts failed:
+            1. CSS :has(.hai-directory-screen) — not honored on
+               every WKWebView version in the wild.
+            2. JS-toggled html.hai-route-directory class — there
+               was a hydration window where the class wasn't on
+               <html> yet, AND on some builds the useEffect ran
+               but the iOS rubber-band overscroll still exposed
+               the old background until the page repainted.
+            3. background-color override that forgot the
+               --hai-safe-top-bg CSS var that html::before reads.
+          This inline <style> renders as part of the page SSR
+          output, so the rules apply BEFORE first paint with no
+          JS dependency, and Next.js removes it on unmount when
+          the user navigates away from a directory route. */}
+      <style>{`
+        html {
+          --hai-safe-top-bg: rgb(249 250 251);
+          background-color: #f9fafb !important;
+        }
+        html body {
+          background-color: #f9fafb !important;
+        }
+        html.dark, .dark html {
+          --hai-safe-top-bg: rgb(17 24 39);
+          background-color: #111827 !important;
+        }
+        html.dark body, .dark html body {
+          background-color: #111827 !important;
+        }
+      `}</style>
       {/* Safe-area cover. The global html::before paints the
-          top-inset region with --hai-safe-top-bg, but on some
-          Capacitor/WKWebView versions the :has() override that
-          recolors that variable doesn't take effect, leaving the
-          notch zone in --hai-surface-1 (white / #101619) while
-          the page below is gray. This fixed div paints the exact
-          page color directly into the inset region with no CSS-
-          variable dependency, guaranteeing a seamless edge. */}
+          top-inset region with --hai-safe-top-bg; the inline
+          <style> above keeps that var pointing at the page
+          color. This <div> is an extra belt-and-suspenders layer
+          that paints the exact same color directly into the
+          inset region with no CSS-variable dependency at all, so
+          even if the var-override fails the seam disappears. */}
       <div
         aria-hidden
         className="fixed top-0 left-0 right-0 z-30 pointer-events-none bg-gray-50 dark:bg-gray-900"
