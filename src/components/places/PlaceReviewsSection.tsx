@@ -151,6 +151,64 @@ export default function PlaceReviewsSection({
     }
   }
 
+  async function reportReview(reviewId: string) {
+    if (!confirm('هل تريد الإبلاغ عن هذا التقييم؟')) return
+    try {
+      // Mirrors the post-report UX: a single tap fires the
+      // report with reason=OTHER. Picker UI can be added later
+      // if mods want richer signal.
+      const res = await fetch(
+        `/api/directory/${placeId}/reviews/${reviewId}/report`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'OTHER' }),
+        },
+      )
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data?.error || 'تعذر الإبلاغ')
+        return
+      }
+      toast.success(
+        data.hidden
+          ? 'تم الإبلاغ — وتمّ إخفاء التقييم'
+          : 'تم الإبلاغ، سيراجعه المشرف',
+      )
+      refresh()
+    } catch {
+      toast.error('تعذر الاتصال')
+    }
+  }
+
+  async function shareReview(r: ApiReview) {
+    // Web Share API on native (Capacitor iOS / Android share
+    // sheet) and modern web browsers. Falls back to copy-to-
+    // clipboard everywhere else. The URL points at the place
+    // detail page — the reviewer's content surfaces there in
+    // context.
+    const base =
+      typeof window !== 'undefined' ? window.location.origin : 'https://app.hai-app.net'
+    const url = `${base}/directory/${placeId}`
+    const text = r.body
+      ? `${r.user.name || 'جار'} (${r.rating}/5):\n${r.body}\n\n${url}`
+      : `${r.user.name || 'جار'} قيّم المكان ${r.rating}/5\n${url}`
+    try {
+      if (typeof navigator !== 'undefined' && (navigator as any).share) {
+        await (navigator as any).share({ title: 'تقييم من دليل الحي', text, url })
+        return
+      }
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(text)
+        toast.success('نسخ الرابط')
+        return
+      }
+      toast.error('تعذر المشاركة')
+    } catch {
+      // User cancelled the native share sheet — silent.
+    }
+  }
+
   return (
     <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
       <div className="flex items-start gap-3">
@@ -256,24 +314,41 @@ export default function PlaceReviewsSection({
                       {r.body}
                     </p>
                   )}
-                  {isMyRow && (
-                    <div className="flex items-center gap-3 mt-2">
+                  <div className="flex items-center gap-3 mt-2 flex-wrap">
+                    {isMyRow ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setReviewSheetOpen(true)}
+                          className="text-[11px] font-semibold text-primary-600 dark:text-primary-400 active:scale-95 transition-transform"
+                        >
+                          تعديل
+                        </button>
+                        <button
+                          type="button"
+                          onClick={deleteMine}
+                          className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 active:scale-95 transition-transform"
+                        >
+                          حذف
+                        </button>
+                      </>
+                    ) : (
                       <button
                         type="button"
-                        onClick={() => setReviewSheetOpen(true)}
-                        className="text-[11px] font-semibold text-primary-600 dark:text-primary-400 active:scale-95 transition-transform"
+                        onClick={() => reportReview(r.id)}
+                        className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 active:scale-95 transition-transform"
                       >
-                        تعديل
+                        🚩 إبلاغ
                       </button>
-                      <button
-                        type="button"
-                        onClick={deleteMine}
-                        className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 active:scale-95 transition-transform"
-                      >
-                        حذف
-                      </button>
-                    </div>
-                  )}
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => shareReview(r)}
+                      className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 active:scale-95 transition-transform"
+                    >
+                      🔗 مشاركة
+                    </button>
+                  </div>
                 </div>
               </div>
 

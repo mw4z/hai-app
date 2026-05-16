@@ -185,6 +185,7 @@ model User {
   placeReportsFiled     PlaceReport[]       @relation("PlaceReportsFiled")
   placeReviewsAuthored  PlaceReview[]       @relation("PlaceReviewsAuthored")
   placeReviewsReplied   PlaceReview[]       @relation("PlaceReviewsReplied")
+  placeReviewReportsFiled PlaceReviewReport[] @relation("PlaceReviewReporter")
 
   deletedAt        DateTime?     // soft delete — null = active, set = deleted
   createdAt        DateTime      @default(now())
@@ -1824,6 +1825,12 @@ model PlaceReview {
   ownerReplyAt       DateTime?
 
   status             PlaceReviewStatus @default(VISIBLE)
+  // Denormalized counter for resident-triggered auto-hide.
+  // PlaceReviewReport rows are the source of truth; this is
+  // incremented inside the same txn as each report insert so
+  // we can threshold-check without a COUNT() on the hot path.
+  reportCount        Int               @default(0)
+  reports            PlaceReviewReport[]
 
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
@@ -1831,4 +1838,27 @@ model PlaceReview {
   @@unique([placeId, userId])
   @@index([placeId, status, createdAt])
   @@index([userId, createdAt])
+}
+
+// Resident-filed reports against a PlaceReview. Mirrors the
+// post-report shape (Report model) so the UX is familiar and
+// mods can later get a unified queue. Auto-hide threshold = 3
+// distinct reporters → status flips to HIDDEN_BY_MOD inside
+// the same txn as the latest report insert.
+model PlaceReviewReport {
+  id         String       @id @default(cuid())
+  reason     ReportReason
+  details    String?
+  reporter   User         @relation("PlaceReviewReporter", fields: [reporterId], references: [id])
+  reporterId String
+  review     PlaceReview  @relation(fields: [reviewId], references: [id])
+  reviewId   String
+  status     ReportStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+
+  // One report per (reporter, review). The API checks for an
+  // existing row before insert so the user sees "أبلغت مسبقاً"
+  // instead of a raw DB constraint error.
+  @@unique([reporterId, reviewId])
+  @@index([reviewId, status])
 }
