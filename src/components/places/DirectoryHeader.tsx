@@ -53,11 +53,23 @@ export default function DirectoryHeader({ title, backHref }: Props) {
           background-color: #f9fafb !important;
         }
         html.dark, .dark html {
-          --hai-safe-top-bg: rgb(17 24 39);
-          background-color: #111827 !important;
+          --hai-safe-top-bg: #1a252b;
+          background-color: #1a252b !important;
         }
         html.dark body, .dark html body {
-          background-color: #111827 !important;
+          background-color: #1a252b !important;
+        }
+        /* Safe-area cover div — Tailwind's bg-gray-50 was getting
+           overridden by the global .dark .bg-gray-50 rule to
+           var(--surface-alt) = #19232a, which still read as
+           black on phones. Force the requested #1a252b here in
+           dark mode; keep gray-50 in light mode. */
+        .hai-directory-safe-cover {
+          background-color: #f9fafb;
+        }
+        html.dark .hai-directory-safe-cover,
+        .dark html .hai-directory-safe-cover {
+          background-color: #1a252b !important;
         }
       `}</style>
       {/* Safe-area cover. The global html::before paints the
@@ -69,7 +81,7 @@ export default function DirectoryHeader({ title, backHref }: Props) {
           even if the var-override fails the seam disappears. */}
       <div
         aria-hidden
-        className="fixed top-0 left-0 right-0 z-30 pointer-events-none bg-gray-50 dark:bg-gray-900"
+        className="hai-directory-safe-cover fixed top-0 left-0 right-0 z-30 pointer-events-none"
         style={{ height: 'env(safe-area-inset-top, 0px)' }}
       />
       {/* Header is fully opaque (no /95 + backdrop-blur). The
