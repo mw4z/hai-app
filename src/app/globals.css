@@ -546,6 +546,26 @@ html {
   background-color: var(--hai-bg, #000000);
 }
 
+/* ── Overscroll bg per directory route ─────────────────────────
+   The directory pages render their <main> with bg-gray-50 /
+   dark:bg-gray-900 (#f9fafb / #111827), but the global html bg
+   is pure black (#000000 from --hai-bg) so iOS rubber-band
+   overscroll exposes a black band at the top and bottom of the
+   list. Override the html background on those routes only —
+   :has(.hai-directory-screen) matches when any descendant of
+   html carries the directory-page wrapper class, leaving every
+   other page untouched. */
+html:has(.hai-directory-screen),
+html:has(.hai-directory-screen) body {
+  background-color: #f9fafb;
+}
+.dark html:has(.hai-directory-screen),
+.dark html:has(.hai-directory-screen) body,
+html.dark:has(.hai-directory-screen),
+html.dark:has(.hai-directory-screen) body {
+  background-color: #111827;
+}
+
 /* ── iOS safe area — universal approach ──────────────────────── */
 /* env() = 0 on web (no-op), ~47px on iOS native.
    body.padding-top reserves flow space at body's content top so
