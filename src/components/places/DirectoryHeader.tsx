@@ -53,23 +53,23 @@ export default function DirectoryHeader({ title, backHref }: Props) {
           background-color: #f9fafb !important;
         }
         html.dark, .dark html {
-          --hai-safe-top-bg: #19222b;
-          background-color: #19222b !important;
+          --hai-safe-top-bg: #111827;
+          background-color: #111827 !important;
         }
         html.dark body, .dark html body {
-          background-color: #19222b !important;
+          background-color: #111827 !important;
         }
         /* Safe-area cover div — Tailwind's bg-gray-50 was getting
            overridden by the global .dark .bg-gray-50 rule to
            var(--surface-alt) = #19232a, which still read as
-           black on phones. Force the requested #19222b here in
+           black on phones. Force the requested #111827 here in
            dark mode; keep gray-50 in light mode. */
         .hai-directory-safe-cover {
           background-color: #f9fafb;
         }
         html.dark .hai-directory-safe-cover,
         .dark html .hai-directory-safe-cover {
-          background-color: #19222b !important;
+          background-color: #111827 !important;
         }
       `}</style>
       {/* Safe-area cover. The global html::before paints the
