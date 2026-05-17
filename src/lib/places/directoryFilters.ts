@@ -23,9 +23,15 @@ import type { Prisma } from '@prisma/client'
 import { PUBLIC_PLACE_STATUSES } from './statusBadge'
 import { computePlacePill } from './openState'
 
-/** Minimum review count required for a min-rating filter to apply
- *  to a place. Prevents one 5★ vote from gaming the "4.5+" view. */
-export const MIN_REVIEWS_FOR_RATING_FILTER = 3
+/**
+ * Minimum review count required for a min-rating filter to apply
+ * to a place. Set to 1 during early-MVP discovery — at this data
+ * scale the original 3-review guard hid almost every place, which
+ * defeats the filter. Mod hide-on-report + the review-reports
+ * dashboard handle the abuse vector. Revisit raising this once
+ * average reviews-per-place is reliably ≥5 in active neighborhoods.
+ */
+export const MIN_REVIEWS_FOR_RATING_FILTER = 1
 
 export type DirectorySort = 'top' | 'reviewed' | 'newest' | 'alpha'
 

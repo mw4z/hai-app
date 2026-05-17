@@ -128,9 +128,9 @@ export default function DirectoryFilterSheet({ open, initial, onClose, onApply }
             {draft.minRating !== null && (
               <p className="text-[10.5px] text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">
                 {tr(
-                  'Places with at least 3 reviews so a single vote can’t game the filter.',
-                  'الأماكن التي حصلت على ٣ تقييمات على الأقل، لمنع تأثير صوت واحد.',
-                  'کم از کم 3 جائزوں والی جگہیں — ایک ووٹ سے بچاؤ۔',
+                  'Includes every place that has at least one review at this rating or above.',
+                  'يشمل كل مكان حصل على تقييم واحد على الأقل بهذا المستوى أو أعلى.',
+                  'وہ تمام جگہیں جنہیں اس درجے یا اس سے زیادہ کا کم از کم ایک جائزہ ملا ہے۔',
                 )}
               </p>
             )}
