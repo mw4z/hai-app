@@ -1,10 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
+import { FiMoreHorizontal } from 'react-icons/fi'
 import StarRating from './StarRating'
 import PlaceReviewSheet from './PlaceReviewSheet'
 import PlaceOwnerReplySheet from './PlaceOwnerReplySheet'
+import { useConfirm } from '@/components/ConfirmProvider'
 
 /**
  * Review section rendered inside the place detail page. Three
@@ -102,6 +104,33 @@ export default function PlaceReviewsSection({
   const [reviewSheetOpen, setReviewSheetOpen] = useState(false)
   // reviewId currently being replied to (owner mode). null = closed.
   const [replyingTo, setReplyingTo] = useState<{ reviewId: string; existing: string | null } | null>(null)
+  // Which review's kebab (⋯) menu is currently open. null = all closed.
+  const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
+  // In-app confirm dialog (replaces native window.confirm so the
+  // sheet UX matches the rest of the app and Capacitor doesn't
+  // pop a native system dialog).
+  const confirmDialog = useConfirm()
+
+  // Close the kebab on outside click. Listening at document
+  // level + comparing to a ref lets us avoid a portal.
+  const menuRootRef = useRef<HTMLUListElement>(null)
+  useEffect(() => {
+    if (!openMenuFor) return
+    function onPointer(e: PointerEvent) {
+      if (!menuRootRef.current) return
+      if (menuRootRef.current.contains(e.target as Node)) return
+      setOpenMenuFor(null)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpenMenuFor(null)
+    }
+    document.addEventListener('pointerdown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [openMenuFor])
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -133,7 +162,12 @@ export default function PlaceReviewsSection({
 
   async function deleteMine() {
     if (!mine) return
-    if (!confirm('هل تريد حذف تقييمك؟')) return
+    const ok = await confirmDialog({
+      message: 'هل تريد حذف تقييمك؟',
+      variant: 'danger',
+      confirmText: 'حذف',
+    })
+    if (!ok) return
     try {
       const res = await fetch(`/api/directory/${placeId}/reviews/mine`, {
         method: 'DELETE',
@@ -152,7 +186,12 @@ export default function PlaceReviewsSection({
   }
 
   async function reportReview(reviewId: string) {
-    if (!confirm('هل تريد الإبلاغ عن هذا التقييم؟')) return
+    const ok = await confirmDialog({
+      message: 'هل تريد الإبلاغ عن هذا التقييم؟',
+      variant: 'danger',
+      confirmText: 'إبلاغ',
+    })
+    if (!ok) return
     try {
       // Mirrors the post-report UX: a single tap fires the
       // report with reason=OTHER. Picker UI can be added later
@@ -314,41 +353,21 @@ export default function PlaceReviewsSection({
                       {r.body}
                     </p>
                   )}
-                  <div className="flex items-center gap-3 mt-2 flex-wrap">
-                    {isMyRow ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setReviewSheetOpen(true)}
-                          className="text-[11px] font-semibold text-primary-600 dark:text-primary-400 active:scale-95 transition-transform"
-                        >
-                          تعديل
-                        </button>
-                        <button
-                          type="button"
-                          onClick={deleteMine}
-                          className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 active:scale-95 transition-transform"
-                        >
-                          حذف
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => reportReview(r.id)}
-                        className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 active:scale-95 transition-transform"
-                      >
-                        🚩 إبلاغ
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => shareReview(r)}
-                      className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 active:scale-95 transition-transform"
-                    >
-                      🔗 مشاركة
-                    </button>
-                  </div>
+                  {/* ⋯ kebab menu — replaces the flat row of
+                      tap-targets. Per-row state, only one menu
+                      open at a time, closes on outside-click /
+                      Escape / item-pick. */}
+                  <ReviewActionsMenu
+                    isMyRow={!!isMyRow}
+                    open={openMenuFor === r.id}
+                    onToggle={() => setOpenMenuFor((cur) => (cur === r.id ? null : r.id))}
+                    onClose={() => setOpenMenuFor(null)}
+                    rootRef={openMenuFor === r.id ? menuRootRef : undefined}
+                    onEdit={() => setReviewSheetOpen(true)}
+                    onDelete={deleteMine}
+                    onReport={() => reportReview(r.id)}
+                    onShare={() => shareReview(r)}
+                  />
                 </div>
               </div>
 
@@ -414,5 +433,88 @@ export default function PlaceReviewsSection({
         />
       )}
     </section>
+  )
+}
+
+/**
+ * Per-row kebab (⋯) menu. Stays minimal — small floating card
+ * with 2–3 items, no portal needed since it lives inside the
+ * review's bounding box and we close on outside-click in the
+ * parent component. Items shift based on whether the viewer is
+ * the review's author:
+ *   own row    →  تعديل / حذف / مشاركة
+ *   other row  →  إبلاغ / مشاركة
+ *
+ * The trigger and menu share a relative wrapper so the menu
+ * positions against the trigger via `absolute`. start-0 +
+ * top-full lands it directly under the kebab.
+ */
+function ReviewActionsMenu({
+  isMyRow,
+  open,
+  onToggle,
+  onClose,
+  rootRef,
+  onEdit,
+  onDelete,
+  onReport,
+  onShare,
+}: {
+  isMyRow: boolean
+  open: boolean
+  onToggle: () => void
+  onClose: () => void
+  rootRef?: React.RefObject<HTMLUListElement>
+  onEdit: () => void
+  onDelete: () => void
+  onReport: () => void
+  onShare: () => void
+}) {
+  const items = isMyRow
+    ? [
+        { key: 'edit',   label: 'تعديل',  tone: 'text-primary-700 dark:text-primary-300', onClick: onEdit },
+        { key: 'delete', label: 'حذف',    tone: 'text-rose-600 dark:text-rose-400',       onClick: onDelete },
+        { key: 'share',  label: 'مشاركة', tone: 'text-gray-700 dark:text-gray-200',       onClick: onShare },
+      ]
+    : [
+        { key: 'report', label: 'إبلاغ',  tone: 'text-rose-600 dark:text-rose-400', onClick: onReport },
+        { key: 'share',  label: 'مشاركة', tone: 'text-gray-700 dark:text-gray-200', onClick: onShare },
+      ]
+  return (
+    <div className="relative mt-1 inline-block">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label="خيارات"
+        aria-expanded={open}
+        className="w-7 h-7 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 active:bg-gray-200/60 dark:active:bg-gray-700/60 transition-colors"
+      >
+        <FiMoreHorizontal className="w-4 h-4" />
+      </button>
+      {open && (
+        <ul
+          ref={rootRef}
+          role="menu"
+          className="absolute z-30 top-full mt-1 start-0 min-w-[140px] rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden"
+        >
+          {items.map((it) => (
+            <li key={it.key}>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose()
+                  // Defer the action by one tick so the menu's
+                  // unmount doesn't fight a sheet's mount.
+                  setTimeout(it.onClick, 0)
+                }}
+                className={`block w-full text-start px-3 py-2 text-[12.5px] font-semibold ${it.tone} active:bg-gray-100 dark:active:bg-gray-700`}
+              >
+                {it.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
