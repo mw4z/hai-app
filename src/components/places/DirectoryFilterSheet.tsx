@@ -1,11 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FiX } from 'react-icons/fi'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { useLanguage } from '@/hooks/useLanguage'
 import type { DirectoryFilters, DirectorySort } from '@/lib/places/directoryFilters'
+
+/** Drag-to-dismiss threshold (px). Past this, releasing the
+ *  finger closes the sheet; below it, the sheet springs back. */
+const SWIPE_CLOSE_THRESHOLD = 100
+/** Cap how far the sheet can be dragged before release — keeps
+ *  the gesture from looking like the user can fling it off the
+ *  top of the viewport. */
+const SWIPE_MAX_TRAVEL = 360
 
 /**
  * Bottom sheet that edits a DirectoryFilters value. Local
@@ -53,11 +61,25 @@ export default function DirectoryFilterSheet({ open, initial, onClose, onApply }
 
   const [draft, setDraft] = useState<DirectoryFilters>(initial)
 
+  // Swipe-down-to-dismiss state. dragY is how far the user's
+  // finger has pulled the sheet from its rest position (always
+  // ≥ 0 — upward drags are ignored so the sheet doesn't lift off).
+  // animating disables the transform transition while the finger
+  // is down so the sheet tracks the touch directly; we re-enable
+  // it on touchend so the spring-back / fly-out is smooth.
+  const [dragY, setDragY] = useState(0)
+  const [animating, setAnimating] = useState(true)
+  const dragStartY = useRef<number | null>(null)
+
   // Reset local staging to the incoming filters every time the
   // sheet opens, so a dismissed-without-apply session doesn't
   // bleed into the next open.
   useEffect(() => {
-    if (open) setDraft(initial)
+    if (open) {
+      setDraft(initial)
+      setDragY(0)
+      setAnimating(true)
+    }
   }, [open, initial])
 
   useBodyScrollLock(open)
@@ -75,11 +97,50 @@ export default function DirectoryFilterSheet({ open, initial, onClose, onApply }
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[88vh]"
+        style={{
+          transform: `translateY(${dragY}px)`,
+          transition: animating ? 'transform 0.22s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+        }}
       >
         {/* Header (fixed-height; flex-shrink-0 keeps it from
             collapsing under content). Drag handle matches the
-            other sheets in the app. */}
-        <div className="flex-shrink-0 px-5 pt-3 pb-3 border-b border-gray-100 dark:border-gray-800">
+            other sheets in the app. The whole header doubles as
+            the swipe-down-to-dismiss grab area — pulling on the
+            scrollable content area should still scroll, so we
+            don't put listeners there. */}
+        <div
+          className="flex-shrink-0 px-5 pt-3 pb-3 border-b border-gray-100 dark:border-gray-800"
+          style={{ touchAction: 'pan-y' }}
+          onTouchStart={(e) => {
+            dragStartY.current = e.touches[0].clientY
+            setAnimating(false)
+          }}
+          onTouchMove={(e) => {
+            if (dragStartY.current === null) return
+            const delta = e.touches[0].clientY - dragStartY.current
+            // Only follow downward drags; upward pulls are ignored.
+            if (delta <= 0) {
+              setDragY(0)
+              return
+            }
+            setDragY(Math.min(delta, SWIPE_MAX_TRAVEL))
+          }}
+          onTouchEnd={() => {
+            const released = dragY
+            dragStartY.current = null
+            setAnimating(true)
+            if (released >= SWIPE_CLOSE_THRESHOLD) {
+              // Fly out fully, then unmount via onClose so the
+              // animation looks like the sheet exits cleanly
+              // rather than vanishing mid-drag.
+              setDragY(window.innerHeight)
+              setTimeout(onClose, 200)
+            } else {
+              // Spring back to rest.
+              setDragY(0)
+            }
+          }}
+        >
           <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-2.5" />
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-gray-900 dark:text-white">

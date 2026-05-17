@@ -190,18 +190,16 @@ export default function DirectoryClient({
           )}
         </div>
 
-        <div data-guide="dir-search">
-          <CategoryChips selected={category} onSelect={setCategory} />
-        </div>
-
-        {/* Pro filter pill + active-filter chips. Pill opens the
-            sheet. Each active chip is removable via its X — clears
-            just that single filter without touching the others. */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Filter pill lives at the start of the category-chips
+            scroll row so it stays visually grouped with the rest
+            of the filter affordances. A subtle vertical divider
+            separates the modal-filter pill from the inline
+            category chips. */}
+        <div className="flex items-center gap-2" data-guide="dir-search">
           <button
             type="button"
             onClick={() => setFilterOpen(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
               filtersActive
                 ? 'bg-primary-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
@@ -210,37 +208,48 @@ export default function DirectoryClient({
             <FiSliders className="w-3.5 h-3.5" />
             {tr('Filter', 'تصفية', 'فلٹر')}
           </button>
-          {filters.minRating !== null && (
-            <ActiveChip
-              label={`★${filters.minRating}+`}
-              onClear={() => setFilters((f) => ({ ...f, minRating: null }))}
-            />
-          )}
-          {filters.openNow && (
-            <ActiveChip
-              label={tr('Open now', 'مفتوح الآن', 'ابھی کھلا')}
-              onClear={() => setFilters((f) => ({ ...f, openNow: false }))}
-            />
-          )}
-          {filters.verifiedOnly && (
-            <ActiveChip
-              label={tr('Verified', 'موثّق', 'تصدیق شدہ')}
-              onClear={() => setFilters((f) => ({ ...f, verifiedOnly: false }))}
-            />
-          )}
-          {filters.hasPhotos && (
-            <ActiveChip
-              label={tr('Photos', 'صور', 'تصاویر')}
-              onClear={() => setFilters((f) => ({ ...f, hasPhotos: false }))}
-            />
-          )}
-          {filters.sort !== 'newest' && (
-            <ActiveChip
-              label={sortLabel(filters.sort, lang)}
-              onClear={() => setFilters((f) => ({ ...f, sort: 'newest' }))}
-            />
-          )}
+          <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <CategoryChips selected={category} onSelect={setCategory} />
+          </div>
         </div>
+
+        {/* Active-filter chips — only rendered when at least one
+            filter is on. No empty row when filtersActive is false. */}
+        {filtersActive && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {filters.minRating !== null && (
+              <ActiveChip
+                label={`★${filters.minRating}+`}
+                onClear={() => setFilters((f) => ({ ...f, minRating: null }))}
+              />
+            )}
+            {filters.openNow && (
+              <ActiveChip
+                label={tr('Open now', 'مفتوح الآن', 'ابھی کھلا')}
+                onClear={() => setFilters((f) => ({ ...f, openNow: false }))}
+              />
+            )}
+            {filters.verifiedOnly && (
+              <ActiveChip
+                label={tr('Verified', 'موثّق', 'تصدیق شدہ')}
+                onClear={() => setFilters((f) => ({ ...f, verifiedOnly: false }))}
+              />
+            )}
+            {filters.hasPhotos && (
+              <ActiveChip
+                label={tr('Photos', 'صور', 'تصاویر')}
+                onClear={() => setFilters((f) => ({ ...f, hasPhotos: false }))}
+              />
+            )}
+            {filters.sort !== 'newest' && (
+              <ActiveChip
+                label={sortLabel(filters.sort, lang)}
+                onClear={() => setFilters((f) => ({ ...f, sort: 'newest' }))}
+              />
+            )}
+          </div>
+        )}
 
         {loading && (
           <p className="text-center text-xs text-gray-400 py-2">
