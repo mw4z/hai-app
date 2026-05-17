@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { FiSliders, FiX } from 'react-icons/fi'
 import type { PlaceCategory } from '@prisma/client'
 import { useLanguage } from '@/hooks/useLanguage'
 import type { PublicPlace } from '@/lib/places/serialize'
@@ -9,6 +10,21 @@ import PlaceCard from '@/components/places/PlaceCard'
 import CategoryChips from '@/components/places/CategoryChips'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
 import ContextualGuide from '@/components/ContextualGuide'
+import DirectoryFilterSheet from '@/components/places/DirectoryFilterSheet'
+import {
+  type DirectoryFilters,
+  type DirectorySort,
+  hasActiveFilters,
+  serializeDirectoryFilters,
+} from '@/lib/places/directoryFilters'
+
+const DEFAULT_FILTERS: DirectoryFilters = {
+  minRating: null,
+  openNow: false,
+  verifiedOnly: false,
+  hasPhotos: false,
+  sort: 'newest',
+}
 
 const DIRECTORY_GUIDE_STEPS = [
   {
@@ -42,6 +58,9 @@ interface Props {
    *  write-side restriction independently. */
   isReadOnly?: boolean
   browseNeighborhood?: { id: string; name: string; nameEn: string | null } | null
+  /** Filters parsed by SSR from URL params so first-paint matches
+   *  the URL state (e.g. /directory?minRating=4.5&sort=top). */
+  initialFilters?: DirectoryFilters
 }
 
 /** Directory list client. Server seeds with the first 30 visible
@@ -53,17 +72,37 @@ export default function DirectoryClient({
   initialPlaces,
   isReadOnly = false,
   browseNeighborhood = null,
+  initialFilters,
 }: Props) {
   const { lang } = useLanguage()
+  const tr = (en: string, ar: string, ur: string) =>
+    lang === 'en' ? en : lang === 'ur' ? ur : ar
+
   const [q, setQ] = useState('')
   const [category, setCategory] = useState<PlaceCategory | null>(null)
+  const [filters, setFilters] = useState<DirectoryFilters>(
+    initialFilters ?? DEFAULT_FILTERS,
+  )
+  const [filterOpen, setFilterOpen] = useState(false)
   const [places, setPlaces] = useState<PublicPlace[]>(initialPlaces)
   const [loading, setLoading] = useState(false)
 
-  // Refetch when the filters actually change. Empty filters reset
-  // to the SSR slice to avoid an unnecessary round trip.
+  const filtersActive = hasActiveFilters(filters)
+
+  // Refetch when ANY filter / query / category changes. The SSR
+  // slice already reflects initialFilters, so we only short-circuit
+  // when there's nothing additional layered on top of it.
   useEffect(() => {
-    if (!q && !category) {
+    const noFilterLayer =
+      !q &&
+      !category &&
+      !filtersActive &&
+      // initialFilters provided (or DEFAULT_FILTERS) — if filters
+      // currently equal what SSR was rendered with we can reuse
+      // initialPlaces. With filtersActive=false this is the
+      // default-no-filter state, so always safe.
+      true
+    if (noFilterLayer) {
       setPlaces(initialPlaces)
       return
     }
@@ -78,6 +117,9 @@ export default function DirectoryClient({
     if (isReadOnly && browseNeighborhood?.id) {
       params.set('neighborhood', browseNeighborhood.id)
     }
+    // Pro filters
+    const filterParams = serializeDirectoryFilters(filters)
+    for (const [k, v] of Object.entries(filterParams)) params.set(k, v)
     fetch(`/api/directory?${params.toString()}`)
       .then((r) => r.json())
       .then((d) => {
@@ -87,7 +129,7 @@ export default function DirectoryClient({
       .catch(() => {})
       .finally(() => { if (!aborted) setLoading(false) })
     return () => { aborted = true }
-  }, [q, category, initialPlaces, isReadOnly, browseNeighborhood?.id])
+  }, [q, category, filters, filtersActive, initialPlaces, isReadOnly, browseNeighborhood?.id])
 
   const empty = !loading && places.length === 0
   const headerTitle =
@@ -152,6 +194,54 @@ export default function DirectoryClient({
           <CategoryChips selected={category} onSelect={setCategory} />
         </div>
 
+        {/* Pro filter pill + active-filter chips. Pill opens the
+            sheet. Each active chip is removable via its X — clears
+            just that single filter without touching the others. */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setFilterOpen(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+              filtersActive
+                ? 'bg-primary-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+            }`}
+          >
+            <FiSliders className="w-3.5 h-3.5" />
+            {tr('Filter', 'تصفية', 'فلٹر')}
+          </button>
+          {filters.minRating !== null && (
+            <ActiveChip
+              label={`★${filters.minRating}+`}
+              onClear={() => setFilters((f) => ({ ...f, minRating: null }))}
+            />
+          )}
+          {filters.openNow && (
+            <ActiveChip
+              label={tr('Open now', 'مفتوح الآن', 'ابھی کھلا')}
+              onClear={() => setFilters((f) => ({ ...f, openNow: false }))}
+            />
+          )}
+          {filters.verifiedOnly && (
+            <ActiveChip
+              label={tr('Verified', 'موثّق', 'تصدیق شدہ')}
+              onClear={() => setFilters((f) => ({ ...f, verifiedOnly: false }))}
+            />
+          )}
+          {filters.hasPhotos && (
+            <ActiveChip
+              label={tr('Photos', 'صور', 'تصاویر')}
+              onClear={() => setFilters((f) => ({ ...f, hasPhotos: false }))}
+            />
+          )}
+          {filters.sort !== 'newest' && (
+            <ActiveChip
+              label={sortLabel(filters.sort, lang)}
+              onClear={() => setFilters((f) => ({ ...f, sort: 'newest' }))}
+            />
+          )}
+        </div>
+
         {loading && (
           <p className="text-center text-xs text-gray-400 py-2">
             {lang === 'en' ? 'Loading…' : 'جاري التحميل…'}
@@ -193,6 +283,39 @@ export default function DirectoryClient({
       {!isReadOnly && (
         <ContextualGuide guideId="directory" steps={DIRECTORY_GUIDE_STEPS} />
       )}
+      <DirectoryFilterSheet
+        open={filterOpen}
+        initial={filters}
+        onClose={() => setFilterOpen(false)}
+        onApply={(next) => setFilters(next)}
+      />
     </main>
   )
+}
+
+function ActiveChip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 text-[11px] font-semibold border border-primary-200 dark:border-primary-800">
+      {label}
+      <button
+        type="button"
+        onClick={onClear}
+        aria-label="إزالة"
+        className="-me-1 w-4 h-4 rounded-full flex items-center justify-center active:bg-primary-100 dark:active:bg-primary-900/50"
+      >
+        <FiX className="w-3 h-3" />
+      </button>
+    </span>
+  )
+}
+
+function sortLabel(s: DirectorySort, lang: string): string {
+  const map: Record<DirectorySort, [en: string, ar: string, ur: string]> = {
+    top:      ['Top rated',     'الأعلى تقييماً', 'سب سے اعلیٰ'],
+    reviewed: ['Most reviewed', 'الأكثر مراجعات', 'سب سے زیادہ جائزے'],
+    newest:   ['Newest',        'الأحدث',         'تازہ ترین'],
+    alpha:    ['A→Z',           'أبجدي',          'حروف تہجی'],
+  }
+  const [en, ar, ur] = map[s]
+  return lang === 'en' ? en : lang === 'ur' ? ur : ar
 }

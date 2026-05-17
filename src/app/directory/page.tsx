@@ -3,7 +3,12 @@ import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { ssrPublicGateOrNotFound } from '@/lib/places/ssrGate'
 import { toPublicPlace } from '@/lib/places/serialize'
-import { PUBLIC_PLACE_STATUSES } from '@/lib/places/statusBadge'
+import {
+  parseDirectoryFilters,
+  buildDirectoryWhere,
+  buildDirectoryOrderBy,
+  applyOpenNowFilter,
+} from '@/lib/places/directoryFilters'
 import DirectoryClient from './DirectoryClient'
 
 export const dynamic = 'force-dynamic'
@@ -19,7 +24,7 @@ export const dynamic = 'force-dynamic'
 export default async function DirectoryPage({
   searchParams,
 }: {
-  searchParams: { neighborhood?: string }
+  searchParams: { [key: string]: string | string[] | undefined }
 }) {
   const session = await getSession()
   if (!session) redirect('/login')
@@ -35,13 +40,20 @@ export default async function DirectoryPage({
   if (!user.neighborhoodId) redirect('/onboarding')
 
   // Browse-mode resolution — identical shape to /feed's SSR.
-  const browseNeighborhoodId = searchParams?.neighborhood
+  const rawBrowse = searchParams?.neighborhood
+  const browseNeighborhoodId =
+    typeof rawBrowse === 'string' ? rawBrowse : undefined
   const isReadOnly = !!(
     browseNeighborhoodId && browseNeighborhoodId !== user.neighborhoodId
   )
   const activeNeighborhoodId = isReadOnly
     ? browseNeighborhoodId!
     : user.neighborhoodId!
+
+  // Pro-filter knobs from URL — applied to the SSR slice so first
+  // paint already reflects ?minRating / ?openNow / ?sort / etc.
+  const filters = parseDirectoryFilters(searchParams)
+  const filterWhere = buildDirectoryWhere(filters)
 
   // When browsing another nbhd, fetch its display name so the
   // banner can say WHICH neighborhood the user is viewing.
@@ -57,25 +69,33 @@ export default async function DirectoryPage({
     if (!browseNeighborhood) redirect('/directory')
   }
 
-  const places = await db.placeListing.findMany({
+  // Overfetch when openNow is active — the JS-side filter trims
+  // some rows after the DB returns, so a 3x window keeps the page
+  // looking full when most rows happen to be closed right now.
+  const dbTake = filters.openNow ? 90 : 30
+  const rows = await db.placeListing.findMany({
     where: {
       neighborhoodId: activeNeighborhoodId,
-      status: { in: PUBLIC_PLACE_STATUSES },
+      // filterWhere supplies status (tighter when verifiedOnly,
+      // PUBLIC_PLACE_STATUSES otherwise).
+      ...filterWhere,
     },
-    orderBy: [{ status: 'desc' }, { createdAt: 'desc' }],
-    take: 30,
+    orderBy: buildDirectoryOrderBy(filters),
+    take: dbTake,
     include: {
       claimedByUser: {
         select: { id: true, name: true, avatarUrl: true, providerStatus: true },
       },
     },
   })
+  const places = applyOpenNowFilter(rows, filters).slice(0, 30)
 
   return (
     <DirectoryClient
       initialPlaces={places.map(toPublicPlace)}
       isReadOnly={isReadOnly}
       browseNeighborhood={browseNeighborhood}
+      initialFilters={filters}
     />
   )
 }

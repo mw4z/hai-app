@@ -1,0 +1,242 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { FiX } from 'react-icons/fi'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { useLanguage } from '@/hooks/useLanguage'
+import type { DirectoryFilters, DirectorySort } from '@/lib/places/directoryFilters'
+
+/**
+ * Bottom sheet that edits a DirectoryFilters value. Local
+ * staging — changes only fire onApply after the user taps
+ * "تطبيق"; the parent caller decides whether to push them
+ * to the URL or just to local state. "إعادة تعيين" inside
+ * the sheet sets all knobs to the unfiltered defaults
+ * without closing it, so the user can tweak and re-apply
+ * without two round trips.
+ */
+
+interface Props {
+  open: boolean
+  initial: DirectoryFilters
+  onClose: () => void
+  onApply: (next: DirectoryFilters) => void
+}
+
+const RATING_PRESETS: Array<{ value: number | null; labelAr: string; labelEn: string }> = [
+  { value: null, labelAr: 'الكل', labelEn: 'All' },
+  { value: 3,   labelAr: '★3+',   labelEn: '★3+' },
+  { value: 4,   labelAr: '★4+',   labelEn: '★4+' },
+  { value: 4.5, labelAr: '★4.5+', labelEn: '★4.5+' },
+]
+
+const SORT_OPTIONS: Array<{ value: DirectorySort; ar: string; en: string; ur: string }> = [
+  { value: 'top',      ar: 'الأعلى تقييماً', en: 'Top rated',     ur: 'سب سے اعلیٰ' },
+  { value: 'reviewed', ar: 'الأكثر مراجعات', en: 'Most reviewed', ur: 'سب سے زیادہ جائزے' },
+  { value: 'newest',   ar: 'الأحدث',         en: 'Newest',        ur: 'تازہ ترین' },
+  { value: 'alpha',    ar: 'أبجدي',          en: 'A → Z',         ur: 'حروف تہجی' },
+]
+
+const DEFAULT_FILTERS: DirectoryFilters = {
+  minRating: null,
+  openNow: false,
+  verifiedOnly: false,
+  hasPhotos: false,
+  sort: 'newest',
+}
+
+export default function DirectoryFilterSheet({ open, initial, onClose, onApply }: Props) {
+  const { lang } = useLanguage()
+  const tr = (en: string, ar: string, ur: string) =>
+    lang === 'en' ? en : lang === 'ur' ? ur : ar
+
+  const [draft, setDraft] = useState<DirectoryFilters>(initial)
+
+  // Reset local staging to the incoming filters every time the
+  // sheet opens, so a dismissed-without-apply session doesn't
+  // bleed into the next open.
+  useEffect(() => {
+    if (open) setDraft(initial)
+  }, [open, initial])
+
+  useBodyScrollLock(open)
+
+  if (!open) return null
+  if (typeof document === 'undefined' || !document.body) return null
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[70] bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div
+        className="bg-white dark:bg-gray-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[88vh] overflow-y-auto"
+        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+      >
+        {/* Header */}
+        <div className="sticky top-0 bg-white dark:bg-gray-900 px-5 pt-5 pb-3 flex items-center justify-between border-b border-gray-100 dark:border-gray-800">
+          <h2 className="text-base font-bold text-gray-900 dark:text-white">
+            {tr('Filter directory', 'تصفية الدليل', 'ڈائریکٹری فلٹر')}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={tr('Close', 'إغلاق', 'بند کریں')}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 active:bg-gray-100 dark:active:bg-gray-800"
+          >
+            <FiX className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-5">
+          {/* Minimum rating */}
+          <section>
+            <h3 className="text-[12px] font-bold text-gray-700 dark:text-gray-200 mb-2">
+              {tr('Minimum rating', 'الحد الأدنى للتقييم', 'کم از کم درجہ بندی')}
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {RATING_PRESETS.map((p) => {
+                const active = (draft.minRating ?? null) === p.value
+                return (
+                  <button
+                    key={String(p.value)}
+                    type="button"
+                    onClick={() => setDraft((d) => ({ ...d, minRating: p.value }))}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                      active
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                    }`}
+                  >
+                    {lang === 'en' ? p.labelEn : p.labelAr}
+                  </button>
+                )
+              })}
+            </div>
+            {draft.minRating !== null && (
+              <p className="text-[10.5px] text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">
+                {tr(
+                  'Places with at least 3 reviews so a single vote can’t game the filter.',
+                  'الأماكن التي حصلت على ٣ تقييمات على الأقل، لمنع تأثير صوت واحد.',
+                  'کم از کم 3 جائزوں والی جگہیں — ایک ووٹ سے بچاؤ۔',
+                )}
+              </p>
+            )}
+          </section>
+
+          {/* Toggles */}
+          <section className="space-y-2.5">
+            <ToggleRow
+              label={tr('Open now', 'مفتوح الآن', 'ابھی کھلا')}
+              checked={draft.openNow}
+              onChange={(v) => setDraft((d) => ({ ...d, openNow: v }))}
+            />
+            <ToggleRow
+              label={tr('Verified only', 'موثّق فقط', 'صرف تصدیق شدہ')}
+              checked={draft.verifiedOnly}
+              onChange={(v) => setDraft((d) => ({ ...d, verifiedOnly: v }))}
+            />
+            <ToggleRow
+              label={tr('Has photos', 'يحتوي صور', 'تصاویر والی')}
+              checked={draft.hasPhotos}
+              onChange={(v) => setDraft((d) => ({ ...d, hasPhotos: v }))}
+            />
+          </section>
+
+          {/* Sort */}
+          <section>
+            <h3 className="text-[12px] font-bold text-gray-700 dark:text-gray-200 mb-2">
+              {tr('Sort', 'الترتيب', 'ترتیب')}
+            </h3>
+            <div className="space-y-1.5">
+              {SORT_OPTIONS.map((s) => {
+                const active = draft.sort === s.value
+                return (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() => setDraft((d) => ({ ...d, sort: s.value }))}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                      active
+                        ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800'
+                        : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-transparent'
+                    }`}
+                  >
+                    <span>{lang === 'en' ? s.en : lang === 'ur' ? s.ur : s.ar}</span>
+                    <span
+                      className={`w-4 h-4 rounded-full border-2 ${
+                        active
+                          ? 'border-primary-600 bg-primary-600'
+                          : 'border-gray-300 dark:border-gray-600'
+                      }`}
+                      aria-hidden
+                    >
+                      {active && (
+                        <span className="block w-1.5 h-1.5 rounded-full bg-white m-auto mt-[3px]" />
+                      )}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        </div>
+
+        {/* Footer actions */}
+        <div className="sticky bottom-0 bg-white dark:bg-gray-900 px-5 py-3 border-t border-gray-100 dark:border-gray-800 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setDraft(DEFAULT_FILTERS)}
+            className="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-semibold active:scale-95 transition-transform"
+          >
+            {tr('Reset', 'إعادة تعيين', 'دوبارہ ترتیب')}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onApply(draft)
+              onClose()
+            }}
+            className="flex-1 py-3 rounded-xl bg-primary-600 text-white text-sm font-bold active:scale-95 transition-transform"
+          >
+            {tr('Apply', 'تطبيق', 'لاگو کریں')}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function ToggleRow({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string
+  checked: boolean
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <label className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 cursor-pointer">
+      <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{label}</span>
+      <span
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+          checked ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+            checked ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0.5 rtl:-translate-x-0.5'
+          }`}
+        />
+      </span>
+    </label>
+  )
+}

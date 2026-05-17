@@ -7,6 +7,12 @@ import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { validatePlaceInput, placeLimitForUser, PLACE_LIMIT_WINDOW_MS, sanitizeImageUrls } from '@/lib/places/validation'
 import { toPublicPlace } from '@/lib/places/serialize'
 import { PUBLIC_PLACE_STATUSES } from '@/lib/places/statusBadge'
+import {
+  parseDirectoryFilters,
+  buildDirectoryWhere,
+  buildDirectoryOrderBy,
+  applyOpenNowFilter,
+} from '@/lib/places/directoryFilters'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,9 +68,16 @@ export async function GET(req: NextRequest) {
 
   const q = (url.searchParams.get('q') || '').trim().slice(0, 80)
 
+  // Pro-filter knobs: minRating, openNow, verifiedOnly, hasPhotos,
+  // sort. All optional; defaults preserve legacy behaviour
+  // (status DESC, createdAt DESC, PUBLIC_PLACE_STATUSES, no extras).
+  const filters = parseDirectoryFilters(url.searchParams)
+  const filterWhere = buildDirectoryWhere(filters)
+
   const where: Prisma.PlaceListingWhereInput = {
     neighborhoodId: targetNeighborhoodId,
-    status: { in: PUBLIC_PLACE_STATUSES },
+    // filterWhere supplies status (tighter when verifiedOnly).
+    ...filterWhere,
     ...(category ? { category } : {}),
     ...(q
       ? {
@@ -76,15 +89,14 @@ export async function GET(req: NextRequest) {
       : {}),
   }
 
-  const places = await db.placeListing.findMany({
+  // openNow is post-filtered in JS (parser-driven). Overfetch a bit
+  // when it's active so a normal-sized page survives the trim.
+  const dbTake = filters.openNow ? PAGE_SIZE * 3 : PAGE_SIZE
+
+  const rows = await db.placeListing.findMany({
     where,
-    orderBy: [
-      // Pin claimed and mod-verified places to the top so directory
-      // browsers see the higher-confidence rows first.
-      { status: 'desc' },
-      { createdAt: 'desc' },
-    ],
-    take: PAGE_SIZE,
+    orderBy: buildDirectoryOrderBy(filters),
+    take: dbTake,
     include: {
       claimedByUser: {
         select: { id: true, name: true, avatarUrl: true, providerStatus: true },
@@ -92,7 +104,9 @@ export async function GET(req: NextRequest) {
     },
   })
 
-  return NextResponse.json({ places: places.map(toPublicPlace) })
+  const filtered = applyOpenNowFilter(rows, filters).slice(0, PAGE_SIZE)
+
+  return NextResponse.json({ places: filtered.map(toPublicPlace) })
 }
 
 /**
