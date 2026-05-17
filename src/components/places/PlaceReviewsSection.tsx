@@ -7,6 +7,7 @@ import StarRating from './StarRating'
 import PlaceReviewSheet from './PlaceReviewSheet'
 import PlaceOwnerReplySheet from './PlaceOwnerReplySheet'
 import { useConfirm } from '@/components/ConfirmProvider'
+import HaiLoader from '@/components/HaiLoader'
 
 /**
  * Review section rendered inside the place detail page. Three
@@ -309,9 +310,9 @@ export default function PlaceReviewsSection({
       )}
 
       {loading && reviews.length === 0 && (
-        <p className="text-center text-[12px] text-gray-400 py-4">
-          جاري التحميل…
-        </p>
+        <div className="py-4">
+          <HaiLoader size="md" />
+        </div>
       )}
 
       {!loading && reviews.length === 0 && (

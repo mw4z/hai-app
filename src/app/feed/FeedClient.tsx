@@ -884,7 +884,11 @@ export default function FeedClient({
                 disabled={loadingMore}
                 className="w-full py-3 text-sm text-primary-600 font-medium bg-white rounded-2xl border border-gray-100 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
-                {loadingMore ? t('common_loading') : t('feed_load_more')}
+                {loadingMore ? (
+                  <span className="inline-flex items-center justify-center"><HaiSpinner /></span>
+                ) : (
+                  t('feed_load_more')
+                )}
               </button>
             )}
           </>

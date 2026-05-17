@@ -3463,7 +3463,7 @@ function RepSection({ userId, reputation, lang, t }: { userId: string; reputatio
         {lang === 'en' ? 'Your recent activity' : lang === 'ur' ? 'آپ کی حالیہ سرگرمی' : 'آخر نشاطك'}
       </p>
       {!loaded ? (
-        <p className="text-xs text-gray-300">{t('common_loading')}</p>
+        <div className="py-3"><HaiLoader size="sm" /></div>
       ) : grouped.length === 0 ? (
         <p className="text-xs text-gray-400 py-2">{lang === 'en' ? 'No activity yet' : lang === 'ur' ? 'ابھی کوئی سرگرمی نہیں' : 'لا يوجد نشاط بعد'}</p>
       ) : (

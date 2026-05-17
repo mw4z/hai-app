@@ -7,6 +7,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { getCategoryMeta } from '@/lib/places/categories'
 import PlaceStatusBadge from '@/components/places/PlaceStatusBadge'
+import HaiLoader from '@/components/HaiLoader'
 
 /**
  * Bottom sheet for picking a directory place to attach to a post,
@@ -172,9 +173,9 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
         {/* Result list */}
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {loading && results === null && (
-            <p className="text-center text-xs text-gray-400 py-8">
-              {tr('Loading…', 'جاري التحميل…', 'لوڈ ہو رہا ہے…')}
-            </p>
+            <div className="py-8">
+              <HaiLoader size="md" />
+            </div>
           )}
           {results !== null && results.length === 0 && !loading && (
             <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-10">

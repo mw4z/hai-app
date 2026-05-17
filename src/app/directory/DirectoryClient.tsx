@@ -11,6 +11,7 @@ import CategoryChips from '@/components/places/CategoryChips'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
 import ContextualGuide from '@/components/ContextualGuide'
 import DirectoryFilterSheet from '@/components/places/DirectoryFilterSheet'
+import HaiLoader from '@/components/HaiLoader'
 import {
   type DirectoryFilters,
   type DirectorySort,
@@ -103,7 +104,12 @@ export default function DirectoryClient({
       // default-no-filter state, so always safe.
       true
     if (noFilterLayer) {
+      // Cleared the search / dropped every filter: snap back to the
+      // SSR slice and force-clear the loading flag in case a prior
+      // fetch left it stuck on `true` (this branch returns without
+      // a finally, so the spinner would otherwise linger forever).
       setPlaces(initialPlaces)
+      setLoading(false)
       return
     }
     let aborted = false
@@ -252,9 +258,9 @@ export default function DirectoryClient({
         )}
 
         {loading && (
-          <p className="text-center text-xs text-gray-400 py-2">
-            {lang === 'en' ? 'Loading…' : 'جاري التحميل…'}
-          </p>
+          <div className="py-2">
+            <HaiLoader size="md" />
+          </div>
         )}
 
         {empty ? (

@@ -8,6 +8,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import { FiArrowRight, FiArrowLeft, FiAlertTriangle, FiEyeOff, FiUserX, FiActivity, FiFileText } from 'react-icons/fi'
 import { useConfirm, usePrompt } from '@/components/ConfirmProvider'
 import EmergencyCreator from '@/components/EmergencyCreator'
+import HaiLoader from '@/components/HaiLoader'
 
 const ACTION_LABELS: Record<string, { ar: string; en: string }> = {
   hide_post: { ar: 'إخفاء منشور', en: 'Hide post' },
@@ -461,7 +462,7 @@ export default function ModDashboard({ data }: Props) {
             for context but never reaches the resulting PollCard. */}
         {tab === 'poll_requests' && (
           pollRequests === null ? (
-            <EmptyState icon="⏳" text={dn('جاري التحميل…', 'Loading…')} />
+            <div className="py-8"><HaiLoader size="md" /></div>
           ) : pollRequests.length === 0 ? (
             <EmptyState icon="🗳️" text={dn('لا يوجد اقتراحات استفتاء', 'No pending poll suggestions')} />
           ) : (
