@@ -133,8 +133,14 @@ export async function POST(
       },
     })
     if (shouldHide) {
-      // Auto-hidden review drops out of the VISIBLE-only
-      // aggregate; recalc inside the same txn.
+      // Threshold auto-hide: drop the review from VISIBLE-only
+      // aggregate AND mark every PENDING report as ACTION_TAKEN
+      // so they leave the mod queue. resolvedById is null here
+      // because there's no acting moderator — the system did it.
+      await tx.placeReviewReport.updateMany({
+        where: { reviewId: review.id, status: 'PENDING' },
+        data: { status: 'ACTION_TAKEN', resolvedAt: new Date() },
+      })
       await recalcPlaceRating(review.placeId, tx)
     }
   })

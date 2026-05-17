@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -10,6 +10,7 @@ import { getCategoryMeta } from '@/lib/places/categories'
 import type { ModPlace } from '@/lib/places/serialize'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
 import { buildWhatsAppHref } from '@/lib/phone'
+import { usePrompt } from '@/components/ConfirmProvider'
 
 interface PendingClaim {
   id: string
@@ -28,15 +29,40 @@ interface RecentReport {
   place: { id: string; name: string; category: PlaceCategory; status: string }
 }
 
+interface ReviewReportGroup {
+  review: {
+    id: string
+    rating: number
+    bodyExcerpt: string | null
+    createdAt: string
+    reportCount: number
+    author: { id: string; name: string | null; avatarUrl: string | null; providerStatus: string }
+    place: { id: string; name: string; category: PlaceCategory; status: string }
+  }
+  reporterCount: number
+  reports: {
+    id: string
+    reason: string
+    details: string | null
+    createdAt: string
+    reporter: { id: string; name: string | null; avatarUrl: string | null }
+  }[]
+  reasonsSummary: { reason: string; count: number }[]
+  firstReportAt: string
+  latestReportAt: string
+  currentUserHasReported: boolean
+}
+
 interface Props {
   data: {
     pendingPlaces: ModPlace[]
     pendingClaims: PendingClaim[]
     recentReports: RecentReport[]
+    reviewReportGroups: ReviewReportGroup[]
   }
 }
 
-type Tab = 'places' | 'claims' | 'reports'
+type Tab = 'places' | 'claims' | 'reports' | 'review-reports'
 
 export default function ModDirectoryClient({ data }: Props) {
   const { lang } = useLanguage()
@@ -46,6 +72,7 @@ export default function ModDirectoryClient({ data }: Props) {
   const [tab, setTab] = useState<Tab>('places')
   const [pendingPlaces, setPendingPlaces] = useState(data.pendingPlaces)
   const [pendingClaims, setPendingClaims] = useState(data.pendingClaims)
+  const [reviewReportGroups, setReviewReportGroups] = useState(data.reviewReportGroups)
 
   return (
     <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -59,6 +86,7 @@ export default function ModDirectoryClient({ data }: Props) {
           <TabBtn active={tab === 'places'}  onClick={() => setTab('places')}  label={tr('Pending places', 'طلبات الدليل', 'زیر التواء جگہیں')}  count={pendingPlaces.length} />
           <TabBtn active={tab === 'claims'}  onClick={() => setTab('claims')}  label={tr('Pending claims', 'طلبات الإدارة', 'انتظامی دعوے')} count={pendingClaims.length} />
           <TabBtn active={tab === 'reports'} onClick={() => setTab('reports')} label={tr('Place reports', 'بلاغات الأماكن', 'جگہ کی شکایات')} count={data.recentReports.length} />
+          <TabBtn active={tab === 'review-reports'} onClick={() => setTab('review-reports')} label={tr('Review reports', 'بلاغات التقييمات', 'جائزہ شکایات')} count={reviewReportGroups.length} />
         </div>
 
         {tab === 'places' && (
@@ -95,6 +123,16 @@ export default function ModDirectoryClient({ data }: Props) {
               ? <Empty label={tr('No recent reports.', 'لا توجد بلاغات.', 'کوئی شکایت نہیں۔')} />
               : data.recentReports.map((r) => <ReportRow key={r.id} report={r} />)}
           </div>
+        )}
+
+        {tab === 'review-reports' && (
+          <ReviewReportsTab
+            groups={reviewReportGroups}
+            onResolve={(reviewId) =>
+              setReviewReportGroups((prev) => prev.filter((g) => g.review.id !== reviewId))
+            }
+            onRefresh={(next) => setReviewReportGroups(next)}
+          />
         )}
       </div>
     </main>
@@ -371,6 +409,218 @@ function ClaimRow({ claim, onResolve }: { claim: PendingClaim; onResolve: (id: s
           className="px-3 py-2 rounded-xl bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 text-xs font-semibold disabled:opacity-50"
         >
           {tr('Reject', 'رفض', 'مسترد')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const REASON_LABELS: Record<string, [ar: string, en: string]> = {
+  WRONG_CATEGORY:  ['تصنيف خاطئ', 'Wrong category'],
+  SPAM:            ['إعلان/سبام', 'Spam'],
+  INAPPROPRIATE:   ['محتوى غير لائق', 'Inappropriate'],
+  SCAM:            ['احتيال', 'Scam'],
+  NOT_NEIGHBORHOOD:['ليس من الحي', 'Not from neighborhood'],
+  OFFENSIVE:       ['مسيء', 'Offensive'],
+  OTHER:           ['أخرى', 'Other'],
+}
+
+/**
+ * "بلاغات التقييمات" tab. On mount, re-fetches the grouped pending
+ * report list so the SSR snapshot stays fresh after the user
+ * switches tabs back. Each card lets a mod hide the review or
+ * bulk-dismiss all pending reports against it.
+ */
+function ReviewReportsTab({
+  groups,
+  onResolve,
+  onRefresh,
+}: {
+  groups: ReviewReportGroup[]
+  onResolve: (reviewId: string) => void
+  onRefresh: (next: ReviewReportGroup[]) => void
+}) {
+  const { lang } = useLanguage()
+  const tr = (en: string, ar: string, ur: string) =>
+    lang === 'en' ? en : lang === 'ur' ? ur : ar
+
+  // Refetch the queue on mount so a mod who tabs away + back doesn't
+  // act on stale rows. SSR seeds the first paint; this just keeps
+  // it honest.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/mod/directory/reviews/reports', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled) return
+        if (d && Array.isArray(d.groups)) onRefresh(d.groups as ReviewReportGroup[])
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  if (groups.length === 0) {
+    return <Empty label={tr('No review reports.', 'لا توجد بلاغات تقييمات.', 'کوئی جائزہ شکایت نہیں۔')} />
+  }
+  return (
+    <div className="space-y-3">
+      {groups.map((g) => (
+        <ReviewReportRow key={g.review.id} group={g} onResolve={onResolve} />
+      ))}
+    </div>
+  )
+}
+
+function ReviewReportRow({
+  group,
+  onResolve,
+}: {
+  group: ReviewReportGroup
+  onResolve: (reviewId: string) => void
+}) {
+  const { lang } = useLanguage()
+  const tr = (en: string, ar: string, ur: string) => (lang === 'en' ? en : lang === 'ur' ? ur : ar)
+  const cat = getCategoryMeta(group.review.place.category)
+  const prompt = usePrompt()
+  const [busy, setBusy] = useState(false)
+
+  async function act(kind: 'hide' | 'dismiss') {
+    if (busy) return
+    const reason = await prompt({
+      title:
+        kind === 'hide'
+          ? tr('Hide review', 'إخفاء التقييم', 'جائزہ چھپائیں')
+          : tr('Dismiss reports', 'تجاهل البلاغات', 'شکایات مسترد کریں'),
+      message:
+        kind === 'hide'
+          ? tr(
+              'Reason for hiding this review (3–300 chars). Reviewer will be notified.',
+              'سبب الإخفاء (٣–٣٠٠ حرف). سيتم إخطار صاحب التقييم.',
+              'چھپانے کی وجہ (3-300 حروف). جائزہ نگار کو اطلاع دی جائے گی۔',
+            )
+          : tr(
+              'Why dismiss all reports on this review? (3–300 chars)',
+              'سبب رفض البلاغات على هذا التقييم؟ (٣–٣٠٠ حرف)',
+              'اس جائزے کی شکایات کیوں مسترد ہوں؟ (3-300 حروف)',
+            ),
+      placeholder: tr('Reason', 'السبب', 'وجہ'),
+      multiline: true,
+      confirmText:
+        kind === 'hide'
+          ? tr('Hide review', 'إخفاء', 'چھپائیں')
+          : tr('Dismiss all', 'تجاهل الكل', 'سب مسترد کریں'),
+    })
+    if (!reason || reason.trim().length < 3 || reason.trim().length > 300) return
+    setBusy(true)
+    try {
+      const url =
+        kind === 'hide'
+          ? `/api/mod/directory/reviews/${group.review.id}/hide`
+          : `/api/mod/directory/reviews/${group.review.id}/reports/dismiss`
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason.trim() }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(d?.error || 'فشل'); return }
+      toast.success(
+        kind === 'hide'
+          ? tr('Review hidden', 'تم إخفاء التقييم', 'جائزہ چھپا دیا')
+          : tr('Reports dismissed', 'تم تجاهل البلاغات', 'شکایات مسترد ہوئیں'),
+      )
+      onResolve(group.review.id)
+    } finally { setBusy(false) }
+  }
+
+  const stars = '★'.repeat(group.review.rating) + '☆'.repeat(5 - group.review.rating)
+  const placeIsHidden = group.review.place.status !== 'APPROVED'
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-3.5 space-y-3">
+      {/* Place + rating header */}
+      <div className="flex items-start gap-3">
+        <span className="text-2xl flex-shrink-0">{cat.emoji}</span>
+        <div className="flex-1 min-w-0">
+          <Link
+            href={`/directory/${group.review.place.id}`}
+            className="text-sm font-bold text-gray-900 dark:text-white hover:underline"
+          >
+            {group.review.place.name}
+          </Link>
+          <p className="text-xs text-amber-500" aria-label={`${group.review.rating} / 5`}>
+            {stars}
+            <span className="ms-1 text-gray-500 dark:text-gray-400">
+              {group.review.rating} / 5
+            </span>
+          </p>
+          {placeIsHidden && (
+            <p className="text-[10px] text-amber-600 dark:text-amber-400">
+              {tr('Place not approved', 'المكان غير موافق عليه', 'جگہ منظور نہیں')}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <span className="px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 text-[10px] font-bold">
+            {group.reporterCount}{' '}
+            {group.reporterCount === 1
+              ? tr('report', 'بلاغ', 'شکایت')
+              : tr('reports', 'بلاغات', 'شکایات')}
+          </span>
+          {group.currentUserHasReported && (
+            <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-[10px] font-semibold">
+              {tr('You reported', 'بلّغت', 'آپ نے رپورٹ کی')}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Review body excerpt */}
+      {group.review.bodyExcerpt && (
+        <p className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-line leading-relaxed border-s-2 border-gray-200 dark:border-gray-700 ps-2.5">
+          {group.review.bodyExcerpt}
+        </p>
+      )}
+
+      {/* Author + reasons summary */}
+      <div className="text-[11px] text-gray-500 dark:text-gray-400 space-y-1">
+        <p>
+          {tr('Reviewer:', 'صاحب التقييم:', 'جائزہ نگار:')} {group.review.author.name ?? '—'}
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {group.reasonsSummary.map((r) => {
+            const [ar, en] = REASON_LABELS[r.reason] ?? [r.reason, r.reason]
+            return (
+              <span
+                key={r.reason}
+                className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-900/40 text-[10px] font-semibold text-gray-700 dark:text-gray-300"
+              >
+                {lang === 'en' ? en : ar}
+                {r.count > 1 ? ` ×${r.count}` : ''}
+              </span>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={() => act('hide')}
+          disabled={busy}
+          className="flex-1 py-2 rounded-xl bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 text-xs font-semibold disabled:opacity-50"
+        >
+          {tr('Hide review', 'إخفاء التقييم', 'جائزہ چھپائیں')}
+        </button>
+        <button
+          type="button"
+          onClick={() => act('dismiss')}
+          disabled={busy}
+          className="flex-1 py-2 rounded-xl bg-gray-100 dark:bg-gray-900/40 text-gray-700 dark:text-gray-300 text-xs font-semibold disabled:opacity-50"
+        >
+          {tr('Dismiss all', 'تجاهل الكل', 'سب مسترد')}
         </button>
       </div>
     </div>

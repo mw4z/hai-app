@@ -87,6 +87,18 @@ export async function POST(req: NextRequest, { params }: { params: { reviewId: s
       where: { id: review.id },
       data: { status: 'HIDDEN_BY_MOD' },
     })
+    // Resolve every PENDING report for this review — they
+    // were the trigger / signal; now that the review is
+    // hidden they leave the mod queue with status=ACTION_TAKEN
+    // and a snapshot of who acted + when.
+    await tx.placeReviewReport.updateMany({
+      where: { reviewId: review.id, status: 'PENDING' },
+      data: {
+        status: 'ACTION_TAKEN',
+        resolvedAt: new Date(),
+        resolvedById: user.id,
+      },
+    })
     await recalcPlaceRating(review.place.id, tx)
   })
 

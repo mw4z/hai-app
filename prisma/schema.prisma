@@ -185,7 +185,8 @@ model User {
   placeReportsFiled     PlaceReport[]       @relation("PlaceReportsFiled")
   placeReviewsAuthored  PlaceReview[]       @relation("PlaceReviewsAuthored")
   placeReviewsReplied   PlaceReview[]       @relation("PlaceReviewsReplied")
-  placeReviewReportsFiled PlaceReviewReport[] @relation("PlaceReviewReporter")
+  placeReviewReportsFiled    PlaceReviewReport[] @relation("PlaceReviewReporter")
+  placeReviewReportsResolved PlaceReviewReport[] @relation("PlaceReviewReportResolver")
 
   deletedAt        DateTime?     // soft delete — null = active, set = deleted
   createdAt        DateTime      @default(now())
@@ -1845,20 +1846,31 @@ model PlaceReview {
 // mods can later get a unified queue. Auto-hide threshold = 3
 // distinct reporters → status flips to HIDDEN_BY_MOD inside
 // the same txn as the latest report insert.
+//
+// Lifecycle: PENDING on insert. Mod dismiss → DISMISSED.
+// Mod hide-via-review (or auto-hide threshold trip) →
+// ACTION_TAKEN for every PENDING report on that review.
+// resolvedAt + resolvedById are the mod-action snapshot.
+// We never hard-delete reports — the row is the audit trail.
 model PlaceReviewReport {
-  id         String       @id @default(cuid())
-  reason     ReportReason
-  details    String?
-  reporter   User         @relation("PlaceReviewReporter", fields: [reporterId], references: [id])
-  reporterId String
-  review     PlaceReview  @relation(fields: [reviewId], references: [id])
-  reviewId   String
-  status     ReportStatus @default(PENDING)
-  createdAt  DateTime     @default(now())
+  id            String        @id @default(cuid())
+  reason        ReportReason
+  details       String?
+  reporter      User          @relation("PlaceReviewReporter", fields: [reporterId], references: [id])
+  reporterId    String
+  review        PlaceReview   @relation(fields: [reviewId], references: [id])
+  reviewId      String
+  status        ReportStatus  @default(PENDING)
+  resolvedAt    DateTime?
+  resolvedById  String?
+  resolvedBy    User?         @relation("PlaceReviewReportResolver", fields: [resolvedById], references: [id])
+  createdAt     DateTime      @default(now())
 
   // One report per (reporter, review). The API checks for an
   // existing row before insert so the user sees "أبلغت مسبقاً"
   // instead of a raw DB constraint error.
   @@unique([reporterId, reviewId])
   @@index([reviewId, status])
+  // Mod-dashboard query — pending reports ordered by recency.
+  @@index([status, createdAt])
 }

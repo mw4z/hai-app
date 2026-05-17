@@ -353,22 +353,22 @@ export default function PlaceReviewsSection({
                       {r.body}
                     </p>
                   )}
-                  {/* ⋯ kebab menu — replaces the flat row of
-                      tap-targets. Per-row state, only one menu
-                      open at a time, closes on outside-click /
-                      Escape / item-pick. */}
-                  <ReviewActionsMenu
-                    isMyRow={!!isMyRow}
-                    open={openMenuFor === r.id}
-                    onToggle={() => setOpenMenuFor((cur) => (cur === r.id ? null : r.id))}
-                    onClose={() => setOpenMenuFor(null)}
-                    rootRef={openMenuFor === r.id ? menuRootRef : undefined}
-                    onEdit={() => setReviewSheetOpen(true)}
-                    onDelete={deleteMine}
-                    onReport={() => reportReview(r.id)}
-                    onShare={() => shareReview(r)}
-                  />
                 </div>
+                {/* ⋯ kebab sits in the row's far corner — same row
+                    as the reviewer name + timestamp, not below the
+                    body. Per-row state, only one menu open at a
+                    time, closes on outside-click / Escape / pick. */}
+                <ReviewActionsMenu
+                  isMyRow={!!isMyRow}
+                  open={openMenuFor === r.id}
+                  onToggle={() => setOpenMenuFor((cur) => (cur === r.id ? null : r.id))}
+                  onClose={() => setOpenMenuFor(null)}
+                  rootRef={openMenuFor === r.id ? menuRootRef : undefined}
+                  onEdit={() => setReviewSheetOpen(true)}
+                  onDelete={deleteMine}
+                  onReport={() => reportReview(r.id)}
+                  onShare={() => shareReview(r)}
+                />
               </div>
 
               {/* Owner reply */}
@@ -481,13 +481,13 @@ function ReviewActionsMenu({
         { key: 'share',  label: 'مشاركة', tone: 'text-gray-700 dark:text-gray-200', onClick: onShare },
       ]
   return (
-    <div className="relative mt-1 inline-block">
+    <div className="relative inline-block flex-shrink-0">
       <button
         type="button"
         onClick={onToggle}
         aria-label="خيارات"
         aria-expanded={open}
-        className="w-7 h-7 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 active:bg-gray-200/60 dark:active:bg-gray-700/60 transition-colors"
+        className="w-8 h-8 -m-1 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 active:bg-gray-200/60 dark:active:bg-gray-700/60 transition-colors"
       >
         <FiMoreHorizontal className="w-4 h-4" />
       </button>
@@ -495,7 +495,7 @@ function ReviewActionsMenu({
         <ul
           ref={rootRef}
           role="menu"
-          className="absolute z-30 top-full mt-1 start-0 min-w-[140px] rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden"
+          className="absolute z-30 top-full mt-1 end-0 min-w-[140px] rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden"
         >
           {items.map((it) => (
             <li key={it.key}>
