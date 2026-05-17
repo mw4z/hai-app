@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { matchesArabic } from '@/lib/arabicNormalize'
 
 const ADMIN_ROLES = ['NEIGHBORHOOD_MOD', 'PLATFORM_MOD', 'SUPER_ADMIN']
 
@@ -45,11 +46,15 @@ export async function GET(req: NextRequest) {
     case 'all_posts': {
       const q = searchParams.get('q') || ''
       const statusFilter = searchParams.get('status') || ''
-      const posts = await db.post.findMany({
+      // Arabic-aware match: drop `q` from the DB query and post-
+      // filter in JS via matchesArabic so أحمد == احمد == آحمد.
+      // Overfetch when q is set so the post-filter has room to
+      // cut down to ~50 visible results.
+      const dbTake = q ? 500 : 50
+      const rows = await db.post.findMany({
         where: {
           ...nbhdFilter,
           ...womenOnlyFilter,
-          ...(q ? { OR: [{ title: { contains: q } }, { body: { contains: q } }] } : {}),
           ...(statusFilter ? { status: statusFilter as any } : {}),
         },
         include: {
@@ -57,8 +62,13 @@ export async function GET(req: NextRequest) {
           neighborhood: { select: { name: true } },
         },
         orderBy: { createdAt: 'desc' },
-        take: 50,
+        take: dbTake,
       })
+      const posts = q
+        ? rows
+            .filter((p) => matchesArabic(p.title, q) || matchesArabic(p.body, q))
+            .slice(0, 50)
+        : rows
       return NextResponse.json(posts)
     }
 
@@ -81,15 +91,30 @@ export async function GET(req: NextRequest) {
 
     case 'users': {
       const q = searchParams.get('q') || ''
-      const users = await db.user.findMany({
-        where: {
-          ...userNbhdFilter,
-          ...(q ? { OR: [{ name: { contains: q } }, { phone: { contains: q } }, { email: { contains: q } }] } : {}),
-        },
+      // Drop the DB-side q filter when q is set — Postgres ILIKE
+      // isn't Arabic-aware, so أحمد wouldn't match احمد at the DB
+      // layer. Instead overfetch (bounded by userNbhdFilter for
+      // NEIGHBORHOOD_MOD; capped to 500 for SUPER_ADMIN) and apply
+      // matchesArabic in JS. Trade: slightly more bytes off the
+      // wire for admin search; correctness for Arabic-name lookups.
+      const dbTake = q ? 500 : 50
+      const rows = await db.user.findMany({
+        where: { ...userNbhdFilter },
         select: { id: true, name: true, lastName: true, phone: true, email: true, role: true, status: true, neighborhoodId: true, reputation: true, accountType: true, providerStatus: true },
         orderBy: { createdAt: 'desc' },
-        take: 50,
+        take: dbTake,
       })
+      const users = q
+        ? rows
+            .filter(
+              (u) =>
+                (u.phone ?? '').includes(q) ||
+                (u.email ?? '').toLowerCase().includes(q.toLowerCase()) ||
+                matchesArabic(u.name, q) ||
+                matchesArabic(u.lastName, q),
+            )
+            .slice(0, 50)
+        : rows
       return NextResponse.json(users)
     }
 

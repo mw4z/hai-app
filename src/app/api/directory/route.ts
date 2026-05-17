@@ -13,6 +13,7 @@ import {
   buildDirectoryOrderBy,
   applyOpenNowFilter,
 } from '@/lib/places/directoryFilters'
+import { matchesArabic } from '@/lib/arabicNormalize'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,19 +80,20 @@ export async function GET(req: NextRequest) {
     // filterWhere supplies status (tighter when verifiedOnly).
     ...filterWhere,
     ...(category ? { category } : {}),
-    ...(q
-      ? {
-          OR: [
-            { name: { contains: q, mode: 'insensitive' } },
-            { addressText: { contains: q, mode: 'insensitive' } },
-          ],
-        }
-      : {}),
+    // NOTE: when `q` is set we deliberately DON'T constrain in
+    // Prisma — Postgres ILIKE doesn't know أحمد == احمد. Instead
+    // we overfetch a wider page and filter in JS via the
+    // arabicNormalize helper. Safe at directory scale (per-nbhd,
+    // bounded by category + status). If a directory ever grows past
+    // ~2k places per nbhd, move to a generated normalized column
+    // and reinstate the DB-side filter.
   }
 
-  // openNow is post-filtered in JS (parser-driven). Overfetch a bit
-  // when it's active so a normal-sized page survives the trim.
-  const dbTake = filters.openNow ? PAGE_SIZE * 3 : PAGE_SIZE
+  // openNow is post-filtered in JS (parser-driven). Same for `q`
+  // when set (Arabic-aware match). Overfetch when either is active
+  // so a normal-sized page survives the trim.
+  const needsPostFilter = filters.openNow || q.length > 0
+  const dbTake = needsPostFilter ? PAGE_SIZE * 10 : PAGE_SIZE
 
   const rows = await db.placeListing.findMany({
     where,
@@ -104,9 +106,16 @@ export async function GET(req: NextRequest) {
     },
   })
 
-  const filtered = applyOpenNowFilter(rows, filters).slice(0, PAGE_SIZE)
+  // q filter first (cheaper), then openNow, then slice.
+  let working = rows
+  if (q) {
+    working = working.filter(
+      (p) => matchesArabic(p.name, q) || matchesArabic(p.addressText, q),
+    )
+  }
+  working = applyOpenNowFilter(working, filters).slice(0, PAGE_SIZE)
 
-  return NextResponse.json({ places: filtered.map(toPublicPlace) })
+  return NextResponse.json({ places: working.map(toPublicPlace) })
 }
 
 /**
