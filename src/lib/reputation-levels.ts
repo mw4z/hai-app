@@ -146,7 +146,42 @@ export function getReportWeight(rep: number): number {
   }
 }
 
-/** @deprecated Use getReportWeight + REPORT_HIDE_THRESHOLD instead */
+/**
+ * Author-tier-aware HIDE threshold (weighted units) for posts.
+ *
+ *   weightedScore   = Σ getReportWeight(reporter.reputation) over distinct reporters
+ *   shouldHide      = weightedScore ≥ getAuthorHideThreshold(author.reputation)
+ *   shouldRemove    = weightedScore ≥ getAuthorRemoveThreshold(author.reputation)
+ *
+ * Calibrated so that at the floor reporter weight (1.0 for new+active),
+ * the COUNT of reports needed to hide matches the legacy count-based
+ * thresholds: new=2, active=4, trusted=5, top=6. Higher-tier reporters
+ * (trusted=1.2x, top=1.4x) reach thresholds with fewer total reports —
+ * which is the entire point of weighting. The maximum single-reporter
+ * weight (1.4) is below every author tier's hide threshold ≥ 2.0, so
+ * one report can NEVER auto-hide a post on its own.
+ *
+ * Reviews intentionally do NOT use this — see PlaceReview report
+ * route for the flat-3-distinct-reporters rule, kept simpler until
+ * we have more operational confidence.
+ */
+export function getAuthorHideThreshold(authorRep: number): number {
+  const level = getRepLevel(authorRep)
+  switch (level) {
+    case 'top':     return 6.0
+    case 'trusted': return 5.0
+    case 'active':  return 4.0
+    default:        return 2.0  // new
+  }
+}
+
+export function getAuthorRemoveThreshold(authorRep: number): number {
+  return getAuthorHideThreshold(authorRep) + 2.0
+}
+
+/** @deprecated Use getReportWeight + getAuthorHideThreshold instead.
+ *  Kept exported for any legacy caller — the posts/report route has
+ *  migrated to the weighted system. */
 export function getReportThreshold(rep: number): number {
   const level = getRepLevel(rep)
   switch (level) {

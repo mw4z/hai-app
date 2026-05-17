@@ -3,13 +3,17 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { ReportReason } from '@prisma/client'
 import { apiError } from '@/lib/validation'
-import { addReputation, REP_POINTS, getReportThreshold } from '@/lib/reputation'
+import {
+  addReputation,
+  REP_POINTS,
+  getReportWeight,
+  getAuthorHideThreshold,
+  getAuthorRemoveThreshold,
+} from '@/lib/reputation'
 import { requireUserReady } from '@/lib/requireUserReady'
 import { cleanupNotificationsFor } from '@/lib/notifications'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
-const HIDE_THRESHOLD = 3
-const REMOVE_THRESHOLD = 5
 const MAX_REPORTS_PER_HOUR = 5
 const VALID_REASONS = Object.values(ReportReason)
 
@@ -89,19 +93,36 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Use rep-based thresholds: trusted users need more reports to be hidden
-    const author = await db.user.findUnique({ where: { id: post.authorId }, select: { reputation: true } })
-    const hideThreshold = getReportThreshold(author?.reputation ?? 0)
-    const removeThreshold = hideThreshold + 2
+    // Weighted-report system: each reporter's contribution scales
+    // with their reputation tier, and the threshold to hide / remove
+    // scales with the AUTHOR's tier. Lower-rep authors are still
+    // easier to hide (so spam from a fresh account flips out fast);
+    // top-rep authors still need substantial signal — but a trusted
+    // reporter now counts as 1.2 instead of 1.0, so coordinated
+    // signal from real users surfaces sooner. See
+    // src/lib/reputation-levels.ts for the calibration & invariants.
+    const [author, allReports] = await Promise.all([
+      db.user.findUnique({ where: { id: post.authorId }, select: { reputation: true } }),
+      db.report.findMany({
+        where: { postId },
+        select: { reporter: { select: { reputation: true } } },
+      }),
+    ])
+    const weightedScore = allReports.reduce(
+      (acc, r) => acc + getReportWeight(r.reporter?.reputation ?? 0),
+      0,
+    )
+    const hideThreshold = getAuthorHideThreshold(author?.reputation ?? 0)
+    const removeThreshold = getAuthorRemoveThreshold(author?.reputation ?? 0)
 
-    if (newCount >= removeThreshold) {
+    if (weightedScore >= removeThreshold) {
       newStatus = 'REMOVED'
       // Rep penalty for confirmed removal
       await addReputation({ userId: post.authorId, action: 'report_confirmed', points: REP_POINTS.report_confirmed, postId })
-      console.log(`[MODERATION] post auto-removed: postId=${postId}, reports=${newCount}, threshold=${removeThreshold}`)
-    } else if (newCount >= hideThreshold) {
+      console.log(`[MODERATION] post auto-removed: postId=${postId}, reports=${newCount}, score=${weightedScore.toFixed(2)}, threshold=${removeThreshold}`)
+    } else if (weightedScore >= hideThreshold) {
       newStatus = 'HIDDEN'
-      console.log(`[MODERATION] post auto-hidden: postId=${postId}, reports=${newCount}, threshold=${hideThreshold}`)
+      console.log(`[MODERATION] post auto-hidden: postId=${postId}, reports=${newCount}, score=${weightedScore.toFixed(2)}, threshold=${hideThreshold}`)
     }
 
     await db.post.update({

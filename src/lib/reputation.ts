@@ -2,7 +2,17 @@ import { db } from '@/lib/db'
 import { log } from '@/lib/logger'
 
 // Re-export pure functions so server code can import everything from one place
-export { getRepLevel, getRepBadge, getFeedBoost, getPostLimit, getReportThreshold } from './reputation-levels'
+export {
+  getRepLevel,
+  getRepBadge,
+  getFeedBoost,
+  getPostLimit,
+  getReportWeight,
+  getAuthorHideThreshold,
+  getAuthorRemoveThreshold,
+  /** @deprecated kept for legacy callers — prefer the weighted helpers above */
+  getReportThreshold,
+} from './reputation-levels'
 export type { RepLevel } from './reputation-levels'
 
 // ─── Reward Table (rebalanced: harder to gain, tied to real impact) ─────────
