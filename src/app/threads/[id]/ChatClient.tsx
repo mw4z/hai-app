@@ -72,13 +72,13 @@ interface Msg {
 }
 
 function WhatsAppCheck({ double, read }: { double: boolean; read: boolean }) {
-  // Checkmark paths tuned for legibility on the green outgoing
-  // bubble (#00a884):
-  //   read     → #1E88E5 (deep saturated blue). Darker than the
-  //              previous sky-blue so the 'seen' signal really
-  //              pops against the green instead of blending.
-  //   unread   → rgba(255,255,255,0.85) (solid white).
-  const color = read ? '#1E88E5' : 'rgba(255,255,255,0.85)'
+  // The status row renders in a text-gray-400 <p> BELOW the bubble (on
+  // the page background), not on the green bubble — so the old white
+  // tick was invisible in light mode. Inherit the row color instead:
+  //   read     → #1E88E5 (deep saturated blue) — the 'seen' signal.
+  //   unread   → currentColor (gray-400) — visible on both light and
+  //              dark page backgrounds.
+  const color = read ? '#1E88E5' : 'currentColor'
   if (double) {
     return (
       <svg width="16" height="11" viewBox="0 0 16 11" className="ml-1 inline-block flex-shrink-0" style={{ marginBottom: -1 }}>
@@ -109,23 +109,25 @@ function PendingClock() {
       style={{ marginBottom: -1 }}
       aria-label="sending"
     >
+      {/* currentColor → inherits the gray-400 status row (visible in
+          light + dark); was white, invisible on the light page bg. */}
       {/* Outline */}
       <circle
         cx="5.5" cy="5.5" r="4.6"
         fill="none"
-        stroke="rgba(255,255,255,0.85)"
+        stroke="currentColor"
         strokeWidth="1"
       />
       {/* Hour hand (12 → 4 o'clock) */}
       <path
         d="M5.5 5.5 V2.5"
-        stroke="rgba(255,255,255,0.85)"
+        stroke="currentColor"
         strokeWidth="1"
         strokeLinecap="round"
       />
       <path
         d="M5.5 5.5 L7.5 5.5"
-        stroke="rgba(255,255,255,0.85)"
+        stroke="currentColor"
         strokeWidth="1"
         strokeLinecap="round"
       />
@@ -155,6 +157,39 @@ function MsgStatus({ msg, isMe }: { msg: Msg; isMe: boolean }) {
   if (msg.readAt) return <WhatsAppCheck double read />
   if (msg.deliveredAt) return <WhatsAppCheck double read={false} />
   return <WhatsAppCheck double={false} read={false} />
+}
+
+/** Fingerprint of everything a bubble actually renders. The 3s poll
+ *  used to replace EVERY message object with a fresh one each tick, so
+ *  React re-rendered (and re-mounted <audio>/<img>) the whole list —
+ *  the visible "flashing". When a polled row fingerprints identically
+ *  to the cached copy we keep the OLD object reference, so unchanged
+ *  bubbles don't re-render. */
+function msgFingerprint(m: any): string {
+  return JSON.stringify([
+    m.id, m.type, m.body, m.status,
+    m.deliveredAt ?? null, m.readAt ?? null, m.editedAt ?? null,
+    m.imageUrl ?? null, m.audioUrl ?? null, m.audioDurationMs ?? null,
+    m.pdfUrl ?? null, m.pdfName ?? null,
+    m.reactions ?? null,
+  ])
+}
+
+/** Merge freshly-polled server rows over local state, preserving the
+ *  session blob preview AND the existing object identity for unchanged
+ *  rows (see msgFingerprint). Pending local-only placeholders are kept. */
+function mergeServerMessages(prev: any[], serverMsgs: any[]): any[] {
+  const serverIds = new Set(serverMsgs.map((m: any) => m.id))
+  const merged = serverMsgs.map((serverMsg: any) => {
+    const existing = prev.find((m: any) => m.id === serverMsg.id)
+    if (!existing) return serverMsg
+    const withPreview = existing.localPreview
+      ? { ...serverMsg, localPreview: existing.localPreview }
+      : serverMsg
+    return msgFingerprint(existing) === msgFingerprint(withPreview) ? existing : withPreview
+  })
+  const localOnly = prev.filter((m: any) => !serverIds.has(m.id) && m.pending)
+  return [...merged, ...localOnly]
 }
 
 // Long press + double tap hook
@@ -670,16 +705,7 @@ export default function ChatClient({
           return
         }
         const serverMsgs: any[] = data.messages || data || []
-        const serverIds = new Set(serverMsgs.map((m: any) => m.id))
-        setMessages((prev: any[]) => {
-          const merged = serverMsgs.map((serverMsg: any) => {
-            const existing = prev.find((m: any) => m.id === serverMsg.id)
-            if (existing?.localPreview) return { ...serverMsg, localPreview: existing.localPreview }
-            return serverMsg
-          })
-          const localOnly = prev.filter((m: any) => !serverIds.has(m.id) && m.pending)
-          return [...merged, ...localOnly]
-        })
+        setMessages((prev: any[]) => mergeServerMessages(prev, serverMsgs))
       } catch { /* ignore — the poll below will catch up */ }
     }
     refreshOnce()
@@ -705,25 +731,12 @@ export default function ChatClient({
             setShowRating(true)
             clearInterval(interval)
           } else {
-            // Merge server data with local state instead of replacing.
-            // Preserves:
-            //   - localPreview (blob URL) on messages we just sent this
-            //     session, so the <img> doesn't flash to the remote URL
-            //   - pending placeholders whose upload hasn't returned yet
-            //     (their id is still the temp "pending-…")
+            // Merge server data with local state instead of replacing
+            // (preserves localPreview blob URLs + pending placeholders,
+            // AND keeps object identity for unchanged rows so the poll
+            // doesn't re-render every bubble — see mergeServerMessages).
             const serverMsgs: any[] = data.messages || data || []
-            const serverIds = new Set(serverMsgs.map((m: any) => m.id))
-            setMessages((prev: any[]) => {
-              const merged = serverMsgs.map((serverMsg: any) => {
-                const existing = prev.find((m: any) => m.id === serverMsg.id)
-                if (existing?.localPreview) {
-                  return { ...serverMsg, localPreview: existing.localPreview }
-                }
-                return serverMsg
-              })
-              const localOnly = prev.filter((m: any) => !serverIds.has(m.id) && m.pending)
-              return [...merged, ...localOnly]
-            })
+            setMessages((prev: any[]) => mergeServerMessages(prev, serverMsgs))
           }
         }
       } catch { /* ignore */ }

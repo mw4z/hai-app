@@ -25,13 +25,6 @@ export function isNativeRecorder(): boolean {
   return typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform?.() === true
 }
 
-function base64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64)
-  const out = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
-  return out
-}
-
 // ── Native (Capgo) ──────────────────────────────────────────────
 let nativeStartedAt = 0
 
@@ -59,7 +52,12 @@ async function nativeStart(): Promise<void> {
       throw new RecorderError('permission', 'Microphone permission denied')
     }
   }
-  await CapacitorAudioRecorder.startRecording()
+  // Voice-grade encoding: the plugin defaults to 192 kbps @ 44.1 kHz
+  // (music quality) which makes a short note several hundred KB and the
+  // upload feel slow. 48 kbps AAC @ 22.05 kHz is plenty for speech and
+  // roughly 4× smaller — much faster to read off disk and upload.
+  // bitRate is bits/sec (iOS maps it to AVEncoderBitRateKey).
+  await CapacitorAudioRecorder.startRecording({ bitRate: 48000, sampleRate: 22050 })
   nativeStartedAt = Date.now()
 }
 
@@ -75,7 +73,11 @@ async function nativeStop(): Promise<RecorderResult> {
   const read: any = await Filesystem.readFile({ path: uri })
   const base64 = typeof read?.data === 'string' ? read.data : ''
   if (!base64) throw new RecorderError('failed', 'Could not read recording')
-  const blob = new Blob([base64ToBytes(base64) as unknown as BlobPart], { type: 'audio/mp4' })
+  // Decode via a data: URL so the browser's native base64 decoder does
+  // the work (fast, C++) instead of a per-byte JS atob loop, which
+  // stalls the UI for hundreds of ms on a multi-MB recording before the
+  // upload even starts.
+  const blob = await (await fetch(`data:audio/mp4;base64,${base64}`)).blob()
   return { blob, mimeType: 'audio/mp4', durationMs }
 }
 
