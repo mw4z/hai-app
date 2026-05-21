@@ -41,6 +41,17 @@ interface SearchResult {
   lat: number
   lng: number
   distKm: number
+  // Set for Google Places suggestions — coordinates aren't known
+  // until a Place Details call, so these carry a placeId and a
+  // distKm of -1 (no distance badge) until resolved on select.
+  placeId?: string
+}
+
+function newPlacesToken(): string {
+  try {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  } catch {}
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -66,6 +77,9 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
   const [permissionDenied, setPermissionDenied] = useState(false)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  // Shared Places session token (autocomplete keystrokes + the final
+  // details call billed as one). Reset after each resolved selection.
+  const placesTokenRef = useRef<string>(newPlacesToken())
 
   const refLat = userLat || 21.4
   const refLng = userLng || 39.8
@@ -232,7 +246,38 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
     }
   }
 
-  // ── Search (MapTiler + Photon) ────────────────────────────────────────────
+  // ── Search (Google Places primary + MapTiler/Photon fallback) ──────────────
+
+  // Google Places autocomplete — best SA business coverage. Returns
+  // text suggestions only (no coords); we resolve lat/lng via a
+  // Details call in selectResult. Empty array if Places is off or
+  // errors, so the free geocoders below carry the search.
+  async function searchGooglePlaces(query: string): Promise<SearchResult[]> {
+    try {
+      const res = await fetch('/api/places/autocomplete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: query, sessionToken: placesTokenRef.current, lang }),
+      })
+      const d = await res.json().catch(() => ({}))
+      const sugg: Array<{ placeId: string; primary: string; secondary: string }> =
+        Array.isArray(d.suggestions) ? d.suggestions : []
+      return sugg
+        .filter((s) => s.placeId && s.primary)
+        .map((s) => ({
+          id: `g-${s.placeId}`,
+          name: s.primary,
+          secondary: s.secondary,
+          fullAddress: [s.primary, s.secondary].filter(Boolean).join(', '),
+          lat: 0,
+          lng: 0,
+          distKm: -1, // unknown until details resolves coords
+          placeId: s.placeId,
+        }))
+    } catch {
+      return []
+    }
+  }
 
   async function searchMapTiler(query: string): Promise<SearchResult[]> {
     if (!maptilerKey) return []
@@ -265,20 +310,63 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
     debounceRef.current = setTimeout(async () => {
       setSearching(true)
       try {
-        const [mt, ph] = await Promise.all([searchMapTiler(query), searchPhoton(query)])
-        const merged: SearchResult[] = []
+        // Google first (best coverage), free geocoders in parallel as
+        // the fallback layer. Google suggestions float to the top
+        // (distKm -1); OSM results are deduped among themselves and
+        // sorted by distance underneath.
+        const [g, mt, ph] = await Promise.all([
+          searchGooglePlaces(query),
+          searchMapTiler(query),
+          searchPhoton(query),
+        ])
+        const osm: SearchResult[] = []
         for (const r of [...mt, ...ph]) {
           if (!r.name) continue
-          if (!merged.some(m => haversine(m.lat, m.lng, r.lat, r.lng) < 0.3)) merged.push(r)
+          if (!osm.some((m) => haversine(m.lat, m.lng, r.lat, r.lng) < 0.3)) osm.push(r)
         }
-        merged.sort((a, b) => a.distKm - b.distKm)
-        setResults(merged.slice(0, 8))
+        osm.sort((a, b) => a.distKm - b.distKm)
+        setResults([...g, ...osm].slice(0, 8))
       } catch { setResults([]) }
       setSearching(false)
     }, 250)
   }, [refLat, refLng, lang, maptilerKey])
 
-  function selectResult(r: SearchResult) {
+  async function selectResult(r: SearchResult) {
+    // Google suggestion — no coords yet. Resolve via Place Details
+    // (closes the billed session), then commit. Falls back to a toast
+    // if details fail so the user can pick another result.
+    if (r.placeId && !r.lat && !r.lng) {
+      setSearching(true)
+      try {
+        const res = await fetch('/api/places/details', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ placeId: r.placeId, sessionToken: placesTokenRef.current, lang }),
+        })
+        const d = await res.json().catch(() => ({}))
+        placesTokenRef.current = newPlacesToken() // new session after details
+        const det = d.details
+        if (det && typeof det.latitude === 'number' && typeof det.longitude === 'number') {
+          onChange({
+            lat: det.latitude,
+            lng: det.longitude,
+            address: det.address || r.fullAddress,
+            area: r.name,
+          })
+          setShowSearch(false)
+          setSearchQuery('')
+          setResults([])
+        } else {
+          toast.error(lang === 'en' ? 'Could not resolve that place' : lang === 'ur' ? 'مقام حل نہیں ہو سکا' : 'تعذّر تحديد هذا المكان')
+        }
+      } catch {
+        toast.error(lang === 'en' ? 'Could not resolve that place' : lang === 'ur' ? 'مقام حل نہیں ہو سکا' : 'تعذّر تحديد هذا المكان')
+      } finally {
+        setSearching(false)
+      }
+      return
+    }
+    // OSM result — coords already inline.
     onChange({ lat: r.lat, lng: r.lng, address: r.fullAddress, area: r.name })
     setShowSearch(false)
     setSearchQuery('')
@@ -416,7 +504,9 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
                           <p className="text-sm text-gray-900 dark:text-white font-semibold truncate">{r.name}</p>
                           {r.secondary && <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{r.secondary}</p>}
                         </div>
-                        <span className="text-[10px] text-gray-400 flex-shrink-0 mt-1 font-medium">{formatDist(r.distKm)}</span>
+                        {r.distKm >= 0 && (
+                          <span className="text-[10px] text-gray-400 flex-shrink-0 mt-1 font-medium">{formatDist(r.distKm)}</span>
+                        )}
                       </button>
                     ))}
                   </div>
