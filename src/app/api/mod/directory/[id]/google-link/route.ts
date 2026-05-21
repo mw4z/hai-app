@@ -53,6 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     select: {
       id: true,
       neighborhoodId: true,
+      status: true,
       phone: true,
       whatsapp: true,
       website: true,
@@ -84,10 +85,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }
     : {}
 
+  // Linking to Google confirms the place (موثّق) — but don't disturb
+  // an owner-claimed listing or a deliberately rejected/removed one.
+  const confirm = place.status === 'PENDING' || place.status === 'VISIBLE_UNVERIFIED'
+
   const updated = await db.placeListing.update({
     where: { id: place.id },
     data: {
       source: 'GOOGLE',
+      ...(confirm ? { status: 'MOD_VERIFIED' as const } : {}),
       googlePlaceId,
       googleRating: snap.rating,
       googleRatingCount: snap.ratingCount,
