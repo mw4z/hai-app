@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiX, FiPlus } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
@@ -9,6 +9,8 @@ import { uploadFiles } from '@/lib/upload'
 
 const MAX_IMAGES = 5
 const PER_FILE_MAX_BYTES = 10 * 1024 * 1024
+const SWIPE_CLOSE_THRESHOLD = 100
+const SWIPE_MAX_TRAVEL = 360
 
 interface Props {
   placeId: string
@@ -48,6 +50,14 @@ export default function EditPhotosSheet({
   const [pendingFiles, setPendingFiles] = useState<{ file: File; preview: string }[]>([])
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Swipe-down-to-dismiss state.
+  const [dragY, setDragY] = useState(0)
+  const [animating, setAnimating] = useState(true)
+  const dragStartY = useRef<number | null>(null)
+  useEffect(() => {
+    if (open) { setDragY(0); setAnimating(true) }
+  }, [open])
 
   // Freeze background scroll while the sheet is open. Shared hook
   // already used by ImageLightbox + AttachmentMenu — sets
@@ -144,8 +154,35 @@ export default function EditPhotosSheet({
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-[480px] max-h-[88vh] flex flex-col bg-white dark:bg-gray-800 rounded-t-3xl"
+        style={{
+          transform: `translateY(${dragY}px)`,
+          transition: animating ? 'transform 0.22s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+        }}
       >
-        <div className="px-4 pt-3 pb-2 flex-shrink-0">
+        <div
+          className="px-4 pt-3 pb-2 flex-shrink-0"
+          style={{ touchAction: 'pan-y' }}
+          onTouchStart={(e) => {
+            dragStartY.current = e.touches[0].clientY
+            setAnimating(false)
+          }}
+          onTouchMove={(e) => {
+            if (dragStartY.current === null) return
+            const delta = e.touches[0].clientY - dragStartY.current
+            setDragY(delta <= 0 ? 0 : Math.min(delta, SWIPE_MAX_TRAVEL))
+          }}
+          onTouchEnd={() => {
+            const released = dragY
+            dragStartY.current = null
+            setAnimating(true)
+            if (released >= SWIPE_CLOSE_THRESHOLD) {
+              setDragY(window.innerHeight)
+              setTimeout(close, 200)
+            } else {
+              setDragY(0)
+            }
+          }}
+        >
           <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-2" />
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-gray-900 dark:text-white">
