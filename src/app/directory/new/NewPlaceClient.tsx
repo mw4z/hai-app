@@ -83,9 +83,11 @@ export default function NewPlaceClient() {
     }
     if (p.website) setWebsite(p.website)
     if (p.mapUrl) setMapUrl(p.mapUrl)
-    // Google hours converted to the app format → fills the picker so
-    // the open/closed pill works.
-    if (p.appHours) setOpeningHours(p.appHours)
+    // NOTE: we deliberately do NOT autofill the openingHours picker
+    // from Google — Google's hours (shifts / per-day variation) can't
+    // be represented in the single-schedule picker without losing
+    // detail. The accurate Google hours are stored server-side
+    // (periods + per-day text) and shown + drive the pill directly.
     if (p.latitude !== null && p.longitude !== null) {
       setLatitude(p.latitude)
       setLongitude(p.longitude)

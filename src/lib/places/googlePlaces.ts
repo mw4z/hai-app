@@ -18,7 +18,7 @@
  */
 
 import type { PlaceCategory } from '@prisma/client'
-import { googleTypeToCategory, googleHoursToApp, type GooglePeriod } from './googleConvert'
+import { googleTypeToCategory, type GooglePeriod } from './googleConvert'
 
 const PLACES_BASE = 'https://places.googleapis.com/v1'
 
@@ -144,10 +144,9 @@ export interface PlaceDetails {
   // Google snapshot (attribution-required; refresh within ~30d).
   rating: number | null
   ratingCount: number | null
-  hours: string | null // weekdayDescriptions joined by \n (display fallback)
-  /** Google hours converted into the app's openingHours string so the
-   *  open/closed pill works. null when not convertible. */
-  appHours: string | null
+  hours: string | null // weekdayDescriptions joined by \n (per-day display)
+  /** Raw Google periods — accurate open/closed (shifts + per-day). */
+  periods: GooglePeriod[]
   photoRefs: string[] // up to 3 Google photo resource names
   reviews: GoogleReview[] // up to 5 Google reviews
 }
@@ -202,7 +201,7 @@ function mapPlace(d: RawPlace): PlaceDetails {
     d.regularOpeningHours.weekdayDescriptions.length > 0
       ? d.regularOpeningHours.weekdayDescriptions.join('\n')
       : null
-  const appHours = googleHoursToApp(d.regularOpeningHours?.periods)
+  const periods = d.regularOpeningHours?.periods ?? []
   const photoRefs = (d.photos ?? [])
     .map((p) => p.name)
     .filter((n): n is string => typeof n === 'string' && n.startsWith('places/'))
@@ -228,7 +227,7 @@ function mapPlace(d: RawPlace): PlaceDetails {
     rating: typeof d.rating === 'number' ? d.rating : null,
     ratingCount: typeof d.userRatingCount === 'number' ? d.userRatingCount : null,
     hours,
-    appHours,
+    periods,
     photoRefs,
     reviews,
   }

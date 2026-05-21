@@ -248,9 +248,10 @@ export async function POST(req: NextRequest) {
       latitude: v.value.latitude,
       longitude: v.value.longitude,
       addressText: v.value.addressText,
-      // Prefer the user-entered hours; fall back to Google's converted
-      // hours so the open/closed pill works for Google-sourced places.
-      openingHours: v.value.openingHours ?? snap?.appHours ?? null,
+      // User-entered hours only. Google's hours live in googleHours
+      // (per-day text) + googlePeriods (drives the pill) — we don't
+      // squeeze them into the lossy single-schedule string.
+      openingHours: v.value.openingHours,
       // Image URLs accepted from the composer. The /api/upload
       // endpoint validates each file's MIME + size BEFORE handing
       // back a URL, so by the time bytes reach this row we just
@@ -264,6 +265,10 @@ export async function POST(req: NextRequest) {
       googleRating: snap?.rating ?? null,
       googleRatingCount: snap?.ratingCount ?? null,
       googleHours: snap?.hours ?? null,
+      googlePeriods:
+        snap?.periods && snap.periods.length > 0
+          ? (snap.periods as unknown as Prisma.InputJsonValue)
+          : undefined,
       googlePhotoRefs: snap?.photoRefs ?? [],
       googleReviews:
         snap?.reviews && snap.reviews.length > 0

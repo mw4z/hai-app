@@ -92,13 +92,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       googleRating: snap.rating,
       googleRatingCount: snap.ratingCount,
       googleHours: snap.hours,
+      googlePeriods:
+        snap.periods && snap.periods.length > 0 ? (snap.periods as unknown as object) : undefined,
       googlePhotoRefs: snap.photoRefs,
       googleReviews:
         snap.reviews && snap.reviews.length > 0 ? (snap.reviews as unknown as object) : undefined,
       googleSyncedAt: new Date(),
-      // Fill the app openingHours from Google's converted hours when
-      // the place has none, so the open/closed pill lights up.
-      openingHours: place.openingHours ?? snap.appHours ?? null,
+      // openingHours left as-is — Google hours drive the pill via
+      // googlePeriods, and an owner can still set manual hours.
       ...contactPatch,
     },
     select: { id: true },

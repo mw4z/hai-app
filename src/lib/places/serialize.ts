@@ -1,4 +1,5 @@
 import type { PlaceListing, ServiceItem, User } from '@prisma/client'
+import type { GooglePeriodLike } from './openState'
 
 /**
  * Public-facing shape of a PlaceListing.
@@ -50,8 +51,10 @@ export interface PublicPlace {
   /** Google rating snapshot (attribution-required). null on LOCAL. */
   googleRating: number | null
   googleRatingCount: number | null
-  /** Google opening hours — weekdayDescriptions joined by \n. */
+  /** Google opening hours — weekdayDescriptions joined by \n (per-day display). */
   googleHours: string | null
+  /** Raw Google periods — drives the open/closed pill on Google places. */
+  googlePeriods: GooglePeriodLike[]
   /** Google photo resource names — render via /api/places/photo. */
   googlePhotoRefs: string[]
   /** Up to 5 Google reviews snapshot (attribution-required). */
@@ -148,6 +151,9 @@ export function toPublicPlace(place: PlaceWithRelations): PublicPlace {
     googleRating: place.googleRating,
     googleRatingCount: place.googleRatingCount,
     googleHours: place.googleHours,
+    googlePeriods: Array.isArray(place.googlePeriods)
+      ? (place.googlePeriods as unknown as GooglePeriodLike[])
+      : [],
     googlePhotoRefs: place.googlePhotoRefs,
     googleReviews: Array.isArray(place.googleReviews)
       ? (place.googleReviews as unknown as GoogleReviewPublic[])

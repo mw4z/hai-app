@@ -146,9 +146,9 @@ export default function DetailClient({
             <p className="text-sm text-gray-600 dark:text-gray-400">🕒 {place.openingHours}</p>
           )}
 
-          {/* Google opening hours — per-day list from the snapshot.
-              Only when the place has no manually-entered hours, so
-              we don't show two conflicting schedules. */}
+          {/* Google opening hours — accurate per-day list (handles
+              shifts + days that differ). Shown when the place has no
+              manually-entered hours so we don't show two schedules. */}
           {!place.openingHours && place.source === 'GOOGLE' && place.googleHours && (
             <div className="text-sm text-gray-600 dark:text-gray-400">
               <div className="flex items-center gap-1.5 mb-0.5">

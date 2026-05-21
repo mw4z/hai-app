@@ -1753,7 +1753,8 @@ model PlaceListing {
   googlePlaceId     String?
   googleRating      Float?
   googleRatingCount Int?
-  googleHours       String?     // Google weekdayDescriptions, joined by \n
+  googleHours       String?     // Google weekdayDescriptions, joined by \n (per-day display)
+  googlePeriods     Json?       // raw Google opening periods (accurate open/closed pill, handles shifts + per-day variation)
   googlePhotoRefs   String[]    @default([]) // up to 3 photo resource names
   googleReviews     Json?       // up to 5 Google reviews: [{author,rating,text,relativeTime}]
   googleSyncedAt    DateTime?

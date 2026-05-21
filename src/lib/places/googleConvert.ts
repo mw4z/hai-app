@@ -88,97 +88,11 @@ export function googleTypeToCategory(
 
 // ── Opening hours ────────────────────────────────────────────────
 
+/** One Google opening period. Stored raw on the listing and used by
+ *  openState.computeFromGooglePeriods for an accurate pill that
+ *  handles shifts + per-day-varying hours (the single-schedule
+ *  openingHours string can't represent those). */
 export interface GooglePeriod {
   open?: { day?: number; hour?: number; minute?: number }
   close?: { day?: number; hour?: number; minute?: number }
-}
-
-// Google week: 0=Sun … 6=Sat. Hai week: 0=Sat … 6=Fri.
-//   appDay = (googleDay + 1) % 7
-function googleDayToApp(g: number): number {
-  return (g + 1) % 7
-}
-
-const DAY_AR = ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة']
-
-/** 24h "HH:MM" → "9 ص" / "9:30 م" — matches OpeningHoursPicker.formatTime (ar). */
-function formatTimeAr(hour24: number, minute: number): string {
-  const h = Math.max(0, Math.min(23, hour24))
-  const m = Math.max(0, Math.min(59, minute))
-  const isPM = h >= 12
-  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h
-  const mm = m === 0 ? '' : `:${m.toString().padStart(2, '0')}`
-  return `${h12}${mm} ${isPM ? 'م' : 'ص'}`
-}
-
-/** Matches OpeningHoursPicker.formatDays (ar). days are app indices. */
-function formatDaysAr(sorted: number[]): string {
-  if (sorted.length === 7) return 'يومياً'
-  const isContig =
-    sorted.length >= 2 && sorted.every((d, i) => i === 0 || d === sorted[i - 1] + 1)
-  if (isContig) return `${DAY_AR[sorted[0]]} - ${DAY_AR[sorted[sorted.length - 1]]}`
-  if (sorted.length === 6 && !sorted.includes(6)) return 'السبت - الخميس'
-  return sorted.map((d) => DAY_AR[d]).join('، ')
-}
-
-/**
- * Convert Google `regularOpeningHours.periods` into the Arabic
- * `openingHours` string the picker emits. Returns null when there's
- * nothing convertible.
- *
- * Strategy: derive each day's shift list, take the DOMINANT shift
- * signature (the one covering the most days) and emit those days +
- * shifts. The app format assumes one shift-set shared across the
- * listed days, so days with a different pattern (e.g. a special
- * Friday) are dropped — a pragmatic approximation that keeps the
- * pill working for the common case.
- */
-export function googleHoursToApp(periods: GooglePeriod[] | undefined): string | null {
-  if (!periods || periods.length === 0) return null
-
-  // 24/7: a single open with no close (Google's convention).
-  if (
-    periods.length === 1 &&
-    periods[0].open &&
-    !periods[0].close &&
-    (periods[0].open.hour ?? 0) === 0 &&
-    (periods[0].open.minute ?? 0) === 0
-  ) {
-    return '24 ساعة طوال الأسبوع'
-  }
-
-  // Group shifts by the open day (app index). Overnight shifts are
-  // attributed to their open day.
-  const byDay = new Map<number, { open: string; close: string }[]>()
-  for (const p of periods) {
-    if (!p.open || !p.close) continue
-    const day = googleDayToApp(p.open.day ?? 0)
-    const open = formatTimeAr(p.open.hour ?? 0, p.open.minute ?? 0)
-    const close = formatTimeAr(p.close.hour ?? 0, p.close.minute ?? 0)
-    const list = byDay.get(day) ?? []
-    list.push({ open, close })
-    byDay.set(day, list)
-  }
-  if (byDay.size === 0) return null
-
-  // Signature per day = its shifts joined; group days by signature.
-  const bySig = new Map<string, { days: number[]; shifts: { open: string; close: string }[] }>()
-  for (const [day, shifts] of Array.from(byDay.entries())) {
-    const sig = shifts.map((s) => `${s.open}-${s.close}`).join('|')
-    const entry = bySig.get(sig)
-    if (entry) entry.days.push(day)
-    else bySig.set(sig, { days: [day], shifts })
-  }
-
-  // Dominant signature = most days (tie → earliest day).
-  let best: { days: number[]; shifts: { open: string; close: string }[] } | null = null
-  for (const entry of Array.from(bySig.values())) {
-    if (!best || entry.days.length > best.days.length) best = entry
-  }
-  if (!best) return null
-
-  const days = [...best.days].sort((a, b) => a - b)
-  const dayPart = formatDaysAr(days)
-  const shiftParts = best.shifts.map((s) => `${s.open} - ${s.close}`)
-  return `${dayPart} ${shiftParts.join('، ')}`
 }

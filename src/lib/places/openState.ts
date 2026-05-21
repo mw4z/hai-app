@@ -28,10 +28,21 @@
  * guessing wrong.
  */
 
+/** One Google opening period (Places API). day: 0=Sun … 6=Sat. */
+export interface GooglePeriodLike {
+  open?: { day?: number; hour?: number; minute?: number } | null
+  close?: { day?: number; hour?: number; minute?: number } | null
+}
+
 export interface PlaceOpenStateInput {
   openingHours: string | null
   manualStatus: string | null
   manualStatusUntil: string | Date | null
+  /** Raw Google periods — used for the pill on GOOGLE-sourced places
+   *  so shifts + per-day-varying hours are handled accurately. Only
+   *  consulted when there's no manual override and no user-entered
+   *  openingHours. */
+  googlePeriods?: GooglePeriodLike[] | null
 }
 
 export type PillTone = 'open' | 'soon' | 'closed' | 'manual-warn' | 'manual-danger'
@@ -59,10 +70,19 @@ export function computePlacePill(
     }
   }
 
-  // 3. Auto path — parse openingHours and compute.
+  // 3. User-entered openingHours wins over the Google snapshot — an
+  //    owner who set hours via the picker overrides Google.
   const parsed = parseOpeningHours(place.openingHours || '')
-  if (!parsed) return null
-  return computeAutoPill(parsed, now)
+  if (parsed) return computeAutoPill(parsed, now)
+
+  // 4. Google periods — accurate for shifts + per-day-varying hours
+  //    (the single-schedule openingHours string can't represent them).
+  if (place.googlePeriods && place.googlePeriods.length > 0) {
+    return computeFromGooglePeriods(place.googlePeriods, now)
+  }
+
+  // 5. Nothing parseable → no pill.
+  return null
 }
 
 /**
@@ -322,5 +342,55 @@ function computeAutoPill(parsed: ParsedHours, now: Date): PlacePill {
       }
     }
   }
+  return { label: 'مغلق', tone: 'closed' }
+}
+
+const WEEK_MIN = 7 * 24 * 60 // 10080
+
+/**
+ * Open/closed pill computed directly from Google's raw `periods`,
+ * which (unlike our single-schedule string) faithfully represents
+ * shifts AND per-day-varying hours. Times are the place's local
+ * time; for KSA that's Asia/Riyadh, matching riyadhParts.
+ *
+ * Each period → an absolute "minute of week" window [openMOW, closeMOW),
+ * with wrap handling for overnight / week-boundary spans. We test the
+ * current Riyadh minute-of-week (and its +1 week shadow) against every
+ * window; "opens soon" if the nearest upcoming open is ≤30 min away.
+ */
+function computeFromGooglePeriods(periods: GooglePeriodLike[], now: Date): PlacePill {
+  // Google day 0=Sun…6=Sat → app Sat0 (0=Sat…6=Fri): (g + 1) % 7.
+  const gToApp = (g: number) => ((g + 1) % 7 + 7) % 7
+  const { dayOfWeekSat0, minutes } = riyadhParts(now)
+  const nowMOW = dayOfWeekSat0 * 1440 + minutes
+
+  // 24/7: a single open with no close.
+  if (periods.length === 1 && periods[0].open && !periods[0].close) {
+    return { label: 'مفتوح', tone: 'open' }
+  }
+
+  let soonest = Infinity
+  for (const p of periods) {
+    if (!p.open) continue
+    const openMOW = gToApp(p.open.day ?? 0) * 1440 + (p.open.hour ?? 0) * 60 + (p.open.minute ?? 0)
+    // No close → treat as open-ended from openMOW (rare; 24h-ish).
+    let closeMOW = p.close
+      ? gToApp(p.close.day ?? 0) * 1440 + (p.close.hour ?? 0) * 60 + (p.close.minute ?? 0)
+      : openMOW + WEEK_MIN
+    if (closeMOW <= openMOW) closeMOW += WEEK_MIN // wrap (overnight / week edge)
+
+    // Open now? Test now and now+1week against [openMOW, closeMOW).
+    if (
+      (nowMOW >= openMOW && nowMOW < closeMOW) ||
+      (nowMOW + WEEK_MIN >= openMOW && nowMOW + WEEK_MIN < closeMOW)
+    ) {
+      return { label: 'مفتوح', tone: 'open' }
+    }
+    // Minutes until this opening (forward around the week).
+    const until = (openMOW - nowMOW + WEEK_MIN) % WEEK_MIN
+    if (until < soonest) soonest = until
+  }
+
+  if (soonest <= SOON_WINDOW_MIN) return { label: 'يفتح قريبًا', tone: 'soon' }
   return { label: 'مغلق', tone: 'closed' }
 }
