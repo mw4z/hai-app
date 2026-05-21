@@ -20,6 +20,7 @@ import ImageLightbox from '@/components/ImageLightbox'
 import { buildWhatsAppHref } from '@/lib/phone'
 import { formatGoogleHours } from '@/lib/places/googleHoursDisplay'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { usePrompt } from '@/components/ConfirmProvider'
 import { createPortal } from 'react-dom'
 import { FiX } from 'react-icons/fi'
 
@@ -43,6 +44,9 @@ interface Props {
    *  to pull in rating / hours / photos (enrich a locally-added
    *  place). */
   canLinkGoogle: boolean
+  /** Mod / admin (scoped) — can remove (soft-delete) a published
+   *  place via the remove endpoint, with a reason. */
+  canRemove: boolean
 }
 
 /** Public detail page. Renders the place's identity, contact
@@ -57,7 +61,9 @@ export default function DetailClient({
   canEditInfo,
   canEditSensitive,
   canLinkGoogle,
+  canRemove,
 }: Props) {
+  const promptDialog = usePrompt()
   // Place data + local override. The text-edit sheet patches
   // individual fields; we merge them into a local copy so the
   // detail page re-renders the new values without router.refresh().
@@ -74,6 +80,46 @@ export default function DetailClient({
   const [photoEditOpen, setPhotoEditOpen] = useState(false)
   const [infoEditOpen, setInfoEditOpen] = useState(false)
   const [googleLinkOpen, setGoogleLinkOpen] = useState(false)
+  const [removing, setRemoving] = useState(false)
+
+  // Soft-remove a published place (mod/admin). Asks for a reason
+  // (≥3 chars, required by the endpoint), then bounces back to the
+  // directory list. The row is set to REMOVED — hidden from the
+  // public list but kept in the DB with an audit entry.
+  async function removePlace() {
+    if (removing) return
+    const reason = await promptDialog({
+      title: tr('Remove place', 'حذف المكان', 'جگہ ہٹائیں'),
+      message: tr(
+        'Why are you removing this place? The submitter will be notified.',
+        'سبب حذف هذا المكان؟ سيتم إخطار من أضافه.',
+        'یہ جگہ کیوں ہٹا رہے ہیں؟ شامل کرنے والے کو اطلاع دی جائے گی۔',
+      ),
+      placeholder: tr('Reason', 'السبب', 'وجہ'),
+      multiline: true,
+      confirmText: tr('Remove', 'حذف', 'ہٹائیں'),
+    })
+    if (!reason || reason.trim().length < 3) return
+    setRemoving(true)
+    try {
+      const res = await fetch(`/api/mod/directory/${place.id}/remove`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason.trim() }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(d?.error || tr('Failed', 'فشل', 'ناکام'))
+        return
+      }
+      toast.success(tr('Place removed', 'تم حذف المكان', 'جگہ ہٹا دی گئی'))
+      router.push('/directory')
+    } catch {
+      toast.error(tr('Connection failed', 'فشل الاتصال', 'کنیکشن ناکام'))
+    } finally {
+      setRemoving(false)
+    }
+  }
   // Lightbox: index of the photo the user tapped (null = closed).
   // Using the shared ImageLightbox keeps photos in-app — tapping
   // opens the same gesture-driven viewer the chat + post detail
@@ -505,6 +551,22 @@ export default function DetailClient({
             {tr('Report wrong info', 'الإبلاغ عن معلومة خاطئة', 'غلط معلومات کی اطلاع')}
           </button>
         </div>
+
+        {/* Mod/admin — remove (soft-delete) a published place. Asks
+            for a reason; the row goes to REMOVED (hidden) and the
+            submitter is notified. */}
+        {canRemove && (
+          <button
+            type="button"
+            onClick={removePlace}
+            disabled={removing}
+            className="w-full py-2.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 text-xs font-semibold active:scale-95 transition-transform disabled:opacity-50"
+          >
+            🗑️ {removing
+              ? tr('Removing…', 'جاري الحذف…', 'ہٹایا جا رہا ہے…')
+              : tr('Remove this place', 'حذف هذا المكان', 'یہ جگہ ہٹائیں')}
+          </button>
+        )}
 
         {/* Claim / report sheets */}
         {claimOpen && (

@@ -101,6 +101,7 @@ export default async function PlaceDetailPage({
       canEditInfo={canEditOwnerFields}
       canEditSensitive={canEditSensitive}
       canLinkGoogle={isSuper}
+      canRemove={isAdminScoped && isPubliclyVisible}
     />
   )
 }
