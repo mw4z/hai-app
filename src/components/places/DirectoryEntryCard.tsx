@@ -54,7 +54,7 @@ export default function DirectoryEntryCard({
 
   return (
     <Link
-      href="/directory"
+      href={href}
       className="flex items-center justify-between gap-3 rounded-2xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/60 px-4 py-3 active:scale-[0.99] transition-transform"
     >
       <div className="flex items-center gap-2.5">
