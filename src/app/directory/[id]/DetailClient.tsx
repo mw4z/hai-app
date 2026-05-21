@@ -18,6 +18,7 @@ import EditPlaceInfoSheet from '@/components/places/EditPlaceInfoSheet'
 import PlaceAutocomplete, { type SelectedPlace } from '@/components/places/PlaceAutocomplete'
 import ImageLightbox from '@/components/ImageLightbox'
 import { buildWhatsAppHref } from '@/lib/phone'
+import { callPhone, openExternal } from '@/lib/openExternal'
 import { formatGoogleHours } from '@/lib/places/googleHoursDisplay'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { usePrompt } from '@/components/ConfirmProvider'
@@ -288,9 +289,9 @@ export default function DetailClient({
         {/* Contact + map row */}
         <div className="grid grid-cols-2 gap-2">
           {place.phone && (
-            <a href={`tel:${place.phone}`} className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-800 dark:text-gray-100 active:scale-95">
+            <button type="button" onClick={() => callPhone(place.phone!)} className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-800 dark:text-gray-100 active:scale-95">
               📞 {tr('Call', 'اتصال', 'کال')}
-            </a>
+            </button>
           )}
           {place.whatsapp && (() => {
             // Saudi phones can arrive in many shapes (05..., 5...,
@@ -301,9 +302,9 @@ export default function DetailClient({
             const href = buildWhatsAppHref(place.whatsapp)
             if (!href) return null
             return (
-              <a href={href} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/60 text-sm font-semibold text-emerald-700 dark:text-emerald-300 active:scale-95">
+              <button type="button" onClick={() => openExternal(href)} className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/60 text-sm font-semibold text-emerald-700 dark:text-emerald-300 active:scale-95">
                 💬 {tr('WhatsApp', 'واتساب', 'واٹس ایپ')}
-              </a>
+              </button>
             )
           })()}
           {(place.latitude && place.longitude) || place.addressText || place.mapUrl ? (() => {

@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { FiPhone, FiCopy } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { hapticLight } from '@/lib/haptic'
+import { callPhone, openWhatsApp } from '@/lib/openExternal'
 
 // WhatsApp icon — inline SVG to avoid adding a dependency
 function WhatsAppIcon({ className }: { className?: string }) {
@@ -47,7 +48,10 @@ export default function ContactChip({ name, phone, variant = 'light' }: Props) {
 
   const handleCall = useCallback(() => {
     hapticLight()
-    window.open(`tel:${cleanPhone}`, '_self')
+    // Native: opens the dialer via a real Intent (AppLauncher). The old
+    // window.open('tel:…') route showed "webpage not available" on
+    // Android because the WebView tried to load the tel: scheme itself.
+    void callPhone(cleanPhone)
   }, [cleanPhone])
 
   const handleCopy = useCallback(() => {
@@ -59,7 +63,11 @@ export default function ContactChip({ name, phone, variant = 'light' }: Props) {
 
   const handleWhatsApp = useCallback(() => {
     hapticLight()
-    window.open(`https://wa.me/${toInternational(cleanPhone)}`, '_blank')
+    // Native: wa.me opened in a Custom Tab, which hands off to the
+    // WhatsApp app (App Links). The old window.open(_blank) navigated the
+    // main WebView into wa.me → whatsapp:// redirect → "webpage not
+    // available".
+    void openWhatsApp(toInternational(cleanPhone))
   }, [cleanPhone])
 
   return (
