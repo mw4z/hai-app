@@ -194,7 +194,14 @@ export default function NewPlaceClient() {
       })
       const d = await res.json().catch(() => ({}))
       if (res.ok) {
-        toast.success(tr('Submitted for review', 'تم الإرسال للمراجعة', 'جائزے کیلئے بھیج دیا گیا'))
+        // Google-sourced places auto-publish (status !== PENDING);
+        // manual ones go to mod review.
+        const published = d.place?.status && d.place.status !== 'PENDING'
+        toast.success(
+          published
+            ? tr('Added to the directory', 'تمت الإضافة إلى الدليل', 'ڈائریکٹری میں شامل کر دیا گیا')
+            : tr('Submitted for review', 'تم الإرسال للمراجعة', 'جائزے کیلئے بھیج دیا گیا'),
+        )
         router.push(`/directory/${d.place.id}`)
         return
       }

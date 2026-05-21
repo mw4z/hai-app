@@ -257,7 +257,13 @@ export async function POST(req: NextRequest) {
       // back a URL, so by the time bytes reach this row we just
       // need to cap the array count + reject non-https junk.
       imageUrls: sanitizeImageUrls((raw as { imageUrls?: unknown }).imageUrls),
-      status: 'PENDING',
+      // Auto-publish Google-sourced listings (data is authoritative
+      // and the add-place search is restricted to the neighborhood
+      // bbox, so it can only be a real place in the حي). Manually
+      // typed places still go through mod review (PENDING). Note: a
+      // claim-as-owner request, when present, is still reviewed
+      // separately below regardless of this status.
+      status: snap ? 'VISIBLE_UNVERIFIED' : 'PENDING',
       createdByUserId: user.id,
       // Google provenance + snapshot (LOCAL when no place_id).
       source: snap ? 'GOOGLE' : 'LOCAL',
