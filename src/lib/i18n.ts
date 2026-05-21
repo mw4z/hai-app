@@ -11,6 +11,7 @@ export const translations = {
   feed_title:          { ar: 'حي',               en: 'Hai',              ur: 'حی'              },
   feed_all:            { ar: 'الكل',             en: 'All',              ur: 'سب'              },
   feed_requests:       { ar: 'طلبات',            en: 'Requests',         ur: 'درخواستیں'       },
+  feed_offers:         { ar: 'عروض',             en: 'Offers',           ur: 'آفرز'            },
   feed_new_post:       { ar: 'منشور جديد',       en: 'New Post',         ur: 'نئی پوسٹ'        },
   feed_quick_ask:      { ar: 'تبحث عن شيء؟',    en: 'Looking for something?' , ur: 'کچھ ڈھونڈ رہے ہیں؟' },
 
@@ -26,6 +27,8 @@ export const translations = {
   home_action_sell_help:    { ar: 'سوق الحي والفرص',                  en: 'Neighborhood market and listings',         ur: 'محلے کا بازار اور اشتہارات' },
   home_action_report_title: { ar: 'أبلّغ عن مشكلة',                   en: 'Report a problem',                          ur: 'مسئلہ رپورٹ کریں' },
   home_action_report_help:  { ar: 'حفرة، إنارة، زحمة، نظافة',         en: 'Pothole, lighting, traffic, cleaning',      ur: 'سڑک، لائٹنگ، ٹریفک، صفائی' },
+  home_action_offers_title: { ar: 'عروض الحي',                        en: 'Neighborhood offers',                       ur: 'محلے کی آفرز' },
+  home_action_offers_help:  { ar: 'تصفّح أحدث العروض في سوق الحي',     en: 'Browse the latest deals in the market',     ur: 'بازار میں تازہ ترین آفرز دیکھیں' },
   feed_quick_ask_btn:  { ar: 'اسأل',             en: 'Ask'               , ur: 'پوچھیں' },
   feed_inline_ask_cta: { ar: 'تبي شيء؟ اسأل جيرانك',   en: 'Need something? Ask your neighbors', ur: 'کچھ چاہیے؟ اپنے پڑوسیوں سے پوچھیں' },
   ask_submitted_title: { ar: 'تم نشر طلبك',         en: 'Your request is live',              ur: 'آپ کی درخواست شائع ہو گئی' },

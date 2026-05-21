@@ -34,6 +34,8 @@ const CATEGORIES: { key: string; tKey: TranslationKey; icon: string }[] = [
   { key: 'ALL',                  tKey: 'feed_all',                    icon: '🏘️' },
   // Promoted to position 2 — visibility boost for request content.
   { key: 'REQUESTS',             tKey: 'feed_requests',               icon: '🔎' },
+  // Offers — intent-based chip (every "offering" post, any category).
+  { key: 'OFFERS',               tKey: 'feed_offers',                 icon: '🏷️' },
   // Core categories
   { key: 'MARKETPLACE',          tKey: 'post_v2_MARKETPLACE',         icon: '🛒' },
   { key: 'SERVICES',             tKey: 'post_v2_SERVICES',            icon: '🔧' },

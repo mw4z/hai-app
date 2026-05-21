@@ -136,6 +136,10 @@ export async function GET(req: NextRequest) {
     categoryFilter = isFemale ? {} : { audience: { not: 'WOMEN' } }
   } else if (category === 'REQUESTS') {
     categoryFilter = { intent: 'REQUEST' }
+  } else if (category === 'OFFERS') {
+    // Intent-only chip — every "offering" post across categories
+    // (marketplace sells, service/home-business promos, etc.).
+    categoryFilter = { intent: 'OFFER' }
   } else if (category === 'MARKETPLACE') {
     categoryFilter = { category: 'MARKETPLACE' as PostCategory, intent: 'OFFER' }
   } else if (V2_FILTER_VALUES.includes(category)) {

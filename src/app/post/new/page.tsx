@@ -416,6 +416,9 @@ export default function NewPostPage() {
   const [showOptionalTitle, setShowOptionalTitle] = useState(false)
   const [body, setBody] = useState('')
   const [price, setPrice] = useState('')
+  // "Mark as offer" — sets intent=OFFER so the post surfaces in the
+  // feed's "عروض / Offers" filter. Optional; off by default.
+  const [isOffer, setIsOffer] = useState(false)
   const [images, setImages] = useState<{ file: File; preview: string; url?: string }[]>([])
   const [uploading, setUploading] = useState(false)
   // 0..100 while the image upload is in flight. Drives the per-
@@ -808,11 +811,15 @@ export default function NewPostPage() {
           title,
           body,
           category: useCategory,
-          // "معلومة لأهل الحي" picker maps to GENERAL+NORMAL explicitly.
-          // The classifier still auto-routes the post if the text turns
-          // out to be commercial/civic — it just won't drift to REQUEST
-          // on a casual "فيه..." mention when the user is sharing info.
-          ...(useCategory === 'GENERAL' ? { intent: 'NORMAL' } : {}),
+          // Intent resolution: an explicit "mark as offer" wins
+          // (→ shows in the Offers filter). Otherwise "معلومة لأهل
+          // الحي" maps to GENERAL+NORMAL; the classifier handles the
+          // rest.
+          ...(isOffer
+            ? { intent: 'OFFER' }
+            : useCategory === 'GENERAL'
+              ? { intent: 'NORMAL' }
+              : {}),
           price: price ? parseFloat(price) : null,
           imageUrls,
           pdfUrl,
@@ -1247,6 +1254,34 @@ export default function NewPostPage() {
                   />
                 </div>
               </div>
+            )}
+
+            {/* "Mark as offer" — sets intent=OFFER so it lands in the
+                feed's Offers filter AND in the سوق الحي store (which is
+                offer-only). Gated to exactly the store's categories so
+                every offer is reachable from both surfaces; GENERAL is
+                excluded because the store doesn't carry it. */}
+            {['MARKETPLACE', 'SERVICES', 'HOME_BUSINESSES', 'REAL_ESTATE'].includes(category) && (
+              <label className="flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 p-3">
+                <input
+                  type="checkbox"
+                  checked={isOffer}
+                  onChange={(e) => setIsOffer(e.target.checked)}
+                  className="w-4 h-4 rounded border-amber-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                />
+                <span className="flex-1">
+                  <span className="block text-sm font-semibold text-amber-900 dark:text-amber-200">
+                    🏷️ {lang === 'en' ? 'Mark as an offer' : lang === 'ur' ? 'آفر کے طور پر نشان زد کریں' : 'علّمه كعرض'}
+                  </span>
+                  <span className="block text-[11px] text-amber-700/80 dark:text-amber-300/70 mt-0.5">
+                    {lang === 'en'
+                      ? 'Appears in the "Offers" filter on the feed'
+                      : lang === 'ur'
+                        ? 'فیڈ کے "آفرز" فلٹر میں ظاہر ہوگا'
+                        : 'يظهر في فلتر "العروض" بالصفحة الرئيسية'}
+                  </span>
+                </span>
+              </label>
             )}
 
             {/* Image picker */}
