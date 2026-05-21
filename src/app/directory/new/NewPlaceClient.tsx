@@ -3,13 +3,18 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiX } from 'react-icons/fi'
+import { FiX, FiMapPin, FiCheck } from 'react-icons/fi'
 import type { PlaceCategory } from '@prisma/client'
 import { useLanguage } from '@/hooks/useLanguage'
 import { PLACE_CATEGORIES } from '@/lib/places/categories'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
 import OpeningHoursPicker from '@/components/places/OpeningHoursPicker'
+import PlaceAutocomplete, { type SelectedPlace } from '@/components/places/PlaceAutocomplete'
+import { openMapPicker } from '@/components/rides/openMapPicker'
 import { uploadFiles } from '@/lib/upload'
+
+// Riyadh fallback center for the map picker when no coords are set yet.
+const FALLBACK_CENTER = { lat: 24.7136, lng: 46.6753 }
 
 const MAX_IMAGES = 5
 
@@ -29,6 +34,10 @@ export default function NewPlaceClient() {
   const [description, setDescription] = useState('')
   const [openingHours, setOpeningHours] = useState('')
   const [website, setWebsite] = useState('')
+  // Coordinates — captured from Places autocomplete or the map pin.
+  // Sent to /api/directory which validates both-or-neither (WGS84).
+  const [latitude, setLatitude] = useState<number | null>(null)
+  const [longitude, setLongitude] = useState<number | null>(null)
   const [instagram, setInstagram] = useState('')
   const [snapchat, setSnapchat] = useState('')
   const [tiktok, setTiktok] = useState('')
@@ -54,6 +63,45 @@ export default function NewPlaceClient() {
 
   const tr = (en: string, ar: string, ur: string) =>
     lang === 'en' ? en : lang === 'ur' ? ur : ar
+
+  // Autofill from a Google Places selection. Only overwrites fields
+  // Google actually returned — never blanks out something the user
+  // already typed. Coordinates always come as a pair.
+  function applyPlace(p: SelectedPlace) {
+    if (p.name) setName(p.name)
+    if (p.address) setAddressText(p.address)
+    if (p.phone) setPhone(p.phone)
+    if (p.website) setWebsite(p.website)
+    if (p.mapUrl) setMapUrl(p.mapUrl)
+    if (p.latitude !== null && p.longitude !== null) {
+      setLatitude(p.latitude)
+      setLongitude(p.longitude)
+    }
+    toast.success(tr('Details filled in', 'تم تعبئة البيانات', 'تفصیلات بھر دی گئیں'))
+  }
+
+  // Open the existing MapLibre/MapTiler picker to set or adjust the
+  // pin. Centers on the current coords (or Riyadh fallback). On
+  // confirm we store lat/lng and, if the address field is empty,
+  // seed it with the reverse-geocoded address.
+  async function pickOnMap() {
+    const maptilerKey = process.env.NEXT_PUBLIC_MAPTILER_KEY || ''
+    const center =
+      latitude !== null && longitude !== null
+        ? { lat: latitude, lng: longitude }
+        : FALLBACK_CENTER
+    const result = await openMapPicker({
+      centerLat: center.lat,
+      centerLng: center.lng,
+      lang,
+      maptilerKey,
+    })
+    if (result) {
+      setLatitude(result.lat)
+      setLongitude(result.lng)
+      if (!addressText.trim() && result.address) setAddressText(result.address)
+    }
+  }
 
   function pickImages(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || [])
@@ -110,6 +158,8 @@ export default function NewPlaceClient() {
           phone: phone || undefined,
           whatsapp: whatsapp || undefined,
           mapUrl: mapUrl || undefined,
+          latitude: latitude ?? undefined,
+          longitude: longitude ?? undefined,
           description: description || undefined,
           openingHours: openingHours || undefined,
           website: website || undefined,
@@ -161,13 +211,29 @@ export default function NewPlaceClient() {
           )}
         </p>
 
+        {/* Google Places search — type the business name, pick it,
+            and name/address/phone/website/coords autofill below.
+            Degrades silently if Places isn't configured. */}
+        <div className="rounded-2xl border border-primary-200 dark:border-primary-800/60 bg-primary-50/60 dark:bg-primary-900/15 p-3 space-y-2">
+          <span className="block text-[12px] font-bold text-primary-700 dark:text-primary-300">
+            ✨ {tr('Quick fill from Google Maps', 'تعبئة سريعة من خرائط Google', 'گوگل میپس سے فوری بھریں')}
+          </span>
+          <PlaceAutocomplete onSelect={applyPlace} />
+          <p className="text-[10.5px] text-gray-500 dark:text-gray-400 leading-snug">
+            {tr(
+              'Optional — you can also fill everything manually below.',
+              'اختياري — يمكنك أيضاً تعبئة الحقول يدويًا بالأسفل.',
+              'اختیاری — آپ نیچے دستی طور پر بھی بھر سکتے ہیں۔',
+            )}
+          </p>
+        </div>
+
         <Field label={tr('Name', 'الاسم', 'نام')}>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={80}
             className="input-field"
-            autoFocus
           />
         </Field>
 
@@ -192,6 +258,43 @@ export default function NewPlaceClient() {
           <Field label={tr('WhatsApp', 'واتساب', 'واٹس ایپ')}>
             <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} dir="ltr" placeholder="05xxxxxxxx" className="input-field" />
           </Field>
+        </div>
+
+        {/* Location pin — set/adjust via the map picker. Shows a
+            confirmed state once coords exist (from autocomplete or
+            the map). The raw Map URL stays editable underneath for
+            anyone who wants to paste a link directly. */}
+        <div>
+          <span className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+            📍 {tr('Location (optional)', 'الموقع (اختياري)', 'مقام (اختیاری)')}
+          </span>
+          <button
+            type="button"
+            onClick={pickOnMap}
+            className={`w-full flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-sm transition-colors ${
+              latitude !== null && longitude !== null
+                ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-200'
+                : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400'
+            }`}
+          >
+            <span className="flex items-center gap-2 min-w-0">
+              {latitude !== null && longitude !== null ? (
+                <FiCheck className="w-4 h-4 flex-shrink-0" />
+              ) : (
+                <FiMapPin className="w-4 h-4 flex-shrink-0" />
+              )}
+              <span className="truncate">
+                {latitude !== null && longitude !== null
+                  ? tr('Location pinned', 'تم تحديد الموقع', 'مقام مقرر')
+                  : tr('Set location on map', 'حدد الموقع على الخريطة', 'نقشے پر مقام مقرر کریں')}
+              </span>
+            </span>
+            <span className="text-[11px] flex-shrink-0" dir="ltr">
+              {latitude !== null && longitude !== null
+                ? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
+                : ''}
+            </span>
+          </button>
         </div>
 
         <Field label={tr('Map URL (optional)', 'رابط الخريطة (اختياري)', 'نقشہ لنک (اختیاری)')}>
