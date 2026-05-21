@@ -74,6 +74,12 @@ export default async function FeedPage({
     categoryFilter = isFemale ? {} : { audience: { not: 'WOMEN' } }
   } else if (category === 'REQUESTS') {
     categoryFilter = { intent: 'REQUEST' }
+  } else if (category === 'OFFERS') {
+    // Intent-only chip — explicitly-marked offers across categories.
+    // MUST mirror the /api/feed branch; without it OFFERS fell through
+    // to the `{}` default below and the SSR feed rendered EVERYTHING
+    // (reports included, since they out-boost everything).
+    categoryFilter = { intent: 'OFFER' }
   } else if (category === 'MARKETPLACE') {
     categoryFilter = { category: 'MARKETPLACE' as PostCategory, intent: 'OFFER' }
   } else if (V2_FILTER_VALUES.includes(category)) {
