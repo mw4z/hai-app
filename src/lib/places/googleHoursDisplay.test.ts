@@ -44,6 +44,25 @@ test('a closed day shows as Closed', () => {
   ])
 })
 
+test('24h most days + Friday partial (the reported bug)', () => {
+  // ONE Google period: open Fri 1 PM → close Fri 2 AM, wrapping the
+  // whole week. Sat–Thu are fully inside it (24h); Friday is partial.
+  const periods = [{ open: { day: 5, hour: 13, minute: 0 }, close: { day: 5, hour: 2, minute: 0 } }]
+  assert.deepEqual(formatGoogleHours(periods, 'en'), [
+    'Sat - Thu: 24 hours',
+    'Fri: 1 PM - 2 AM',
+  ])
+})
+
+test('overnight on one day attributes to its open day', () => {
+  // Open every day 10 PM → 2 AM next day. Each day's run starts 22:00.
+  const periods = Array.from({ length: 7 }, (_, g) => ({
+    open: { day: g, hour: 22, minute: 0 },
+    close: { day: (g + 1) % 7, hour: 2, minute: 0 },
+  }))
+  assert.deepEqual(formatGoogleHours(periods, 'en'), ['Sat - Fri: 10 PM - 2 AM'])
+})
+
 test('24/7 → single open with no close', () => {
   assert.deepEqual(
     formatGoogleHours([{ open: { day: 0, hour: 0, minute: 0 } }], 'en'),
