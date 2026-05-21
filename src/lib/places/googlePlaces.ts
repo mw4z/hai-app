@@ -41,16 +41,48 @@ function lc(lang: string): string {
   return lang === 'en' ? 'en' : lang === 'ur' ? 'ur' : 'ar'
 }
 
+export interface AutocompleteArea {
+  /** Soft "near first" bias circle. */
+  bias?: { lat: number; lng: number; radiusM?: number }
+  /** Hard rectangle restriction — results OUTSIDE this box are
+   *  dropped entirely. Used for add-place (neighborhood-only). */
+  restrictRect?: { lowLat: number; lowLng: number; highLat: number; highLng: number }
+}
+
 export async function placesAutocomplete(
   input: string,
   sessionToken: string,
   lang: string,
-  /** Optional center to bias results toward — nearby places rank
-   *  first, like Google Maps. Radius defaults to 30km. */
-  bias?: { lat: number; lng: number; radiusM?: number } | null,
+  area?: AutocompleteArea | null,
 ): Promise<AutocompleteSuggestion[] | null> {
   const k = key()
   if (!k) return null
+  // Build the location qualifier: a hard rectangle restriction wins
+  // (add-place must stay inside the neighborhood); else a soft bias
+  // circle ("near first"); else just restrict to KSA by region.
+  let locationField: Record<string, unknown>
+  if (area?.restrictRect) {
+    const r = area.restrictRect
+    locationField = {
+      locationRestriction: {
+        rectangle: {
+          low: { latitude: r.lowLat, longitude: r.lowLng },
+          high: { latitude: r.highLat, longitude: r.highLng },
+        },
+      },
+    }
+  } else if (area?.bias) {
+    locationField = {
+      locationBias: {
+        circle: {
+          center: { latitude: area.bias.lat, longitude: area.bias.lng },
+          radius: area.bias.radiusM ?? 30000,
+        },
+      },
+    }
+  } else {
+    locationField = { includedRegionCodes: ['sa'] }
+  }
   try {
     const res = await fetch(`${PLACES_BASE}/places:autocomplete`, {
       method: 'POST',
@@ -60,18 +92,7 @@ export async function placesAutocomplete(
         sessionToken,
         languageCode: lc(lang),
         regionCode: 'SA',
-        // locationBias (soft "near first") + region restriction. When
-        // we have a center we use the bias; otherwise restrict to KSA.
-        ...(bias
-          ? {
-              locationBias: {
-                circle: {
-                  center: { latitude: bias.lat, longitude: bias.lng },
-                  radius: bias.radiusM ?? 30000,
-                },
-              },
-            }
-          : { includedRegionCodes: ['sa'] }),
+        ...locationField,
       }),
     })
     if (!res.ok) return []

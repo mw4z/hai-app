@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { role: true, neighborhood: { select: { lat: true, lng: true } } },
+    select: { role: true, neighborhood: { select: { lat: true, lng: true, bbox: true } } },
   })
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const gate = gatePublicRoute(user.role)
@@ -43,19 +43,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ suggestions: [] })
   }
 
-  // "Near first" bias: prefer client-sent device coords (rides passes
-  // these); otherwise fall back to the user's neighborhood center so
-  // the directory still ranks nearby places first without prompting
-  // for location.
-  const bodyLat = Number(raw?.lat)
-  const bodyLng = Number(raw?.lng)
-  const bias =
-    Number.isFinite(bodyLat) && Number.isFinite(bodyLng)
-      ? { lat: bodyLat, lng: bodyLng }
-      : user.neighborhood?.lat != null && user.neighborhood?.lng != null
-        ? { lat: user.neighborhood.lat, lng: user.neighborhood.lng }
-        : null
+  // Area qualifier:
+  //  - restrict=true (add-place): HARD-limit to the neighborhood's
+  //    bounding box so far places never appear.
+  //  - else: soft "near first" bias toward client device coords
+  //    (rides) or the neighborhood center (directory search).
+  const bbox = user.neighborhood?.bbox as number[] | null | undefined
+  const hasBbox = Array.isArray(bbox) && bbox.length === 4 && bbox.every((n) => Number.isFinite(n))
+  let area: import('@/lib/places/googlePlaces').AutocompleteArea | null = null
 
-  const suggestions = await placesAutocomplete(input, sessionToken, lang, bias)
+  if (raw?.restrict === true && hasBbox) {
+    // bbox = [minLng, minLat, maxLng, maxLat]
+    area = {
+      restrictRect: { lowLat: bbox![1], lowLng: bbox![0], highLat: bbox![3], highLng: bbox![2] },
+    }
+  } else {
+    const bodyLat = Number(raw?.lat)
+    const bodyLng = Number(raw?.lng)
+    if (Number.isFinite(bodyLat) && Number.isFinite(bodyLng)) {
+      area = { bias: { lat: bodyLat, lng: bodyLng } }
+    } else if (user.neighborhood?.lat != null && user.neighborhood?.lng != null) {
+      area = { bias: { lat: user.neighborhood.lat, lng: user.neighborhood.lng } }
+    }
+  }
+
+  const suggestions = await placesAutocomplete(input, sessionToken, lang, area)
   return NextResponse.json({ suggestions: suggestions ?? [] })
 }

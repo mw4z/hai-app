@@ -87,7 +87,9 @@ export default function PlaceAutocomplete({
         const res = await fetch('/api/places/autocomplete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ input: query, sessionToken: tokenRef.current, lang }),
+          // restrict=true → server hard-limits results to the user's
+          // neighborhood bbox, so far places outside the حي never show.
+          body: JSON.stringify({ input: query, sessionToken: tokenRef.current, lang, restrict: true }),
         })
         const d = await res.json().catch(() => ({}))
         if (aborted) return
