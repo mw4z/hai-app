@@ -108,6 +108,36 @@ export function openMapPicker(options: {
     let pin = { lat: centerLat, lng: centerLng }
     let currentAddress = ''
     let currentArea = ''
+    // Initial center — starts at the passed value but gets overridden
+    // by the user's live GPS position when available (resolveInitialCenter),
+    // so the picker opens on "where you are" instead of a default city.
+    let startLat = centerLat
+    let startLng = centerLng
+
+    // Try to get the device's current position before the map paints.
+    // Resolves to the GPS fix if granted+quick, otherwise the passed
+    // center after a short timeout — so a denied/slow lookup never
+    // leaves the user staring at the loader.
+    function resolveInitialCenter(): Promise<{ lat: number; lng: number }> {
+      return new Promise((res) => {
+        if (typeof navigator === 'undefined' || !navigator.geolocation) {
+          res({ lat: centerLat, lng: centerLng })
+          return
+        }
+        let settled = false
+        const finish = (lat: number, lng: number) => {
+          if (settled) return
+          settled = true
+          res({ lat, lng })
+        }
+        const t = setTimeout(() => finish(centerLat, centerLng), 4500)
+        navigator.geolocation.getCurrentPosition(
+          (pos) => { clearTimeout(t); finish(pos.coords.latitude, pos.coords.longitude) },
+          () => { clearTimeout(t); finish(centerLat, centerLng) },
+          { enableHighAccuracy: false, timeout: 4500, maximumAge: 60000 },
+        )
+      })
+    }
 
     function cleanup() {
       if (map) map.remove()
@@ -179,6 +209,11 @@ export function openMapPicker(options: {
     }
 
     async function initMap() {
+      // Kick off geolocation NOW, in parallel with the (slower) script
+      // + RTL-plugin loads, so the GPS fix is usually ready by the time
+      // we're about to create the map — hiding the lookup latency.
+      const geoPromise = resolveInitialCenter()
+
       loadCSS('https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css')
       await loadScript('https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js')
 
@@ -215,6 +250,12 @@ export function openMapPicker(options: {
         }
       })
 
+      // Resolve the live GPS center (or fall back) just before paint.
+      const detected = await geoPromise
+      startLat = detected.lat
+      startLng = detected.lng
+      pin = { lat: startLat, lng: startLng }
+
       // 'hybrid' = satellite imagery with street/neighborhood labels
       // overlaid. Gives the user real aerial context when picking a
       // location, without losing the ability to read place names.
@@ -223,7 +264,7 @@ export function openMapPicker(options: {
         style: maptilerKey
           ? `https://api.maptiler.com/maps/hybrid/style.json?key=${maptilerKey}${lang === 'ar' ? '&language=ar' : lang === 'ur' ? '&language=ur' : ''}`
           : 'https://demotiles.maplibre.org/style.json',
-        center: [centerLng, centerLat],
+        center: [startLng, startLat],
         zoom: 16,
       })
 
@@ -267,9 +308,9 @@ export function openMapPicker(options: {
       map.addControl(new ml.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: false }), 'top-right')
 
       const marker = new ml.Marker({ color: '#ef4444', draggable: true })
-      marker.setLngLat([centerLng, centerLat]).addTo(map)
+      marker.setLngLat([startLng, startLat]).addTo(map)
 
-      reverseGeocode(centerLat, centerLng)
+      reverseGeocode(startLat, startLng)
 
       map.on('click', (e: any) => {
         const { lat, lng } = e.lngLat
