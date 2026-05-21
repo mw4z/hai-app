@@ -352,6 +352,18 @@ input, textarea, [contenteditable="true"] {
 .animate-slide-in-ltr { animation: slide-in-left  var(--hai-dur-slow) var(--hai-ease-standard); }
 .animate-fade-in-up   { animation: fade-in-up     var(--hai-dur-slow) var(--hai-ease-standard); }
 
+/* Voice-note waveform idle motion — a gentle traveling wave (staggered
+   per-bar delay set inline) so a sent note reads as "voice" even before
+   playback. transform-only, so it stays on the compositor. */
+@keyframes hai-voice-idle {
+  0%, 100% { transform: scaleY(0.6); }
+  50%      { transform: scaleY(1); }
+}
+.hai-voice-bar {
+  transform-origin: center;
+  animation: hai-voice-idle 1.5s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-slide-up,
   .animate-slide-in-rtl,
@@ -360,7 +372,8 @@ input, textarea, [contenteditable="true"] {
   .hai-arc-pin-ltr,
   .hai-arc-pin-rtl,
   .hai-label-in,
-  .hai-label-out {
+  .hai-label-out,
+  .hai-voice-bar {
     animation: none;
   }
 }

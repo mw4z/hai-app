@@ -1979,7 +1979,7 @@ export default function ChatClient({
               onClick={() => { hapticLight(); setShowAttachMenu(true) }}
               disabled={sendingImage || sendingLocation}
               aria-label={lang === 'en' ? 'Attach' : lang === 'ur' ? 'منسلک کریں' : 'إرفاق'}
-              className="p-2 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50 flex-shrink-0">
+              className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50 flex-shrink-0">
               <FiPaperclip className={`w-5 h-5 ${(sendingImage || sendingLocation) ? 'animate-pulse' : ''}`} />
             </button>
             {/* Voice note recorder — mic button + record/preview overlay. */}
@@ -2276,14 +2276,18 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
             {replyQuote && <div className="mb-1">{replyQuote}</div>}
             <div className={`relative rounded-2xl px-3 py-2.5 shadow-sm ${
               isMe ? `bg-primary-600 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white dark:bg-[#242625] ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
-            } ${(msg as any).pending ? 'opacity-90' : ''}`}>
+            }`}>
               {/* Prefer the local blob (localPreview) as the playback
                   source so a just-sent note plays instantly and the swap
-                  to the server row doesn't re-fetch over the network. */}
-              <VoicePlayer src={(msg as any).localPreview || msg.audioUrl} durationMs={msg.audioDurationMs} isMe={isMe} />
-              {(msg as any).pending && (
-                <span className="absolute top-1 end-1 w-3.5 h-3.5 border-2 border-white/70 border-t-transparent rounded-full animate-spin" aria-hidden />
-              )}
+                  to the server row doesn't re-fetch over the network. The
+                  upload spinner is a ring around the play button (passed
+                  via `pending`), not a corner dot. */}
+              <VoicePlayer
+                src={(msg as any).localPreview || msg.audioUrl}
+                durationMs={msg.audioDurationMs}
+                isMe={isMe}
+                pending={!!(msg as any).pending}
+              />
             </div>
             <p className={`text-[10px] mt-1 px-1 flex items-center gap-0.5 ${isMe ? 'text-gray-400 justify-start' : 'text-gray-400 justify-end'}`}>
               {timeStr}
@@ -2457,8 +2461,13 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
           const grouped = msg.reactions.reduce((acc: Record<string, number>, r: any) => {
             acc[r.emoji] = (acc[r.emoji] || 0) + 1; return acc
           }, {})
+          // VOICE/IMAGE/PDF render their time+status meta row OUTSIDE the
+          // bubble (as a sibling), so the usual -mt-2 overlap lands the
+          // chip ON the timestamp and looks broken. For those, sit the
+          // chip cleanly just below the meta row instead of overlapping.
+          const metaOutsideBubble = msg.type === 'VOICE' || msg.type === 'IMAGE' || msg.type === 'PDF'
           return (
-            <div className={`-mt-2 ${isMe ? 'mr-2' : 'ml-2'} mb-1`}>
+            <div className={`${metaOutsideBubble ? '-mt-0.5' : '-mt-2'} ${isMe ? 'mr-2' : 'ml-2'} mb-1`}>
               <div className="inline-flex items-center gap-0.5 bg-white dark:bg-gray-800 rounded-full shadow-md border-2 border-gray-200 dark:border-gray-600 px-2 py-1">
                 {Object.entries(grouped).map(([emoji, count]) => (
                   <span key={emoji} className="text-[13px] leading-none">

@@ -32,6 +32,13 @@ export default async function ThreadPage({ params }: { params: { id: string } })
       select: {
         id: true, type: true, text: true, lat: true, lng: true,
         imageUrl: true, senderId: true, createdAt: true,
+        // Audio + PDF fields are REQUIRED here: without them the SSR
+        // initial render of a VOICE/PDF bubble had no url, so its render
+        // branch was false and it fell through to a placeholder — then
+        // refreshOnce() added the url and the bubble visibly swapped in
+        // (the "mic icon → playable" flash on opening a chat).
+        audioUrl: true, audioDurationMs: true, audioMimeType: true,
+        pdfUrl: true, pdfName: true,
         deliveredAt: true, readAt: true, edited: true, reactions: true,
         replyToId: true,
         replyTo: { select: { id: true, text: true, senderId: true, type: true } },
