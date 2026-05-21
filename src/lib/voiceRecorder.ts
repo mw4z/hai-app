@@ -37,20 +37,25 @@ let nativeStartedAt = 0
 
 async function nativeStart(): Promise<void> {
   const { CapacitorAudioRecorder } = await import('@capgo/capacitor-audio-recorder')
-  // Ensure mic permission. Shapes vary slightly across versions, so be
-  // lenient: check, then request if not clearly granted.
+  // Ensure mic permission. The plugin's PermissionStatus exposes the
+  // state under `recordAudio` (not `microphone`); keep a `microphone`
+  // fallback in case a future version renames it.
+  const permState = (s: any): string | undefined => s?.recordAudio ?? s?.microphone
   try {
     const cur: any = await CapacitorAudioRecorder.checkPermissions?.()
-    if (cur && cur.microphone && cur.microphone !== 'granted') {
+    const st = permState(cur)
+    if (st && st !== 'granted') {
       const req: any = await CapacitorAudioRecorder.requestPermissions()
-      if (req?.microphone && req.microphone !== 'granted') {
+      const rst = permState(req)
+      if (rst && rst !== 'granted') {
         throw new RecorderError('permission', 'Microphone permission denied')
       }
     }
   } catch (e) {
     if (e instanceof RecorderError) throw e
     const req: any = await CapacitorAudioRecorder.requestPermissions?.().catch(() => null)
-    if (req && req.microphone && req.microphone !== 'granted') {
+    const rst = permState(req)
+    if (rst && rst !== 'granted') {
       throw new RecorderError('permission', 'Microphone permission denied')
     }
   }
@@ -91,17 +96,24 @@ async function nativeLevel(): Promise<number> {
     const { CapacitorAudioRecorder } = await import('@capgo/capacitor-audio-recorder')
     const res: any = await (CapacitorAudioRecorder as any).getCurrentAmplitude?.()
     if (!res) return 0
-    let v =
-      typeof res.amplitude === 'number'
-        ? res.amplitude
-        : typeof res.value === 'number'
-          ? res.value
+    const raw =
+      typeof res.value === 'number'
+        ? res.value
+        : typeof res.amplitude === 'number'
+          ? res.amplitude
           : typeof res.current === 'number'
             ? res.current
             : 0
-    // dB-scale (≤0) → normalize from roughly -60..0 dB into 0..1.
-    if (v <= 0 && v !== 0) v = Math.max(0, (v + 60) / 60)
-    return Math.min(1, Math.max(0, v))
+    if (!(raw > 0)) return 0
+    // The plugin returns a LINEAR amplitude in [0,1], but iOS derives it
+    // from average power in dB (value = 10^(dB/20)). That packs ordinary
+    // speech (~ -25 dB → value ≈ 0.056) into a tiny band near zero, so a
+    // raw value barely lifts the bars off their 3px floor — the "quiet
+    // dots" symptom. Re-expand through a dB window so speech is lively:
+    //   -50 dB → 0 (silence/noise floor)   -5 dB → 1 (loud).
+    // Android (peak sample amplitude) maps through the same window fine.
+    const db = 20 * Math.log10(Math.min(1, raw))
+    return Math.min(1, Math.max(0, (db + 50) / 45))
   } catch {
     return 0
   }
