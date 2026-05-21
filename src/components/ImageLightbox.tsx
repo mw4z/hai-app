@@ -150,7 +150,15 @@ export default function ImageLightbox({
     }
   }, [index, trackIdx])
 
-  const getActiveWrap = () => imgWrapRefs.current[index]
+  // Active-image index mirrored into a ref. The native touch handlers
+  // are bound once per open (deps: [mounted]), so reading `index`
+  // directly would capture the mount-time value — after swiping to
+  // another photo, pinch/double-tap would transform the WRONG (stale)
+  // image and zoom looked broken. Reading indexRef keeps it live.
+  const indexRef = useRef(index)
+  useEffect(() => { indexRef.current = index }, [index])
+
+  const getActiveWrap = () => imgWrapRefs.current[indexRef.current]
 
   function applyImgTransform(tx: number, ty: number, scale: number) {
     const wrap = getActiveWrap()
