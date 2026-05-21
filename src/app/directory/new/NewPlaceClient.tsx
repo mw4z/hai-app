@@ -38,6 +38,9 @@ export default function NewPlaceClient() {
   // Sent to /api/directory which validates both-or-neither (WGS84).
   const [latitude, setLatitude] = useState<number | null>(null)
   const [longitude, setLongitude] = useState<number | null>(null)
+  // Google place_id when this listing was started from a Places pick.
+  // The server uses it to snapshot rating/hours/photos + tag source.
+  const [googlePlaceId, setGooglePlaceId] = useState<string | null>(null)
   const [instagram, setInstagram] = useState('')
   const [snapchat, setSnapchat] = useState('')
   const [tiktok, setTiktok] = useState('')
@@ -77,6 +80,7 @@ export default function NewPlaceClient() {
       setLatitude(p.latitude)
       setLongitude(p.longitude)
     }
+    if (p.placeId) setGooglePlaceId(p.placeId)
     toast.success(tr('Details filled in', 'تم تعبئة البيانات', 'تفصیلات بھر دی گئیں'))
   }
 
@@ -160,6 +164,7 @@ export default function NewPlaceClient() {
           mapUrl: mapUrl || undefined,
           latitude: latitude ?? undefined,
           longitude: longitude ?? undefined,
+          googlePlaceId: googlePlaceId || undefined,
           description: description || undefined,
           openingHours: openingHours || undefined,
           website: website || undefined,

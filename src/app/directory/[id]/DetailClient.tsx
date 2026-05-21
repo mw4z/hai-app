@@ -10,6 +10,7 @@ import { getCategoryMeta } from '@/lib/places/categories'
 import PlaceStatusBadge from '@/components/places/PlaceStatusBadge'
 import PlacePill from '@/components/places/PlacePill'
 import PlaceReviewsSection from '@/components/places/PlaceReviewsSection'
+import PlaceSourceBadge from '@/components/places/PlaceSourceBadge'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
 import EditPhotosSheet from '@/components/places/EditPhotosSheet'
 import EditPlaceInfoSheet from '@/components/places/EditPlaceInfoSheet'
@@ -93,7 +94,25 @@ export default function DetailClient({
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-xs text-gray-500 dark:text-gray-400">{categoryLabel}</p>
                 <PlacePill place={place} size="md" />
+                <PlaceSourceBadge source={place.source} />
               </div>
+              {/* Google rating snapshot — shown distinctly from the
+                  in-app "تقييمات أهل الحي" section below, with the
+                  required Google attribution. */}
+              {place.source === 'GOOGLE' && place.googleRating != null && (
+                <div className="flex items-center gap-1.5 mt-1.5 text-[13px] text-gray-700 dark:text-gray-200">
+                  <span className="text-amber-500" aria-hidden>★</span>
+                  <span className="font-bold" dir="ltr">{place.googleRating.toFixed(1)}</span>
+                  {place.googleRatingCount != null && (
+                    <span className="text-gray-500 dark:text-gray-400" dir="ltr">
+                      ({place.googleRatingCount})
+                    </span>
+                  )}
+                  <span className="text-gray-400 text-[11px]">
+                    {tr('on Google', 'على Google', 'على Google')}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -109,6 +128,23 @@ export default function DetailClient({
 
           {place.openingHours && (
             <p className="text-sm text-gray-600 dark:text-gray-400">🕒 {place.openingHours}</p>
+          )}
+
+          {/* Google opening hours — per-day list from the snapshot.
+              Only when the place has no manually-entered hours, so
+              we don't show two conflicting schedules. */}
+          {!place.openingHours && place.source === 'GOOGLE' && place.googleHours && (
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span aria-hidden>🕒</span>
+                <PlaceSourceBadge source="GOOGLE" size="xs" />
+              </div>
+              <div className="ps-5 space-y-0.5">
+                {place.googleHours.split('\n').map((line, i) => (
+                  <p key={i} className="text-[12.5px] leading-snug">{line}</p>
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Attribution — generic, never exposes createdByUser. */}
@@ -142,6 +178,35 @@ export default function DetailClient({
                   />
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Google photos — served through our proxy (never re-hosted).
+            Up to 3, with the required Google attribution. Tap opens a
+            larger proxied size in a new tab. */}
+        {place.source === 'GOOGLE' && place.googlePhotoRefs.length > 0 && (
+          <div className="space-y-1.5">
+            <PlaceSourceBadge source="GOOGLE" size="xs" />
+            <div className="-mx-4 px-4 overflow-x-auto">
+              <div className="flex gap-2">
+                {place.googlePhotoRefs.slice(0, 3).map((ref, i) => (
+                  <a
+                    key={i}
+                    href={`/api/places/photo?name=${encodeURIComponent(ref)}&w=1200`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-shrink-0 block active:scale-[0.98] transition-transform"
+                  >
+                    <img
+                      src={`/api/places/photo?name=${encodeURIComponent(ref)}&w=640`}
+                      alt=""
+                      loading="lazy"
+                      className="h-44 w-auto rounded-2xl object-cover border border-gray-200 dark:border-gray-700"
+                    />
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
         )}

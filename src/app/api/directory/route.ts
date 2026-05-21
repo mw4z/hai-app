@@ -14,6 +14,7 @@ import {
   applyOpenNowFilter,
 } from '@/lib/places/directoryFilters'
 import { matchesArabic } from '@/lib/arabicNormalize'
+import { placeSnapshot } from '@/lib/places/googlePlaces'
 
 export const dynamic = 'force-dynamic'
 
@@ -214,6 +215,21 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // ── Google Places snapshot ────────────────────────────────────
+  // If the submitter started from a Google pick, we re-fetch Place
+  // Details SERVER-SIDE from the place_id (trusting only the id the
+  // client sent, never client-supplied rating/hours) so the stored
+  // snapshot is authoritative + attributable. Best-effort: a failed
+  // lookup just leaves it a normal LOCAL listing.
+  const rawGoogleId = (raw as { googlePlaceId?: unknown }).googlePlaceId
+  const googlePlaceId =
+    typeof rawGoogleId === 'string' && rawGoogleId.startsWith('places/')
+      ? rawGoogleId
+      : typeof rawGoogleId === 'string' && rawGoogleId.length > 0 && rawGoogleId.length < 300
+        ? rawGoogleId
+        : null
+  const snap = googlePlaceId ? await placeSnapshot(googlePlaceId) : null
+
   const place = await db.placeListing.create({
     data: {
       neighborhoodId: user.neighborhoodId,
@@ -240,6 +256,14 @@ export async function POST(req: NextRequest) {
       imageUrls: sanitizeImageUrls((raw as { imageUrls?: unknown }).imageUrls),
       status: 'PENDING',
       createdByUserId: user.id,
+      // Google provenance + snapshot (LOCAL when no place_id).
+      source: snap ? 'GOOGLE' : 'LOCAL',
+      googlePlaceId: googlePlaceId,
+      googleRating: snap?.rating ?? null,
+      googleRatingCount: snap?.ratingCount ?? null,
+      googleHours: snap?.hours ?? null,
+      googlePhotoRefs: snap?.photoRefs ?? [],
+      googleSyncedAt: snap ? new Date() : null,
     },
     include: {
       claimedByUser: {

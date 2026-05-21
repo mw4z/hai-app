@@ -6,6 +6,7 @@ import { useLanguage } from '@/hooks/useLanguage'
 import { getCategoryMeta } from '@/lib/places/categories'
 import PlaceStatusBadge from './PlaceStatusBadge'
 import PlacePill from './PlacePill'
+import PlaceSourceBadge from './PlaceSourceBadge'
 
 /** Card used in /directory and /directory/mine. Renders the
  *  category emoji + name + short address + status badge with
@@ -38,16 +39,30 @@ export default function PlaceCard({ place }: { place: PublicPlace }) {
               the detail page renders. Hidden when there are no
               reviews yet, replaced with a softer label so
               fresh places don't look broken. */}
-          <p className="text-[11.5px] text-gray-500 dark:text-gray-400 mt-0.5">
-            {place.ratingCount > 0 ? (
-              <>
-                <span aria-hidden>★</span> <span dir="ltr">{place.ratingAvg.toFixed(1)}</span>
-                <span> · {place.ratingCount} تقييم</span>
-              </>
-            ) : (
-              <>بدون تقييمات بعد</>
+          <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-0.5">
+            <p className="text-[11.5px] text-gray-500 dark:text-gray-400">
+              {place.ratingCount > 0 ? (
+                <>
+                  <span aria-hidden>★</span> <span dir="ltr">{place.ratingAvg.toFixed(1)}</span>
+                  <span> · {place.ratingCount} تقييم</span>
+                </>
+              ) : (
+                <>بدون تقييمات بعد</>
+              )}
+            </p>
+            {/* Google rating shown distinctly (not merged with the
+                in-app ⭐), with the required Google attribution. */}
+            {place.source === 'GOOGLE' && place.googleRating != null && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400">
+                <PlaceSourceBadge source="GOOGLE" size="xs" />
+                <span aria-hidden>★</span>
+                <span dir="ltr">{place.googleRating.toFixed(1)}</span>
+                {place.googleRatingCount != null && (
+                  <span dir="ltr">({place.googleRatingCount})</span>
+                )}
+              </span>
             )}
-          </p>
+          </div>
           {/* Live open/closed (or owner override) pill. Hides
               itself when the place has no parseable hours AND
               no manual override. */}

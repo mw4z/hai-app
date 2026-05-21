@@ -95,6 +95,68 @@ export interface PlaceDetails {
   phone: string | null
   website: string | null
   mapUrl: string | null
+  // Google snapshot (attribution-required; refresh within ~30d).
+  rating: number | null
+  ratingCount: number | null
+  hours: string | null // weekdayDescriptions joined by \n
+  photoRefs: string[] // up to 3 Google photo resource names
+}
+
+const DETAILS_FIELD_MASK = [
+  'id',
+  'displayName',
+  'formattedAddress',
+  'location',
+  'nationalPhoneNumber',
+  'websiteUri',
+  'googleMapsUri',
+  'rating',
+  'userRatingCount',
+  'regularOpeningHours',
+  'photos',
+].join(',')
+
+interface RawPlace {
+  displayName?: { text?: string }
+  formattedAddress?: string
+  location?: { latitude?: number; longitude?: number }
+  nationalPhoneNumber?: string
+  websiteUri?: string
+  googleMapsUri?: string
+  rating?: number
+  userRatingCount?: number
+  regularOpeningHours?: { weekdayDescriptions?: string[] }
+  photos?: Array<{ name?: string }>
+}
+
+function mapPlace(d: RawPlace): PlaceDetails {
+  // Normalize the Saudi national phone ("055 123 4567") to the bare
+  // 05xxxxxxxx the form + validators expect.
+  const phone = d.nationalPhoneNumber
+    ? d.nationalPhoneNumber.replace(/\D/g, '') || null
+    : null
+  const hours =
+    d.regularOpeningHours?.weekdayDescriptions &&
+    d.regularOpeningHours.weekdayDescriptions.length > 0
+      ? d.regularOpeningHours.weekdayDescriptions.join('\n')
+      : null
+  const photoRefs = (d.photos ?? [])
+    .map((p) => p.name)
+    .filter((n): n is string => typeof n === 'string' && n.startsWith('places/'))
+    .slice(0, 3)
+  return {
+    name: d.displayName?.text ?? '',
+    address: d.formattedAddress ?? null,
+    latitude: typeof d.location?.latitude === 'number' ? d.location.latitude : null,
+    longitude: typeof d.location?.longitude === 'number' ? d.location.longitude : null,
+    phone,
+    website: d.websiteUri ?? null,
+    mapUrl: d.googleMapsUri ?? null,
+    rating: typeof d.rating === 'number' ? d.rating : null,
+    ratingCount: typeof d.userRatingCount === 'number' ? d.userRatingCount : null,
+    hours,
+    photoRefs,
+  }
 }
 
 export async function placeDetails(
@@ -105,37 +167,61 @@ export async function placeDetails(
   const k = key()
   if (!k) return null
   try {
-    const fields =
-      'id,displayName,formattedAddress,location,nationalPhoneNumber,websiteUri,googleMapsUri'
     const url =
       `${PLACES_BASE}/places/${encodeURIComponent(placeId)}` +
       `?sessionToken=${encodeURIComponent(sessionToken)}&languageCode=${lc(lang)}`
     const res = await fetch(url, {
-      headers: { 'X-Goog-Api-Key': k, 'X-Goog-FieldMask': fields },
+      headers: { 'X-Goog-Api-Key': k, 'X-Goog-FieldMask': DETAILS_FIELD_MASK },
     })
     if (!res.ok) return null
-    const d = (await res.json()) as {
-      displayName?: { text?: string }
-      formattedAddress?: string
-      location?: { latitude?: number; longitude?: number }
-      nationalPhoneNumber?: string
-      websiteUri?: string
-      googleMapsUri?: string
-    }
-    // Normalize the Saudi national phone ("055 123 4567") to the bare
-    // 05xxxxxxxx the form + validators expect.
-    const phone = d.nationalPhoneNumber
-      ? d.nationalPhoneNumber.replace(/\D/g, '') || null
-      : null
-    return {
-      name: d.displayName?.text ?? '',
-      address: d.formattedAddress ?? null,
-      latitude: typeof d.location?.latitude === 'number' ? d.location.latitude : null,
-      longitude: typeof d.location?.longitude === 'number' ? d.location.longitude : null,
-      phone,
-      website: d.websiteUri ?? null,
-      mapUrl: d.googleMapsUri ?? null,
-    }
+    return mapPlace((await res.json()) as RawPlace)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Authoritative server-side snapshot for a place_id, with NO session
+ * token (a standalone billable lookup). Used on submit so we trust
+ * Google's own rating/hours/photos rather than client-sent values a
+ * user could forge. lang fixed to Arabic for the stored snapshot.
+ */
+export async function placeSnapshot(placeId: string): Promise<PlaceDetails | null> {
+  const k = key()
+  if (!k) return null
+  try {
+    const url = `${PLACES_BASE}/places/${encodeURIComponent(placeId)}?languageCode=ar`
+    const res = await fetch(url, {
+      headers: { 'X-Goog-Api-Key': k, 'X-Goog-FieldMask': DETAILS_FIELD_MASK },
+    })
+    if (!res.ok) return null
+    return mapPlace((await res.json()) as RawPlace)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Fetch the bytes for a Google photo resource name and return them
+ * for the /api/places/photo proxy to stream. ToS-compliant: we never
+ * persist the image, just relay it per request. Returns null on any
+ * failure so the proxy can 404 cleanly.
+ */
+export async function fetchPlacePhoto(
+  photoName: string,
+  maxWidthPx: number,
+): Promise<{ body: ArrayBuffer; contentType: string } | null> {
+  const k = key()
+  if (!k) return null
+  if (!photoName.startsWith('places/')) return null
+  try {
+    const w = Math.min(Math.max(maxWidthPx, 80), 1600)
+    const url = `${PLACES_BASE}/${photoName}/media?maxWidthPx=${w}&key=${encodeURIComponent(k)}`
+    const res = await fetch(url, { redirect: 'follow' })
+    if (!res.ok) return null
+    const contentType = res.headers.get('content-type') || 'image/jpeg'
+    const body = await res.arrayBuffer()
+    return { body, contentType }
   } catch {
     return null
   }

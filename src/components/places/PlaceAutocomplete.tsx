@@ -29,6 +29,9 @@ export interface SelectedPlace {
   phone: string | null
   website: string | null
   mapUrl: string | null
+  // The Google place_id — sent on submit so the server takes an
+  // authoritative rating/hours/photos snapshot + tags source=GOOGLE.
+  placeId: string
 }
 
 interface Suggestion {
@@ -114,7 +117,7 @@ export default function PlaceAutocomplete({
         body: JSON.stringify({ placeId: s.placeId, sessionToken: tokenRef.current, lang }),
       })
       const d = await res.json().catch(() => ({}))
-      if (d.details) onSelect(d.details as SelectedPlace)
+      if (d.details) onSelect({ ...(d.details as Omit<SelectedPlace, 'placeId'>), placeId: s.placeId })
     } catch {
       /* silent — user can still type manually */
     } finally {

@@ -1624,6 +1624,15 @@ enum PlaceStatus {
   REMOVED               // mod-removed a previously-visible place
 }
 
+// Where a listing's data originated. LOCAL = added/typed by a
+// neighbor. GOOGLE = pulled from Google Places at add-time (rating,
+// hours, photos snapshot). Drives the source-attribution badge —
+// Google data MUST be attributed per Google's Places ToS.
+enum PlaceSource {
+  LOCAL
+  GOOGLE
+}
+
 enum PlaceClaimStatus {
   PENDING
   APPROVED
@@ -1732,6 +1741,21 @@ model PlaceListing {
   // so a place with no reviews renders cleanly without a JOIN.
   ratingAvg       Float         @default(0)
   ratingCount     Int           @default(0)
+
+  // ── Google Places provenance + snapshot ──
+  // Set when a listing is created from a Google Places pick. The
+  // place_id is safe to store indefinitely (Google ToS); the rating/
+  // hours/photo snapshot is attribution-required and refreshed via
+  // googleSyncedAt (don't treat as permanent — re-sync within ~30d).
+  // Photos are stored as Google resource names (refs) only and served
+  // through /api/places/photo, never re-hosted (ToS-compliant).
+  source            PlaceSource @default(LOCAL)
+  googlePlaceId     String?
+  googleRating      Float?
+  googleRatingCount Int?
+  googleHours       String?     // Google weekdayDescriptions, joined by \n
+  googlePhotoRefs   String[]    @default([]) // up to 3 photo resource names
+  googleSyncedAt    DateTime?
 
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt

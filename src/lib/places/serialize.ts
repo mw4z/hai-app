@@ -43,6 +43,17 @@ export interface PublicPlace {
   ratingCount: number
   imageUrls: string[]
   addedByCommunity: boolean
+  /** Where the listing's data came from. 'GOOGLE' rows carry the
+   *  Google snapshot below + require the "from Google" attribution
+   *  badge; 'LOCAL' rows show the community badge. */
+  source: 'LOCAL' | 'GOOGLE'
+  /** Google rating snapshot (attribution-required). null on LOCAL. */
+  googleRating: number | null
+  googleRatingCount: number | null
+  /** Google opening hours — weekdayDescriptions joined by \n. */
+  googleHours: string | null
+  /** Google photo resource names — render via /api/places/photo. */
+  googlePhotoRefs: string[]
   claimedByUser: PublicClaimedUser | null
   /** Optional — populated only on the detail endpoint when the
    *  claimedByUser is a service provider with active items. */
@@ -124,6 +135,11 @@ export function toPublicPlace(place: PlaceWithRelations): PublicPlace {
     ratingCount: place.ratingCount,
     imageUrls: place.imageUrls,
     addedByCommunity: !!place.createdByUserId,
+    source: place.source,
+    googleRating: place.googleRating,
+    googleRatingCount: place.googleRatingCount,
+    googleHours: place.googleHours,
+    googlePhotoRefs: place.googlePhotoRefs,
     claimedByUser,
     ownerServiceItems,
     createdAt: place.createdAt.toISOString(),
