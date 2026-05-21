@@ -75,6 +75,7 @@ model User {
   neighborhood     Neighborhood? @relation(fields: [neighborhoodId], references: [id])
   neighborhoodId   String?
   posts            Post[]
+  postViews        PostView[]
   reports          Report[]      @relation("reporter")
   reportedPosts    Report[]      @relation("reportedUser")
   userReportsSent     UserReport[] @relation("userReporter")
@@ -379,11 +380,15 @@ model Post {
   neighborhoodId String
   expiresAt      DateTime?     // for paid ads
   reportCount    Int           @default(0)
+  // Distinct-viewer count, denormalized. Incremented only on a user's
+  // FIRST view (one PostView row per user); re-views don't bump it.
+  viewCount      Int           @default(0)
   reports        Report[]
   reactions      Reaction[]
   bookmarks      Bookmark[]
   subscriptions  PostSubscription[]
   comments       Comment[]
+  views          PostView[]
   payment        Payment?
   editedAt       DateTime?     // set when author edits
   createdAt      DateTime      @default(now())
@@ -392,6 +397,22 @@ model Post {
   @@index([neighborhoodId, category, status])
   @@index([authorId])
   @@index([neighborhoodId, highlightPinnedAt])
+}
+
+// One row per (post, user) who has viewed the post — the dedup key
+// for the distinct-viewer count. A re-view is a no-op (unique
+// constraint), so a user is counted once no matter how many times
+// they come back to the post.
+model PostView {
+  id        String   @id @default(cuid())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+  @@index([postId])
 }
 
 // Canonical category enum (renamed from PostCategoryV2 in Phase 4).

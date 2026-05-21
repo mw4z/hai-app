@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiBell, FiBellOff, FiImage, FiUser, FiPaperclip } from 'react-icons/fi'
+import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiBell, FiBellOff, FiImage, FiUser, FiPaperclip, FiEye } from 'react-icons/fi'
 import AttachmentMenu from './AttachmentMenu'
 import PlacePickerSheet from './places/PlacePickerSheet'
 import { canAttachDirectoryPlace } from '@/lib/places/canAttachPlace'
@@ -83,6 +83,12 @@ interface Comment {
   replies: Reply[]
 }
 
+// Per-session dedup of view-record calls. The server is the source
+// of truth for the distinct-viewer count (unique postId+userId), but
+// this avoids re-POSTing for a post we already reported this session
+// as the user scrolls it in and out of view.
+const reportedViews = new Set<string>()
+
 interface Post {
   id: string
   title: string
@@ -115,6 +121,8 @@ interface Post {
   locationName?: string | null
   createdAt: string
   editedAt?: string | null
+  /** Distinct-viewer count (denormalized). Optional for back-compat. */
+  viewCount?: number
   author: {
     id: string
     name: string | null
@@ -257,6 +265,35 @@ export default function PostCard({
     const mine = post.reactions?.find(r => r.userId === currentUserId)
     return mine?.emoji ?? null
   })
+  // Distinct-viewer count. Seeded from the server; bumped to the
+  // server's authoritative value after we record this user's view.
+  const [viewCount, setViewCount] = useState<number>(post.viewCount ?? 0)
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  // Record a view when the card first scrolls ≥50% into view. Fired
+  // at most once per post per session (reportedViews); the server
+  // dedups across sessions so a returning viewer never re-increments.
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el || reportedViews.has(post.id)) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return
+        if (reportedViews.has(post.id)) { io.disconnect(); return }
+        reportedViews.add(post.id)
+        io.disconnect()
+        fetch(`/api/posts/${post.id}/view`, { method: 'POST' })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (d && typeof d.viewCount === 'number') setViewCount(d.viewCount)
+          })
+          .catch(() => {})
+      },
+      { threshold: 0.5 },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [post.id])
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>(() => {
     const counts: Record<string, number> = {}
     for (const r of post.reactions || []) {
@@ -957,7 +994,7 @@ export default function PostCard({
   const isLookingFor = isRequest
 
   return (
-    <div id={`post-${post.id}`} data-post-id={post.id} className={`hai-card relative animate-fade-in-up glow-card ${post.isPinned ? 'hai-post--pinned' : ''} ${isLookingFor ? 'hai-post--looking-for' : ''}`}>
+    <div ref={cardRef} id={`post-${post.id}`} data-post-id={post.id} className={`hai-card relative animate-fade-in-up glow-card ${post.isPinned ? 'hai-post--pinned' : ''} ${isLookingFor ? 'hai-post--looking-for' : ''}`}>
       {post.isPinned && (
         <StatePill state="pinned" label={t('post_pinned')} className="hai-mb-1" />
       )}
@@ -1665,6 +1702,18 @@ export default function PostCard({
               <span className="hai-action-btn__count">{totalComments > 0 ? totalComments : t('post_comment')}</span>
             </button>
           )}
+
+          {/* Distinct-viewer count — non-interactive stat (icon +
+              number only, no viewer list). */}
+          <span
+            className="hai-action-btn"
+            style={{ cursor: 'default', opacity: 0.75 }}
+            title={lang === 'en' ? `${viewCount} views` : `${viewCount} مشاهدة`}
+            aria-label={lang === 'en' ? `${viewCount} views` : `${viewCount} مشاهدة`}
+          >
+            <FiEye className="hai-icon-md hai-action-btn__icon" />
+            <span className="hai-action-btn__count">{viewCount}</span>
+          </span>
         </div>
       </div>
 
