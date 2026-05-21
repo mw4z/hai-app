@@ -55,6 +55,35 @@ const ASK_GUIDE_STEPS = [
   },
 ]
 
+/** Guide variant for the OUTSIDE ask flow (asking a neighborhood you
+ *  don't live in). Same three cards, but the wording matches the
+ *  context: "this neighborhood" / "the neighborhood's people" instead
+ *  of "your neighbors", and no mention of category routing (outside
+ *  asks are request-only, no picker). */
+const ASK_OUTSIDE_GUIDE_STEPS = [
+  {
+    targetSelector: null,
+    title: 'اسأل أهل هذا الحي',
+    body: 'النشر العام مخصص لسكان الحي، لكن يمكنك إرسال طلب أو استفسار لأهل هذا الحي.',
+    position: 'center' as const,
+    nextLabel: 'التالي',
+  },
+  {
+    targetSelector: '[data-guide="ask-text"]',
+    title: 'اكتب بطريقتك',
+    body: 'مثلاً: أبحث عن سبّاك في حيّكم، أو وين أقرب صيدلية.',
+    position: 'bottom' as const,
+    nextLabel: 'التالي',
+  },
+  {
+    targetSelector: '[data-guide="ask-submit"]',
+    title: 'أرسل الطلب',
+    body: 'بعد الإرسال يظهر طلبك لأهل الحي ضمن قسم الطلبات.',
+    position: 'bottom' as const,
+    nextLabel: 'فهمت',
+  },
+]
+
 // Optional category strip — Ask flow excludes COMPETITIONS (admin-only,
 // nothing to ask there) and GENERAL (admin-only fallback). Order
 // mirrors the post composer for muscle memory.
@@ -429,9 +458,13 @@ export default function AskNeighborsPage() {
       }
       playSuccess()
       toast.success(
-        lang === 'en' ? 'Sent to your neighbors!'
-        : lang === 'ur' ? 'پڑوسیوں کو بھیج دیا!'
-        : 'وصل سؤالك للجيران!',
+        isOutside
+          ? (lang === 'en' ? 'Sent to the neighborhood!'
+            : lang === 'ur' ? 'محلے کو بھیج دیا!'
+            : 'وصل طلبك لأهل الحي!')
+          : (lang === 'en' ? 'Sent to your neighbors!'
+            : lang === 'ur' ? 'پڑوسیوں کو بھیج دیا!'
+            : 'وصل سؤالك للجيران!'),
       )
       // Meaningful-action trigger for the notification nudge.
       // All gates (mobile only, cooldown, snooze, no-overlay,
@@ -481,7 +514,9 @@ export default function AskNeighborsPage() {
           <span>
             {loading
               ? (lang === 'en' ? 'Sending…' : lang === 'ur' ? 'بھیج رہا ہے…' : 'جاري الإرسال…')
-              : translate('ask_submit', lang)}
+              : isOutside
+                ? (lang === 'en' ? 'Ask' : lang === 'ur' ? 'پوچھیں' : 'اسأل أهل الحي')
+                : translate('ask_submit', lang)}
           </span>
         </button>
       </div>
@@ -736,7 +771,10 @@ export default function AskNeighborsPage() {
         onCamera={pickFromCamera}
         onGallery={pickFromGallery}
       />
-      <ContextualGuide guideId="ask" steps={ASK_GUIDE_STEPS} />
+      <ContextualGuide
+        guideId={isOutside ? 'ask-outside' : 'ask'}
+        steps={isOutside ? ASK_OUTSIDE_GUIDE_STEPS : ASK_GUIDE_STEPS}
+      />
     </main>
   )
 }
