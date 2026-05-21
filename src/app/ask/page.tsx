@@ -562,7 +562,7 @@ export default function AskNeighborsPage() {
             {/* Directory chip — only renders when
                 NEXT_PUBLIC_DIRECTORY_ENABLED='1'. Inert during pre-launch. */}
             <div className="mt-3">
-              <DirectoryEntryCard variant="chip" />
+              <DirectoryEntryCard variant="chip" browseNeighborhoodId={isOutside ? targetNeighborhoodId : null} />
             </div>
           </div>
         ) : (() => {
