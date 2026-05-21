@@ -362,7 +362,14 @@ model Post {
   highlightPinnedAt DateTime?
   coordinationMode CoordinationMode @default(OPEN)
   activeThreadId String?       // for exclusive mode: the one active thread
-  price          Float?        // for marketplace items
+  price          Float?        // for marketplace items (the effective / "new" price)
+  // Offers ("عروض"): a user-marked deal. isOffer is the canonical flag
+  // the Offers feed chip and the Market's Offers tab filter on — kept
+  // SEPARATE from intent=OFFER (the offer-vs-request "side"), which is
+  // far broader and not what users mean by a "deal". originalPrice is
+  // the optional pre-offer price shown struck-through next to `price`.
+  isOffer        Boolean       @default(false)
+  originalPrice  Float?        // optional "was" price for an offer/deal
   imageUrls      String[]      // array of image URLs
   // PDF attachment — single optional document up to 25MB. pdfUrl points
   // at the Vercel Blob; pdfName is the original filename for display.

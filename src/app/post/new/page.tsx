@@ -416,9 +416,13 @@ export default function NewPostPage() {
   const [showOptionalTitle, setShowOptionalTitle] = useState(false)
   const [body, setBody] = useState('')
   const [price, setPrice] = useState('')
-  // "Mark as offer" — sets intent=OFFER so the post surfaces in the
-  // feed's "عروض / Offers" filter. Optional; off by default.
+  // "Mark as offer" — sets isOffer=true so the post surfaces in the
+  // "عروض / Offers" feed chip + Market Offers tab. Optional; off by
+  // default. When on, the composer asks for an optional old→new price
+  // (originalPrice = "was", price = "now") to render a struck-through
+  // deal on the card.
   const [isOffer, setIsOffer] = useState(false)
+  const [originalPrice, setOriginalPrice] = useState('')
   const [images, setImages] = useState<{ file: File; preview: string; url?: string }[]>([])
   const [uploading, setUploading] = useState(false)
   // 0..100 while the image upload is in flight. Drives the per-
@@ -815,11 +819,23 @@ export default function NewPostPage() {
           // (→ shows in the Offers filter). Otherwise "معلومة لأهل
           // الحي" maps to GENERAL+NORMAL; the classifier handles the
           // rest.
-          ...(isOffer
-            ? { intent: 'OFFER' }
-            : useCategory === 'GENERAL'
-              ? { intent: 'NORMAL' }
-              : {}),
+          // Offer marking only applies to the store's categories — if
+          // the user ticked it then switched to a non-eligible category,
+          // drop it. A marked offer also pins intent=OFFER so it shows
+          // in the Market's existing tabs, not just the Offers tab.
+          ...(() => {
+            const offerEligible = ['MARKETPLACE', 'SERVICES', 'HOME_BUSINESSES', 'REAL_ESTATE'].includes(useCategory)
+            const effectiveOffer = isOffer && offerEligible
+            return {
+              isOffer: effectiveOffer,
+              ...(effectiveOffer
+                ? { intent: 'OFFER' }
+                : useCategory === 'GENERAL'
+                  ? { intent: 'NORMAL' }
+                  : {}),
+              ...(effectiveOffer && originalPrice ? { originalPrice: parseFloat(originalPrice) } : {}),
+            }
+          })(),
           price: price ? parseFloat(price) : null,
           imageUrls,
           pdfUrl,
@@ -1235,8 +1251,10 @@ export default function NewPostPage() {
               </p>
             )}
 
-            {/* Price field */}
-            {showPrice && (
+            {/* Price field — hidden when the post is an offer, because
+                the offer block below captures the "new" price itself
+                (alongside the optional "was" price). */}
+            {showPrice && !isOffer && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   {lang === 'en' ? 'Price' : lang === 'ur' ? 'قیمت' : 'السعر'}
@@ -1256,32 +1274,73 @@ export default function NewPostPage() {
               </div>
             )}
 
-            {/* "Mark as offer" — sets intent=OFFER so it lands in the
-                feed's Offers filter AND in the سوق الحي store (which is
-                offer-only). Gated to exactly the store's categories so
-                every offer is reachable from both surfaces; GENERAL is
-                excluded because the store doesn't carry it. */}
+            {/* "Mark as offer" → isOffer=true. Surfaces in the "عروض /
+                Offers" feed chip AND the Market's Offers tab. Gated to
+                the store's categories. When on, reveals an optional
+                old→new price so the card can show a struck-through deal. */}
             {['MARKETPLACE', 'SERVICES', 'HOME_BUSINESSES', 'REAL_ESTATE'].includes(category) && (
-              <label className="flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 p-3">
-                <input
-                  type="checkbox"
-                  checked={isOffer}
-                  onChange={(e) => setIsOffer(e.target.checked)}
-                  className="w-4 h-4 rounded border-amber-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
-                />
-                <span className="flex-1">
-                  <span className="block text-sm font-semibold text-amber-900 dark:text-amber-200">
-                    🏷️ {lang === 'en' ? 'Mark as an offer' : lang === 'ur' ? 'آفر کے طور پر نشان زد کریں' : 'علّمه كعرض'}
+              <div className="rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-900/20 overflow-hidden">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none p-3">
+                  <input
+                    type="checkbox"
+                    checked={isOffer}
+                    onChange={(e) => setIsOffer(e.target.checked)}
+                    className="w-4 h-4 rounded border-amber-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                  />
+                  <span className="flex-1">
+                    <span className="block text-sm font-semibold text-amber-900 dark:text-amber-200">
+                      🏷️ {lang === 'en' ? 'Mark as an offer' : lang === 'ur' ? 'آفر کے طور پر نشان زد کریں' : 'علّمه كعرض'}
+                    </span>
+                    <span className="block text-[11px] text-amber-700/80 dark:text-amber-300/70 mt-0.5">
+                      {lang === 'en'
+                        ? 'Shows in the Offers filter (feed + market)'
+                        : lang === 'ur'
+                          ? 'آفرز فلٹر میں ظاہر ہوگا (فیڈ + بازار)'
+                          : 'يظهر في فلتر العروض (الرئيسية + السوق)'}
+                    </span>
                   </span>
-                  <span className="block text-[11px] text-amber-700/80 dark:text-amber-300/70 mt-0.5">
-                    {lang === 'en'
-                      ? 'Appears in the "Offers" filter on the feed'
-                      : lang === 'ur'
-                        ? 'فیڈ کے "آفرز" فلٹر میں ظاہر ہوگا'
-                        : 'يظهر في فلتر "العروض" بالصفحة الرئيسية'}
-                  </span>
-                </span>
-              </label>
+                </label>
+                {isOffer && (
+                  <div className="px-3 pb-3 pt-0 grid grid-cols-2 gap-2.5">
+                    {/* "Was" price — optional, struck through on the card */}
+                    <div>
+                      <label className="block text-[11px] font-medium text-amber-800/90 dark:text-amber-300/80 mb-1">
+                        {lang === 'en' ? 'Price before' : lang === 'ur' ? 'پہلے قیمت' : 'السعر قبل'}
+                        <span className="opacity-60"> · {lang === 'en' ? 'optional' : lang === 'ur' ? 'اختیاری' : 'اختياري'}</span>
+                      </label>
+                      <div className="flex items-center border border-amber-200 dark:border-amber-800/60 rounded-lg bg-white dark:bg-gray-800 focus-within:ring-2 focus-within:ring-amber-400">
+                        <span className="ps-2 text-gray-400 text-xs"><RiyalIcon /></span>
+                        <input
+                          type="number"
+                          placeholder="0"
+                          value={originalPrice}
+                          onChange={(e) => setOriginalPrice(e.target.value)}
+                          className="flex-1 min-w-0 px-2 py-2.5 bg-transparent focus:outline-none text-start text-gray-500 dark:text-gray-400 line-through decoration-rose-400"
+                          dir="ltr"
+                        />
+                      </div>
+                    </div>
+                    {/* "Now" price — optional, the effective price */}
+                    <div>
+                      <label className="block text-[11px] font-medium text-amber-800/90 dark:text-amber-300/80 mb-1">
+                        {lang === 'en' ? 'Price after' : lang === 'ur' ? 'بعد قیمت' : 'السعر بعد'}
+                        <span className="opacity-60"> · {lang === 'en' ? 'optional' : lang === 'ur' ? 'اختیاری' : 'اختياري'}</span>
+                      </label>
+                      <div className="flex items-center border border-amber-300 dark:border-amber-700 rounded-lg bg-white dark:bg-gray-800 focus-within:ring-2 focus-within:ring-amber-400">
+                        <span className="ps-2 text-gray-400 text-xs"><RiyalIcon /></span>
+                        <input
+                          type="number"
+                          placeholder="0"
+                          value={price}
+                          onChange={(e) => setPrice(e.target.value)}
+                          className="flex-1 min-w-0 px-2 py-2.5 bg-transparent focus:outline-none text-start font-semibold text-emerald-700 dark:text-emerald-400"
+                          dir="ltr"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Image picker */}

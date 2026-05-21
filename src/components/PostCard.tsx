@@ -113,6 +113,10 @@ interface Post {
   isFeatured: boolean
   isPinned: boolean
   price: number | null
+  // Offers ("عروض"): isOffer is the user-marked deal flag; originalPrice
+  // is the optional "was" price rendered struck-through next to price.
+  isOffer?: boolean
+  originalPrice?: number | null
   imageUrls: string[]
   pdfUrl?: string | null
   pdfName?: string | null
@@ -1466,9 +1470,29 @@ export default function PostCard({
         </>
       )}
 
-      {post.price && (
-        <div className="hai-mt-2">
-          <span className="hai-price">{post.price.toLocaleString('ar-SA')} <RiyalIcon /></span>
+      {(post.price || (post.isOffer && post.originalPrice)) && (
+        <div className="hai-mt-2 flex items-center flex-wrap gap-2">
+          {post.isOffer && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-[11px] font-bold px-2 py-0.5">
+              🏷️ {lang === 'en' ? 'Offer' : lang === 'ur' ? 'آفر' : 'عرض'}
+            </span>
+          )}
+          {post.price != null && (
+            <span className="hai-price">{post.price.toLocaleString('ar-SA')} <RiyalIcon /></span>
+          )}
+          {/* "Was" price struck-through + discount %, only a genuine drop */}
+          {post.isOffer && post.originalPrice != null && post.originalPrice > (post.price ?? 0) && (
+            <>
+              <span className="text-sm text-gray-400 line-through decoration-rose-400">
+                {post.originalPrice.toLocaleString('ar-SA')} <RiyalIcon />
+              </span>
+              {post.price != null && post.price > 0 && (
+                <span className="rounded-md bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 text-[11px] font-bold px-1.5 py-0.5 tabular-nums">
+                  -{Math.round((1 - post.price / post.originalPrice) * 100)}%
+                </span>
+              )}
+            </>
+          )}
         </div>
       )}
 

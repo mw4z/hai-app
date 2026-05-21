@@ -75,11 +75,11 @@ export default async function FeedPage({
   } else if (category === 'REQUESTS') {
     categoryFilter = { intent: 'REQUEST' }
   } else if (category === 'OFFERS') {
-    // Intent-only chip — explicitly-marked offers across categories.
-    // MUST mirror the /api/feed branch; without it OFFERS fell through
-    // to the `{}` default below and the SSR feed rendered EVERYTHING
-    // (reports included, since they out-boost everything).
-    categoryFilter = { intent: 'OFFER' }
+    // Explicitly user-marked offers ("عروض") across categories. Uses the
+    // dedicated isOffer flag — NOT intent=OFFER, which is far broader
+    // (the offer-vs-request "side") and used to leak reports into this
+    // chip. MUST mirror the /api/feed branch.
+    categoryFilter = { isOffer: true }
   } else if (category === 'MARKETPLACE') {
     categoryFilter = { category: 'MARKETPLACE' as PostCategory, intent: 'OFFER' }
   } else if (V2_FILTER_VALUES.includes(category)) {

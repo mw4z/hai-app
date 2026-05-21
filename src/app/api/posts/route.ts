@@ -107,6 +107,22 @@ export async function POST(req: NextRequest) {
     const eventStartAtInput   = typeof reqBody.eventStartAt === 'string'   ? reqBody.eventStartAt   : undefined
     const eventEndAtInput     = typeof reqBody.eventEndAt === 'string'     ? reqBody.eventEndAt     : undefined
     const eventLocationInput  = typeof reqBody.eventLocation === 'string'  ? reqBody.eventLocation  : undefined
+    // Offers ("عروض"): a user-marked deal. `isOffer` is the canonical
+    // flag the Offers chip + Market Offers tab filter on (distinct from
+    // intent=OFFER). `originalPrice` is the optional "was" price — only
+    // stored for a genuine discount (positive, and above the new price
+    // when one is given) so the struck-through display always makes
+    // sense; otherwise it's dropped.
+    const isOffer = reqBody.isOffer === true
+    const originalPriceNum = Number(reqBody.originalPrice)
+    const newPriceNum = Number(price)
+    const originalPrice =
+      isOffer
+      && Number.isFinite(originalPriceNum)
+      && originalPriceNum > 0
+      && (!Number.isFinite(newPriceNum) || originalPriceNum > newPriceNum)
+        ? originalPriceNum
+        : null
 
     // SUPER_ADMIN can target any neighborhood by passing neighborhoodId in
     // the body. Regular users (and all other roles) are always pinned to
@@ -508,6 +524,8 @@ export async function POST(req: NextRequest) {
         marketplaceType, // SELL by default, validated above for MARKETPLACE
         coordinationMode,
         price: price || null,
+        isOffer,
+        originalPrice,
         imageUrls: validatedImages,
         pdfUrl,
         pdfName,

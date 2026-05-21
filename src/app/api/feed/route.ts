@@ -137,9 +137,10 @@ export async function GET(req: NextRequest) {
   } else if (category === 'REQUESTS') {
     categoryFilter = { intent: 'REQUEST' }
   } else if (category === 'OFFERS') {
-    // Intent-only chip — every "offering" post across categories
-    // (marketplace sells, service/home-business promos, etc.).
-    categoryFilter = { intent: 'OFFER' }
+    // Explicitly user-marked offers ("عروض") across categories — the
+    // dedicated isOffer flag, NOT the broad intent=OFFER side (which
+    // leaked reports into this chip). Mirrors /feed/page.tsx.
+    categoryFilter = { isOffer: true }
   } else if (category === 'MARKETPLACE') {
     categoryFilter = { category: 'MARKETPLACE' as PostCategory, intent: 'OFFER' }
   } else if (V2_FILTER_VALUES.includes(category)) {

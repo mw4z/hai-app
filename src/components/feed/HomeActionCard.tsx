@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { FiSearch, FiMapPin, FiShoppingBag, FiAlertTriangle, FiTag, FiX } from 'react-icons/fi'
+import { FiSearch, FiMapPin, FiShoppingBag, FiAlertTriangle, FiX } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { directoryUIVisible } from '@/lib/places/featureFlag'
 
@@ -98,13 +98,15 @@ export default function HomeActionCard() {
       route: findRoute,
     },
     {
+      // Market + offers in one tile: opens سوق الحي where listings AND
+      // the Offers tab live (offers are no longer a separate button).
       key: 'sell',
       title: t('home_action_sell_title'),
       help: t('home_action_sell_help'),
       Icon: FiShoppingBag,
       tileBg: 'bg-amber-100 dark:bg-amber-900/30',
       iconColor: 'text-amber-600 dark:text-amber-300',
-      route: () => '/post/new?category=MARKETPLACE',
+      route: () => '/market',
     },
     {
       key: 'report',
@@ -167,32 +169,6 @@ export default function HomeActionCard() {
           </button>
         ))}
       </div>
-
-      {/* Offers — full-width CTA below the grid so users discover that
-          the neighborhood has deals and exactly where to find them
-          (سوق الحي / the offer-only Market). Amber + tag mirror the
-          composer's "mark as offer" toggle and the feed's Offers chip. */}
-      <button
-        type="button"
-        onClick={() => router.push('/market')}
-        aria-label={`${t('home_action_offers_title')} — ${t('home_action_offers_help')}`}
-        className="mt-2 w-full text-start min-h-[60px] flex items-center gap-3 rounded-2xl border border-amber-200/80 dark:border-amber-800/50 bg-gradient-to-l from-amber-50 to-amber-100/50 dark:from-amber-900/20 dark:to-amber-900/30 p-3 active:scale-[0.98] transition-transform"
-      >
-        <span
-          className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center bg-amber-500/15"
-          aria-hidden
-        >
-          <FiTag className="w-5 h-5 text-amber-600 dark:text-amber-300" />
-        </span>
-        <span className="flex-1 min-w-0">
-          <span className="block text-[13px] font-bold text-amber-900 dark:text-amber-200 leading-tight truncate">
-            🏷️ {t('home_action_offers_title')}
-          </span>
-          <span className="block text-[11px] text-amber-700/80 dark:text-amber-300/70 leading-snug mt-0.5 line-clamp-1">
-            {t('home_action_offers_help')}
-          </span>
-        </span>
-      </button>
     </section>
   )
 }

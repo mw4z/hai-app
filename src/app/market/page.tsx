@@ -45,8 +45,8 @@ const OFFER_CATEGORIES_SERVICES: PostCategory[] = ['SERVICES']
 // through to ALL — the resolved tab is what drives the Prisma where
 // clause AND the cache key, so a request URL physically can't reach
 // the request-side query path.
-type MarketTabKey = 'ALL' | 'SELLING' | 'SERVICES'
-const VALID_MARKET_TABS = new Set<MarketTabKey>(['ALL', 'SELLING', 'SERVICES'])
+type MarketTabKey = 'ALL' | 'SELLING' | 'SERVICES' | 'OFFERS'
+const VALID_MARKET_TABS = new Set<MarketTabKey>(['ALL', 'SELLING', 'SERVICES', 'OFFERS'])
 
 export default async function MarketPage({
   searchParams,
@@ -91,6 +91,12 @@ export default async function MarketPage({
     case 'SERVICES':
       tabFilter = { intent: 'OFFER', category: { in: OFFER_CATEGORIES_SERVICES } }
       break
+    case 'OFFERS':
+      // Deals the user explicitly marked (🏷️). The dedicated isOffer
+      // flag — the same one the feed's Offers chip filters on — so this
+      // tab and that chip always agree.
+      tabFilter = { isOffer: true, category: { in: OFFER_CATEGORIES_ALL } }
+      break
     case 'ALL':
     default:
       tabFilter = { intent: 'OFFER', category: { in: OFFER_CATEGORIES_ALL } }
@@ -120,12 +126,14 @@ export default async function MarketPage({
   // do so through the main feed's REQUESTS chip.
   const tabs = [
     { key: 'ALL',      label: 'الكل',  labelEn: 'All',      icon: '🛍️' },
+    { key: 'OFFERS',   label: 'عروض',  labelEn: 'Offers',   icon: '🏷️' },
     { key: 'SELLING',  label: 'بيع',   labelEn: 'Selling',  icon: '🛒' },
     { key: 'SERVICES', label: 'خدمات', labelEn: 'Services', icon: '🔧' },
   ]
 
   const emptyStates: Record<string, { emoji: string; title: string; sub: string }> = {
     ALL:      { emoji: '🛍️', title: 'لا توجد إعلانات بعد',       sub: 'كن أول من يضيف في حيّك!' },
+    OFFERS:   { emoji: '🏷️', title: 'لا توجد عروض حالياً',       sub: 'علّم منشورك كعرض ليظهر هنا!' },
     SELLING:  { emoji: '🛒', title: 'لا توجد منتجات للبيع',      sub: 'أضف منتجك الآن!' },
     SERVICES: { emoji: '🔧', title: 'لا توجد خدمات مسجّلة بعد',  sub: 'هل تقدم خدمة في الحي؟ أضفها!' },
   }
