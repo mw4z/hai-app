@@ -55,22 +55,22 @@ export default function DirectoryHeader({ title, backHref }: Props) {
         }
         /* Dark-mode band color is now driven by --hai-directory-band
            (set on documentElement.style by DirectoryBandColorPicker
-           — falls back to #101619 when no picker selection exists).
+           — falls back to #111827 when no picker selection exists).
            That lets a super admin live-tweak the band color from the
            in-app picker without redeploying. */
         html.dark, .dark html {
-          --hai-safe-top-bg: var(--hai-directory-band, #101619);
-          background-color: var(--hai-directory-band, #101619) !important;
+          --hai-safe-top-bg: var(--hai-directory-band, #111827);
+          background-color: var(--hai-directory-band, #111827) !important;
         }
         html.dark body, .dark html body {
-          background-color: var(--hai-directory-band, #101619) !important;
+          background-color: var(--hai-directory-band, #111827) !important;
         }
         .hai-directory-safe-cover {
           background-color: #f9fafb;
         }
         html.dark .hai-directory-safe-cover,
         .dark html .hai-directory-safe-cover {
-          background-color: var(--hai-directory-band, #101619) !important;
+          background-color: var(--hai-directory-band, #111827) !important;
         }
       `}</style>
       {/* Safe-area cover. The global html::before paints the

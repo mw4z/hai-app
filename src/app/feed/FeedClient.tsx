@@ -438,7 +438,17 @@ export default function FeedClient({
             this nesting two separate sticky elements would overlap on
             top:0 and the banner would visually cover the header. */}
         {isReadOnly && (
-          <div className="bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800/60 px-4 py-2.5 space-y-2">
+          <>
+          {/* Paint the top safe-area with the SAME amber as this read-only
+              banner so it reads as one continuous strip to the screen edge
+              (no black gap above it). Dark value is amber-900/30
+              pre-composited over --hai-bg (#19232a) → #362822, used opaque
+              here AND on the banner so they match exactly. */}
+          <style>{`
+            html { --hai-safe-top-bg: rgb(255 251 235) !important; }
+            html.dark { --hai-safe-top-bg: #362822 !important; }
+          `}</style>
+          <div className="bg-amber-50 dark:bg-[#362822] border-b border-amber-200 dark:border-amber-800/60 px-4 py-2.5 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs text-amber-700 dark:text-amber-200 font-medium">
                 🔒 {t('feed_readonly_banner')}
@@ -462,6 +472,7 @@ export default function FeedClient({
               💬 {t('feed_outside_ask_cta')}
             </button>
           </div>
+          </>
         )}
         <div className="hai-row-2 hai-justify-between hai-px-4 hai-header-top">
           <div className="hai-flex-1 hai-min-w-0">
