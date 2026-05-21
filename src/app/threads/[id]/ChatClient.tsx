@@ -13,6 +13,8 @@ import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
 import { uploadFiles, uploadPdf, uploadStageLabel, type UploadStage } from '@/lib/upload'
 import PdfTile from '@/components/PdfTile'
+import VoicePlayer from '@/components/chat/VoicePlayer'
+import VoiceComposer from '@/components/chat/VoiceComposer'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
@@ -51,6 +53,9 @@ interface Msg {
   imageUrl?: string | null
   pdfUrl?: string | null
   pdfName?: string | null
+  audioUrl?: string | null
+  audioDurationMs?: number | null
+  audioMimeType?: string | null
   senderId: string
   createdAt: string
   deliveredAt?: string | null
@@ -857,6 +862,38 @@ export default function ChatClient({
       else { await showApiError(res, lang as 'ar' | 'en' | 'ur') }
     } catch { toast.error(t('common_error')) }
     finally { setSendingImage(false); if (imgInputRef.current) imgInputRef.current.value = '' }
+  }
+
+  /**
+   * Voice note. The VoiceComposer hands us the recorded blob; we
+   * upload to /api/upload-audio (m4a/AAC), then POST a VOICE message
+   * and append the server row. Throws on failure so the composer
+   * keeps the recording for retry (no broken message gets created).
+   */
+  async function sendVoice(blob: Blob, mimeType: string, durationMs: number, sizeBytes: number) {
+    const replyId = replyingTo?.id || null
+    setReplyingTo(null)
+    const ext = mimeType.includes('webm') ? 'webm' : 'm4a'
+    const fd = new FormData()
+    fd.append('audio', new File([blob], `voice.${ext}`, { type: mimeType }))
+    const up = await fetch('/api/upload-audio', { method: 'POST', body: fd })
+    const upd = await up.json().catch(() => ({}))
+    if (!up.ok || !upd.url) throw new Error(upd?.error || 'upload_failed')
+    const res = await fetch(`/api/threads/${threadId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'VOICE',
+        audioUrl: upd.url,
+        audioDurationMs: durationMs,
+        audioMimeType: upd.mimeType || mimeType,
+        audioSizeBytes: upd.sizeBytes ?? sizeBytes,
+        replyToId: replyId,
+      }),
+    })
+    if (!res.ok) { await showApiError(res, lang as 'ar' | 'en' | 'ur'); throw new Error('send_failed') }
+    const msg = await res.json()
+    setMessages((prev) => [...prev, msg])
   }
 
   /**
@@ -1799,7 +1836,7 @@ export default function ChatClient({
                     : (fullName(other) || (lang === 'en' ? 'Neighbor' : 'جار'))}
                 </p>
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-                  {replyingTo.type === 'IMAGE' ? '📷' : replyingTo.type === 'PDF' ? '📄 PDF' : replyingTo.type === 'LOCATION' ? '📍' : (replyingTo.text || '').slice(0, 80)}
+                  {replyingTo.type === 'IMAGE' ? '📷' : replyingTo.type === 'PDF' ? '📄 PDF' : replyingTo.type === 'LOCATION' ? '📍' : replyingTo.type === 'VOICE' ? '🎤' : (replyingTo.text || '').slice(0, 80)}
                 </p>
               </div>
               <button onClick={() => setReplyingTo(null)} className="p-1 text-gray-400 active:scale-90">
@@ -1827,6 +1864,8 @@ export default function ChatClient({
               className="p-2 rounded-full text-gray-300 dark:text-gray-300 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50 flex-shrink-0">
               <FiPaperclip className={`w-5 h-5 ${(sendingImage || sendingLocation) ? 'animate-pulse' : ''}`} />
             </button>
+            {/* Voice note recorder — mic button + record/preview overlay. */}
+            <VoiceComposer onSend={sendVoice} disabled={sendingImage || sendingLocation} />
             <form onSubmit={sendText} className="flex-1 min-w-0 flex items-center gap-2">
               {/* min-w-0 on the input AND its parent form is required for the
                   flex-1 input to actually shrink below its content's min
@@ -2079,7 +2118,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
           : otherName}
       </p>
       <p className={`text-[11px] truncate ${isMe ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'}`}>
-        {msg.replyTo.type === 'IMAGE' ? '📷' : msg.replyTo.type === 'PDF' ? '📄 PDF' : msg.replyTo.type === 'LOCATION' ? '📍' : (msg.replyTo.text || '').slice(0, 60)}
+        {msg.replyTo.type === 'IMAGE' ? '📷' : msg.replyTo.type === 'PDF' ? '📄 PDF' : msg.replyTo.type === 'LOCATION' ? '📍' : msg.replyTo.type === 'VOICE' ? '🎤' : (msg.replyTo.text || '').slice(0, 60)}
       </p>
     </button>
   ) : null
@@ -2114,7 +2153,20 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
         // Android tablet users were reporting).
         className={`flex flex-col ${isMe ? 'ltr:items-end rtl:items-start' : 'ltr:items-start rtl:items-end'} ${isLastInGroup ? 'mb-2' : 'mb-[3px]'} ${isFirstInGroup && !showDate ? 'mt-3' : ''}`}
       >
-        {msg.type === 'PDF' && (msg.pdfUrl || (msg as any).pending) ? (
+        {msg.type === 'VOICE' && msg.audioUrl ? (
+          <div className="max-w-[85%]" data-msg-id={msg.id} {...longPress}>
+            {replyQuote && <div className="mb-1">{replyQuote}</div>}
+            <div className={`relative rounded-2xl px-3 py-2.5 shadow-sm ${
+              isMe ? `bg-primary-600 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white dark:bg-[#242625] ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
+            }`}>
+              <VoicePlayer src={msg.audioUrl} durationMs={msg.audioDurationMs} isMe={isMe} />
+            </div>
+            <p className={`text-[10px] mt-1 px-1 flex items-center gap-0.5 ${isMe ? 'text-gray-400 justify-start' : 'text-gray-400 justify-end'}`}>
+              {timeStr}
+              <MsgStatus msg={msg} isMe={isMe} />
+            </p>
+          </div>
+        ) : msg.type === 'PDF' && (msg.pdfUrl || (msg as any).pending) ? (
           // PDF bubble — same width budget as image messages so it
           // doesn't visually balloon. While the upload is in flight
           // (pending=true, no pdfUrl yet), we render an "Uploading…"
