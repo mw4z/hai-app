@@ -1,5 +1,5 @@
 import { PlaceCategory } from '@prisma/client'
-import { isValidSaudiPhone } from '@/lib/phone'
+import { isValidPlacePhone } from '@/lib/phone'
 import { normalizePlaceName } from './normalize'
 
 /**
@@ -298,14 +298,15 @@ export function validateMessage(input: unknown): string | false | null {
   return v
 }
 
-/** Saudi-phone gate that allows the field to be absent. Returns
+/** Place-phone gate that allows the field to be absent. Accepts
+ *  mobile, 800 toll-free, and 920 unified business numbers. Returns
  *  the cleaned phone, null if absent, or false if present-but-bad. */
 function optionalSaudiPhone(input: unknown): string | null | false {
   if (input === undefined || input === null) return null
   if (typeof input !== 'string') return false
   const v = input.trim()
   if (!v) return null
-  if (!isValidSaudiPhone(v)) return false
+  if (!isValidPlacePhone(v)) return false
   return v
 }
 

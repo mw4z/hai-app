@@ -12,6 +12,22 @@ export function isValidSaudiPhone(phone: string): boolean {
   return /^(0?5[0-9]{8})$/.test(cleaned)
 }
 
+/**
+ * Looser validator for BUSINESS / place contact numbers. Accepts:
+ *   - mobile          05xxxxxxxx / 5xxxxxxxx
+ *   - toll-free 800   800xxxxxxx        (Saudi free numbers)
+ *   - unified 92xx    9200xxxxx / 920… (Saudi unified business lines)
+ *
+ * Used for directory place phone/WhatsApp fields — a shop's listed
+ * number is often an 800 or 9200 line, not a personal mobile. Do NOT
+ * use this for OTP login (that must stay mobile-only — see
+ * isValidSaudiPhone).
+ */
+export function isValidPlacePhone(phone: string): boolean {
+  const cleaned = phone.replace(/\D/g, '')
+  return /^(0?5\d{8}|800\d{6,7}|92\d{6,8})$/.test(cleaned)
+}
+
 /** Build a wa.me URL from any Saudi number format the user might
  *  have entered. wa.me requires the international form WITHOUT
  *  a leading plus or zero — pure digits starting with the country
