@@ -130,19 +130,16 @@ export default function VoiceComposer({
     setPhase('idle')
   }
 
-  async function send() {
+  function send() {
     const rec = recordedRef.current
     if (!rec) return
-    setPhase('sending')
-    try {
-      await onSend(rec.blob, rec.mimeType, rec.durationMs, rec.blob.size)
-      discard() // success → clean up; the parent rendered the message
-    } catch {
-      // Upload/post failed — keep the recording, return to preview so
-      // the user can retry. No broken message was created.
-      toast.error(tr('Send failed — try again', 'فشل الإرسال — حاول مجدداً', 'بھیجنا ناکام — دوبارہ کوشش'))
-      setPhase('preview')
-    }
+    // Hand the recording to the parent, which drops an optimistic bubble
+    // into the chat and uploads in the BACKGROUND. Close the composer
+    // immediately so the user isn't held on a "sending" spinner while the
+    // upload runs — the bubble's own pending clock/spinner shows progress
+    // and the parent toasts on failure (no broken message is created).
+    void onSend(rec.blob, rec.mimeType, rec.durationMs, rec.blob.size).catch(() => {})
+    discard()
   }
 
   function togglePreview() {

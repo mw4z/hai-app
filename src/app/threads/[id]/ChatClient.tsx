@@ -901,28 +901,85 @@ export default function ChatClient({
    */
   async function sendVoice(blob: Blob, mimeType: string, durationMs: number, sizeBytes: number) {
     const replyId = replyingTo?.id || null
+    const replySnapshot = replyingTo
+      ? { id: replyingTo.id, senderId: replyingTo.senderId, type: replyingTo.type, text: replyingTo.text }
+      : null
     setReplyingTo(null)
+
+    // Optimistic insert: the voice bubble appears in the chat INSTANTLY,
+    // playable from the local blob, with a pending clock + spinner while
+    // it uploads in the background. The composer closes right away — the
+    // user is never blocked on the (slow) upload. localPreview keeps the
+    // blob as the playback source so the swap to the server row doesn't
+    // re-fetch the audio over the network. pending:true keeps the
+    // placeholder alive across the 3s poll (see mergeServerMessages).
+    const tempId = `pending-voice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const localUrl = URL.createObjectURL(blob)
+    const optimistic: any = {
+      id: tempId,
+      tempId,
+      type: 'VOICE',
+      text: null,
+      lat: null,
+      lng: null,
+      imageUrl: null,
+      audioUrl: localUrl,
+      localPreview: localUrl,
+      audioDurationMs: durationMs,
+      audioMimeType: mimeType,
+      senderId: currentUserId,
+      createdAt: new Date().toISOString(),
+      deliveredAt: null,
+      readAt: null,
+      pending: true,
+      replyToId: replyId,
+      replyTo: replySnapshot,
+    }
+    setMessages((prev) => [...prev, optimistic])
+    playSend()
+
     const ext = mimeType.includes('webm') ? 'webm' : 'm4a'
-    const fd = new FormData()
-    fd.append('audio', new File([blob], `voice.${ext}`, { type: mimeType }))
-    const up = await fetch('/api/upload-audio', { method: 'POST', body: fd })
-    const upd = await up.json().catch(() => ({}))
-    if (!up.ok || !upd.url) throw new Error(upd?.error || 'upload_failed')
-    const res = await fetch(`/api/threads/${threadId}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'VOICE',
-        audioUrl: upd.url,
-        audioDurationMs: durationMs,
-        audioMimeType: upd.mimeType || mimeType,
-        audioSizeBytes: upd.sizeBytes ?? sizeBytes,
-        replyToId: replyId,
-      }),
-    })
-    if (!res.ok) { await showApiError(res, lang as 'ar' | 'en' | 'ur'); throw new Error('send_failed') }
-    const msg = await res.json()
-    setMessages((prev) => [...prev, msg])
+    try {
+      const fd = new FormData()
+      fd.append('audio', new File([blob], `voice.${ext}`, { type: mimeType }))
+      const up = await fetch('/api/upload-audio', { method: 'POST', body: fd })
+      const upd = await up.json().catch(() => ({}))
+      if (!up.ok || !upd.url) throw new Error(upd?.error || 'upload_failed')
+      const res = await fetch(`/api/threads/${threadId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'VOICE',
+          audioUrl: upd.url,
+          audioDurationMs: durationMs,
+          audioMimeType: upd.mimeType || mimeType,
+          audioSizeBytes: upd.sizeBytes ?? sizeBytes,
+          replyToId: replyId,
+        }),
+      })
+      if (!res.ok) throw new Error('send_failed')
+      const msg = await res.json()
+      // Swap placeholder → server row in place (keep tempId for a stable
+      // key; keep localPreview so playback stays on the local blob). If a
+      // poll already inserted the real row, just drop the placeholder.
+      setMessages((prev) => {
+        const hasReal = prev.some((m) => m.id === msg.id)
+        if (hasReal) return prev.filter((m) => m.tempId !== tempId)
+        return prev.map((m) => (m.tempId === tempId ? { ...msg, tempId, localPreview: localUrl } : m))
+      })
+    } catch {
+      // Upload/post failed — drop the placeholder + free the blob. No
+      // broken message lingers; the user can re-record.
+      URL.revokeObjectURL(localUrl)
+      setMessages((prev) => prev.filter((m) => m.tempId !== tempId))
+      toast.error(
+        lang === 'en'
+          ? 'Voice note failed to send'
+          : lang === 'ur'
+            ? 'صوتی نوٹ بھیجنے میں ناکام'
+            : 'تعذّر إرسال الملاحظة الصوتية',
+      )
+    }
   }
 
   /**
@@ -2214,13 +2271,19 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
         // Android tablet users were reporting).
         className={`flex flex-col ${isMe ? 'ltr:items-end rtl:items-start' : 'ltr:items-start rtl:items-end'} ${isLastInGroup ? 'mb-2' : 'mb-[3px]'} ${isFirstInGroup && !showDate ? 'mt-3' : ''}`}
       >
-        {msg.type === 'VOICE' && msg.audioUrl ? (
+        {msg.type === 'VOICE' && (msg.audioUrl || (msg as any).localPreview) ? (
           <div className="max-w-[85%]" data-msg-id={msg.id} {...longPress}>
             {replyQuote && <div className="mb-1">{replyQuote}</div>}
             <div className={`relative rounded-2xl px-3 py-2.5 shadow-sm ${
               isMe ? `bg-primary-600 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white dark:bg-[#242625] ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
-            }`}>
-              <VoicePlayer src={msg.audioUrl} durationMs={msg.audioDurationMs} isMe={isMe} />
+            } ${(msg as any).pending ? 'opacity-90' : ''}`}>
+              {/* Prefer the local blob (localPreview) as the playback
+                  source so a just-sent note plays instantly and the swap
+                  to the server row doesn't re-fetch over the network. */}
+              <VoicePlayer src={(msg as any).localPreview || msg.audioUrl} durationMs={msg.audioDurationMs} isMe={isMe} />
+              {(msg as any).pending && (
+                <span className="absolute top-1 end-1 w-3.5 h-3.5 border-2 border-white/70 border-t-transparent rounded-full animate-spin" aria-hidden />
+              )}
             </div>
             <p className={`text-[10px] mt-1 px-1 flex items-center gap-0.5 ${isMe ? 'text-gray-400 justify-start' : 'text-gray-400 justify-end'}`}>
               {timeStr}
