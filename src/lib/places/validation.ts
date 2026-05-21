@@ -78,14 +78,16 @@ export function sanitizeImageUrls(raw: unknown): string[] {
   return cleaned
 }
 
-/** Permissive https-only URL check for website / instagram. */
+/** Permissive http(s) URL check for website / instagram. Accepts
+ *  both http:// and https:// (some small business sites are still
+ *  http-only); rejects other schemes (javascript:, data:, etc.). */
 export function isSafeHttpsUrl(input: string | null | undefined): boolean {
   if (!input) return true
   if (typeof input !== 'string') return false
   if (input.length > 500) return false
   try {
     const u = new URL(input)
-    return u.protocol === 'https:'
+    return u.protocol === 'https:' || u.protocol === 'http:'
   } catch {
     return false
   }
