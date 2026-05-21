@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { PlaceCategory, type Prisma } from '@prisma/client'
 import { gatePublicRoute } from '@/lib/places/routeGate'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
+import { isDirectoryModerator } from '@/lib/places/isDirectoryModerator'
 import { validatePlaceInput, placeLimitForUser, PLACE_LIMIT_WINDOW_MS, sanitizeImageUrls } from '@/lib/places/validation'
 import { toPublicPlace } from '@/lib/places/serialize'
 import { PUBLIC_PLACE_STATUSES } from '@/lib/places/statusBadge'
@@ -196,12 +197,19 @@ export async function POST(req: NextRequest) {
   // ── Dupe check: same neighborhood + normalized name + category ─
   // Returns 409 with the existing place id so the client can
   // suggest "هل تقصد هذا المكان؟".
+  //
+  // REJECTED never blocks (anyone can re-submit a rejected place).
+  // REMOVED normally blocks (a removed place shouldn't be quietly
+  // re-added by a resident, circumventing the moderation decision) —
+  // BUT directory admins/mods may re-add a previously-removed place,
+  // so for them REMOVED is excluded from the block too.
+  const isAdmin = isSuper || isDirectoryModerator(user.role)
   const existing = await db.placeListing.findFirst({
     where: {
       neighborhoodId: user.neighborhoodId,
       nameNormalized: v.value.nameNormalized,
       category: v.value.category,
-      status: { not: 'REJECTED' },
+      status: isAdmin ? { notIn: ['REJECTED', 'REMOVED'] } : { not: 'REJECTED' },
     },
     select: { id: true, name: true, status: true },
   })
