@@ -310,22 +310,22 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
     debounceRef.current = setTimeout(async () => {
       setSearching(true)
       try {
-        // Google first (best coverage), free geocoders in parallel as
-        // the fallback layer. Google suggestions float to the top
-        // (distKm -1); OSM results are deduped among themselves and
-        // sorted by distance underneath.
-        const [g, mt, ph] = await Promise.all([
-          searchGooglePlaces(query),
-          searchMapTiler(query),
-          searchPhoton(query),
-        ])
-        const osm: SearchResult[] = []
-        for (const r of [...mt, ...ph]) {
-          if (!r.name) continue
-          if (!osm.some((m) => haversine(m.lat, m.lng, r.lat, r.lng) < 0.3)) osm.push(r)
+        // Google Places is the source. Only if it returns nothing
+        // (key unset / no match) do we fall back to the free
+        // geocoders so the box never dead-ends.
+        const g = await searchGooglePlaces(query)
+        if (g.length > 0) {
+          setResults(g.slice(0, 8))
+        } else {
+          const [mt, ph] = await Promise.all([searchMapTiler(query), searchPhoton(query)])
+          const osm: SearchResult[] = []
+          for (const r of [...mt, ...ph]) {
+            if (!r.name) continue
+            if (!osm.some((m) => haversine(m.lat, m.lng, r.lat, r.lng) < 0.3)) osm.push(r)
+          }
+          osm.sort((a, b) => a.distKm - b.distKm)
+          setResults(osm.slice(0, 8))
         }
-        osm.sort((a, b) => a.distKm - b.distKm)
-        setResults([...g, ...osm].slice(0, 8))
       } catch { setResults([]) }
       setSearching(false)
     }, 250)
@@ -411,42 +411,83 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
         <span className={`w-2.5 h-2.5 rounded-full ${dotColor}`} /> {label}
       </label>
 
-      {/* GPS + map fallback — rendered on the field that represents
-          the user's current location (pickup in RIDE, dropoff in
-          DELIVERY). */}
-      {showGpsBlock && (
-        <>
-          {value ? (
-            <div className={`border ${borderColor} rounded-xl p-3.5 flex items-start gap-3`}>
-              <FiMapPin className={`w-5 h-5 ${iconColor} flex-shrink-0 mt-0.5`} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{value.area || label}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{value.address}</p>
-              </div>
-              <button onClick={() => { onChange(null as any); setPermissionDenied(false); setError('') }} className="text-gray-400 p-1"><FiX className="w-4 h-4" /></button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <button onClick={detectGPS} disabled={detecting}
-                className="w-full border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-4 flex items-center justify-center gap-3 hover:border-primary-400 transition-colors active:scale-[0.98] disabled:opacity-60">
-                {detecting ? (
-                  <><div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" /><span className="text-sm text-gray-400">{lang === 'en' ? 'Detecting...' : lang === 'ur' ? 'معلوم ہو رہا ہے...' : 'جاري التحديد...'}</span></>
-                ) : (
-                  <><FiNavigation className="w-5 h-5 text-primary-600" /><span className="text-sm font-medium text-primary-600">{lang === 'en' ? 'Use my current location' : lang === 'ur' ? 'میرا موجودہ مقام استعمال کریں' : 'استخدم موقعي الحالي'}</span></>
-                )}
-              </button>
-              {/* Always offer map-pick as a fallback, even before denial */}
-              <button onClick={pickPickupFromMap}
-                className="w-full flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 rounded-xl py-3 text-sm font-medium text-gray-600 dark:text-gray-300 hover:border-primary-400 dark:hover:border-primary-600 transition-colors active:scale-[0.98]">
-                <FiMap className="w-4 h-4 text-primary-600" />
-                {lang === 'en' ? 'Pick from map' : lang === 'ur' ? 'نقشے سے منتخب کریں' : 'اختر من الخريطة'}
-              </button>
-            </div>
+      {value ? (
+        /* Selected location — same card for both fields. The X clears
+           it so the user can search or re-pin. */
+        <div className={`border ${borderColor} rounded-xl p-3.5 flex items-start gap-3`}>
+          <FiMapPin className={`w-5 h-5 ${iconColor} flex-shrink-0 mt-0.5`} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 dark:text-white">{value.area || label}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{value.address}</p>
+          </div>
+          <button
+            onClick={() => { onChange(null as any); setPermissionDenied(false); setError(''); setShowSearch(false); setSearchQuery(''); setResults([]) }}
+            className="text-gray-400 p-1"
+          >
+            <FiX className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {/* "Use my current location" — only on the field that is the
+              user's own position (pickup in RIDE, dropoff in DELIVERY). */}
+          {showGpsBlock && (
+            <button onClick={detectGPS} disabled={detecting}
+              className="w-full border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-4 flex items-center justify-center gap-3 hover:border-primary-400 transition-colors active:scale-[0.98] disabled:opacity-60">
+              {detecting ? (
+                <><div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" /><span className="text-sm text-gray-400">{lang === 'en' ? 'Detecting...' : lang === 'ur' ? 'معلوم ہو رہا ہے...' : 'جاري التحديد...'}</span></>
+              ) : (
+                <><FiNavigation className="w-5 h-5 text-primary-600" /><span className="text-sm font-medium text-primary-600">{lang === 'en' ? 'Use my current location' : lang === 'ur' ? 'میرا موجودہ مقام استعمال کریں' : 'استخدم موقعي الحالي'}</span></>
+              )}
+            </button>
           )}
 
-          {/* Permission-denied recovery UI */}
-          {permissionDenied && !value && (
-            <div className="mt-3 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-900 rounded-xl p-3">
+          {/* Google Places search — BOTH pickup and dropoff. */}
+          <div className="relative">
+            <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 overflow-hidden focus-within:ring-2 focus-within:ring-primary-500">
+              <FiSearch className="w-4 h-4 text-gray-400 mx-3 flex-shrink-0" />
+              <input ref={inputRef} type="text" value={searchQuery}
+                onChange={e => handleSearchInput(e.target.value)}
+                placeholder={lang === 'en' ? 'Search place, restaurant, store...' : lang === 'ur' ? 'جگہ، ریستوران، دکان تلاش کریں...' : 'ابحث عن مكان، مطعم، محل...'}
+                className="flex-1 min-w-0 py-3.5 text-sm bg-transparent text-gray-900 dark:text-white focus:outline-none" />
+              {searching && <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mx-3" />}
+            </div>
+
+            {results.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-30 max-h-64 overflow-y-auto">
+                {results.map(r => (
+                  <button key={r.id} onClick={() => selectResult(r)}
+                    className="w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-start border-b border-gray-50 dark:border-gray-700 last:border-0">
+                    <FiMapPin className="w-4 h-4 text-red-500 flex-shrink-0 mt-1" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-900 dark:text-white font-semibold truncate">{r.name}</p>
+                      {r.secondary && <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{r.secondary}</p>}
+                    </div>
+                    {r.distKm >= 0 && (
+                      <span className="text-[10px] text-gray-400 flex-shrink-0 mt-1 font-medium">{formatDist(r.distKm)}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {searchQuery.length >= 2 && !searching && results.length === 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-30 p-4 text-center">
+                <p className="text-sm text-gray-400">{lang === 'en' ? 'No results' : lang === 'ur' ? 'کوئی نتیجہ نہیں' : 'لا توجد نتائج'}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Map picker — BOTH fields. */}
+          <button onClick={pickPickupFromMap}
+            className="w-full flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 rounded-xl py-3 text-sm font-medium text-gray-600 dark:text-gray-300 hover:border-primary-400 dark:hover:border-primary-600 transition-colors active:scale-[0.98]">
+            <FiMap className="w-4 h-4 text-primary-600" />
+            {lang === 'en' ? 'Pick from map' : lang === 'ur' ? 'نقشے سے منتخب کریں' : 'اختر من الخريطة'}
+          </button>
+
+          {/* GPS permission recovery — only the current-location field. */}
+          {showGpsBlock && permissionDenied && (
+            <div className="bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-900 rounded-xl p-3">
               <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed mb-3">{error || permissionDeniedMsg()}</p>
               <div className="flex gap-2">
                 <button type="button" onClick={openSystemSettings}
@@ -463,74 +504,10 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
             </div>
           )}
 
-          {/* Non-denial error (e.g., timeout) */}
-          {error && !permissionDenied && <p className="text-xs text-red-500 mt-1.5 px-1">{error}</p>}
-        </>
-      )}
-
-      {/* Search + Map picker — rendered on the OTHER field (dropoff
-          in RIDE, pickup in DELIVERY). */}
-      {!showGpsBlock && (
-        <>
-          {value && !showSearch ? (
-            <div className={`border ${borderColor} rounded-xl p-3.5 flex items-start gap-3`}>
-              <FiMapPin className={`w-5 h-5 ${iconColor} flex-shrink-0 mt-0.5`} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{value.area || label}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{value.address}</p>
-              </div>
-              <button onClick={() => setShowSearch(true)} className="text-gray-400 p-1"><FiX className="w-4 h-4" /></button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {/* Search bar */}
-              <div className="relative">
-                <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 overflow-hidden focus-within:ring-2 focus-within:ring-primary-500">
-                  <FiSearch className="w-4 h-4 text-gray-400 mx-3 flex-shrink-0" />
-                  <input ref={inputRef} type="text" value={searchQuery}
-                    onChange={e => handleSearchInput(e.target.value)}
-                    placeholder={lang === 'en' ? 'Search place, restaurant, store...' : lang === 'ur' ? 'جگہ، ریستوران، دکان تلاش کریں...' : 'ابحث عن مكان، مطعم، محل...'}
-                    className="flex-1 min-w-0 py-3.5 text-sm bg-transparent text-gray-900 dark:text-white focus:outline-none" />
-                  {searching && <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mx-3" />}
-                </div>
-
-                {results.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-30 max-h-64 overflow-y-auto">
-                    {results.map(r => (
-                      <button key={r.id} onClick={() => selectResult(r)}
-                        className="w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-start border-b border-gray-50 dark:border-gray-700 last:border-0">
-                        <FiMapPin className="w-4 h-4 text-red-500 flex-shrink-0 mt-1" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-900 dark:text-white font-semibold truncate">{r.name}</p>
-                          {r.secondary && <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{r.secondary}</p>}
-                        </div>
-                        {r.distKm >= 0 && (
-                          <span className="text-[10px] text-gray-400 flex-shrink-0 mt-1 font-medium">{formatDist(r.distKm)}</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {searchQuery.length >= 2 && !searching && results.length === 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-30 p-4 text-center">
-                    <p className="text-sm text-gray-400">{lang === 'en' ? 'No results' : lang === 'ur' ? 'کوئی نتیجہ نہیں' : 'لا توجد نتائج'}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Map picker button */}
-              <button onClick={async () => {
-                const result = await openMapPicker({ centerLat: refLat, centerLng: refLng, lang, maptilerKey })
-                if (result) onChange(result)
-              }}
-                className="w-full flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 rounded-xl py-3 text-sm font-medium text-gray-600 dark:text-gray-300 hover:border-primary-400 dark:hover:border-primary-600 transition-colors active:scale-[0.98]">
-                <FiMap className="w-4 h-4 text-primary-600" />
-                {lang === 'en' ? 'Pick from map' : lang === 'ur' ? 'نقشے سے منتخب کریں' : 'اختر من الخريطة'}
-              </button>
-            </div>
+          {showGpsBlock && error && !permissionDenied && (
+            <p className="text-xs text-red-500 mt-1.5 px-1">{error}</p>
           )}
-        </>
+        </div>
       )}
     </div>
   )
