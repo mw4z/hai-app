@@ -51,7 +51,18 @@ export async function openExternal(url: string): Promise<void> {
   }
 
   try {
-    window.open(url, isHttp ? '_blank' : '_self')
+    if (isHttp) {
+      window.open(url, '_blank')
+    } else {
+      // Non-http scheme (tel:, mailto:, sms:, geo:): a DIRECT location
+      // change is intercepted by Capacitor's WebViewClient
+      // (shouldOverrideUrlLoading → native ACTION_VIEW Intent → dialer).
+      // window.open routed through the WebView popup path
+      // (onCreateWindow) and showed the "webpage not available" error
+      // page instead — that was the bug. This fallback makes Call work
+      // even on binaries that don't yet bundle @capacitor/app-launcher.
+      window.location.href = url
+    }
   } catch {
     /* ignore */
   }
