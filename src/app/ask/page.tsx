@@ -180,6 +180,16 @@ export default function AskNeighborsPage() {
   // to the default-category, no-intent state.
   const initialIntentKey = searchParams?.get('intent') || ''
 
+  // Outside-neighborhood ask: /ask?neighborhood=<id> arrives from the
+  // read-only feed banner. The post is then a REQUEST to a hood the user
+  // doesn't live in — restricted to GENERAL / SERVICES, request-only.
+  // The server independently enforces all of this; this just shapes the
+  // UI so the user can't try a blocked path.
+  const targetNeighborhoodId = searchParams?.get('neighborhood') || ''
+  const isOutside = !!targetNeighborhoodId
+  // Intent tiles allowed for outside asks (map to GENERAL / SERVICES).
+  const OUTSIDE_INTENT_KEYS = ['service_need', 'recommendation']
+
   const [text, setText] = useState('')
   // Seed category/intent/marketplaceType from the URL deep-link if
   // one was provided, otherwise fall back to the existing defaults.
@@ -187,7 +197,7 @@ export default function AskNeighborsPage() {
     (c) => c.key === initialIntentKey && c.postMap,
   )
   const [category, setCategory] = useState<string>(
-    initialIntent?.postMap?.category ?? DEFAULT_CATEGORY,
+    initialIntent?.postMap?.category ?? (isOutside ? 'GENERAL' : DEFAULT_CATEGORY),
   )
   // Track whether the user has explicitly overridden the suggested
   // category. Once they pick anything from the strip, we stop nudging
@@ -230,10 +240,12 @@ export default function AskNeighborsPage() {
   // (sub-millisecond). If the user has manually picked a category, we
   // do NOT overwrite their choice — only the auto-default is updated.
   useEffect(() => {
-    if (userOverrode) return
+    // Outside asks are pinned to GENERAL/SERVICES — never auto-reroute
+    // into a blocked category (the server would reject it anyway).
+    if (userOverrode || isOutside) return
     const suggested = inferAskCategory(text)
     setCategory((prev) => (prev === suggested ? prev : suggested))
-  }, [text, userOverrode])
+  }, [text, userOverrode, isOutside])
   const [location, setLocation] = useState<{ lat: number; lng: number; name: string } | null>(null)
   const [detectingLocation, setDetectingLocation] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -397,7 +409,12 @@ export default function AskNeighborsPage() {
           // marketplaceType is only meaningful when category=MARKETPLACE,
           // but the API safely ignores it otherwise. Sending it lets the
           // "product to buy" tile land as MARKETPLACE+BUY on first try.
-          marketplaceType,
+          // OMITTED for outside asks — the server rejects any
+          // marketplaceType on an outside request.
+          ...(isOutside ? {} : { marketplaceType }),
+          // Outside ask → target the browsed neighborhood; the server
+          // marks it originScope=OUTSIDE_REQUEST and enforces the limits.
+          ...(isOutside && targetNeighborhoodId ? { neighborhoodId: targetNeighborhoodId } : {}),
           imageUrls,
           locationLat: location?.lat || null,
           locationLng: location?.lng || null,
@@ -449,7 +466,7 @@ export default function AskNeighborsPage() {
           <span className="text-sm font-medium">{lang === 'en' ? 'Cancel' : lang === 'ur' ? 'منسوخ' : 'إلغاء'}</span>
         </button>
         <h1 className="flex-1 text-center font-bold text-gray-900 dark:text-white">
-          {translate('ask_neighbors', lang)}
+          {isOutside ? translate('feed_outside_ask_cta', lang) : translate('ask_neighbors', lang)}
         </h1>
         <button
           data-guide="ask-submit"
@@ -481,7 +498,7 @@ export default function AskNeighborsPage() {
               {lang === 'en' ? 'What are you looking for?' : lang === 'ur' ? 'آپ کیا تلاش کر رہے ہیں؟' : 'وش تبي تلقى؟'}
             </p>
             <div className="grid grid-cols-2 gap-2">
-              {ASK_INTENT_CHOICES.map((c) => (
+              {ASK_INTENT_CHOICES.filter((c) => !isOutside || OUTSIDE_INTENT_KEYS.includes(c.key)).map((c) => (
                 <button
                   key={c.key}
                   type="button"
@@ -551,7 +568,9 @@ export default function AskNeighborsPage() {
             text changes from "Category (optional)" to "Suggested
             category" once a non-default suggestion has matched, so
             the user knows it was inferred — and can still tap to
-            override (sets userOverrode). */}
+            override (sets userOverrode). Hidden for outside asks — the
+            category is locked to GENERAL/SERVICES via the two tiles. */}
+        {!isOutside && (
         <div>
           <button
             type="button"
@@ -599,6 +618,7 @@ export default function AskNeighborsPage() {
             </div>
           )}
         </div>
+        )}
 
         {/* Optional image attach — same camera/gallery flow as the
             regular post composer. Single image (asks rarely benefit
@@ -699,11 +719,13 @@ export default function AskNeighborsPage() {
             neighborhood-wide. */}
         <div className="bg-sky-50 dark:bg-sky-900/30 rounded-xl p-3">
           <p className="text-sky-700 dark:text-sky-300 text-xs">
-            🔎 {lang === 'en'
-              ? 'Your question goes to neighbors in your area — they reply directly.'
-              : lang === 'ur'
-                ? 'آپ کا سوال محلے کے پڑوسیوں کو جائے گا — وہ خود جواب دیں گے۔'
-                : 'سيُعرض سؤالك للجيران في حيّك — هم يردوا عليك مباشرة'}
+            🔎 {isOutside
+              ? translate('feed_outside_helper', lang)
+              : lang === 'en'
+                ? 'Your question goes to neighbors in your area — they reply directly.'
+                : lang === 'ur'
+                  ? 'آپ کا سوال محلے کے پڑوسیوں کو جائے گا — وہ خود جواب دیں گے۔'
+                  : 'سيُعرض سؤالك للجيران في حيّك — هم يردوا عليك مباشرة'}
           </p>
         </div>
       </div>

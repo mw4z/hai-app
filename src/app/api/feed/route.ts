@@ -37,8 +37,10 @@ function scorePost(post: {
   const hoursAgo = (Date.now() - new Date(post.createdAt).getTime()) / 3600_000
   const engagement = Math.min(post._count.comments * 3 + post._count.reactions, 30)
   const typeBoost = (post.category && TYPE_BOOST[post.category]) || 0
-  // Replicate the legacy LOOKING_FOR +3 boost via intent: REQUEST.
-  const intentBoost = post.intent === 'REQUEST' ? 3 : 0
+  // Replicate the legacy LOOKING_FOR +3 boost via intent: REQUEST —
+  // but NOT for outside requests: they appear in the feed without being
+  // ranked above resident content.
+  const intentBoost = post.intent === 'REQUEST' && (post as any).originScope !== 'OUTSIDE_REQUEST' ? 3 : 0
   const repBoost = getFeedBoost((post as any).author?.reputation || 0)
   const base = 50 + engagement + typeBoost + intentBoost + repBoost
 

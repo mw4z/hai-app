@@ -201,6 +201,9 @@ export const translations = {
   // ── Feed (additional) ───────────────────────────────────────────────────────
   feed_readonly_banner:  { ar: 'أنت تتصفح حياً آخر — القراءة فقط', en: 'Browsing another neighborhood — read only' , ur: 'دوسرا محلہ دیکھ رہے ہیں — صرف پڑھنے کیلئے' },
   feed_return_home:      { ar: 'عُد لحيّك',                          en: 'Return home'                              , ur: 'واپس جائیں' },
+  feed_outside_ask_cta:  { ar: 'اسأل أهل هذا الحي',                  en: 'Ask this neighborhood'                    , ur: 'اس محلے سے پوچھیں' },
+  feed_outside_helper:   { ar: 'النشر العام مخصص لسكان الحي، لكن يمكنك إرسال طلب أو استفسار لأهل الحي.', en: 'Public posting is for residents, but you can send a request or question to this neighborhood.', ur: 'عام پوسٹنگ رہائشیوں کیلئے ہے، لیکن آپ اس محلے کو درخواست یا سوال بھیج سکتے ہیں۔' },
+  post_outside_badge:    { ar: 'من خارج الحي',                       en: 'From outside'                             , ur: 'محلے سے باہر' },
   feed_no_posts_own:     { ar: 'كن أول من يكتب في حيّك!',           en: 'Be the first to post!'                   , ur: 'پہلے لکھنے والے بنیں!' },
   feed_no_posts_readonly:{ ar: 'لا توجد منشورات في هذا الحي',       en: 'No posts in this neighborhood'           , ur: 'اس محلے میں کوئی پوسٹ نہیں' },
   feed_browse_title:     { ar: 'تصفح الأحياء',                       en: 'Browse Neighborhoods'                    , ur: 'محلے دیکھیں' },

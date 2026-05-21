@@ -117,6 +117,9 @@ interface Post {
   // is the optional "was" price rendered struck-through next to price.
   isOffer?: boolean
   originalPrice?: number | null
+  // OUTSIDE_REQUEST when the author wasn't a resident of this hood at
+  // post time → renders a subtle "من خارج الحي" badge.
+  originScope?: 'RESIDENT' | 'OUTSIDE_REQUEST'
   imageUrls: string[]
   pdfUrl?: string | null
   pdfName?: string | null
@@ -1045,6 +1048,11 @@ export default function PostCard({
               <TierLabel reputation={post.author.reputation} compact />
               {post.isFeatured && (
                 <StatePill state="featured" label={lang !== 'en' ? 'بارز' : 'Featured'} />
+              )}
+              {post.originScope === 'OUTSIDE_REQUEST' && (
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-[10px] font-semibold px-1.5 py-0.5 leading-none">
+                  📍 {t('post_outside_badge')}
+                </span>
               )}
             </div>
           </div>

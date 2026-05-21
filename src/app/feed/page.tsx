@@ -289,7 +289,9 @@ export default async function FeedPage({
     const hoursAgo = (Date.now() - new Date(p.createdAt).getTime()) / 3600_000
     const engagement = Math.min(p._count.comments * 3 + p._count.reactions, 30)
     const boost = (p.category && TYPE_BOOST[p.category]) || 0
-    const intentBoost = p.intent === 'REQUEST' ? REQUEST_INTENT_BOOST : 0
+    // Outside requests appear in the feed but are never ranked above
+    // resident content — no intent boost for them.
+    const intentBoost = p.intent === 'REQUEST' && p.originScope !== 'OUTSIDE_REQUEST' ? REQUEST_INTENT_BOOST : 0
     // Phase 0: small extra bump for HIGH/CRITICAL civic posts so a
     // genuine neighborhood issue out-ranks fresh commercial content.
     // Stacks on top of TYPE_BOOST so a HIGH report gets +5+15 = +20.
@@ -347,10 +349,14 @@ export default async function FeedPage({
   let pickedIdForCookie: string | null = null
   if (REQUEST_BOOST_ON && balanced.length >= 5) {
     const firstFive = balanced.slice(0, 5)
-    const hasRequestUp = firstFive.some(p => p.intent === 'REQUEST')
+    // Only resident requests get the first-screen visibility nudge —
+    // outside requests are never promoted onto the first screen.
+    const isResidentRequest = (p: typeof balanced[number]) =>
+      p.intent === 'REQUEST' && p.originScope !== 'OUTSIDE_REQUEST'
+    const hasRequestUp = firstFive.some(isResidentRequest)
     if (!hasRequestUp) {
       const idx = balanced.findIndex(
-        p => p.intent === 'REQUEST' && !seenIds.has(p.id),
+        p => isResidentRequest(p) && !seenIds.has(p.id),
       )
       if (idx >= 5) {
         const [pick] = balanced.splice(idx, 1)
@@ -379,6 +385,7 @@ export default async function FeedPage({
   const sixHoursAgo = Date.now() - 6 * 3600_000
   const requestsRecentDot = REQUEST_BOOST_ON && activePosts.some(p =>
     p.intent === 'REQUEST'
+    && p.originScope !== 'OUTSIDE_REQUEST'
     && new Date(p.createdAt).getTime() >= sixHoursAgo,
   )
 

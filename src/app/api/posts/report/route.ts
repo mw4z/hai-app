@@ -112,8 +112,16 @@ export async function POST(req: NextRequest) {
       (acc, r) => acc + getReportWeight(r.reporter?.reputation ?? 0),
       0,
     )
-    const hideThreshold = getAuthorHideThreshold(author?.reputation ?? 0)
-    const removeThreshold = getAuthorRemoveThreshold(author?.reputation ?? 0)
+    let hideThreshold = getAuthorHideThreshold(author?.reputation ?? 0)
+    let removeThreshold = getAuthorRemoveThreshold(author?.reputation ?? 0)
+    // Outside requests carry less trust (the author isn't a resident of
+    // this neighborhood), so they auto-hide / auto-remove on a LOWER
+    // threshold than resident posts — abuse from outsiders flips out
+    // faster. 0.6× of the author-tier threshold, with sane floors.
+    if (post.originScope === 'OUTSIDE_REQUEST') {
+      hideThreshold = Math.max(1, Math.round(hideThreshold * 0.6))
+      removeThreshold = Math.max(2, Math.round(removeThreshold * 0.6))
+    }
 
     if (weightedScore >= removeThreshold) {
       newStatus = 'REMOVED'

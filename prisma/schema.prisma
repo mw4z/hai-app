@@ -334,6 +334,11 @@ model Post {
   intent         PostIntent       @default(NORMAL)
   priority       PostPriority     @default(NORMAL)
   audience       PostAudience     @default(ALL)
+  // Whether the author was a resident of this post's neighborhood at
+  // creation. OUTSIDE_REQUEST posts are request-only, badge "من خارج
+  // الحي", and never boosted/pushed. Defaults RESIDENT for all existing
+  // rows + every normal in-neighborhood post.
+  originScope    PostOriginScope  @default(RESIDENT)
   // Subtype for category=MARKETPLACE only. Ignored otherwise. SELL is
   // the default so every existing Marketplace row keeps its meaning.
   marketplaceType MarketplaceType @default(SELL)
@@ -440,6 +445,18 @@ enum PostIntent {
   OFFER     // user is offering something
   REQUEST   // user is asking / looking for something (was LOOKING_FOR / RIDE_REQUEST)
   NORMAL    // informational / no transactional intent
+}
+
+// Who, relative to the post's neighborhood, created it.
+//   RESIDENT        — author is a verified member of the target hood
+//                     (the default; full posting rights).
+//   OUTSIDE_REQUEST — author was NOT a member of the target hood at
+//                     creation time. Restricted to intent=REQUEST only,
+//                     never boosted, never pushed broadly. See the gate
+//                     in /api/posts.
+enum PostOriginScope {
+  RESIDENT
+  OUTSIDE_REQUEST
 }
 
 enum PostPriority {

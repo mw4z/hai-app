@@ -5,7 +5,7 @@ import { classifyPostCategory } from '@/lib/posts/classify'
 import { getSession } from '@/lib/auth'
 import { notifyNeighborhood } from '@/lib/notifications'
 import { validateContent, normalizeForComparison, isSimilar, apiError } from '@/lib/validation'
-import { PostCategory, PostIntent, PostPriority, PostAudience, MarketplaceType } from '@prisma/client'
+import { PostCategory, PostIntent, PostPriority, PostAudience, MarketplaceType, PostOriginScope } from '@prisma/client'
 import { getPostLimit } from '@/lib/reputation'
 import { getLimits } from '@/lib/capabilities'
 import { cacheDeletePrefix } from '@/lib/cache'
@@ -16,6 +16,7 @@ import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { fullName } from '@/lib/displayName'
 import { isTitleRequired } from '@/lib/posts/titleRequired'
 import { buildNotifTitle } from '@/lib/posts/displayTitle'
+import { evaluateOutsideRequest, OUTSIDE_MAX_PER_HOOD_PER_DAY, OUTSIDE_MAX_TOTAL_PER_DAY } from '@/lib/posts/outsideGate'
 
 const DEFAULT_POST_LIMIT = 5
 const POST_COOLDOWN_SECONDS = 60
@@ -39,6 +40,7 @@ const JOB_MAX_PER_DAY = 2
 // External-chat link pattern — WhatsApp groups / channels are the
 // dominant Saudi-region spam vector for "jobs". Block at write-time.
 const EXTERNAL_GROUP_LINK = /(?:chat\.whatsapp\.com|wa\.me\/[^\s]*\?|t\.me\/joinchat|t\.me\/\+)/i
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -124,12 +126,19 @@ export async function POST(req: NextRequest) {
         ? originalPriceNum
         : null
 
-    // SUPER_ADMIN can target any neighborhood by passing neighborhoodId in
-    // the body. Regular users (and all other roles) are always pinned to
-    // their own neighborhood. If the id is valid, we use it as the post's
-    // neighborhoodId for the create + feed-invalidation + push fanout.
+    // Target neighborhood resolution.
+    //  - Own neighborhood (or no override): normal resident posting.
+    //  - SUPER_ADMIN passing another id: cross-neighborhood as a resident
+    //    (broadcast/admin) — NOT an outside request.
+    //  - Any other user passing another id: an OUTSIDE request — allowed,
+    //    but restricted to REQUEST-only by the gate below.
     let targetNeighborhoodId: string = user.neighborhoodId
-    if (bypass && typeof requestedNeighborhoodId === 'string' && requestedNeighborhoodId.trim() && requestedNeighborhoodId !== user.neighborhoodId) {
+    let isOutside = false
+    if (
+      typeof requestedNeighborhoodId === 'string' &&
+      requestedNeighborhoodId.trim() &&
+      requestedNeighborhoodId.trim() !== user.neighborhoodId
+    ) {
       const nbhd = await db.neighborhood.findUnique({
         where: { id: requestedNeighborhoodId.trim() },
         select: { id: true },
@@ -138,6 +147,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(apiError('الحي غير موجود', 404), { status: 404 })
       }
       targetNeighborhoodId = nbhd.id
+      isOutside = !bypass
     }
 
     if (
@@ -176,6 +186,23 @@ export async function POST(req: NextRequest) {
     const priority: PostPriority | undefined = priorityInput && (VALID_PRIORITIES as readonly string[]).includes(priorityInput)
       ? (priorityInput as PostPriority)
       : undefined
+
+    // ── Outside-neighborhood posting gate ──────────────────────────────
+    // Enforced on the SERVER regardless of what the client sent: a user
+    // posting to a hood that isn't their home gets REQUEST-only, a tiny
+    // category allowlist, no marketplace, no raised priority. Rejections
+    // are explicit (not silent coercion) so a manipulated client is told.
+    const originScope: PostOriginScope = isOutside ? 'OUTSIDE_REQUEST' : 'RESIDENT'
+    const outsideGate = evaluateOutsideRequest({
+      isOutside,
+      intentInput,
+      category,
+      marketplaceTypeInput,
+      priorityInput,
+    })
+    if (!outsideGate.ok) {
+      return NextResponse.json(apiError(outsideGate.messageAr, 403, outsideGate.code), { status: 403 })
+    }
 
     // Server-side priority clamp — gates the URGENT_ONLY intent override
     // in canSendNotification, so abuse here would punch through user mutes.
@@ -244,10 +271,12 @@ export async function POST(req: NextRequest) {
       selectedIntent: intent,
       selectedMarketplaceType: marketplaceType,
     })
-    let classifyAction: 'ALLOW' | 'AUTO_CORRECT' | 'REJECT_WITH_SUGGESTION' = bypass ? 'ALLOW' : cls.action
+    // Outside requests are already constrained to a tiny allowlist, so we
+    // don't let the classifier reroute them into a blocked category.
+    let classifyAction: 'ALLOW' | 'AUTO_CORRECT' | 'REJECT_WITH_SUGGESTION' = (bypass || isOutside) ? 'ALLOW' : cls.action
     let classifyReason = cls.reason
 
-    if (!bypass && cls.action === 'REJECT_WITH_SUGGESTION') {
+    if (!bypass && !isOutside && cls.action === 'REJECT_WITH_SUGGESTION') {
       return NextResponse.json(
         {
           error: 'category_mismatch',
@@ -261,7 +290,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (!bypass && cls.action === 'AUTO_CORRECT') {
+    if (!bypass && !isOutside && cls.action === 'AUTO_CORRECT') {
       // Replace the user-selected category + marketplaceType with
       // the classifier's call. The downstream code reads from these
       // same variable names — so the rest of the handler is unaware
@@ -319,7 +348,16 @@ export async function POST(req: NextRequest) {
     // classifyPost fills defaults (intent/priority/audience) when the
     // composer didn't pass them. Single source of truth — see
     // src/lib/posts/classifyPost.ts.
-    const c = classifyPost({ category: category as PostCategory, intent, priority, audience })
+    // Outside requests are hard-pinned to REQUEST / NORMAL / ALL — never
+    // OFFER, never elevated priority, never women/men-targeted — no matter
+    // what the client passed (the gate above already rejected obvious
+    // attempts; this guarantees the stored row regardless).
+    const c = classifyPost({
+      category: category as PostCategory,
+      intent: isOutside ? 'REQUEST' : intent,
+      priority: isOutside ? 'NORMAL' : priority,
+      audience: isOutside ? 'ALL' : audience,
+    })
 
     // Women-only audience check (SUPER_ADMIN bypasses).
     if (!bypass && c.audience === 'WOMEN' && user.gender !== 'FEMALE') {
@@ -363,6 +401,37 @@ export async function POST(req: NextRequest) {
       const dailyLimit = Math.max(repLimit, planLimit) // use whichever is higher
       if (todayPosts >= dailyLimit) {
         return NextResponse.json(apiError('وصلت الحد الأقصى للمنشورات اليوم', 429), { status: 429 })
+      }
+
+      // Stricter caps for outside requests — on top of the general daily
+      // limit above. A 24h rolling window: at most 2 to any one
+      // neighborhood and 5 across all neighborhoods, so an outsider can't
+      // blanket-spam hoods they don't live in.
+      if (isOutside) {
+        const dayAgo = new Date(Date.now() - 24 * 3600_000)
+        const outsideTotal = await db.post.count({
+          where: { authorId: user.id, originScope: 'OUTSIDE_REQUEST', createdAt: { gte: dayAgo } },
+        })
+        if (outsideTotal >= OUTSIDE_MAX_TOTAL_PER_DAY) {
+          return NextResponse.json(
+            apiError(`الحد الأقصى ${OUTSIDE_MAX_TOTAL_PER_DAY} طلبات من خارج حيّك خلال اليوم`, 429, 'OUTSIDE_DAILY_LIMIT'),
+            { status: 429 },
+          )
+        }
+        const outsidePerHood = await db.post.count({
+          where: {
+            authorId: user.id,
+            originScope: 'OUTSIDE_REQUEST',
+            neighborhoodId: targetNeighborhoodId,
+            createdAt: { gte: dayAgo },
+          },
+        })
+        if (outsidePerHood >= OUTSIDE_MAX_PER_HOOD_PER_DAY) {
+          return NextResponse.json(
+            apiError(`الحد الأقصى ${OUTSIDE_MAX_PER_HOOD_PER_DAY} طلب لنفس الحي خلال اليوم`, 429, 'OUTSIDE_HOOD_LIMIT'),
+            { status: 429 },
+          )
+        }
       }
 
       // Duplicate/similarity detection: check last 3 hours.
@@ -521,6 +590,7 @@ export async function POST(req: NextRequest) {
         intent:   c.intent,
         priority: c.priority,
         audience: c.audience,
+        originScope, // RESIDENT, or OUTSIDE_REQUEST for cross-hood asks
         marketplaceType, // SELL by default, validated above for MARKETPLACE
         coordinationMode,
         price: price || null,
@@ -554,36 +624,44 @@ export async function POST(req: NextRequest) {
     // Processor applies filtering (author exclusion, prefs, quiet
     // hours, gender). priority:'high' so every neighbor's phone gets
     // the banner the moment the post is published.
-    try {
-      await db.notifJob.create({
-        data: {
-          type: 'new_post',
-          priority: 'high',
-          targetType: 'nbhd_topic',
-          targetRef: targetNeighborhoodId,
-          payload: {
-            postId: post.id,
-            authorId: user.id,
-            authorName: fullName(user) || user.name || null,
-            // Synthesize a body-excerpt headline when the post is
-            // title-optional and the author skipped it — the push
-            // banner needs SOMETHING for the subject row.
-            title: buildNotifTitle({ title: finalTitle, body: finalBody, category: c.category }).slice(0, 140),
-            category: c.category,
+    //
+    // SKIPPED for OUTSIDE requests: an outsider's question must not
+    // banner every resident's phone — it surfaces through the REQUESTS
+    // feed filter only (per the outside-posting spec; broad push for
+    // outside requests is intentionally not designed yet).
+    if (!isOutside) {
+      try {
+        await db.notifJob.create({
+          data: {
+            type: 'new_post',
+            priority: 'high',
+            targetType: 'nbhd_topic',
+            targetRef: targetNeighborhoodId,
+            payload: {
+              postId: post.id,
+              authorId: user.id,
+              authorName: fullName(user) || user.name || null,
+              // Synthesize a body-excerpt headline when the post is
+              // title-optional and the author skipped it — the push
+              // banner needs SOMETHING for the subject row.
+              title: buildNotifTitle({ title: finalTitle, body: finalBody, category: c.category }).slice(0, 140),
+              category: c.category,
+            },
           },
-        },
-      })
-    } catch (err) {
-      console.error('[NOTIF_JOB] enqueue new_post failed:', err)
+        })
+      } catch (err) {
+        console.error('[NOTIF_JOB] enqueue new_post failed:', err)
+      }
+      kickNotifCron()
     }
-    kickNotifCron()
 
     // Ask flow — fan out a dedicated notification when the post is a
     // REQUEST so neighbors see it as an explicit help-needed signal.
     // When the post has no real title (Ask flow on optional categories),
     // buildNotifTitle synthesizes a body-excerpt headline so the
-    // notification still has a meaningful subject.
-    if (c.intent === 'REQUEST') {
+    // notification still has a meaningful subject. Outside requests are
+    // excluded — no broad notification, feed-only discovery.
+    if (c.intent === 'REQUEST' && !isOutside) {
       notifyNeighborhood({
         type: 'LOOKING_FOR_POST',
         actorId: user.id,
