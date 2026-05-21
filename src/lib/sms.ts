@@ -13,8 +13,17 @@
  *
  * Required env vars (replace the old TWILIO_* in .env):
  *   AUTHENTICA_API_KEY      — your Authentica X-Authorization token
- *   AUTHENTICA_SENDER       — registered sender name (optional, default: 'Hai')
+ *   AUTHENTICA_SENDER       — see note below; NOT honored by the API
  *   AUTHENTICA_API_BASE     — override base URL (optional, default below)
+ *
+ * ⚠️ SENDER NAME: Authentica's /send-otp body only accepts `method`,
+ * `phone`/`email`, and `template_id` — there is NO request parameter for
+ * the SMS sender name. The "from" shown on the SMS is set in the
+ * Authentica DASHBOARD (Application settings) and must be a sender ID
+ * registered + approved with Authentica/CITC; an unregistered account
+ * falls back to Authentica's default sender ("Authentica"). The `sender`
+ * field we send below is therefore best-effort / ignored — to brand the
+ * sender as the app name you must register it in the dashboard.
  *
  * Reference: https://docs.authentica.sa
  */
@@ -117,8 +126,11 @@ export async function sendOTP(phone: string): Promise<boolean> {
     // placeholder is filled with `app_name` below.
     template_id: TEMPLATE_ID,
     app_name: APP_NAME,
-    // Sender name shown on the SMS. Must be pre-registered with
-    // Authentica or this will fail with a sender-not-approved error.
+    // NOTE: not a documented /send-otp parameter — Authentica derives the
+    // SMS "from" from the dashboard Application settings (a registered
+    // sender ID), not this field. Sent best-effort in case the account
+    // honors it; the dashboard config is what actually governs the
+    // displayed sender. See the module header.
     sender: SENDER,
     // Body language — paired with the chosen template (10 = en).
     // Flip to 'ar' here if you change AUTHENTICA_TEMPLATE_ID back
