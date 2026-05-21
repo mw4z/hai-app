@@ -5,6 +5,24 @@ import { getSession } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 
 /**
+ * GET /api/posts/[id]/view → { viewCount }
+ *
+ * Read-only current count, polled by visible PostCards so the number
+ * updates "live" as other users view (no websocket infra in the app;
+ * polling pauses when the card is off-screen / tab hidden).
+ */
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const post = await db.post.findUnique({
+    where: { id: params.id },
+    select: { viewCount: true },
+  })
+  if (!post) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  return NextResponse.json({ viewCount: post.viewCount })
+}
+
+/**
  * POST /api/posts/[id]/view
  *
  * Records that the current user has viewed this post. Counted ONCE

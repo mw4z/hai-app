@@ -268,32 +268,55 @@ export default function PostCard({
   // Distinct-viewer count. Seeded from the server; bumped to the
   // server's authoritative value after we record this user's view.
   const [viewCount, setViewCount] = useState<number>(post.viewCount ?? 0)
+  const [cardVisible, setCardVisible] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
-  // Record a view when the card first scrolls ≥50% into view. Fired
-  // at most once per post per session (reportedViews); the server
-  // dedups across sessions so a returning viewer never re-increments.
+  // Track on-screen state. Records this user's view ONCE the first
+  // time the card is ≥50% visible (reportedViews dedups per session;
+  // server dedups across sessions). Keeps observing afterwards so the
+  // poll below knows when the card is on screen.
   useEffect(() => {
     const el = cardRef.current
-    if (!el || reportedViews.has(post.id)) return
+    if (!el) return
     const io = new IntersectionObserver(
       (entries) => {
-        if (!entries.some((e) => e.isIntersecting)) return
-        if (reportedViews.has(post.id)) { io.disconnect(); return }
-        reportedViews.add(post.id)
-        io.disconnect()
-        fetch(`/api/posts/${post.id}/view`, { method: 'POST' })
-          .then((r) => (r.ok ? r.json() : null))
-          .then((d) => {
-            if (d && typeof d.viewCount === 'number') setViewCount(d.viewCount)
-          })
-          .catch(() => {})
+        const isVis = entries.some((e) => e.isIntersecting)
+        setCardVisible(isVis)
+        if (isVis && !reportedViews.has(post.id)) {
+          reportedViews.add(post.id)
+          fetch(`/api/posts/${post.id}/view`, { method: 'POST' })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => {
+              if (d && typeof d.viewCount === 'number') setViewCount(d.viewCount)
+            })
+            .catch(() => {})
+        }
       },
       { threshold: 0.5 },
     )
     io.observe(el)
     return () => io.disconnect()
   }, [post.id])
+
+  // Live-ish view count: while the card is on screen (and the tab is
+  // visible), re-fetch the count every 25s so it climbs as others
+  // view. Paused entirely when scrolled away or the tab is hidden, so
+  // it costs nothing in the background.
+  useEffect(() => {
+    if (!cardVisible) return
+    let cancelled = false
+    const poll = () => {
+      if (typeof document !== 'undefined' && document.hidden) return
+      fetch(`/api/posts/${post.id}/view`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!cancelled && d && typeof d.viewCount === 'number') setViewCount(d.viewCount)
+        })
+        .catch(() => {})
+    }
+    const id = setInterval(poll, 25_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [cardVisible, post.id])
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>(() => {
     const counts: Record<string, number> = {}
     for (const r of post.reactions || []) {
