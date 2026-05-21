@@ -83,17 +83,60 @@ async function nativeCancel(): Promise<void> {
   }
 }
 
+// ── Live input level (for the recording waveform) ───────────────
+// Native: poll the plugin's amplitude. Web: an AnalyserNode on the
+// mic stream → RMS. Always normalized to 0..1.
+async function nativeLevel(): Promise<number> {
+  try {
+    const { CapacitorAudioRecorder } = await import('@capgo/capacitor-audio-recorder')
+    const res: any = await (CapacitorAudioRecorder as any).getCurrentAmplitude?.()
+    if (!res) return 0
+    let v =
+      typeof res.amplitude === 'number'
+        ? res.amplitude
+        : typeof res.value === 'number'
+          ? res.value
+          : typeof res.current === 'number'
+            ? res.current
+            : 0
+    // dB-scale (≤0) → normalize from roughly -60..0 dB into 0..1.
+    if (v <= 0 && v !== 0) v = Math.max(0, (v + 60) / 60)
+    return Math.min(1, Math.max(0, v))
+  } catch {
+    return 0
+  }
+}
+
+function webLevel(): number {
+  if (!analyser || !levelBuf) return 0
+  analyser.getByteTimeDomainData(levelBuf as any)
+  let sum = 0
+  for (let i = 0; i < levelBuf.length; i++) {
+    const d = (levelBuf[i] - 128) / 128
+    sum += d * d
+  }
+  const rms = Math.sqrt(sum / levelBuf.length)
+  return Math.min(1, rms * 3.2) // amplify into a usable visual range
+}
+
 // ── Web fallback (MediaRecorder) ────────────────────────────────
 let mediaRecorder: MediaRecorder | null = null
 let webChunks: Blob[] = []
 let webStream: MediaStream | null = null
 let webStartedAt = 0
+let audioCtx: AudioContext | null = null
+let analyser: AnalyserNode | null = null
+let levelBuf: Uint8Array | null = null
 
 function cleanupWeb() {
   try { webStream?.getTracks().forEach((t) => t.stop()) } catch {}
+  try { audioCtx?.close() } catch {}
   webStream = null
   mediaRecorder = null
   webChunks = []
+  audioCtx = null
+  analyser = null
+  levelBuf = null
 }
 
 async function webStart(): Promise<void> {
@@ -112,6 +155,22 @@ async function webStart(): Promise<void> {
   }
   webStream = stream
   webChunks = []
+  // Live-level analyser for the waveform (best-effort).
+  try {
+    const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext
+    if (Ctx) {
+      audioCtx = new Ctx()
+      const srcNode = audioCtx!.createMediaStreamSource(stream)
+      analyser = audioCtx!.createAnalyser()
+      analyser.fftSize = 256
+      levelBuf = new Uint8Array(analyser.fftSize)
+      srcNode.connect(analyser)
+    }
+  } catch {
+    audioCtx = null
+    analyser = null
+    levelBuf = null
+  }
   const prefer = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm']
   const mime = prefer.find((m) => (MediaRecorder as any).isTypeSupported?.(m)) || ''
   mediaRecorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream)
@@ -151,5 +210,9 @@ export const voiceRecorder = {
   },
   async cancel(): Promise<void> {
     return isNativeRecorder() ? nativeCancel() : webCancel()
+  },
+  /** Current mic input level, 0..1 — drives the recording waveform. */
+  getLevel(): Promise<number> {
+    return isNativeRecorder() ? nativeLevel() : Promise.resolve(webLevel())
   },
 }

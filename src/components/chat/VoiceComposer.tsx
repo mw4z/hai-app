@@ -37,6 +37,11 @@ export default function VoiceComposer({
 
   const [phase, setPhase] = useState<Phase>('idle')
   const [elapsed, setElapsed] = useState(0)
+  // Rolling window of recent input levels (0..1) for the live
+  // waveform. Newest pushed at the end; the bar row scrolls left.
+  const WAVE_BARS = 28
+  const [levels, setLevels] = useState<number[]>(() => new Array(WAVE_BARS).fill(0))
+  const levelTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recordedRef = useRef<RecorderResult | null>(null)
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const previewUrlRef = useRef<string | null>(null)
@@ -48,16 +53,20 @@ export default function VoiceComposer({
   function clearTick() {
     if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null }
   }
+  function clearLevelTimer() {
+    if (levelTimerRef.current) { clearInterval(levelTimerRef.current); levelTimerRef.current = null }
+  }
   function revokePreview() {
     if (previewUrlRef.current) { URL.revokeObjectURL(previewUrlRef.current); previewUrlRef.current = null }
   }
-  useEffect(() => () => { clearTick(); revokePreview() }, [])
+  useEffect(() => () => { clearTick(); clearLevelTimer(); revokePreview() }, [])
 
   async function start() {
     if (disabled || phase !== 'idle') return
     try {
       await voiceRecorder.start()
       setElapsed(0)
+      setLevels(new Array(WAVE_BARS).fill(0))
       setPhase('recording')
       tickRef.current = setInterval(() => {
         setElapsed((e) => {
@@ -66,6 +75,11 @@ export default function VoiceComposer({
           return next
         })
       }, 200)
+      // Poll the live mic level and scroll it into the waveform.
+      levelTimerRef.current = setInterval(async () => {
+        const lvl = await voiceRecorder.getLevel().catch(() => 0)
+        setLevels((prev) => [...prev.slice(1), lvl])
+      }, 90)
     } catch (err) {
       const code = err instanceof RecorderError ? err.code : 'failed'
       toast.error(
@@ -82,6 +96,7 @@ export default function VoiceComposer({
   async function stop() {
     if (phase !== 'recording') return
     clearTick()
+    clearLevelTimer()
     try {
       const res = await voiceRecorder.stop()
       if (!res.blob || res.blob.size < 512) {
@@ -102,6 +117,7 @@ export default function VoiceComposer({
 
   async function cancel() {
     clearTick()
+    clearLevelTimer()
     try { await voiceRecorder.cancel() } catch {}
     discard()
   }
@@ -166,14 +182,22 @@ export default function VoiceComposer({
             >
               <FiTrash2 className="w-5 h-5" />
             </button>
-            <div className="flex-1 flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse flex-shrink-0" />
-              <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 tabular-nums">
-                {fmt(elapsed)}
-              </span>
-              <span className="text-[11px] text-gray-400">
-                {tr('Recording…', 'جارٍ التسجيل…', 'ریکارڈنگ…')}
-              </span>
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse flex-shrink-0" />
+            <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 tabular-nums flex-shrink-0">
+              {fmt(elapsed)}
+            </span>
+            {/* Live waveform — reacts to mic level in real time. */}
+            <div className="flex-1 min-w-0 h-8 flex items-center justify-end gap-[2px] overflow-hidden" dir="ltr">
+              {levels.map((lvl, i) => {
+                const h = Math.max(3, Math.round(lvl * 30)) // 3..33px
+                return (
+                  <span
+                    key={i}
+                    className="w-[3px] rounded-full bg-primary-500 flex-shrink-0"
+                    style={{ height: `${h}px`, transition: 'height 90ms linear', opacity: 0.55 + lvl * 0.45 }}
+                  />
+                )
+              })}
             </div>
             <button
               type="button"
