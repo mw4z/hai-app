@@ -3,9 +3,22 @@ import { db } from '@/lib/db'
 import { formatSaudiPhone, signToken } from '@/lib/auth'
 import { apiError } from '@/lib/validation'
 import { verifyOTP } from '@/lib/sms'
+import { isReviewTestPhone, isReviewTestCode } from '@/lib/reviewBypass'
 
 const MAX_FAILED_ATTEMPTS = 5
 const LOCKOUT_MINUTES = 15
+
+async function issueSession(userId: string, formattedPhone: string, role: string) {
+  const token = await signToken({ userId, phone: formattedPhone, role })
+  const { cookies } = await import('next/headers')
+  cookies().set('hai_token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 7,
+    path: '/',
+  })
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,6 +29,20 @@ export async function POST(req: NextRequest) {
     }
 
     const formattedPhone = formatSaudiPhone(phone)
+
+    // Store-reviewer bypass: the designated test number + fixed code
+    // logs in directly, skipping Twilio + the brute-force lockout.
+    // Gated by REVIEW_TEST_PHONE / REVIEW_TEST_CODE env vars — with
+    // either unset this branch is unreachable and behaviour is the
+    // standard Twilio path below.
+    if (isReviewTestPhone(formattedPhone) && isReviewTestCode(code)) {
+      let user = await db.user.findUnique({ where: { phone: formattedPhone } })
+      if (!user) user = await db.user.create({ data: { phone: formattedPhone } })
+      const isNewUser = !user.isVerified
+      await db.user.update({ where: { id: user.id }, data: { isVerified: true } })
+      await issueSession(user.id, formattedPhone, user.role)
+      return NextResponse.json({ success: true, isNewUser })
+    }
 
     // Brute force protection
     const lockoutWindow = new Date(Date.now() - LOCKOUT_MINUTES * 60_000)
@@ -77,22 +104,8 @@ export async function POST(req: NextRequest) {
       data: { isVerified: true },
     })
 
-    // Issue JWT
-    const token = await signToken({
-      userId: user.id,
-      phone: formattedPhone,
-      role: user.role,
-    })
-
-    // Set cookie (7 days — was 30, see audit H-4 + signToken comment)
-    const { cookies } = await import('next/headers')
-    cookies().set('hai_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
-      path: '/',
-    })
+    // Issue JWT + cookie (7 days — see audit H-4 + signToken comment)
+    await issueSession(user.id, formattedPhone, user.role)
 
     return NextResponse.json({ success: true, isNewUser })
   } catch (error) {

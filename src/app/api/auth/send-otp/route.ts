@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { sendOTP } from '@/lib/sms'
 import { formatSaudiPhone, isValidSaudiPhone } from '@/lib/auth'
+import { isReviewTestPhone } from '@/lib/reviewBypass'
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,6 +13,17 @@ export async function POST(req: NextRequest) {
     }
 
     const formattedPhone = formatSaudiPhone(phone)
+
+    // Store-reviewer test number: no SMS, no Twilio, no rate limit.
+    // Gated by REVIEW_TEST_PHONE env — absent in normal operation.
+    // The reviewer enters the fixed REVIEW_TEST_CODE on the next
+    // screen, which verify-otp accepts directly. We still ensure the
+    // user row exists so the verify step has something to log in as.
+    if (isReviewTestPhone(formattedPhone)) {
+      let user = await db.user.findUnique({ where: { phone: formattedPhone } })
+      if (!user) user = await db.user.create({ data: { phone: formattedPhone } })
+      return NextResponse.json({ success: true })
+    }
 
     // Rate limit: max 3 OTPs per phone per 10 minutes
     const recentOtps = await db.otpCode.count({
