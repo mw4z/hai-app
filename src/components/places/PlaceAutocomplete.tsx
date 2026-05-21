@@ -49,14 +49,18 @@ function newToken(): string {
 
 export default function PlaceAutocomplete({
   onSelect,
+  initialQuery = '',
 }: {
   onSelect: (place: SelectedPlace) => void
+  /** Pre-seed the search box (e.g. an existing place's name when a
+   *  super admin is matching it to Google). Fires a search on mount. */
+  initialQuery?: string
 }) {
   const { lang } = useLanguage()
   const tr = (en: string, ar: string, ur: string) =>
     lang === 'en' ? en : lang === 'ur' ? ur : ar
 
-  const [q, setQ] = useState('')
+  const [q, setQ] = useState(initialQuery)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)

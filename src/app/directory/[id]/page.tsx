@@ -100,6 +100,7 @@ export default async function PlaceDetailPage({
       canEditPhotos={canEditPhotos}
       canEditInfo={canEditOwnerFields}
       canEditSensitive={canEditSensitive}
+      canLinkGoogle={isSuper}
     />
   )
 }

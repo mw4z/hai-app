@@ -14,8 +14,12 @@ import PlaceSourceBadge from '@/components/places/PlaceSourceBadge'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
 import EditPhotosSheet from '@/components/places/EditPhotosSheet'
 import EditPlaceInfoSheet from '@/components/places/EditPlaceInfoSheet'
+import PlaceAutocomplete, { type SelectedPlace } from '@/components/places/PlaceAutocomplete'
 import ImageLightbox from '@/components/ImageLightbox'
 import { buildWhatsAppHref } from '@/lib/phone'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { createPortal } from 'react-dom'
+import { FiX } from 'react-icons/fi'
 
 interface Props {
   place: PublicPlace
@@ -33,6 +37,10 @@ interface Props {
    *  fields (name / category / addressText / mapUrl). Admin
    *  pre-claim only. */
   canEditSensitive: boolean
+  /** SUPER_ADMIN only — can match this listing to a Google place
+   *  to pull in rating / hours / photos (enrich a locally-added
+   *  place). */
+  canLinkGoogle: boolean
 }
 
 /** Public detail page. Renders the place's identity, contact
@@ -46,6 +54,7 @@ export default function DetailClient({
   canEditPhotos,
   canEditInfo,
   canEditSensitive,
+  canLinkGoogle,
 }: Props) {
   // Place data + local override. The text-edit sheet patches
   // individual fields; we merge them into a local copy so the
@@ -62,6 +71,7 @@ export default function DetailClient({
   const [claimOpen, setClaimOpen] = useState(false)
   const [photoEditOpen, setPhotoEditOpen] = useState(false)
   const [infoEditOpen, setInfoEditOpen] = useState(false)
+  const [googleLinkOpen, setGoogleLinkOpen] = useState(false)
   // Lightbox: index of the photo the user tapped (null = closed).
   // Using the shared ImageLightbox keeps photos in-app — tapping
   // opens the same gesture-driven viewer the chat + post detail
@@ -433,6 +443,31 @@ export default function DetailClient({
           </div>
         )}
 
+        {/* SUPER_ADMIN — match this listing to Google to pull in
+            rating / hours / photos. Shown for any place; the label
+            differs for already-linked ones (re-sync). */}
+        {canLinkGoogle && (
+          <div className="rounded-2xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 p-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+              👑 {tr('Super admin', 'مشرف عام', 'سپر ایڈمن')}
+            </p>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-snug">
+              {place.source === 'GOOGLE'
+                ? tr('This place is linked to Google. Re-match to refresh its data.', 'هذا المكان مرتبط بـ Google. أعد المطابقة لتحديث بياناته.', 'یہ جگہ گوگل سے منسلک ہے۔ ڈیٹا تازہ کرنے کیلئے دوبارہ مماثل کریں۔')
+                : tr('Added locally. Match it to Google to pull rating, hours and photos.', 'مُضاف يدويًا. اربطه بـ Google لجلب التقييم وساعات العمل والصور.', 'مقامی طور پر شامل۔ درجہ بندی، اوقات اور تصاویر کیلئے گوگل سے منسلک کریں۔')}
+            </p>
+            <button
+              type="button"
+              onClick={() => setGoogleLinkOpen(true)}
+              className="w-full py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-bold active:scale-95 transition-transform"
+            >
+              {place.source === 'GOOGLE'
+                ? tr('Re-match to Google', 'إعادة المطابقة مع Google', 'گوگل سے دوبارہ منسلک کریں')
+                : tr('Match to Google', 'ربط بـ Google', 'گوگل سے منسلک کریں')}
+            </button>
+          </div>
+        )}
+
         {/* Action footer */}
         <div className="flex flex-wrap gap-2">
           {!isOwner && !isCreator && (
@@ -490,6 +525,19 @@ export default function DetailClient({
             }}
           />
         )}
+        {canLinkGoogle && googleLinkOpen && (
+          <GoogleLinkSheet
+            placeId={place.id}
+            initialName={place.name}
+            onClose={() => setGoogleLinkOpen(false)}
+            onLinked={() => {
+              setGoogleLinkOpen(false)
+              // Pull the fresh server snapshot (source, rating, hours,
+              // photos) into the page.
+              router.refresh()
+            }}
+          />
+        )}
       </div>
       {/* In-app image viewer. Same lightbox the chat / post detail
           surfaces use — swipe down to close, pinch / double-tap
@@ -505,6 +553,112 @@ export default function DetailClient({
         />
       )}
     </main>
+  )
+}
+
+/** SUPER_ADMIN sheet — search Google for the matching place and link
+ *  it so the listing pulls in rating / hours / photos. Reuses the
+ *  PlaceAutocomplete component (pre-seeded with the place name). */
+function GoogleLinkSheet({
+  placeId,
+  initialName,
+  onClose,
+  onLinked,
+}: {
+  placeId: string
+  initialName: string
+  onClose: () => void
+  onLinked: () => void
+}) {
+  const { lang } = useLanguage()
+  const tr = (en: string, ar: string, ur: string) =>
+    lang === 'en' ? en : lang === 'ur' ? ur : ar
+  const [applyContact, setApplyContact] = useState(false)
+  const [busy, setBusy] = useState(false)
+  useBodyScrollLock(true)
+
+  if (typeof document === 'undefined') return null
+
+  async function link(p: SelectedPlace) {
+    if (busy) return
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/mod/directory/${placeId}/google-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ googlePlaceId: p.placeId, applyContact }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(d?.error || tr('Failed', 'فشل', 'ناکام'))
+        return
+      }
+      toast.success(tr('Linked to Google', 'تم الربط بـ Google', 'گوگل سے منسلک'))
+      onLinked()
+    } catch {
+      toast.error(tr('Connection failed', 'فشل الاتصال', 'کنیکشن ناکام'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[1100] bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[88vh]"
+      >
+        <div className="flex-shrink-0 px-5 pt-3 pb-3 border-b border-gray-100 dark:border-gray-800">
+          <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-2.5" />
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-gray-900 dark:text-white">
+              {tr('Match to Google', 'ربط بـ Google', 'گوگل سے منسلک کریں')}
+            </h2>
+            <button type="button" onClick={onClose} aria-label="إغلاق"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 active:bg-gray-100 dark:active:bg-gray-800">
+              <FiX className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-relaxed">
+            {tr(
+              'Find this place on Google. Picking a result pulls in its rating, opening hours and photos. The name/address you have are kept.',
+              'ابحث عن هذا المكان في Google. اختيار نتيجة يجلب التقييم وساعات العمل والصور. يبقى الاسم/العنوان الحاليّان كما هما.',
+              'گوگل پر یہ جگہ تلاش کریں۔ نتیجہ منتخب کرنے سے درجہ بندی، اوقات اور تصاویر آتی ہیں۔',
+            )}
+          </p>
+          <PlaceAutocomplete onSelect={link} initialQuery={initialName} />
+          <label className="flex items-center gap-2.5 px-1 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={applyContact}
+              onChange={(e) => setApplyContact(e.target.checked)}
+              className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500"
+            />
+            <span className="text-[12px] text-gray-700 dark:text-gray-200">
+              {tr(
+                'Also backfill empty phone / website / coordinates from Google',
+                'املأ أيضًا الجوال/الموقع/الإحداثيات الفارغة من Google',
+                'خالی فون/ویب سائٹ/کوآرڈینیٹس بھی گوگل سے بھریں',
+              )}
+            </span>
+          </label>
+          {busy && (
+            <p className="text-center text-[12px] text-gray-400 py-1">
+              {tr('Linking…', 'جاري الربط…', 'منسلک ہو رہا ہے…')}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
