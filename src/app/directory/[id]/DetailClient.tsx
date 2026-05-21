@@ -18,6 +18,7 @@ import EditPlaceInfoSheet from '@/components/places/EditPlaceInfoSheet'
 import PlaceAutocomplete, { type SelectedPlace } from '@/components/places/PlaceAutocomplete'
 import ImageLightbox from '@/components/ImageLightbox'
 import { buildWhatsAppHref } from '@/lib/phone'
+import { formatGoogleHours } from '@/lib/places/googleHoursDisplay'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { createPortal } from 'react-dom'
 import { FiX } from 'react-icons/fi'
@@ -146,22 +147,34 @@ export default function DetailClient({
             <p className="text-sm text-gray-600 dark:text-gray-400">🕒 {place.openingHours}</p>
           )}
 
-          {/* Google opening hours — accurate per-day list (handles
-              shifts + days that differ). Shown when the place has no
-              manually-entered hours so we don't show two schedules. */}
-          {!place.openingHours && place.source === 'GOOGLE' && place.googleHours && (
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <span aria-hidden>🕒</span>
-                <PlaceSourceBadge source="GOOGLE" size="xs" />
+          {/* Google opening hours — consecutive days with the same
+              schedule are grouped into ranges (e.g. "السبت - الخميس")
+              rather than listing every day. Computed from the raw
+              periods; falls back to Google's per-day text for places
+              synced before periods were stored. Shown only when the
+              place has no manually-entered hours. */}
+          {!place.openingHours && place.source === 'GOOGLE' && (() => {
+            const grouped = formatGoogleHours(place.googlePeriods, lang)
+            const lines = grouped.length > 0
+              ? grouped
+              : place.googleHours
+                ? place.googleHours.split('\n')
+                : []
+            if (lines.length === 0) return null
+            return (
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span aria-hidden>🕒</span>
+                  <PlaceSourceBadge source="GOOGLE" size="xs" />
+                </div>
+                <div className="ps-5 space-y-0.5">
+                  {lines.map((line, i) => (
+                    <p key={i} className="text-[12.5px] leading-snug">{line}</p>
+                  ))}
+                </div>
               </div>
-              <div className="ps-5 space-y-0.5">
-                {place.googleHours.split('\n').map((line, i) => (
-                  <p key={i} className="text-[12.5px] leading-snug">{line}</p>
-                ))}
-              </div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* Attribution — generic, never exposes createdByUser. */}
           <p className="text-[11px] text-gray-400 dark:text-gray-500 pt-1">
