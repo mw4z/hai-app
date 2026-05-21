@@ -29,7 +29,7 @@ export default function PlaceCard({ place }: { place: PublicPlace }) {
             <h3 className="text-[15px] font-bold text-gray-900 dark:text-white leading-tight flex-1 truncate">
               {place.name}
             </h3>
-            <PlaceStatusBadge status={place.status} />
+            <PlaceStatusBadge status={place.status} source={place.source} />
           </div>
           <p className="text-[12px] text-gray-500 dark:text-gray-400 mt-0.5 truncate">
             {categoryLabel}

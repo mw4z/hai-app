@@ -106,7 +106,7 @@ export default function DetailClient({
             <div className="flex-1 min-w-0">
               <div className="flex items-start gap-2 mb-1">
                 <h1 className="text-lg font-bold text-gray-900 dark:text-white flex-1">{place.name}</h1>
-                <PlaceStatusBadge status={place.status} />
+                <PlaceStatusBadge status={place.status} source={place.source} />
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-xs text-gray-500 dark:text-gray-400">{categoryLabel}</p>

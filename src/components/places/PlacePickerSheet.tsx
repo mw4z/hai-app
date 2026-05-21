@@ -208,7 +208,7 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
                         <span className="text-[14px] font-bold text-gray-900 dark:text-white flex-1 truncate">
                           {p.name}
                         </span>
-                        <PlaceStatusBadge status={p.status as any} />
+                        <PlaceStatusBadge status={p.status as any} source={(p as any).source} />
                       </span>
                       <span className="block text-[11.5px] text-gray-500 dark:text-gray-400 mt-0.5 truncate">
                         {categoryLabel}

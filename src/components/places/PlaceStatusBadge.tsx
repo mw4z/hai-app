@@ -6,11 +6,25 @@ import { getStatusBadge } from '@/lib/places/statusBadge'
 
 /** Small pill rendering the trilingual label for a place status.
  *  Color tone comes from the central badge map so every surface
- *  shares the same palette. */
-export default function PlaceStatusBadge({ status }: { status: PlaceStatus }) {
+ *  shares the same palette.
+ *
+ *  When a place is MOD_VERIFIED but its data came from Google
+ *  (source='GOOGLE'), we relabel the pill to "مؤكد من Google" —
+ *  no moderator actually verified it, so "مؤكد من المشرف" would be
+ *  misleading. The confirmation is real, just sourced from Google. */
+export default function PlaceStatusBadge({
+  status,
+  source,
+}: {
+  status: PlaceStatus
+  source?: 'LOCAL' | 'GOOGLE'
+}) {
   const { lang } = useLanguage()
   const meta = getStatusBadge(status)
-  const label = lang === 'en' ? meta.labelEn : lang === 'ur' ? meta.labelUr : meta.labelAr
+  let label = lang === 'en' ? meta.labelEn : lang === 'ur' ? meta.labelUr : meta.labelAr
+  if (status === 'MOD_VERIFIED' && source === 'GOOGLE') {
+    label = lang === 'en' ? 'Verified on Google' : lang === 'ur' ? 'گوگل سے تصدیق شدہ' : 'مؤكد من Google'
+  }
 
   const TONES: Record<typeof meta.tone, string> = {
     gray:    'bg-gray-100  text-gray-700    dark:bg-gray-800     dark:text-gray-300',
