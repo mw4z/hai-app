@@ -20,10 +20,10 @@ export default function ModDirectoryError({
   }, [error])
 
   return (
-    <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center px-6">
+    <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-[#19232a] flex flex-col items-center justify-center px-6">
       <div
         aria-hidden
-        className="fixed top-0 left-0 right-0 z-30 pointer-events-none bg-gray-50 dark:bg-gray-900"
+        className="fixed top-0 left-0 right-0 z-30 pointer-events-none bg-gray-50 dark:bg-[#19232a]"
         style={{ height: 'env(safe-area-inset-top, 0px)' }}
       />
       <div className="max-w-sm text-center space-y-4">

@@ -636,7 +636,15 @@ html:has(.hai-directory-screen) {
   --hai-safe-top-bg: rgb(249 250 251); /* gray-50 */
 }
 html.dark:has(.hai-directory-screen) {
-  --hai-safe-top-bg: rgb(17 24 39); /* gray-900 */
+  --hai-safe-top-bg: #19232a; /* app page bg (--hai-bg), not gray-900 */
+}
+/* Directory screens use the standard app page bg in dark mode (#19232a),
+   so the safe-area, header, and list all read as one continuous surface
+   — same as every other screen. Overrides the Tailwind dark:bg-gray-900
+   on the .hai-directory-screen <main> wrapper across all directory pages
+   (list, detail, new, mine, mod, loading, error) in one place. */
+html.dark .hai-directory-screen {
+  background-color: #19232a !important;
 }
 /* Safe-area cover is now rendered as #__hai_safe_top in layout.tsx —
    a real DOM node paints reliably across WKWebView versions. */

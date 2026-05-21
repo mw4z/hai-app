@@ -55,22 +55,22 @@ export default function DirectoryHeader({ title, backHref }: Props) {
         }
         /* Dark-mode band color is now driven by --hai-directory-band
            (set on documentElement.style by DirectoryBandColorPicker
-           — falls back to #111827 when no picker selection exists).
+           — falls back to #19232a when no picker selection exists).
            That lets a super admin live-tweak the band color from the
            in-app picker without redeploying. */
         html.dark, .dark html {
-          --hai-safe-top-bg: var(--hai-directory-band, #111827);
-          background-color: var(--hai-directory-band, #111827) !important;
+          --hai-safe-top-bg: var(--hai-directory-band, #19232a);
+          background-color: var(--hai-directory-band, #19232a) !important;
         }
         html.dark body, .dark html body {
-          background-color: var(--hai-directory-band, #111827) !important;
+          background-color: var(--hai-directory-band, #19232a) !important;
         }
         .hai-directory-safe-cover {
           background-color: #f9fafb;
         }
         html.dark .hai-directory-safe-cover,
         .dark html .hai-directory-safe-cover {
-          background-color: var(--hai-directory-band, #111827) !important;
+          background-color: var(--hai-directory-band, #19232a) !important;
         }
       `}</style>
       {/* Safe-area cover. The global html::before paints the
@@ -92,7 +92,7 @@ export default function DirectoryHeader({ title, backHref }: Props) {
           even though both targeted the same color. Pinning to a
           solid bg-gray-50 / bg-gray-900 guarantees the header
           matches the page bg edge-to-edge. */}
-      <header className="sticky top-0 z-30 bg-gray-50 dark:bg-gray-900 border-b border-gray-200/60 dark:border-gray-700/60">
+      <header className="sticky top-0 z-30 bg-gray-50 dark:bg-[#19232a] border-b border-gray-200/60 dark:border-gray-700/60">
         <div className="max-w-[760px] mx-auto px-3 py-2.5 flex items-center gap-2">
           <button
             type="button"

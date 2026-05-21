@@ -14,17 +14,17 @@
  */
 export default function DirectoryLoading() {
   return (
-    <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-gray-900">
+    <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-[#19232a]">
       {/* Safe-area cover — same one DirectoryHeader paints. */}
       <div
         aria-hidden
-        className="fixed top-0 left-0 right-0 z-30 pointer-events-none bg-gray-50 dark:bg-gray-900"
+        className="fixed top-0 left-0 right-0 z-30 pointer-events-none bg-gray-50 dark:bg-[#19232a]"
         style={{ height: 'env(safe-area-inset-top, 0px)' }}
       />
       {/* Header skeleton band. Same height + color as the real
           DirectoryHeader so the page below doesn't shift when the
           real header hydrates in. */}
-      <div className="sticky top-0 z-30 bg-gray-50 dark:bg-gray-900 border-b border-gray-200/60 dark:border-gray-700/60">
+      <div className="sticky top-0 z-30 bg-gray-50 dark:bg-[#19232a] border-b border-gray-200/60 dark:border-gray-700/60">
         <div className="max-w-[760px] mx-auto px-3 py-2.5 flex items-center gap-2">
           <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-800 animate-pulse" />
           <div className="h-4 w-32 rounded bg-gray-200 dark:bg-gray-800 animate-pulse" />
