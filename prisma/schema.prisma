@@ -1113,6 +1113,13 @@ model Message {
   // Set only when type == PDF; null on every other message type.
   pdfUrl      String?
   pdfName     String?
+  // Voice note (type == VOICE). m4a/AAC on native (consistent across
+  // iOS + Android via @capgo/capacitor-audio-recorder); webm only as
+  // the web fallback. All null on non-VOICE messages.
+  audioUrl       String?
+  audioDurationMs Int?
+  audioMimeType  String?
+  audioSizeBytes Int?
   edited      Boolean     @default(false)
   reactions   Json        @default("[]")  // [{emoji, userId}]
   // userIds who hid this message via "Delete for me". The read query
@@ -1135,6 +1142,7 @@ enum MessageType {
   LOCATION
   IMAGE
   PDF
+  VOICE
   DELETED
 }
 

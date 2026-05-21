@@ -67,6 +67,12 @@
 	<string>Allow Hai to access your photo library so you can pick images for your profile, posts, and chat messages</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Allow Hai to save images to your photo library</string>
+	<!-- Re-added 2026-05-21 for chat voice notes. @capgo/capacitor-audio-
+	     recorder activates the record session only during an active
+	     recording and deactivates on stop/cancel, so the WKWebView no
+	     longer holds .playAndRecord persistently (the old echo cause). -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Allow Hai to use the microphone so you can record and send voice notes in chat</string>
 	<!-- NSMicrophoneUsageDescription removed 2026-04-29: Hai does not
 	     record audio anywhere. Just declaring the key made iOS treat
 	     the app as a mic-capable client, which on some iOS versions

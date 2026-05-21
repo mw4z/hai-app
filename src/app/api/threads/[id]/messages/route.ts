@@ -38,6 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       select: {
         id: true, type: true, text: true, lat: true, lng: true,
         imageUrl: true, pdfUrl: true, pdfName: true,
+        audioUrl: true, audioDurationMs: true, audioMimeType: true,
         senderId: true, createdAt: true,
         deliveredAt: true, readAt: true, edited: true, reactions: true,
       },
@@ -108,6 +109,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       select: {
         id: true, type: true, text: true, lat: true, lng: true,
         imageUrl: true, pdfUrl: true, pdfName: true,
+        audioUrl: true, audioDurationMs: true, audioMimeType: true,
         senderId: true, createdAt: true,
         deliveredAt: true, readAt: true, edited: true, reactions: true,
         replyToId: true,
@@ -225,6 +227,36 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           text: '📄',
           pdfUrl: pdfUrlRaw,
           pdfName,
+          ...replyData,
+        },
+        include: { replyTo: { select: { id: true, text: true, senderId: true, type: true } } },
+      })
+    } else if (type === 'VOICE') {
+      // Voice note. The client uploads to /api/upload-audio first, then
+      // sends the resulting URL + duration here. Require an https Blob
+      // URL; clamp duration to a sane range (max 5 min) so a bad client
+      // can't store a garbage value.
+      const audioUrlRaw = typeof body.audioUrl === 'string' ? body.audioUrl.trim() : ''
+      if (!audioUrlRaw.startsWith('https://') || audioUrlRaw.length >= 500) {
+        return NextResponse.json({ error: 'Audio URL required' }, { status: 400 })
+      }
+      const durRaw = Number(body.audioDurationMs)
+      const audioDurationMs =
+        Number.isFinite(durRaw) ? Math.max(0, Math.min(Math.round(durRaw), 5 * 60_000)) : null
+      const audioMimeType =
+        typeof body.audioMimeType === 'string' ? body.audioMimeType.slice(0, 60) : null
+      const sizeRaw = Number(body.audioSizeBytes)
+      const audioSizeBytes = Number.isFinite(sizeRaw) ? Math.max(0, Math.round(sizeRaw)) : null
+      message = await db.message.create({
+        data: {
+          threadId: params.id,
+          senderId: session.userId,
+          type: 'VOICE',
+          text: '🎤',
+          audioUrl: audioUrlRaw,
+          audioDurationMs,
+          audioMimeType,
+          audioSizeBytes,
           ...replyData,
         },
         include: { replyTo: { select: { id: true, text: true, senderId: true, type: true } } },
