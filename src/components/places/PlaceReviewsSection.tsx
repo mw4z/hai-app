@@ -107,6 +107,11 @@ export default function PlaceReviewsSection({
   const [replyingTo, setReplyingTo] = useState<{ reviewId: string; existing: string | null } | null>(null)
   // Which review's kebab (⋯) menu is currently open. null = all closed.
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
+  // Star filter (null = all) + per-review "read more" expand state —
+  // same UX as the Google reviews block.
+  const [ratingFilter, setRatingFilter] = useState<number | null>(null)
+  const [expandedBody, setExpandedBody] = useState<Record<string, boolean>>({})
+  const BODY_TRUNCATE = 180
   // In-app confirm dialog (replaces native window.confirm so the
   // sheet UX matches the rest of the app and Capacitor doesn't
   // pop a native system dialog).
@@ -321,8 +326,41 @@ export default function PlaceReviewsSection({
         </p>
       )}
 
+      {/* Star filter — same UX as the Google reviews block. Shown
+          only when there's more than one distinct rating to filter. */}
+      {(() => {
+        const present = Array.from(new Set(reviews.map((r) => r.rating))).sort((a, b) => b - a)
+        if (present.length < 2) return null
+        return (
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+            <button
+              type="button"
+              onClick={() => setRatingFilter(null)}
+              className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold ${ratingFilter === null ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
+            >
+              {`الكل (${reviews.length})`}
+            </button>
+            {present.map((star) => {
+              const c = reviews.filter((r) => r.rating === star).length
+              return (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => setRatingFilter(star)}
+                  className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold ${ratingFilter === star ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
+                >
+                  {`★${star} (${c})`}
+                </button>
+              )
+            })}
+          </div>
+        )
+      })()}
+
       <ul className="space-y-3">
-        {reviews.map((r) => {
+        {reviews
+          .filter((r) => ratingFilter === null || r.rating === ratingFilter)
+          .map((r) => {
           const isMyRow = mine && mine.id === r.id
           return (
             <li
@@ -349,11 +387,25 @@ export default function PlaceReviewsSection({
                   <div className="mt-0.5">
                     <StarRating value={r.rating} size={13} />
                   </div>
-                  {r.body && (
-                    <p className="text-[12.5px] text-gray-700 dark:text-gray-300 leading-relaxed mt-1.5 whitespace-pre-line">
-                      {r.body}
-                    </p>
-                  )}
+                  {r.body && (() => {
+                    const long = r.body.length > BODY_TRUNCATE
+                    const isExp = !!expandedBody[r.id]
+                    const display = long && !isExp ? `${r.body.slice(0, BODY_TRUNCATE).trimEnd()}…` : r.body
+                    return (
+                      <p className="text-[12.5px] text-gray-700 dark:text-gray-300 leading-relaxed mt-1.5 whitespace-pre-line">
+                        {display}{' '}
+                        {long && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedBody((p) => ({ ...p, [r.id]: !isExp }))}
+                            className="text-primary-600 dark:text-primary-400 font-semibold whitespace-nowrap"
+                          >
+                            {isExp ? 'أقل' : 'اقرأ المزيد'}
+                          </button>
+                        )}
+                      </p>
+                    )
+                  })()}
                 </div>
                 {/* ⋯ kebab sits in the row's far corner — same row
                     as the reviewer name + timestamp, not below the

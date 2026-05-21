@@ -10,6 +10,7 @@ import { getCategoryMeta } from '@/lib/places/categories'
 import PlaceStatusBadge from '@/components/places/PlaceStatusBadge'
 import PlacePill from '@/components/places/PlacePill'
 import PlaceReviewsSection from '@/components/places/PlaceReviewsSection'
+import GoogleReviewsSection from '@/components/places/GoogleReviewsSection'
 import PlaceSourceBadge from '@/components/places/PlaceSourceBadge'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
 import EditPhotosSheet from '@/components/places/EditPhotosSheet'
@@ -368,45 +369,10 @@ export default function DetailClient({
           </section>
         )}
 
-        {/* Google reviews — snapshot of up to 5, shown distinctly
-            from the in-app "تقييمات أهل الحي" below, with the
-            required Google attribution. */}
-        {place.source === 'GOOGLE' && place.googleReviews.length > 0 && (
-          <section className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-gray-900 dark:text-white">
-                {tr('Reviews on Google', 'تقييمات على Google', 'گوگل پر جائزے')}
-              </h2>
-              <PlaceSourceBadge source="GOOGLE" size="xs" />
-            </div>
-            <ul className="space-y-3">
-              {place.googleReviews.map((r, i) => (
-                <li key={i} className="border border-gray-100 dark:border-gray-700 rounded-xl p-3 bg-gray-50 dark:bg-gray-900/40">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[12.5px] font-bold text-gray-900 dark:text-white">
-                      {r.author || tr('Google user', 'مستخدم Google', 'گوگل صارف')}
-                    </span>
-                    {r.rating != null && (
-                      <span className="text-amber-500 text-[12px]" aria-label={`${r.rating}/5`}>
-                        {'★'.repeat(Math.round(r.rating))}
-                        <span className="text-gray-300 dark:text-gray-600">
-                          {'★'.repeat(5 - Math.round(r.rating))}
-                        </span>
-                      </span>
-                    )}
-                    {r.relativeTime && (
-                      <span className="text-[10.5px] text-gray-400">· {r.relativeTime}</span>
-                    )}
-                  </div>
-                  {r.text && (
-                    <p className="text-[12.5px] text-gray-700 dark:text-gray-300 leading-relaxed mt-1.5 whitespace-pre-line">
-                      {r.text}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
+        {/* Google reviews — filterable scroll box, up to 5 (API cap),
+            distinct from the in-app reviews, with attribution. */}
+        {place.source === 'GOOGLE' && (
+          <GoogleReviewsSection reviews={place.googleReviews} />
         )}
 
         {/* تقييمات أهل الحي — directory-scoped reviews + stars.
