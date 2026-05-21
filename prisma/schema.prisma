@@ -1755,6 +1755,7 @@ model PlaceListing {
   googleRatingCount Int?
   googleHours       String?     // Google weekdayDescriptions, joined by \n
   googlePhotoRefs   String[]    @default([]) // up to 3 photo resource names
+  googleReviews     Json?       // up to 5 Google reviews: [{author,rating,text,relativeTime}]
   googleSyncedAt    DateTime?
 
   createdAt       DateTime      @default(now())

@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { role: true },
+    select: { role: true, neighborhood: { select: { lat: true, lng: true } } },
   })
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const gate = gatePublicRoute(user.role)
@@ -43,6 +43,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ suggestions: [] })
   }
 
-  const suggestions = await placesAutocomplete(input, sessionToken, lang)
+  // "Near first" bias: prefer client-sent device coords (rides passes
+  // these); otherwise fall back to the user's neighborhood center so
+  // the directory still ranks nearby places first without prompting
+  // for location.
+  const bodyLat = Number(raw?.lat)
+  const bodyLng = Number(raw?.lng)
+  const bias =
+    Number.isFinite(bodyLat) && Number.isFinite(bodyLng)
+      ? { lat: bodyLat, lng: bodyLng }
+      : user.neighborhood?.lat != null && user.neighborhood?.lng != null
+        ? { lat: user.neighborhood.lat, lng: user.neighborhood.lng }
+        : null
+
+  const suggestions = await placesAutocomplete(input, sessionToken, lang, bias)
   return NextResponse.json({ suggestions: suggestions ?? [] })
 }

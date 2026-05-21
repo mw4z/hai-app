@@ -17,6 +17,9 @@
  * UI degrades gracefully (autocomplete box hides, manual entry stays).
  */
 
+import type { PlaceCategory } from '@prisma/client'
+import { googleTypeToCategory, googleHoursToApp, type GooglePeriod } from './googleConvert'
+
 const PLACES_BASE = 'https://places.googleapis.com/v1'
 
 export function placesEnabled(): boolean {
@@ -42,6 +45,9 @@ export async function placesAutocomplete(
   input: string,
   sessionToken: string,
   lang: string,
+  /** Optional center to bias results toward — nearby places rank
+   *  first, like Google Maps. Radius defaults to 30km. */
+  bias?: { lat: number; lng: number; radiusM?: number } | null,
 ): Promise<AutocompleteSuggestion[] | null> {
   const k = key()
   if (!k) return null
@@ -53,9 +59,19 @@ export async function placesAutocomplete(
         input,
         sessionToken,
         languageCode: lc(lang),
-        // Bias + restrict to Saudi Arabia — the directory is KSA-only.
         regionCode: 'SA',
-        includedRegionCodes: ['sa'],
+        // locationBias (soft "near first") + region restriction. When
+        // we have a center we use the bias; otherwise restrict to KSA.
+        ...(bias
+          ? {
+              locationBias: {
+                circle: {
+                  center: { latitude: bias.lat, longitude: bias.lng },
+                  radius: bias.radiusM ?? 30000,
+                },
+              },
+            }
+          : { includedRegionCodes: ['sa'] }),
       }),
     })
     if (!res.ok) return []
@@ -87,6 +103,13 @@ export async function placesAutocomplete(
   }
 }
 
+export interface GoogleReview {
+  author: string | null
+  rating: number | null
+  text: string | null
+  relativeTime: string | null
+}
+
 export interface PlaceDetails {
   name: string
   address: string | null
@@ -95,11 +118,17 @@ export interface PlaceDetails {
   phone: string | null
   website: string | null
   mapUrl: string | null
+  /** Detected Hai category from Google place types (null = keep current). */
+  category: PlaceCategory | null
   // Google snapshot (attribution-required; refresh within ~30d).
   rating: number | null
   ratingCount: number | null
-  hours: string | null // weekdayDescriptions joined by \n
+  hours: string | null // weekdayDescriptions joined by \n (display fallback)
+  /** Google hours converted into the app's openingHours string so the
+   *  open/closed pill works. null when not convertible. */
+  appHours: string | null
   photoRefs: string[] // up to 3 Google photo resource names
+  reviews: GoogleReview[] // up to 5 Google reviews
 }
 
 const DETAILS_FIELD_MASK = [
@@ -110,10 +139,13 @@ const DETAILS_FIELD_MASK = [
   'nationalPhoneNumber',
   'websiteUri',
   'googleMapsUri',
+  'primaryType',
+  'types',
   'rating',
   'userRatingCount',
   'regularOpeningHours',
   'photos',
+  'reviews',
 ].join(',')
 
 interface RawPlace {
@@ -123,10 +155,19 @@ interface RawPlace {
   nationalPhoneNumber?: string
   websiteUri?: string
   googleMapsUri?: string
+  primaryType?: string
+  types?: string[]
   rating?: number
   userRatingCount?: number
-  regularOpeningHours?: { weekdayDescriptions?: string[] }
+  regularOpeningHours?: { weekdayDescriptions?: string[]; periods?: GooglePeriod[] }
   photos?: Array<{ name?: string }>
+  reviews?: Array<{
+    rating?: number
+    text?: { text?: string }
+    originalText?: { text?: string }
+    authorAttribution?: { displayName?: string }
+    relativePublishTimeDescription?: string
+  }>
 }
 
 function mapPlace(d: RawPlace): PlaceDetails {
@@ -140,10 +181,20 @@ function mapPlace(d: RawPlace): PlaceDetails {
     d.regularOpeningHours.weekdayDescriptions.length > 0
       ? d.regularOpeningHours.weekdayDescriptions.join('\n')
       : null
+  const appHours = googleHoursToApp(d.regularOpeningHours?.periods)
   const photoRefs = (d.photos ?? [])
     .map((p) => p.name)
     .filter((n): n is string => typeof n === 'string' && n.startsWith('places/'))
     .slice(0, 3)
+  const reviews: GoogleReview[] = (d.reviews ?? [])
+    .slice(0, 5)
+    .map((r) => ({
+      author: r.authorAttribution?.displayName ?? null,
+      rating: typeof r.rating === 'number' ? r.rating : null,
+      text: r.text?.text ?? r.originalText?.text ?? null,
+      relativeTime: r.relativePublishTimeDescription ?? null,
+    }))
+    .filter((r) => r.text || r.rating != null)
   return {
     name: d.displayName?.text ?? '',
     address: d.formattedAddress ?? null,
@@ -152,10 +203,13 @@ function mapPlace(d: RawPlace): PlaceDetails {
     phone,
     website: d.websiteUri ?? null,
     mapUrl: d.googleMapsUri ?? null,
+    category: googleTypeToCategory(d.types, d.primaryType),
     rating: typeof d.rating === 'number' ? d.rating : null,
     ratingCount: typeof d.userRatingCount === 'number' ? d.userRatingCount : null,
     hours,
+    appHours,
     photoRefs,
+    reviews,
   }
 }
 

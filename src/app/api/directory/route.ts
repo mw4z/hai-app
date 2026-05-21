@@ -248,7 +248,9 @@ export async function POST(req: NextRequest) {
       latitude: v.value.latitude,
       longitude: v.value.longitude,
       addressText: v.value.addressText,
-      openingHours: v.value.openingHours,
+      // Prefer the user-entered hours; fall back to Google's converted
+      // hours so the open/closed pill works for Google-sourced places.
+      openingHours: v.value.openingHours ?? snap?.appHours ?? null,
       // Image URLs accepted from the composer. The /api/upload
       // endpoint validates each file's MIME + size BEFORE handing
       // back a URL, so by the time bytes reach this row we just
@@ -263,6 +265,10 @@ export async function POST(req: NextRequest) {
       googleRatingCount: snap?.ratingCount ?? null,
       googleHours: snap?.hours ?? null,
       googlePhotoRefs: snap?.photoRefs ?? [],
+      googleReviews:
+        snap?.reviews && snap.reviews.length > 0
+          ? (snap.reviews as unknown as Prisma.InputJsonValue)
+          : undefined,
       googleSyncedAt: snap ? new Date() : null,
     },
     include: {

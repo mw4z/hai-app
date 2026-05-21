@@ -73,9 +73,19 @@ export default function NewPlaceClient() {
   function applyPlace(p: SelectedPlace) {
     if (p.name) setName(p.name)
     if (p.address) setAddressText(p.address)
-    if (p.phone) setPhone(p.phone)
+    // Auto-detect category from Google place types.
+    if (p.category) setCategory(p.category as PlaceCategory)
+    if (p.phone) {
+      setPhone(p.phone)
+      // Most KSA shops use one number for both calls + WhatsApp.
+      // Mirror it into WhatsApp when that field is still empty.
+      setWhatsapp((prev) => (prev.trim() ? prev : p.phone!))
+    }
     if (p.website) setWebsite(p.website)
     if (p.mapUrl) setMapUrl(p.mapUrl)
+    // Google hours converted to the app format → fills the picker so
+    // the open/closed pill works.
+    if (p.appHours) setOpeningHours(p.appHours)
     if (p.latitude !== null && p.longitude !== null) {
       setLatitude(p.latitude)
       setLongitude(p.longitude)

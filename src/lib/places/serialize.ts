@@ -54,6 +54,8 @@ export interface PublicPlace {
   googleHours: string | null
   /** Google photo resource names — render via /api/places/photo. */
   googlePhotoRefs: string[]
+  /** Up to 5 Google reviews snapshot (attribution-required). */
+  googleReviews: GoogleReviewPublic[]
   claimedByUser: PublicClaimedUser | null
   /** Optional — populated only on the detail endpoint when the
    *  claimedByUser is a service provider with active items. */
@@ -67,6 +69,13 @@ export interface PublicClaimedUser {
   name: string | null
   avatarUrl: string | null
   providerStatus: User['providerStatus']
+}
+
+export interface GoogleReviewPublic {
+  author: string | null
+  rating: number | null
+  text: string | null
+  relativeTime: string | null
 }
 
 export interface PublicServiceItem {
@@ -140,6 +149,9 @@ export function toPublicPlace(place: PlaceWithRelations): PublicPlace {
     googleRatingCount: place.googleRatingCount,
     googleHours: place.googleHours,
     googlePhotoRefs: place.googlePhotoRefs,
+    googleReviews: Array.isArray(place.googleReviews)
+      ? (place.googleReviews as unknown as GoogleReviewPublic[])
+      : [],
     claimedByUser,
     ownerServiceItems,
     createdAt: place.createdAt.toISOString(),

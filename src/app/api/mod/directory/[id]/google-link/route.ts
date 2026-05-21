@@ -54,10 +54,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       id: true,
       neighborhoodId: true,
       phone: true,
+      whatsapp: true,
       website: true,
       latitude: true,
       longitude: true,
       mapUrl: true,
+      openingHours: true,
     },
   })
   if (!place) return NextResponse.json({ error: 'not_found' }, { status: 404 })
@@ -68,10 +70,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   // Backfill contact ONLY when applyContact and the field is empty —
-  // never clobber what neighbors already entered.
+  // never clobber what neighbors already entered. Phone fills both
+  // phone + whatsapp when each is empty (most KSA shops use one
+  // number for both).
   const contactPatch = applyContact
     ? {
         phone: place.phone ?? snap.phone,
+        whatsapp: place.whatsapp ?? snap.phone,
         website: place.website ?? snap.website,
         mapUrl: place.mapUrl ?? snap.mapUrl,
         latitude: place.latitude ?? snap.latitude,
@@ -88,7 +93,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       googleRatingCount: snap.ratingCount,
       googleHours: snap.hours,
       googlePhotoRefs: snap.photoRefs,
+      googleReviews:
+        snap.reviews && snap.reviews.length > 0 ? (snap.reviews as unknown as object) : undefined,
       googleSyncedAt: new Date(),
+      // Fill the app openingHours from Google's converted hours when
+      // the place has none, so the open/closed pill lights up.
+      openingHours: place.openingHours ?? snap.appHours ?? null,
       ...contactPatch,
     },
     select: { id: true },

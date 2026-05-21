@@ -257,7 +257,14 @@ export default function LocationPicker({ type, value, onChange, userLat, userLng
       const res = await fetch('/api/places/autocomplete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input: query, sessionToken: placesTokenRef.current, lang }),
+        // Bias toward the user's location so nearby places rank first.
+        body: JSON.stringify({
+          input: query,
+          sessionToken: placesTokenRef.current,
+          lang,
+          lat: userLat ?? refLat,
+          lng: userLng ?? refLng,
+        }),
       })
       const d = await res.json().catch(() => ({}))
       const sugg: Array<{ placeId: string; primary: string; secondary: string }> =

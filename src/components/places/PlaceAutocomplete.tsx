@@ -29,6 +29,10 @@ export interface SelectedPlace {
   phone: string | null
   website: string | null
   mapUrl: string | null
+  /** Detected Hai category from Google place types (null = keep). */
+  category: string | null
+  /** Google hours converted to the app's openingHours format. */
+  appHours: string | null
   // The Google place_id — sent on submit so the server takes an
   // authoritative rating/hours/photos snapshot + tags source=GOOGLE.
   placeId: string
