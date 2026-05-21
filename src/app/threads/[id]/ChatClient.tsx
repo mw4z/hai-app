@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useNetworkStatus, isOfflineError } from '@/lib/network'
 import { useConfirm } from '@/components/ConfirmProvider'
-import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, FiTrash2, FiCheck, FiCopy, FiFlag, FiImage, FiUser, FiPaperclip } from 'react-icons/fi'
+import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, FiTrash2, FiCheck, FiCopy, FiFlag, FiImage, FiUser, FiPaperclip, FiMoreVertical } from 'react-icons/fi'
 import AttachmentMenu from '@/components/AttachmentMenu'
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
@@ -451,6 +451,22 @@ export default function ChatClient({
   const [showPlacePicker, setShowPlacePicker] = useState(false)
   const canAttachPlace = canAttachDirectoryPlace(currentUserRole ?? null)
   const [showWallpaperPicker, setShowWallpaperPicker] = useState(false)
+  // Header overflow menu — groups wallpaper / report / end conversation.
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false)
+  const headerMenuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!headerMenuOpen) return
+    function onDown(e: PointerEvent) {
+      if (!headerMenuRef.current?.contains(e.target as Node)) setHeaderMenuOpen(false)
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setHeaderMenuOpen(false) }
+    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [headerMenuOpen])
   const [wallpaperId, setWallpaperId] = useState(() => {
     try { return localStorage.getItem('hai_chat_wallpaper') || 'default' } catch { return 'default' }
   })
@@ -1342,29 +1358,61 @@ export default function ChatClient({
             )}
           </div>
         </button>
-        <button onClick={() => setShowWallpaperPicker(true)}
-          className="p-2 rounded-full hover:bg-white/10 transition-colors active:scale-90">
-          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="#00a884" strokeWidth="1.5" opacity="0.7" />
-            <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="#00a884" strokeWidth="1.5" opacity="0.5" />
-            <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="#00a884" strokeWidth="1.5" opacity="0.5" />
-            <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="#00a884" strokeWidth="1.5" opacity="0.3" />
-          </svg>
-        </button>
-        <button
-          onClick={() => { setReportingUser(true); hapticLight() }}
-          className="p-2 rounded-full hover:bg-white/10 transition-colors active:scale-90"
-          title={lang === 'en' ? 'Report user' : lang === 'ur' ? 'صارف رپورٹ کریں' : 'الإبلاغ عن المستخدم'}
-          aria-label="report user"
-        >
-          <FiFlag className="w-[18px] h-[18px] text-gray-500 dark:text-gray-400" />
-        </button>
-        {!closed && (
-          <button data-tour="chat-close" data-guide="chat-close" onClick={closeThread}
-            className="text-xs text-red-500 dark:text-red-400 flex items-center gap-1 px-3 py-1.5 rounded-full bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors font-medium">
-            <FiX className="w-3.5 h-3.5" />{t('thread_close')}
+        {/* Grouped header options — wallpaper / report / end
+            conversation under one ⋯ menu (was three separate header
+            controls). data-tour/guide kept on the trigger so the
+            chat-close tour step still anchors. */}
+        <div className="relative flex-shrink-0" ref={headerMenuRef}>
+          <button
+            data-tour="chat-close"
+            data-guide="chat-close"
+            onClick={() => { hapticLight(); setHeaderMenuOpen((o) => !o) }}
+            aria-label={lang === 'en' ? 'Chat options' : 'خيارات المحادثة'}
+            aria-expanded={headerMenuOpen}
+            className="p-2 rounded-full hover:bg-white/10 transition-colors active:scale-90 text-gray-500 dark:text-gray-400"
+          >
+            <FiMoreVertical className="w-5 h-5" />
           </button>
-        )}
+          {headerMenuOpen && (
+            <ul
+              role="menu"
+              className="absolute z-30 top-full mt-1 end-0 min-w-[190px] rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl overflow-hidden py-1"
+            >
+              <li>
+                <button
+                  type="button"
+                  onClick={() => { setHeaderMenuOpen(false); setShowWallpaperPicker(true) }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-start text-[13px] font-medium text-gray-700 dark:text-gray-200 active:bg-gray-100 dark:active:bg-gray-700"
+                >
+                  <FiImage className="w-4 h-4 text-primary-600 dark:text-primary-400 flex-shrink-0" />
+                  {lang === 'en' ? 'Wallpaper' : lang === 'ur' ? 'وال پیپر' : 'الخلفية'}
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => { setHeaderMenuOpen(false); setReportingUser(true); hapticLight() }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-start text-[13px] font-medium text-gray-700 dark:text-gray-200 active:bg-gray-100 dark:active:bg-gray-700"
+                >
+                  <FiFlag className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                  {lang === 'en' ? 'Report' : lang === 'ur' ? 'رپورٹ' : 'الإبلاغ'}
+                </button>
+              </li>
+              {!closed && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => { setHeaderMenuOpen(false); closeThread() }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-start text-[13px] font-semibold text-rose-600 dark:text-rose-400 active:bg-rose-50 dark:active:bg-rose-900/30 border-t border-gray-100 dark:border-gray-700"
+                  >
+                    <FiX className="w-4 h-4 flex-shrink-0" />
+                    {t('thread_close')}
+                  </button>
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
       </header>
 
       {/* Messages */}
