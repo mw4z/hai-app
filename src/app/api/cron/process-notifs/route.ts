@@ -1456,8 +1456,12 @@ async function processNewRideRequest(job: JobRow): Promise<JobOutcome> {
 
   const author = [ride.requester.name?.trim(), ride.requester.lastName?.trim()].filter(Boolean).join(' ') || 'جار'
   const pushTitle = `🚗 طلب توصيل · ${author}`
+  // Use Arabic "من … إلى …" rather than an LTR "→" arrow: inside an
+  // RTL notification the arrow glyph gets reordered by the bidi
+  // algorithm and visually points the wrong way (pickup/dropoff look
+  // reversed). Words are direction-safe and unambiguous.
   const pushBody = pickupArea && dropoffArea
-    ? `${pickupArea} → ${dropoffArea}`
+    ? `من ${pickupArea} إلى ${dropoffArea}`
     : 'طلب مشوار جديد في حيّك'
 
   const result = await sendPushBatch(tokens, {
