@@ -177,9 +177,12 @@ function msgFingerprint(m: any): string {
 
 /** Merge freshly-polled server rows over local state, preserving the
  *  session blob preview AND the existing object identity for unchanged
- *  rows (see msgFingerprint). Pending local-only placeholders are kept. */
-function mergeServerMessages(prev: any[], serverMsgs: any[]): any[] {
+ *  rows (see msgFingerprint). Pending local-only placeholders are kept,
+ *  EXCEPT one that the just-landed server row already represents — see
+ *  the collapse step below. */
+function mergeServerMessages(prev: any[], serverMsgs: any[], currentUserId: string): any[] {
   const serverIds = new Set(serverMsgs.map((m: any) => m.id))
+  const prevIds = new Set(prev.map((m: any) => m.id))
   const merged = serverMsgs.map((serverMsg: any) => {
     const existing = prev.find((m: any) => m.id === serverMsg.id)
     if (!existing) return serverMsg
@@ -188,7 +191,34 @@ function mergeServerMessages(prev: any[], serverMsgs: any[]): any[] {
       : serverMsg
     return msgFingerprint(existing) === msgFingerprint(withPreview) ? existing : withPreview
   })
-  const localOnly = prev.filter((m: any) => !serverIds.has(m.id) && m.pending)
+
+  let localOnly = prev.filter((m: any) => !serverIds.has(m.id) && m.pending)
+  // Collapse a pending optimistic placeholder into the matching server
+  // row the moment it lands. Without this, the 3s poll inserts the real
+  // row while the temp-id placeholder still exists, flashing a DUPLICATE
+  // bubble for a beat until sendVoice/sendImages' own swap clears it
+  // (most visible on voice, whose slow upload widens the window). Match
+  // by type + sender among rows we didn't already have, and carry the
+  // local blob preview onto the server row so playback doesn't re-fetch.
+  if (localOnly.length) {
+    const freshOwn: Record<string, number[]> = {}
+    merged.forEach((m: any, i: number) => {
+      if (!prevIds.has(m.id) && m.senderId === currentUserId) {
+        (freshOwn[m.type] ||= []).push(i)
+      }
+    })
+    localOnly = localOnly.filter((ph: any) => {
+      const pool = freshOwn[ph.type]
+      if (pool && pool.length) {
+        const idx = pool.shift()!
+        if (ph.localPreview && !merged[idx].localPreview) {
+          merged[idx] = { ...merged[idx], localPreview: ph.localPreview }
+        }
+        return false // server row now represents this placeholder
+      }
+      return true
+    })
+  }
   return [...merged, ...localOnly]
 }
 
@@ -705,7 +735,7 @@ export default function ChatClient({
           return
         }
         const serverMsgs: any[] = data.messages || data || []
-        setMessages((prev: any[]) => mergeServerMessages(prev, serverMsgs))
+        setMessages((prev: any[]) => mergeServerMessages(prev, serverMsgs, currentUserId))
       } catch { /* ignore — the poll below will catch up */ }
     }
     refreshOnce()
@@ -736,7 +766,7 @@ export default function ChatClient({
             // AND keeps object identity for unchanged rows so the poll
             // doesn't re-render every bubble — see mergeServerMessages).
             const serverMsgs: any[] = data.messages || data || []
-            setMessages((prev: any[]) => mergeServerMessages(prev, serverMsgs))
+            setMessages((prev: any[]) => mergeServerMessages(prev, serverMsgs, currentUserId))
           }
         }
       } catch { /* ignore */ }
