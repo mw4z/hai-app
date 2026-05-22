@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { matchesArabic } from '@/lib/arabicNormalize'
-
-const ADMIN_ROLES = ['NEIGHBORHOOD_MOD', 'PLATFORM_MOD', 'SUPER_ADMIN']
+import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 
 export async function GET(req: NextRequest) {
   const session = await getSession()
@@ -13,7 +12,9 @@ export async function GET(req: NextRequest) {
     where: { id: session.userId },
     select: { role: true, neighborhoodId: true, gender: true },
   })
-  if (!admin || !ADMIN_ROLES.includes(admin.role)) {
+  // Admin-portal read endpoint — SUPER_ADMIN only. Moderators use the
+  // neighborhood-scoped /mod dashboard (+ /api/mod/*) instead.
+  if (!admin || !isSuperAdminRole(admin.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
