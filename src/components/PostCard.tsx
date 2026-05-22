@@ -42,6 +42,7 @@ import { fullName } from '@/lib/displayName'
 import { directoryUIVisible } from '@/lib/places/featureFlag'
 import { extractServiceContact } from '@/lib/services/extractContact'
 import { formatContactSnippet } from '@/lib/contactPicker'
+import PinDurationSheet from '@/components/PinDurationSheet'
 
 /**
  * v2 category → semantic label + icon.
@@ -221,6 +222,26 @@ export default function PostCard({
   const isAdmin = ['SUPER_ADMIN', 'PLATFORM_MOD', 'NEIGHBORHOOD_MOD'].includes(currentUserRole || '')
   const [reported, setReported] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  const [pinSheetOpen, setPinSheetOpen] = useState(false)
+  const [pinBusy, setPinBusy] = useState(false)
+
+  // Pin this post to the neighborhood's "المثبتات" (Pinned items) — NOT
+  // the stars/highlights. The server resolves the neighborhood + auto-fills
+  // title/summary; the mod only picks a duration.
+  async function pinAsReference(duration: string) {
+    if (pinBusy) return
+    setPinBusy(true)
+    try {
+      const res = await fetch('/api/mod/pinned-items/pin-post', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: post.id, duration }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok) toast.success(lang === 'en' ? 'Pinned to references' : 'تم التثبيت في المثبتات')
+      else toast.error(d.error || (lang === 'en' ? 'Failed' : 'فشل'))
+    } catch { toast.error(lang === 'en' ? 'Connection error' : 'خطأ بالاتصال') }
+    finally { setPinBusy(false); setPinSheetOpen(false) }
+  }
   const [reportingUser, setReportingUser] = useState(false)
   // Long-body expand toggle. Default collapsed (clamped). The
   // "overflow" flag is computed in a layout effect by comparing
@@ -1177,20 +1198,17 @@ export default function PostCard({
                     <span className="hai-menu-item__label">{lang !== 'en' ? 'استعادة' : 'Restore'}</span>
                   </button>
                 )}
-                {/* Highlights pin/unpin — admins only, eligible categories only. */}
+                {/* Pin as reference — admins only. Goes to the
+                    neighborhood "المثبتات" (Pinned items), NOT the stars/
+                    highlights; opens a small duration sheet. */}
                 {isAdmin && post.status !== 'HIDDEN' && (
-                  ['NEIGHBORHOOD_REPORTS','LOST_FOUND','SERVICES','EVENTS'].includes(post.category)
-                ) && (
                   <button
-                    onClick={() => {
-                      handleAdminAction(post.highlightPinnedAt ? 'highlight_unpin' : 'highlight_pin')
-                      setShowMenu(false)
-                    }}
+                    onClick={() => { setShowMenu(false); setPinSheetOpen(true) }}
                     className="hai-menu-item"
                   >
-                    <FiFlag className="hai-icon-sm hai-menu-item__icon" />
+                    <span className="hai-icon-sm hai-menu-item__icon" aria-hidden>📌</span>
                     <span className="hai-menu-item__label">
-                      {t(post.highlightPinnedAt ? 'highlights_unpin_action' : 'highlights_pin_action')}
+                      {lang === 'en' ? 'Pin as reference' : 'تثبيت كمرجع'}
                     </span>
                   </button>
                 )}
@@ -1885,6 +1903,7 @@ export default function PostCard({
         }
         variant="comment"
       />
+      <PinDurationSheet open={pinSheetOpen} busy={pinBusy} onClose={() => setPinSheetOpen(false)} onSelect={pinAsReference} />
       {canAttachPlace && (
         <PlacePickerSheet
           open={placePickerFor !== null}
