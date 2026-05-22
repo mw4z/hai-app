@@ -39,7 +39,7 @@ export default function CapacitorBridge() {
       if ((window.Capacitor?.getPlatform?.() || '') === 'android') {
         document.documentElement.style.setProperty(
           '--hai-safe-bottom',
-          'max(env(safe-area-inset-bottom, 0px), 2.25rem)',
+          'max(env(safe-area-inset-bottom, 0px), 2.1rem)',
         )
       }
     } catch {}
