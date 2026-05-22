@@ -230,7 +230,7 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true, 
           bubble into the open handler. Flex direction puts the × on
           the trailing edge — visual right in LTR, visual left in RTL,
           no manual direction logic. */}
-      <div className="w-full mx-auto flex items-stretch bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-y border-amber-100 dark:border-amber-900/40">
+      <div className="sticky top-0 z-20 w-full mx-auto flex items-stretch backdrop-blur-md bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/30 border-y border-amber-100 dark:border-amber-900/40">
         <button
           type="button"
           onClick={() => setOpen(true)}
