@@ -260,7 +260,7 @@ export default function DirectoryFilterSheet({ open, initial, onClose, onApply }
             indicator clearance. */}
         <div
           className="flex-shrink-0 flex gap-2 px-5 py-3 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 rounded-b-3xl"
-          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}
         >
           <button
             type="button"

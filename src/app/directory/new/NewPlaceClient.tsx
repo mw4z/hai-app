@@ -226,7 +226,7 @@ export default function NewPlaceClient() {
         title={tr('Add a place', 'إضافة مكان', 'جگہ شامل کریں')}
         backHref="/directory"
       />
-      <div className="max-w-[640px] mx-auto px-4 py-4 space-y-3">
+      <div className="max-w-[640px] mx-auto px-4 pt-4 space-y-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
         <p className="text-xs text-gray-500 dark:text-gray-400">
           {tr(
             'Your submission will be reviewed by a moderator before appearing in the directory.',
