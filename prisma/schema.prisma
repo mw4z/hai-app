@@ -38,6 +38,7 @@ model Neighborhood {
   pollRequests           PollRequest[]
   placeListings          PlaceListing[]
   serviceContacts        DirectoryServiceContact[]
+  directoryContributions DirectoryContribution[]
   createdAt DateTime @default(now())
 }
 
@@ -192,6 +193,9 @@ model User {
   serviceIdentitiesOwned     ServiceIdentity[]         @relation("ServiceIdentityOwner")
   serviceContactReportsFiled ServiceContactReport[]    @relation("ServiceContactReportsFiled")
   placeReviewReportsFiled    PlaceReviewReport[] @relation("PlaceReviewReporter")
+  directoryContributions         DirectoryContribution[] @relation("DirectoryContributions")
+  directoryContributionsReviewed DirectoryContribution[] @relation("DirectoryContributionsReviewed")
+  reputationEvents               ReputationEvent[]       @relation("ReputationEvents")
   placeReviewReportsResolved PlaceReviewReport[] @relation("PlaceReviewReportResolver")
 
   deletedAt        DateTime?     // soft delete — null = active, set = deleted
@@ -1791,6 +1795,7 @@ model PlaceListing {
   claimRequests   PlaceClaimRequest[]
   reports         PlaceReport[]
   reviews         PlaceReview[]
+  contributions   DirectoryContribution[] @relation("PlaceContributions")
 
   // Denormalized review summary. Recomputed inside the same
   // transaction as every review mutation (create / update /
@@ -2117,4 +2122,77 @@ enum ServiceContactReportReason {
   NOT_THIS_PERSON   // لا يخص هذا الشخص
   FRAUD_OR_ABUSE    // احتيال أو إزعاج
   INAPPROPRIATE     // محتوى غير مناسب
+}
+
+// ── Directory contributions + reputation events ───────────────────
+// A reviewable record of a user's directory contribution. Reputation is
+// awarded ONLY when status flips to APPROVED — never on submit, never on
+// REJECTED/DUPLICATE/NEEDS_EDIT. Existing PlaceListing/PlaceReport flows
+// keep working; a contribution row rides alongside for reward tracking.
+model DirectoryContribution {
+  id              String                      @id @default(cuid())
+  type            DirectoryContributionType
+  status          DirectoryContributionStatus @default(PENDING_REVIEW)
+
+  contributorId   String
+  contributor     User                        @relation("DirectoryContributions", fields: [contributorId], references: [id])
+
+  // Set for contributions tied to an existing/new place row.
+  placeId         String?
+  place           PlaceListing?               @relation("PlaceContributions", fields: [placeId], references: [id])
+  neighborhoodId  String
+  neighborhood    Neighborhood                @relation(fields: [neighborhoodId], references: [id])
+
+  payloadJson     Json?
+  // Flagged at create-time when a near-duplicate place exists (name +
+  // category + proximity in the same neighborhood). Surfaced in review.
+  potentialDuplicate Boolean                  @default(false)
+
+  reviewNote      String?
+  reviewedById    String?
+  reviewedBy      User?                       @relation("DirectoryContributionsReviewed", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  @@index([neighborhoodId, status, createdAt])
+  @@index([contributorId, createdAt])
+  @@index([placeId])
+}
+
+// Idempotent, audited reputation grant. Unique (sourceType, sourceId)
+// guarantees a given source can only ever award once — re-approving a
+// contribution can't double-pay. Separate from the social `reputationLog`
+// (different cap + no idempotency); both increment User.reputation.
+model ReputationEvent {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation("ReputationEvents", fields: [userId], references: [id])
+  sourceType  String   // e.g. "directory_contribution"
+  sourceId    String   // the contribution id
+  points      Int
+  reason      String   // a ReputationReason value (see lib/reputation/directoryRewards)
+  createdAt   DateTime @default(now())
+
+  @@unique([sourceType, sourceId])
+  @@index([userId, createdAt])
+}
+
+enum DirectoryContributionType {
+  CREATE_PLACE
+  EDIT_PLACE
+  ADD_PHOTO
+  FIX_LOCATION
+  ADD_CONTACT
+  REPORT_DUPLICATE
+  REPORT_CLOSED
+}
+
+enum DirectoryContributionStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  DUPLICATE
+  NEEDS_EDIT
 }
