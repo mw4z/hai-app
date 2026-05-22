@@ -3,9 +3,13 @@
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
+import { FiUser } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useConfirm } from '@/components/ConfirmProvider'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
 import { SERVICE_CATEGORIES, isValidServiceCategory } from '@/lib/services/serviceCategories'
+import { inferServiceCategory } from '@/lib/services/extractContact'
+import { pickContact, ContactsPermissionDeniedError } from '@/lib/contactPicker'
 
 /**
  * Lightweight "add a service contact" form. Required: name, category,
@@ -19,6 +23,7 @@ export default function NewServiceContactClient() {
   const router = useRouter()
   const sp = useSearchParams()
   const { lang } = useLanguage()
+  const confirm = useConfirm()
   const tr = (en: string, ar: string, ur: string) => (lang === 'en' ? en : lang === 'ur' ? ur : ar)
 
   const prefillCat = sp?.get('category')
@@ -34,6 +39,43 @@ export default function NewServiceContactClient() {
   const sourceCommentId = sp?.get('sourceCommentId') || undefined
 
   const inputCls = 'w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-[15px] focus:outline-none focus:ring-2 focus:ring-primary-500'
+
+  // Pull a saved number straight from the phone's address book (native
+  // picker on iOS/Android, Web Contact Picker on Chromium). Pre-fills the
+  // phone + name (and infers a category from the name when obvious) — the
+  // user still reviews + confirms before anything is created.
+  async function pickFromContacts() {
+    try {
+      const picked = await pickContact()
+      if (!picked) return
+      if (picked.phone) setPhone(picked.phone)
+      if (picked.name) {
+        setName((cur) => cur || picked.name)
+        if (!category) {
+          const guess = inferServiceCategory(picked.name)
+          if (guess) setCategory(guess)
+        }
+      }
+      if (!picked.phone) {
+        toast(tr('That contact has no number', 'لا يوجد رقم لجهة الاتصال هذه', 'اس رابطے پر نمبر نہیں'), { icon: 'ℹ️' })
+      }
+    } catch (err) {
+      if (err instanceof ContactsPermissionDeniedError) {
+        await confirm({
+          title: tr('Allow contacts access', 'فعّل إذن جهات الاتصال', 'رابطوں کی اجازت دیں'),
+          message: tr(
+            'Open Settings → Apps → حي → Permissions → Contacts → Allow, then come back and tap the button again.',
+            'الإعدادات → التطبيقات → حي → الأذونات → جهات الاتصال → السماح، ثم ارجع واضغط الزر مرة أخرى.',
+            'سیٹنگز → ایپس → حي → اجازتیں → رابطے → اجازت دیں، پھر دوبارہ ٹیپ کریں۔',
+          ),
+          confirmText: tr('OK', 'حسناً', 'ٹھیک ہے'),
+          cancelText: '',
+        })
+        return
+      }
+      toast.error(tr('Could not open contacts', 'تعذّر فتح جهات الاتصال', 'رابطے نہیں کھل سکے'))
+    }
+  }
 
   async function submit() {
     if (loading) return
@@ -112,10 +154,20 @@ export default function NewServiceContactClient() {
           </div>
         </div>
 
-        <label className="block">
-          <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{tr('Phone', 'رقم الجوال', 'فون')} *</span>
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{tr('Phone', 'رقم الجوال', 'فون')} *</span>
+            <button
+              type="button"
+              onClick={pickFromContacts}
+              className="flex items-center gap-1.5 text-xs font-semibold text-primary-600 dark:text-primary-400 active:scale-95 transition-transform"
+            >
+              <FiUser className="w-3.5 h-3.5" />
+              {tr('Pick from contacts', 'اختر من جهات الاتصال', 'رابطوں سے منتخب کریں')}
+            </button>
+          </div>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" inputMode="tel" placeholder="05xxxxxxxx" className={inputCls} />
-        </label>
+        </div>
 
         <label className="flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
           <input type="checkbox" checked={whatsapp} onChange={(e) => setWhatsapp(e.target.checked)} className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500" />
