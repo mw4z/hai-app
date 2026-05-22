@@ -39,6 +39,7 @@ model Neighborhood {
   placeListings          PlaceListing[]
   serviceContacts        DirectoryServiceContact[]
   directoryContributions DirectoryContribution[]
+  pinnedItems            NeighborhoodPinnedItem[]
   createdAt DateTime @default(now())
 }
 
@@ -197,6 +198,9 @@ model User {
   directoryContributions         DirectoryContribution[] @relation("DirectoryContributions")
   directoryContributionsReviewed DirectoryContribution[] @relation("DirectoryContributionsReviewed")
   reputationEvents               ReputationEvent[]       @relation("ReputationEvents")
+  pinnedItemsPinned     NeighborhoodPinnedItem[]         @relation("PinnedItemsPinned")
+  pinnedItemsHidden     NeighborhoodPinnedItem[]         @relation("PinnedItemsHidden")
+  pinnedItemAuditActions NeighborhoodPinnedItemAuditLog[] @relation("PinnedItemAuditActor")
   placeReviewReportsResolved PlaceReviewReport[] @relation("PlaceReviewReportResolver")
 
   deletedAt        DateTime?     // soft delete — null = active, set = deleted
@@ -2218,4 +2222,93 @@ enum DirectoryContributionStatus {
   REJECTED
   DUPLICATE
   NEEDS_EDIT
+}
+
+// ── Neighborhood pinned reference items ───────────────────────────
+// Moderator-pinned references (a message/file/link/post/comment/note) that
+// residents can find later without re-asking. Self-contained snapshot
+// (title/summary/fileUrl/linkUrl) so it renders even if the source post
+// later expires from the feed — pinned-item visibility is INDEPENDENT of
+// the source's feed/highlight expiry. Pinning never mutates the source.
+model NeighborhoodPinnedItem {
+  id              String   @id @default(cuid())
+
+  neighborhoodId  String
+  neighborhood    Neighborhood @relation(fields: [neighborhoodId], references: [id])
+
+  type            PinnedItemType
+  // Origin reference (null for MANUAL_NOTE/standalone FILE/LINK). The
+  // source is loaded on demand by a resolver that can read EXPIRED posts/
+  // comments but still respects deletion + moderation removal.
+  sourceType      String?   // "post" | "comment" | "message" | "file" | "link"
+  sourceId        String?
+
+  title           String
+  summary         String?
+  fileUrl         String?
+  linkUrl         String?
+
+  status          PinnedItemStatus @default(ACTIVE)
+  priority        Int      @default(0)   // higher = shown first
+
+  pinnedById      String
+  pinnedBy        User     @relation("PinnedItemsPinned", fields: [pinnedById], references: [id])
+  pinnedAt        DateTime @default(now())
+  expiresAt       DateTime?               // null = forever
+
+  hiddenById      String?
+  hiddenBy        User?    @relation("PinnedItemsHidden", fields: [hiddenById], references: [id])
+  hiddenAt        DateTime?
+  hiddenReason    String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  auditLogs       NeighborhoodPinnedItemAuditLog[]
+
+  // Resident browse: nbhd + status + expiry + priority ordering.
+  @@index([neighborhoodId, status, expiresAt])
+  @@index([neighborhoodId, priority, pinnedAt])
+  // Duplicate-pin lookup: at most one pin per source per neighborhood.
+  @@unique([neighborhoodId, sourceType, sourceId])
+}
+
+model NeighborhoodPinnedItemAuditLog {
+  id            String   @id @default(cuid())
+  pinnedItemId  String
+  pinnedItem    NeighborhoodPinnedItem @relation(fields: [pinnedItemId], references: [id], onDelete: Cascade)
+  actorId       String
+  actor         User     @relation("PinnedItemAuditActor", fields: [actorId], references: [id])
+  action        PinnedItemAction
+  oldValueJson  Json?
+  newValueJson  Json?
+  createdAt     DateTime @default(now())
+
+  @@index([pinnedItemId, createdAt])
+}
+
+enum PinnedItemType {
+  POST
+  COMMENT
+  MESSAGE
+  FILE
+  LINK
+  MANUAL_NOTE
+}
+
+enum PinnedItemStatus {
+  ACTIVE
+  HIDDEN
+  EXPIRED
+  REMOVED
+}
+
+enum PinnedItemAction {
+  PIN
+  UPDATE
+  HIDE
+  UNHIDE
+  EXPIRE
+  REMOVE
+  REORDER
 }
