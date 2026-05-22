@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { cached } from '@/lib/cache'
+import { getVisibleReputation } from '@/lib/reputation/visibleReputation'
 import ProfileClient from './ProfileClient'
 
 export default async function ProfilePage() {
@@ -62,6 +63,11 @@ export default async function ProfilePage() {
   ])
   if (!user) redirect('/login')
 
+  // ONE visible reputation = social (User.reputation) + approved directory
+  // points (ReputationEvent). Directory points are display-only here; they
+  // don't touch the social score enforcement reads.
+  const visibleReputation = await getVisibleReputation(session.userId)
+
   return (
     <ProfileClient
       user={JSON.parse(JSON.stringify({
@@ -96,6 +102,7 @@ export default async function ProfilePage() {
         modStatus: user.modStatus,
       }))}
       postCount={postCount}
+      visibleReputation={visibleReputation}
     />
   )
 }

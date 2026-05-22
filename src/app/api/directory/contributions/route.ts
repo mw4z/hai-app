@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { DIRECTORY_DAILY_CAP, DIRECTORY_SOURCE_TYPE } from '@/lib/reputation/directoryRewards'
+import { getReputationBreakdown } from '@/lib/reputation/visibleReputation'
 import { extractChangedFields, dailyCapEarned } from '@/lib/directory/contributions'
 
 export const dynamic = 'force-dynamic'
@@ -40,13 +41,19 @@ export async function GET() {
   const pointsBySource = new Map(events.map((e) => [e.sourceId, e.points]))
 
   const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
-  const [lifetime, today] = await Promise.all([
-    db.reputationEvent.aggregate({ where: { userId: session.userId, sourceType: DIRECTORY_SOURCE_TYPE }, _sum: { points: true } }),
+  const [breakdown, today] = await Promise.all([
+    getReputationBreakdown(session.userId),
     db.reputationEvent.aggregate({ where: { userId: session.userId, sourceType: DIRECTORY_SOURCE_TYPE, createdAt: { gte: startOfDay } }, _sum: { points: true } }),
   ])
 
+  // ONE visible reputation ("السمعة") with an explanation breakdown — the
+  // total merges social + directory; directory never alters the social
+  // (enforcement) score.
   const summary = {
-    totalPoints: lifetime._sum.points || 0,
+    reputation: breakdown.total,             // the one visible number
+    socialPoints: breakdown.social,          // النشاط الاجتماعي
+    directoryContributionPoints: breakdown.directoryContributions, // مساهمات دليل الحي
+    directoryReportPoints: breakdown.directoryReports,             // البلاغات الصحيحة
     pending: rows.filter((r) => r.status === 'PENDING_REVIEW' || r.status === 'NEEDS_EDIT').length,
     approved: rows.filter((r) => r.status === 'APPROVED').length,
     rejected: rows.filter((r) => r.status === 'REJECTED' || r.status === 'DUPLICATE').length,

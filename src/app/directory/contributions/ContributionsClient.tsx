@@ -22,8 +22,15 @@ interface Contribution {
   createdAt: string
   reviewedAt: string | null
 }
-interface Summary { totalPoints: number; pending: number; approved: number; rejected: number; total: number }
+interface Summary {
+  reputation: number
+  socialPoints: number
+  directoryContributionPoints: number
+  directoryReportPoints: number
+  pending: number; approved: number; rejected: number; total: number
+}
 interface Payload { summary: Summary; dailyCap: { earnedToday: number; cap: number }; contributions: Contribution[] }
+const EMPTY_SUMMARY: Summary = { reputation: 0, socialPoints: 0, directoryContributionPoints: 0, directoryReportPoints: 0, pending: 0, approved: 0, rejected: 0, total: 0 }
 
 const TYPE_LABEL: Record<ContribType, { ar: string; en: string }> = {
   CREATE_PLACE:     { ar: 'إضافة مكان',            en: 'New place' },
@@ -67,8 +74,8 @@ export default function ContributionsClient() {
   useEffect(() => {
     fetch('/api/directory/contributions')
       .then((r) => r.json())
-      .then((d) => setData(d && d.summary ? d : { summary: { totalPoints: 0, pending: 0, approved: 0, rejected: 0, total: 0 }, dailyCap: { earnedToday: 0, cap: 15 }, contributions: [] }))
-      .catch(() => setData({ summary: { totalPoints: 0, pending: 0, approved: 0, rejected: 0, total: 0 }, dailyCap: { earnedToday: 0, cap: 15 }, contributions: [] }))
+      .then((d) => setData(d && d.summary ? d : { summary: EMPTY_SUMMARY, dailyCap: { earnedToday: 0, cap: 15 }, contributions: [] }))
+      .catch(() => setData({ summary: EMPTY_SUMMARY, dailyCap: { earnedToday: 0, cap: 15 }, contributions: [] }))
   }, [])
 
   const visible = useMemo(
@@ -94,18 +101,24 @@ export default function ContributionsClient() {
           </div>
         ) : (
           <>
-            {/* Summary header */}
+            {/* Summary header — ONE visible reputation with a breakdown
+                that explains where it came from (not separate scores). */}
             <div className="rounded-2xl bg-gradient-to-br from-primary-600 to-primary-700 text-white p-4 shadow-lg shadow-primary-600/20">
-              <p className="text-xs text-primary-100">{tr('Directory points', 'نقاط دليل الحي', 'پوائنٹس')}</p>
-              <p className="text-3xl font-bold mt-0.5">{data.summary.totalPoints} <span className="text-base">⭐</span></p>
-              <div className="flex items-center gap-4 mt-3 text-[12px]">
+              <p className="text-xs text-primary-100">{tr('Reputation', 'السمعة', 'ساکھ')}</p>
+              <p className="text-3xl font-bold mt-0.5">{data.summary.reputation} <span className="text-base">⭐</span></p>
+              <div className="mt-2.5 space-y-0.5 text-[11px] text-primary-50">
+                <p>{tr('From posts & activity', 'من المشاركات والتفاعل', '')}: <b>+{data.summary.socialPoints}</b></p>
+                <p>{tr('From directory contributions', 'من مساهمات دليل الحي', '')}: <b>+{data.summary.directoryContributionPoints}</b></p>
+                <p>{tr('From valid reports', 'من البلاغات الصحيحة', '')}: <b>+{data.summary.directoryReportPoints}</b></p>
+              </div>
+              <div className="flex items-center gap-4 mt-3 pt-2.5 border-t border-white/15 text-[12px]">
                 <span>{tr('Pending', 'قيد المراجعة', 'زیر التواء')}: <b>{data.summary.pending}</b></span>
                 <span>{tr('Approved', 'مقبول', 'منظور')}: <b>{data.summary.approved}</b></span>
                 <span>{tr('Rejected', 'مرفوض', 'مسترد')}: <b>{data.summary.rejected}</b></span>
               </div>
               <p className="text-[11px] text-primary-100 mt-2">
                 {tr(
-                  `Earned ${data.dailyCap.earnedToday} of ${data.dailyCap.cap} points available today`,
+                  `Earned ${data.dailyCap.earnedToday} of ${data.dailyCap.cap} reputation available today`,
                   `حصلت اليوم على ${data.dailyCap.earnedToday} من ${data.dailyCap.cap} نقطة متاحة`,
                   `آج ${data.dailyCap.earnedToday}/${data.dailyCap.cap}`,
                 )}
@@ -163,9 +176,9 @@ export default function ContributionsClient() {
 
                     {/* Points / status line */}
                     {c.points > 0 ? (
-                      <p className="text-[12px] font-bold text-emerald-600 dark:text-emerald-400">{tr(`+${c.points} points awarded`, `تم منحك +${c.points} نقطة`, `+${c.points}`)}</p>
+                      <p className="text-[12px] font-bold text-emerald-600 dark:text-emerald-400">{tr(`+${c.points} reputation added`, `تم منحك +${c.points} سمعة`, `+${c.points}`)}</p>
                     ) : (c.status === 'PENDING_REVIEW' || c.status === 'NEEDS_EDIT') ? (
-                      <p className="text-[11px] text-gray-400">{tr('No points yet', 'لم تحصل على نقاط بعد', 'ابھی پوائنٹس نہیں')}</p>
+                      <p className="text-[11px] text-gray-400">{tr('No reputation yet', 'لم تحصل على نقاط بعد', 'ابھی نہیں')}</p>
                     ) : null}
 
                     {/* Safe rejection reason */}

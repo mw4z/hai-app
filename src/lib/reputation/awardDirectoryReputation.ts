@@ -56,18 +56,21 @@ export async function awardDirectoryReputation(opts: {
   if (decision.award <= 0) return { awarded: 0, reason: decision.reason }
 
   try {
-    await db.$transaction([
-      db.reputationEvent.create({
-        data: {
-          userId,
-          sourceType: DIRECTORY_SOURCE_TYPE,
-          sourceId: contributionId,
-          points: decision.award,
-          reason: reasonForContribution(type, highQuality),
-        },
-      }),
-      db.user.update({ where: { id: userId }, data: { reputation: { increment: decision.award } } }),
-    ])
+    // Directory points live ONLY in the source-tagged ReputationEvent — we
+    // deliberately do NOT increment User.reputation. User.reputation stays
+    // the SOCIAL score that enforcement (report weight / auto-hide / mod
+    // eligibility / tiers) reads, so directory contributions never shift
+    // those. The visible "السمعة" total merges the two for DISPLAY only
+    // (see lib/reputation/visibleReputation). Audit provenance is kept.
+    await db.reputationEvent.create({
+      data: {
+        userId,
+        sourceType: DIRECTORY_SOURCE_TYPE,
+        sourceId: contributionId,
+        points: decision.award,
+        reason: reasonForContribution(type, highQuality),
+      },
+    })
     return { awarded: decision.award, reason: 'ok' }
   } catch (e) {
     // Race: a concurrent approve already inserted the event.

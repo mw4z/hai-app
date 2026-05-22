@@ -90,10 +90,13 @@ interface Props {
     modStatus?: 'ACTIVE' | 'INACTIVE' | 'UNDER_REVIEW' | 'SUSPENDED' | null
   }
   postCount: number
+  /** Visible "السمعة" = social (user.reputation) + approved directory
+   *  points. Display-only; enforcement still uses user.reputation. */
+  visibleReputation?: number
 }
 
 
-export default function ProfileClient({ user, postCount }: Props) {
+export default function ProfileClient({ user, postCount, visibleReputation }: Props) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { t, lang } = useLanguage()
@@ -676,7 +679,7 @@ export default function ProfileClient({ user, postCount }: Props) {
       {/* Stats */}
       <div className="mx-4 mt-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 grid grid-cols-3 gap-3 text-center">
         <div>
-          <div className="text-2xl font-bold text-primary-600">{user.reputation}</div>
+          <div className="text-2xl font-bold text-primary-600">{visibleReputation ?? user.reputation}</div>
           <div className="text-xs text-gray-400 mt-0.5">{t('profile_reputation')}</div>
         </div>
         <div>
@@ -1371,7 +1374,7 @@ export default function ProfileClient({ user, postCount }: Props) {
           openSection={openSection}
           setOpenSection={setOpenSection}
         >
-          <RepSection userId={user.id} reputation={user.reputation} lang={lang} t={t} />
+          <RepSection userId={user.id} reputation={visibleReputation ?? user.reputation} lang={lang} t={t} />
         </AccordionSection>
       </div>
 

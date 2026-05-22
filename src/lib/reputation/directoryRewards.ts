@@ -57,6 +57,38 @@ export function pointsForContribution(
   }
 }
 
+// Directory reasons that came from REPORTS (vs place contributions) — used
+// to split the display breakdown into "مساهمات دليل الحي" vs "البلاغات".
+export const DIRECTORY_REPORT_REASONS = new Set<string>([
+  'DIRECTORY_DUPLICATE_REPORT_ACCEPTED',
+  'DIRECTORY_CLOSED_REPORT_ACCEPTED',
+])
+
+export interface ReputationBreakdown {
+  social: number                 // من المشاركات والتفاعل (User.reputation)
+  directoryContributions: number // من مساهمات دليل الحي
+  directoryReports: number       // من البلاغات الصحيحة
+  total: number                  // visible "السمعة" (= sum of the three)
+}
+
+/**
+ * Pure: merge the social score with source-tagged directory events into the
+ * visible-reputation breakdown. The total is the ONE number users see; the
+ * three parts are explanation only. Social is never changed by directory.
+ */
+export function computeReputationBreakdown(
+  social: number,
+  directoryEvents: { reason: string; points: number }[],
+): ReputationBreakdown {
+  let contributions = 0
+  let reports = 0
+  for (const e of directoryEvents) {
+    if (DIRECTORY_REPORT_REASONS.has(e.reason)) reports += e.points
+    else contributions += e.points
+  }
+  return { social, directoryContributions: contributions, directoryReports: reports, total: social + contributions + reports }
+}
+
 /**
  * Map a PlaceReport.type to a rewardable contribution type — ONLY the two
  * report kinds that produce a real directory correction. Everything else

@@ -10,7 +10,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   pointsForContribution, cappedAward, decideAward, assessPlaceQuality,
-  reportTypeToContributionType, DIRECTORY_DAILY_CAP,
+  reportTypeToContributionType, computeReputationBreakdown, DIRECTORY_DAILY_CAP,
 } from './directoryRewards'
 
 const fresh = (base: number) =>
@@ -91,6 +91,27 @@ test('reportTypeToContributionType: only DUPLICATE + CLOSED are rewardable', () 
   assert.equal(fresh(pointsForContribution('REPORT_CLOSED', 'APPROVED')).award, 3)
   // a rejected/dismissed report never reaches APPROVED → 0
   assert.equal(pointsForContribution('REPORT_DUPLICATE', 'REJECTED'), 0)
+})
+
+// visible reputation = social + directory (display merge), split for
+// explanation; social is never altered, and only awarded events count.
+test('visible reputation merges social + directory; rejected/pending add 0', () => {
+  // approved directory contribution increases the visible total
+  const b = computeReputationBreakdown(10, [
+    { reason: 'DIRECTORY_PLACE_APPROVED', points: 5 },
+    { reason: 'DIRECTORY_DUPLICATE_REPORT_ACCEPTED', points: 3 },
+    { reason: 'DIRECTORY_CONTACT_APPROVED', points: 2 },
+  ])
+  assert.equal(b.social, 10)
+  assert.equal(b.directoryContributions, 7) // 5 + 2 (place + contact)
+  assert.equal(b.directoryReports, 3)        // duplicate report
+  assert.equal(b.total, 20)                  // one visible number
+
+  // rejected / pending produce NO ReputationEvent → no directory points
+  const none = computeReputationBreakdown(10, [])
+  assert.equal(none.directoryContributions, 0)
+  assert.equal(none.directoryReports, 0)
+  assert.equal(none.total, 10) // visible == social when nothing approved
 })
 
 // quality heuristic (drives +8 vs +5)
