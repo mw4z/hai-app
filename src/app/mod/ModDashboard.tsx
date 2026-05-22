@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 import { useLanguage } from '@/hooks/useLanguage'
-import { FiArrowRight, FiArrowLeft, FiAlertTriangle, FiEyeOff, FiUserX, FiActivity, FiFileText } from 'react-icons/fi'
+import { FiArrowRight, FiArrowLeft, FiAlertTriangle, FiEyeOff, FiUserX, FiActivity, FiFileText, FiShield, FiSearch, FiSlash, FiPauseCircle } from 'react-icons/fi'
 import { useConfirm, usePrompt } from '@/components/ConfirmProvider'
+import { canVerifyProviders, canModerateUsers } from '@/lib/modPermissions'
 import EmergencyCreator from '@/components/EmergencyCreator'
 import HaiLoader from '@/components/HaiLoader'
 
@@ -37,7 +38,7 @@ const ACTION_LABELS: Record<string, { ar: string; en: string }> = {
   CONFLICT_BLOCKED: { ar: 'تم حظر الإجراء (تعارض)', en: 'Action blocked (conflict)' },
 }
 
-type Tab = 'reports' | 'user_reports' | 'poll_requests' | 'hidden' | 'banned' | 'activity'
+type Tab = 'reports' | 'user_reports' | 'poll_requests' | 'hidden' | 'banned' | 'activity' | 'verify' | 'users'
 
 interface PollRequestRow {
   id: string
@@ -97,6 +98,99 @@ export default function ModDashboard({ data }: Props) {
   const [tab, setTab] = useState<Tab>('reports')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const dn = (ar: string, en: string) => lang === 'en' ? en : ar
+  const role = data.user.role
+
+  // Provider-verification queue (PLATFORM_MOD + SUPER_ADMIN only) and the
+  // moderation user list — both lazy-fetched when their tab opens.
+  const [verifyReqs, setVerifyReqs] = useState<any[] | null>(null)
+  const [userList, setUserList] = useState<any[] | null>(null)
+  const [userQuery, setUserQuery] = useState('')
+
+  useEffect(() => {
+    if (tab !== 'verify' || !canVerifyProviders(role)) return
+    let cancelled = false
+    fetch('/api/mod/verification', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : { requests: [] }))
+      .then((d) => { if (!cancelled) setVerifyReqs(Array.isArray(d.requests) ? d.requests : []) })
+      .catch(() => { if (!cancelled) setVerifyReqs([]) })
+    return () => { cancelled = true }
+  }, [tab, role])
+
+  useEffect(() => {
+    if (tab !== 'users' || !canModerateUsers(role)) return
+    let cancelled = false
+    setUserList(null)
+    const handle = setTimeout(() => {
+      const params = new URLSearchParams()
+      if (userQuery.trim()) params.set('q', userQuery.trim())
+      fetch(`/api/mod/users?${params.toString()}`, { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : { users: [] }))
+        .then((d) => { if (!cancelled) setUserList(Array.isArray(d.users) ? d.users : []) })
+        .catch(() => { if (!cancelled) setUserList([]) })
+    }, userQuery ? 300 : 0)
+    return () => { cancelled = true; clearTimeout(handle) }
+  }, [tab, role, userQuery])
+
+  async function verifyAction(id: string, action: 'approve' | 'reject') {
+    if (actionLoading) return
+    let reason = ''
+    if (action === 'reject') {
+      const r = await promptDialog({
+        title: dn('سبب الرفض', 'Reject reason'),
+        message: dn('اكتب سبب رفض التوثيق', 'Why is this verification being rejected?'),
+      })
+      if (r === null) return
+      reason = r
+    }
+    setActionLoading('verify-' + id)
+    try {
+      const res = await fetch(`/api/mod/verification/${id}/action`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, reason }),
+      })
+      if (res.ok) {
+        toast.success(dn('تم', 'Done'))
+        setVerifyReqs((cur) => (cur || []).filter((v) => v.id !== id))
+      } else {
+        const d = await res.json().catch(() => ({}))
+        toast.error(d.error || 'Error')
+      }
+    } catch { toast.error('Error') }
+    finally { setActionLoading(null) }
+  }
+
+  async function userBlock(userId: string, action: 'ban_user' | 'temp_ban_user' | 'unban_user') {
+    if (actionLoading) return
+    const verb = action === 'unban_user' ? dn('رفع الحظر عن', 'Unblock') : action === 'temp_ban_user' ? dn('إيقاف', 'Stop') : dn('حظر', 'Block')
+    let reason = ''
+    if (action !== 'unban_user') {
+      const r = await promptDialog({ title: verb, message: dn('السبب (اختياري)', 'Reason (optional)') })
+      if (r === null) return
+      reason = r
+    } else {
+      const ok = await confirmDialog({ title: verb, message: dn('رفع الحظر عن هذا المستخدم؟', 'Unblock this user?'), confirmText: dn('تأكيد', 'Confirm') })
+      if (!ok) return
+    }
+    setActionLoading('user-' + userId)
+    try {
+      const res = await fetch('/api/admin/action', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, targetId: userId, reason }),
+      })
+      if (res.ok) {
+        toast.success(dn('تم', 'Done'))
+        // Re-fetch so the row's status reflects the change.
+        const params = new URLSearchParams()
+        if (userQuery.trim()) params.set('q', userQuery.trim())
+        const d = await fetch(`/api/mod/users?${params.toString()}`, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({ users: [] }))
+        setUserList(Array.isArray(d.users) ? d.users : [])
+      } else {
+        const d = await res.json().catch(() => ({}))
+        toast.error(d.error || dn('غير مسموح', 'Not allowed'))
+      }
+    } catch { toast.error('Error') }
+    finally { setActionLoading(null) }
+  }
 
   // Poll-request queue. Fetched lazily when the user opens the tab so
   // the SSR payload stays small. Polled every 30s while the tab is
@@ -227,6 +321,10 @@ export default function ModDashboard({ data }: Props) {
     { key: 'poll_requests', icon: <FiFileText className="w-4 h-4" />, ar: 'اقتراحات استفتاء', en: 'Poll requests', count: pollRequests?.length },
     { key: 'hidden', icon: <FiEyeOff className="w-4 h-4" />, ar: 'المخفية', en: 'Hidden', count: data.hiddenPosts.length },
     { key: 'banned', icon: <FiUserX className="w-4 h-4" />, ar: 'المحظورين', en: 'Banned', count: data.bannedUsers.length },
+    // User list (block / stop only) — all mod roles, neighborhood-scoped.
+    ...(canModerateUsers(role) ? [{ key: 'users' as Tab, icon: <FiSearch className="w-4 h-4" />, ar: 'المستخدمون', en: 'Users' }] : []),
+    // Provider verification — PLATFORM_MOD + SUPER_ADMIN only (audit H-3).
+    ...(canVerifyProviders(role) ? [{ key: 'verify' as Tab, icon: <FiShield className="w-4 h-4" />, ar: 'توثيق المزودين', en: 'Verification', count: verifyReqs?.length }] : []),
     { key: 'activity', icon: <FiActivity className="w-4 h-4" />, ar: 'نشاطي', en: 'My Activity' },
   ]
 
@@ -589,6 +687,77 @@ export default function ModDashboard({ data }: Props) {
               </div>
             ))
           )
+        )}
+
+        {/* Provider verification — PLATFORM_MOD + SUPER_ADMIN only. */}
+        {tab === 'verify' && canVerifyProviders(role) && (
+          verifyReqs === null ? (
+            <div className="py-6"><HaiLoader size="md" /></div>
+          ) : verifyReqs.length === 0 ? (
+            <EmptyState icon="🛡️" text={dn('لا يوجد طلبات توثيق', 'No verification requests')} />
+          ) : (
+            <div className="space-y-2.5">
+              {verifyReqs.map((v) => (
+                <div key={v.id} className="bg-white dark:bg-gray-800 rounded-2xl p-3.5 border border-gray-100 dark:border-gray-700 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{v.userName || v.userPhone}</span>
+                    {v.userPhone && <span dir="ltr" className="text-xs text-gray-400">{v.userPhone}</span>}
+                  </div>
+                  {v.businessName && <p className="text-xs text-primary-600 dark:text-primary-400">{v.businessName}</p>}
+                  {v.description && <p className="text-[13px] text-gray-600 dark:text-gray-300">{v.description}</p>}
+                  {v.proofUrl && <a href={v.proofUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 dark:text-blue-400 underline">{dn('عرض المستند', 'View document')}</a>}
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={() => verifyAction(v.id, 'approve')} disabled={!!actionLoading} className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold disabled:opacity-50 active:scale-[0.97]">🛡 {dn('توثيق', 'Verify')}</button>
+                    <button onClick={() => verifyAction(v.id, 'reject')} disabled={!!actionLoading} className="flex-1 py-2 rounded-xl bg-red-600 text-white text-xs font-bold disabled:opacity-50 active:scale-[0.97]">{dn('رفض', 'Reject')}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {/* User list — block / stop only; admins controllable by SUPER_ADMIN. */}
+        {tab === 'users' && canModerateUsers(role) && (
+          <div className="space-y-2.5">
+            <div className="relative">
+              <FiSearch className="absolute top-1/2 -translate-y-1/2 start-3 w-4 h-4 text-gray-400 pointer-events-none" aria-hidden />
+              <input value={userQuery} onChange={(e) => setUserQuery(e.target.value)} placeholder={dn('ابحث بالاسم أو الجوال', 'Search by name or phone')} className="w-full ps-9 pe-3 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            </div>
+            {userList === null ? (
+              <div className="py-6"><HaiLoader size="md" /></div>
+            ) : userList.length === 0 ? (
+              <EmptyState icon="👤" text={dn('لا يوجد مستخدمون', 'No users')} />
+            ) : (
+              userList.map((u) => {
+                const banned = u.status === 'BANNED_TEMP' || u.status === 'BANNED_PERM'
+                return (
+                  <div key={u.id} className="bg-white dark:bg-gray-800 rounded-2xl p-3 border border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{u.name || u.phone}</p>
+                        <p className="text-[11px] text-gray-400 truncate" dir="ltr">{u.phone} · {u.role}{u.neighborhood ? ` · ${u.neighborhood}` : ''}</p>
+                      </div>
+                      {banned && <span className="text-[10px] font-semibold rounded-full px-2 py-0.5 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 flex-shrink-0">{dn('محظور', 'Blocked')}</span>}
+                    </div>
+                    {u.controllable ? (
+                      <div className="flex gap-2 mt-2.5">
+                        {banned ? (
+                          <button onClick={() => userBlock(u.id, 'unban_user')} disabled={!!actionLoading} className="flex-1 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold disabled:opacity-50">{dn('رفع الحظر', 'Unblock')}</button>
+                        ) : (
+                          <>
+                            <button onClick={() => userBlock(u.id, 'ban_user')} disabled={!!actionLoading} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold disabled:opacity-50 active:scale-[0.97]"><FiSlash className="w-3.5 h-3.5" /> {dn('حظر', 'Block')}</button>
+                            <button onClick={() => userBlock(u.id, 'temp_ban_user')} disabled={!!actionLoading} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-bold disabled:opacity-50 active:scale-[0.97]"><FiPauseCircle className="w-3.5 h-3.5" /> {dn('إيقاف', 'Stop')}</button>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-gray-400 mt-2">{dn('لا يمكنك التحكم بهذا الحساب', 'You cannot act on this account')}</p>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
         )}
       </div>
 
