@@ -624,11 +624,6 @@ export default function FeedClient({
       {/* Inner scroll container — only this bounces. Header above
           stays glued to the top. */}
       <div className="hai-app-shell__scroll pb-24">
-      {/* Pull-to-refresh portal target — PullToRefresh portals its
-          flow-aware indicator into here so it pushes the list down
-          rather than overlaying it. */}
-      <div id="hai-pull-target" />
-
       {/* Neighborhood Highlights — the single source of truth for
           pinned + HIGH/CRITICAL + popular important posts. Hidden when
           empty. Auto-opens once per device for first-time users.
@@ -642,6 +637,10 @@ export default function FeedClient({
           canManage={['SUPER_ADMIN', 'PLATFORM_MOD', 'NEIGHBORHOOD_MOD'].includes(user.role || '') && !isReadOnly}
         />
       )}
+
+      {/* Pull-to-refresh portal target — below the highlights banner, so
+          the refresh indicator pushes the list down beneath the banner. */}
+      <div id="hai-pull-target" />
 
       {/* Delivery requests strip — DELIVERY-typed RideRequests surfaced
           in the LOOKING_FOR / REQUESTS feed. Single source of truth
