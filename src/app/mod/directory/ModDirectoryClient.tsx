@@ -111,6 +111,13 @@ export default function ModDirectoryClient({ data }: Props) {
           <span className="text-sm font-bold text-gray-900 dark:text-white">📇 {tr('Service contacts queue', 'مراجعة خدمات وأرقام', 'خدمات کی قطار')}</span>
           <span className="text-gray-400 text-lg">‹</span>
         </Link>
+        <Link
+          href="/mod/pinned"
+          className="flex items-center justify-between rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 active:scale-[0.99] transition-transform"
+        >
+          <span className="text-sm font-bold text-gray-900 dark:text-white">📌 {tr('Pinned items', 'الأبرز والمثبتات', 'پن شدہ')}</span>
+          <span className="text-gray-400 text-lg">‹</span>
+        </Link>
 
         {tab === 'places' && (
           <div className="space-y-3">

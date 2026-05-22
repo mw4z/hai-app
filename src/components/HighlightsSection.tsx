@@ -83,16 +83,42 @@ function writeBarHiddenAt(at: number) {
   try { localStorage.setItem(BAR_HIDDEN_KEY, String(at)) } catch { /* */ }
 }
 
+export interface PinnedItemPayload {
+  id: string
+  type: string
+  sourceType: string | null
+  sourceId: string | null
+  title: string
+  summary: string | null
+  fileUrl: string | null
+  linkUrl: string | null
+  pinnedAt: string
+  expiresAt: string | null
+}
+
 interface Props {
   items: HighlightItemPayload[]
   /** When true, the section auto-opens the modal once per device. */
   autoOpenForFirstTime?: boolean
+  /** Enables the "المثبتات" tab (resident pinned references). */
+  neighborhoodId?: string | null
 }
 
-export default function HighlightsSection({ items, autoOpenForFirstTime = true }: Props) {
+export default function HighlightsSection({ items, autoOpenForFirstTime = true, neighborhoodId = null }: Props) {
   const { t, lang } = useLanguage()
   const confirmDialog = useConfirm()
   const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState<'highlights' | 'pinned'>('highlights')
+  const [pinned, setPinned] = useState<PinnedItemPayload[] | null>(null)
+
+  // Lazy-load pinned items the first time the Pinned tab is opened.
+  useEffect(() => {
+    if (tab !== 'pinned' || !neighborhoodId || pinned !== null) return
+    fetch(`/api/neighborhoods/${neighborhoodId}/pinned-items`)
+      .then((r) => r.json())
+      .then((d) => setPinned(Array.isArray(d.items) ? d.items : []))
+      .catch(() => setPinned([]))
+  }, [tab, neighborhoodId, pinned])
   // Hydrate after mount — SSR can't read localStorage, and starting
   // null keeps server/first-client markup identical (no hydration
   // mismatch).
@@ -216,7 +242,11 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
             <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
               <FiStar className="w-5 h-5 text-amber-500" />
               <div className="flex-1 min-w-0">
-                <h2 className="text-base font-bold text-gray-900 dark:text-white">{t('highlights_title')}</h2>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                  {neighborhoodId
+                    ? (lang === 'en' ? 'Highlights & Pinned' : 'الأبرز والمثبتات')
+                    : t('highlights_title')}
+                </h2>
                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{t('highlights_intro')}</p>
               </div>
               <button
@@ -228,8 +258,31 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
               </button>
             </div>
 
+            {/* Tabs — only when pinned items are available for this nbhd. */}
+            {neighborhoodId && (
+              <div className="flex gap-2 px-4 py-2 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setTab('highlights')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold ${tab === 'highlights' ? 'bg-amber-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'}`}
+                >
+                  ⭐ {lang === 'en' ? 'Highlights' : 'الأبرز'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab('pinned')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold ${tab === 'pinned' ? 'bg-amber-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'}`}
+                >
+                  📌 {lang === 'en' ? 'Pinned' : 'المثبتات'}
+                </button>
+              </div>
+            )}
+
             {/* List */}
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain">
+              {tab === 'pinned' ? (
+                <PinnedList items={pinned} lang={lang} />
+              ) : (
               <ul className="divide-y divide-gray-100 dark:divide-gray-800">
                 {items.map((it) => {
                   const bk = badgeKey(it.badge)
@@ -311,10 +364,62 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
                   )
                 })}
               </ul>
+              )}
             </div>
           </div>
         </div>
       )}
     </>
+  )
+}
+
+const PIN_TYPE_BADGE: Record<string, { ar: string; en: string; emoji: string }> = {
+  POST:        { ar: 'منشور', en: 'Post',    emoji: '📝' },
+  COMMENT:     { ar: 'تعليق', en: 'Comment', emoji: '💬' },
+  MESSAGE:     { ar: 'رسالة', en: 'Message', emoji: '✉️' },
+  FILE:        { ar: 'ملف',   en: 'File',    emoji: '📎' },
+  LINK:        { ar: 'رابط',  en: 'Link',    emoji: '🔗' },
+  MANUAL_NOTE: { ar: 'ملاحظة', en: 'Note',   emoji: '📌' },
+}
+
+function PinnedList({ items, lang }: { items: PinnedItemPayload[] | null; lang: string }) {
+  const tr = (en: string, ar: string) => (lang === 'en' ? en : ar)
+  if (items === null) {
+    return <p className="text-center text-sm text-gray-400 py-10">{tr('Loading…', 'جاري التحميل…')}</p>
+  }
+  if (items.length === 0) {
+    return <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-10">{tr('No pinned items yet.', 'لا توجد مثبتات بعد.')}</p>
+  }
+  const fmt = (iso: string) => new Date(iso).toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-SA', { month: 'short', day: 'numeric' })
+  return (
+    <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+      {items.map((it) => {
+        const badge = PIN_TYPE_BADGE[it.type] ?? PIN_TYPE_BADGE.MANUAL_NOTE
+        // open source / download file / open link — first available wins.
+        const href = it.fileUrl || it.linkUrl || (it.sourceType === 'post' && it.sourceId ? '/feed' : null)
+        const actionLabel = it.fileUrl ? tr('Download', 'تحميل') : it.linkUrl ? tr('Open link', 'فتح الرابط') : it.sourceType === 'post' ? tr('Open post', 'فتح المنشور') : null
+        return (
+          <li key={it.id} className="px-4 py-3">
+            <div className="flex items-start gap-2">
+              <span className="text-xl flex-shrink-0" aria-hidden>{badge.emoji}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white flex-1 truncate">{it.title}</p>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 flex-shrink-0">{lang === 'en' ? badge.en : badge.ar}</span>
+                </div>
+                {it.summary && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-3">{it.summary}</p>}
+                <div className="flex items-center gap-3 mt-1.5 text-[11px] text-gray-400">
+                  <span>📌 {fmt(it.pinnedAt)}</span>
+                  {it.expiresAt && <span>⏳ {fmt(it.expiresAt)}</span>}
+                  {href && actionLabel && (
+                    <a href={href} target={it.fileUrl || it.linkUrl ? '_blank' : undefined} rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 font-semibold">{actionLabel}</a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </li>
+        )
+      })}
+    </ul>
   )
 }

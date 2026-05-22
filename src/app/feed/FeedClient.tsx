@@ -636,7 +636,7 @@ export default function FeedClient({
           the user's home neighborhood). Tapping an item scrolls to the
           matching #post-<id> anchor in the post list below. */}
       {!isReadOnly && (
-        <HighlightsSection items={highlights} />
+        <HighlightsSection items={highlights} neighborhoodId={isReadOnly && browseNeighborhood ? browseNeighborhood.id : user.neighborhoodId} />
       )}
 
       {/* Delivery requests strip — DELIVERY-typed RideRequests surfaced
