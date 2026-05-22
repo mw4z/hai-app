@@ -1789,7 +1789,7 @@ export default function ProfileClient({ user, postCount }: Props) {
             }}
           />
           <div className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl" style={{ maxHeight: '65vh' }}>
-            <div className="px-5 pt-3 pb-6">
+            <div className="px-5 pt-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
               <div className="w-10 h-1 bg-gray-200 dark:bg-gray-600 rounded-full mx-auto mb-4" />
               <h3 className="font-bold text-gray-900 dark:text-white text-center mb-4">
                 {lang === 'en' ? 'Choose Cover' : 'اختر غلاف'}
@@ -1854,7 +1854,7 @@ export default function ProfileClient({ user, postCount }: Props) {
             }}
           />
           <div className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl" style={{ maxHeight: '75vh' }}>
-            <div className="px-5 pt-3 pb-6">
+            <div className="px-5 pt-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
               <div className="w-10 h-1 bg-gray-200 dark:bg-gray-600 rounded-full mx-auto mb-4" />
               <h3 className="font-bold text-gray-900 dark:text-white text-center mb-4">
                 {lang === 'en' ? 'Choose Avatar' : 'اختر صورة'}

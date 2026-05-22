@@ -227,7 +227,7 @@ export default function MapPicker({ centerLat, centerLng, lang, maptilerKey, onC
       )}
 
       {/* Bottom card */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl px-4 pt-4 pb-6 border-t border-gray-100 dark:border-gray-700">
+      <div className="absolute bottom-0 left-0 right-0 z-10 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl px-4 pt-4 border-t border-gray-100 dark:border-gray-700" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
         {reversing ? (
           <div className="flex items-center gap-2 py-2 mb-4">
             <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />

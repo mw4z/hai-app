@@ -2413,7 +2413,8 @@ export default function PostCard({
             }}
           >
             <div
-              className="relative bg-white dark:bg-gray-800 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-sm mx-auto pb-8 animate-slide-up max-h-[85vh] overflow-y-auto"
+              className="relative bg-white dark:bg-gray-800 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-sm mx-auto animate-slide-up max-h-[85vh] overflow-y-auto"
+              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 2rem)' }}
             >
               {/* Cover header — uses user's cover or default */}
               <div className="relative h-28 rounded-t-3xl sm:rounded-t-2xl"
@@ -2917,6 +2918,7 @@ function ServiceCatalog({ userId, lang }: { userId: string; lang: string }) {
           <div
             className="bg-white dark:bg-gray-800 rounded-t-3xl w-full max-w-md max-h-[80vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
+            style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
           >
             {/* Image */}
             {selected.imageUrl ? (

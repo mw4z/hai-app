@@ -1734,7 +1734,7 @@ export default function ChatClient({
             <div ref={profileSheetDrag.handleRef} className="px-5 pt-3 pb-3 touch-none">
               <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto" />
             </div>
-            <div className="px-5 pb-5">
+            <div className="px-5" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.25rem)' }}>
 
               {loadingProfile ? (
                 <div className="flex flex-col items-center py-8 gap-3">
@@ -1825,7 +1825,7 @@ export default function ChatClient({
                 {lang === 'en' ? 'Chat Wallpaper' : 'خلفية المحادثة'}
               </h3>
             </div>
-            <div className="px-5 pb-6">
+            <div className="px-5" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
               <div className="grid grid-cols-4 gap-3">
                 {CHAT_WALLPAPERS.map(wp => (
                   <button

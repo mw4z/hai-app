@@ -702,6 +702,7 @@ function GoogleLinkSheet({
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[88vh]"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         <div className="flex-shrink-0 px-5 pt-3 pb-3 border-b border-gray-100 dark:border-gray-800">
           <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-2.5" />
