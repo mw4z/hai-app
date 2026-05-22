@@ -10,7 +10,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   pointsForContribution, cappedAward, decideAward, assessPlaceQuality,
-  DIRECTORY_DAILY_CAP,
+  reportTypeToContributionType, DIRECTORY_DAILY_CAP,
 } from './directoryRewards'
 
 const fresh = (base: number) =>
@@ -75,6 +75,22 @@ test('same place + type already approved → 0', () => {
   const d = decideAward({ base: 5, alreadyAwarded: false, priorSamePlaceType: true, dailyTotal: 0 })
   assert.equal(d.award, 0)
   assert.equal(d.reason, 'dup_place_type')
+})
+
+// report-based rewards: only DUPLICATE / CLOSED map to a reward; generic /
+// abuse / subjective reports earn nothing.
+test('reportTypeToContributionType: only DUPLICATE + CLOSED are rewardable', () => {
+  assert.equal(reportTypeToContributionType('DUPLICATE'), 'REPORT_DUPLICATE')
+  assert.equal(reportTypeToContributionType('CLOSED'), 'REPORT_CLOSED')
+  for (const generic of ['WRONG_INFO', 'WRONG_PHONE', 'WRONG_LOCATION', 'SPAM', 'OTHER']) {
+    assert.equal(reportTypeToContributionType(generic), null)
+  }
+  // accepted duplicate/closed reports each award +3, once (cap/idempotency
+  // covered by decideAward tests above — same engine path).
+  assert.equal(fresh(pointsForContribution('REPORT_DUPLICATE', 'APPROVED')).award, 3)
+  assert.equal(fresh(pointsForContribution('REPORT_CLOSED', 'APPROVED')).award, 3)
+  // a rejected/dismissed report never reaches APPROVED → 0
+  assert.equal(pointsForContribution('REPORT_DUPLICATE', 'REJECTED'), 0)
 })
 
 // quality heuristic (drives +8 vs +5)

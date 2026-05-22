@@ -57,6 +57,18 @@ export function pointsForContribution(
   }
 }
 
+/**
+ * Map a PlaceReport.type to a rewardable contribution type — ONLY the two
+ * report kinds that produce a real directory correction. Everything else
+ * (WRONG_INFO / WRONG_PHONE / WRONG_LOCATION / SPAM / OTHER) returns null,
+ * so generic/abuse/subjective reports never create a reward event.
+ */
+export function reportTypeToContributionType(placeReportType: string): ContributionType | null {
+  if (placeReportType === 'DUPLICATE') return 'REPORT_DUPLICATE'
+  if (placeReportType === 'CLOSED') return 'REPORT_CLOSED'
+  return null
+}
+
 export function reasonForContribution(type: ContributionType, highQuality = false): ReputationReason {
   switch (type) {
     case 'CREATE_PLACE':     return highQuality ? 'DIRECTORY_PLACE_HIGH_QUALITY_APPROVED' : 'DIRECTORY_PLACE_APPROVED'

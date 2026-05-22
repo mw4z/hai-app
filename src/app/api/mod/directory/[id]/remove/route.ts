@@ -4,6 +4,8 @@ import { getSession } from '@/lib/auth'
 import { gateModRoute } from '@/lib/places/routeGate'
 import { logModAction } from '@/lib/modAudit'
 import { createNotification } from '@/lib/notifications'
+import { awardDirectoryReputation } from '@/lib/reputation/awardDirectoryReputation'
+import { reportTypeToContributionType } from '@/lib/reputation/directoryRewards'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,6 +91,58 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       postId: place.id,
       postTitle: `تم حذف "${place.name}" من دليل الحي — ${reason.slice(0, 60)}`,
     }).catch(() => {})
+  }
+
+  // ── Reputation: reward confirmed DUPLICATE / CLOSED reporters ──────
+  // Removing the place IS the directory correction those reports asked
+  // for, so the reporters are vindicated. Award only DUPLICATE/CLOSED
+  // report types (generic/abuse/subjective reports map to null and earn
+  // nothing). Idempotent + anti-farm: skip if this user already has an
+  // APPROVED contribution for this place+type, one award per (user,type),
+  // and awardDirectoryReputation enforces the ReputationEvent uniqueness +
+  // 15/day cap. NEIGHBORHOOD_MOD scope is already enforced above, so a mod
+  // can only trigger awards for reports on places in their own hood.
+  try {
+    const reports = await db.placeReport.findMany({
+      where: { placeId: place.id, type: { in: ['DUPLICATE', 'CLOSED'] } },
+      select: { userId: true, type: true },
+    })
+    const handled = new Set<string>()
+    for (const r of reports) {
+      if (r.userId === user.id) continue // no self-reward
+      const ctype = reportTypeToContributionType(r.type)
+      if (!ctype) continue
+      const key = `${r.userId}:${ctype}`
+      if (handled.has(key)) continue
+      handled.add(key)
+
+      const existing = await db.directoryContribution.findFirst({
+        where: { contributorId: r.userId, type: ctype, placeId: place.id, status: 'APPROVED' },
+        select: { id: true },
+      })
+      if (existing) continue // already rewarded for this place + type
+
+      const contribution = await db.directoryContribution.create({
+        data: {
+          type: ctype,
+          status: 'APPROVED',
+          contributorId: r.userId,
+          placeId: place.id,
+          neighborhoodId: place.neighborhoodId,
+          reviewedById: user.id,
+          reviewedAt: new Date(),
+        },
+        select: { id: true },
+      })
+      await awardDirectoryReputation({
+        contributionId: contribution.id,
+        userId: r.userId,
+        type: ctype,
+        placeId: place.id,
+      })
+    }
+  } catch (err) {
+    console.error('[remove] report reward failed:', err)
   }
 
   return NextResponse.json({ ok: true })
