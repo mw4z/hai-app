@@ -338,6 +338,7 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true, 
                   lang={lang}
                   canManage={canManage}
                   onRemove={removePinned}
+                  onOpenPost={go}
                   emptyLabel={pinnedQuery.trim() ? (lang === 'en' ? 'No results' : 'لا نتائج') : undefined}
                 />
               ) : highlightItems.length === 0 ? (
@@ -354,9 +355,8 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true, 
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); removeHighlight(it.id) }}
-                          aria-label={lang === 'en' ? 'Remove' : 'إزالة'}
-                          className="absolute top-2 end-2 z-10 w-6 h-6 flex items-center justify-center rounded-full bg-white/90 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs shadow active:scale-90"
-                        >✕</button>
+                          className="absolute top-2 end-2 z-10 px-2 py-0.5 rounded-full bg-white/90 dark:bg-gray-700 text-red-500 text-[11px] font-semibold shadow active:scale-90"
+                        >{lang === 'en' ? 'Remove' : 'إزالة'}</button>
                       )}
                       <button
                         type="button"
@@ -450,7 +450,7 @@ const PIN_TYPE_BADGE: Record<string, { ar: string; en: string; emoji: string }> 
   MANUAL_NOTE: { ar: 'ملاحظة', en: 'Note',   emoji: '📌' },
 }
 
-function PinnedList({ items, lang, canManage = false, onRemove, emptyLabel }: { items: PinnedItemPayload[] | null; lang: string; canManage?: boolean; onRemove?: (id: string) => void; emptyLabel?: string }) {
+function PinnedList({ items, lang, canManage = false, onRemove, onOpenPost, emptyLabel }: { items: PinnedItemPayload[] | null; lang: string; canManage?: boolean; onRemove?: (id: string) => void; onOpenPost?: (postId: string) => void; emptyLabel?: string }) {
   const tr = (en: string, ar: string) => (lang === 'en' ? en : ar)
   if (items === null) {
     return <p className="text-center text-sm text-gray-400 py-10">{tr('Loading…', 'جاري التحميل…')}</p>
@@ -464,8 +464,9 @@ function PinnedList({ items, lang, canManage = false, onRemove, emptyLabel }: { 
       {items.map((it) => {
         const badge = PIN_TYPE_BADGE[it.type] ?? PIN_TYPE_BADGE.MANUAL_NOTE
         // open source / download file / open link — first available wins.
-        const href = it.fileUrl || it.linkUrl || (it.sourceType === 'post' && it.sourceId ? '/feed' : null)
-        const actionLabel = it.fileUrl ? tr('Download', 'تحميل') : it.linkUrl ? tr('Open link', 'فتح الرابط') : it.sourceType === 'post' ? tr('Open post', 'فتح المنشور') : null
+        const externalHref = it.fileUrl || it.linkUrl || null
+        const isPost = it.sourceType === 'post' && !!it.sourceId
+        const actionLabel = it.fileUrl ? tr('Download', 'تحميل') : it.linkUrl ? tr('Open link', 'فتح الرابط') : isPost ? tr('Open post', 'فتح المنشور') : null
         return (
           <li key={it.id} className="px-4 py-3">
             <div className="flex items-start gap-2">
@@ -479,9 +480,11 @@ function PinnedList({ items, lang, canManage = false, onRemove, emptyLabel }: { 
                 <div className="flex items-center gap-3 mt-1.5 text-[11px] text-gray-400">
                   <span>📌 {fmt(it.pinnedAt)}</span>
                   {it.expiresAt && <span>⏳ {fmt(it.expiresAt)}</span>}
-                  {href && actionLabel && (
-                    <a href={href} target={it.fileUrl || it.linkUrl ? '_blank' : undefined} rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 font-semibold">{actionLabel}</a>
-                  )}
+                  {externalHref ? (
+                    <a href={externalHref} target="_blank" rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 font-semibold">{actionLabel}</a>
+                  ) : isPost ? (
+                    <button type="button" onClick={() => it.sourceId && onOpenPost?.(it.sourceId)} className="text-primary-600 dark:text-primary-400 font-semibold">{actionLabel}</button>
+                  ) : null}
                   {canManage && onRemove && (
                     <button onClick={() => onRemove(it.id)} className="text-red-500 font-semibold ms-auto">{tr('Remove', 'إزالة')}</button>
                   )}

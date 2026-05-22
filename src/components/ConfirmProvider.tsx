@@ -145,7 +145,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {children}
       {pending && (
         <div
-          className="fixed inset-0 z-[70] bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-[2000] bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4"
           onPointerDown={(e) => {
             if (e.target !== e.currentTarget) return
             e.preventDefault()
