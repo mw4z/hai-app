@@ -624,10 +624,17 @@ export default function FeedClient({
       {/* Inner scroll container — only this bounces. Header above
           stays glued to the top. */}
       <div className="hai-app-shell__scroll pb-24">
-      {/* Neighborhood Highlights — sticky banner; single source of truth
-          for pinned + HIGH/CRITICAL + popular important posts. Skipped in
-          read-only browse mode. Tapping an item scrolls to the matching
-          #post-<id> anchor in the post list below. */}
+      {/* Pull-to-refresh portal target — PullToRefresh portals its
+          flow-aware indicator into here so it pushes the list down
+          rather than overlaying it. */}
+      <div id="hai-pull-target" />
+
+      {/* Neighborhood Highlights — the single source of truth for
+          pinned + HIGH/CRITICAL + popular important posts. Hidden when
+          empty. Auto-opens once per device for first-time users.
+          Skipped in read-only browse mode (the highlights bundle is
+          the user's home neighborhood). Tapping an item scrolls to the
+          matching #post-<id> anchor in the post list below. */}
       {!isReadOnly && (
         <HighlightsSection
           items={highlights}
@@ -635,11 +642,6 @@ export default function FeedClient({
           canManage={['SUPER_ADMIN', 'PLATFORM_MOD', 'NEIGHBORHOOD_MOD'].includes(user.role || '') && !isReadOnly}
         />
       )}
-
-      {/* Pull-to-refresh portal target — BELOW the sticky highlights
-          banner so the banner stays pinned and the refresh indicator
-          appears beneath it (pushes the list down, doesn't overlay). */}
-      <div id="hai-pull-target" />
 
       {/* Delivery requests strip — DELIVERY-typed RideRequests surfaced
           in the LOOKING_FOR / REQUESTS feed. Single source of truth
