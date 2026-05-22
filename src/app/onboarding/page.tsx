@@ -301,12 +301,21 @@ export default function OnboardingPage() {
         return
       }
       try {
-        localStorage.removeItem('hai_tour_seen')
-        localStorage.removeItem('hai_tour_ride_create')
-        localStorage.removeItem('hai_tour_ride_detail')
-        localStorage.removeItem('hai_tour_post_create')
-        localStorage.removeItem('hai_tour_chat')
+        const tourKeys = [
+          'hai_tour_seen',
+          'hai_tour_ride_create',
+          'hai_tour_ride_detail',
+          'hai_tour_post_create',
+          'hai_tour_chat',
+        ]
+        for (const k of tourKeys) localStorage.removeItem(k)
         localStorage.removeItem('hai_splash')
+        // Also clear the seen-COOKIES (they survive logout's
+        // localStorage.clear), otherwise a brand-new account on a device a
+        // previous user already toured would never see the tour.
+        for (const k of tourKeys) {
+          document.cookie = `${k}=; path=/; max-age=0; SameSite=Lax`
+        }
       } catch {}
 
       try { window.dispatchEvent(new CustomEvent('hai:auth-ready')) } catch {}

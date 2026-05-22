@@ -357,18 +357,44 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       const isNewUser = sessionStorage.getItem('hai_show_tour')
       if (!isNewUser) return
       sessionStorage.removeItem('hai_show_tour')
-      // Wait for feed elements to render (cloud DB can be slow)
+
+      // Already seen it? The seen-cookie survives logout (which does
+      // localStorage.clear()), so a returning user who's seen the tour
+      // never gets it again — even though the new-user flag was set.
+      // onboarding/ clears BOTH the cookie + localStorage for genuinely
+      // new accounts, so first-timers still get it.
+      const key = TOUR_FLOWS.global.storageKey
+      const alreadySeen =
+        !!localStorage.getItem(key) || document.cookie.includes(key + '=1')
+      if (alreadySeen) return
+
+      const markSeen = () => {
+        try {
+          localStorage.setItem(key, 'true')
+          document.cookie = `${key}=1; path=/; max-age=315360000; SameSite=Lax`
+        } catch { /* ignore */ }
+      }
+
+      // Wait for the feed to render AND for any open overlay (e.g. the
+      // "أهم ما في الحي" highlights modal, data-overlay="true") to be
+      // dismissed first — the tour must never run on top of an open
+      // window. ~60s safety cap so it can't poll forever.
       const waitAndStart = (attempt: number) => {
+        if (attempt > 120) return
+        const overlayOpen = document.querySelector('[data-overlay="true"]')
         const el = document.querySelector('[data-tour="feed-title"]')
-        if (el) {
+        if (!overlayOpen && el) {
           setTimeout(() => {
+            // Mark seen the moment it starts, so closing it early (or
+            // logging out mid-tour) still counts as seen — no repeat.
+            markSeen()
             setActiveFlowId('global')
             setCurrentStep(0)
             setIsActive(true)
-          }, 500)
-        } else if (attempt < 20) {
-          setTimeout(() => waitAndStart(attempt + 1), 500)
+          }, 400)
+          return
         }
+        setTimeout(() => waitAndStart(attempt + 1), 500)
       }
       setTimeout(() => waitAndStart(0), 1000)
     } catch {
