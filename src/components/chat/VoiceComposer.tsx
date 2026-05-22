@@ -166,7 +166,7 @@ export default function VoiceComposer({
   const overlay = active && mounted && createPortal(
     <div
       className="fixed inset-x-0 bottom-0 z-[60] bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-[0_-4px_16px_rgba(0,0,0,0.12)]"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      style={{ paddingBottom: 'var(--hai-safe-bottom, 0px)' }}
     >
       <div className="max-w-[760px] mx-auto px-4 py-3 flex items-center gap-3">
         {phase === 'recording' && (

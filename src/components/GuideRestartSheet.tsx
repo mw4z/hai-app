@@ -175,7 +175,7 @@ export default function GuideRestartSheet({
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-3xl p-5"
-        style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: 'max(1.25rem, var(--hai-safe-bottom))' }}
         dir="rtl"
       >
         <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-3 sm:hidden" />

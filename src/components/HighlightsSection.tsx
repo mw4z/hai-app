@@ -201,7 +201,7 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
           onClick={() => setOpen(false)}
           style={{
             paddingTop: 'max(env(safe-area-inset-top, 0px), 16px)',
-            paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 16px)',
+            paddingBottom: 'max(var(--hai-safe-bottom, 0px), 16px)',
           }}
         >
           <div
@@ -209,7 +209,7 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true }
             onClick={(e) => e.stopPropagation()}
             style={{
               height: 'min(80dvh, 640px)',
-              maxHeight: 'calc(100dvh - 80px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
+              maxHeight: 'calc(100dvh - 80px - env(safe-area-inset-top, 0px) - var(--hai-safe-bottom, 0px))',
             }}
           >
             {/* Header */}

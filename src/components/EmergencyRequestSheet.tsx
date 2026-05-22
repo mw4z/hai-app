@@ -151,7 +151,7 @@ export default function EmergencyRequestSheet({ open, onClose }: Props) {
         ref={drag.sheetRef}
         className="bg-white dark:bg-gray-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto"
         onPointerDown={(e) => e.stopPropagation()}
-        style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: 'max(1.25rem, var(--hai-safe-bottom))' }}
       >
         <div ref={drag.handleRef} className="px-5 pt-3 touch-none">
           <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-3" />

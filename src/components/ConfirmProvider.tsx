@@ -156,7 +156,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           <div
             className="bg-white dark:bg-gray-900 w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl"
             onPointerDown={(e) => e.stopPropagation()}
-            style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
+            style={{ paddingBottom: 'max(1.25rem, var(--hai-safe-bottom))' }}
           >
             {pending.opts.title && (
               <h2 className="font-bold text-gray-900 dark:text-white text-lg mb-2">

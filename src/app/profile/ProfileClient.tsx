@@ -1789,7 +1789,7 @@ export default function ProfileClient({ user, postCount }: Props) {
             }}
           />
           <div className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl" style={{ maxHeight: '65vh' }}>
-            <div className="px-5 pt-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
+            <div className="px-5 pt-3" style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 1.5rem)' }}>
               <div className="w-10 h-1 bg-gray-200 dark:bg-gray-600 rounded-full mx-auto mb-4" />
               <h3 className="font-bold text-gray-900 dark:text-white text-center mb-4">
                 {lang === 'en' ? 'Choose Cover' : 'اختر غلاف'}
@@ -1854,7 +1854,7 @@ export default function ProfileClient({ user, postCount }: Props) {
             }}
           />
           <div className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl" style={{ maxHeight: '75vh' }}>
-            <div className="px-5 pt-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
+            <div className="px-5 pt-3" style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 1.5rem)' }}>
               <div className="w-10 h-1 bg-gray-200 dark:bg-gray-600 rounded-full mx-auto mb-4" />
               <h3 className="font-bold text-gray-900 dark:text-white text-center mb-4">
                 {lang === 'en' ? 'Choose Avatar' : 'اختر صورة'}
@@ -1936,7 +1936,7 @@ export default function ProfileClient({ user, postCount }: Props) {
           <div
             className="bg-white dark:bg-gray-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5"
             onPointerDown={(e) => e.stopPropagation()}
-            style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
+            style={{ paddingBottom: 'max(1.25rem, var(--hai-safe-bottom))' }}
           >
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center flex-shrink-0">

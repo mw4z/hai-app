@@ -874,7 +874,7 @@ textarea.hai-input {
   padding:
     var(--hai-space-6)
     var(--hai-space-6)
-    max(env(safe-area-inset-bottom, 0px), var(--hai-space-6));
+    max(var(--hai-safe-bottom, 0px), var(--hai-space-6));
   background: var(--hai-bg);
   min-height: calc(100dvh - env(safe-area-inset-top, 0px));
 }
@@ -2393,7 +2393,7 @@ textarea.hai-input {
   flex-shrink: 0;
   border-top: 1px solid var(--hai-border-soft);
   padding: var(--hai-space-2) var(--hai-space-3);
-  padding-bottom: max(var(--hai-space-2), env(safe-area-inset-bottom));
+  padding-bottom: max(var(--hai-space-2), var(--hai-safe-bottom));
   background: var(--hai-surface-1);
 }
 
@@ -2419,7 +2419,7 @@ textarea.hai-input {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: env(safe-area-inset-top) var(--hai-space-4) env(safe-area-inset-bottom);
+  padding: env(safe-area-inset-top) var(--hai-space-4) var(--hai-safe-bottom);
   /* Lightbox owns its own scroll/pan gestures — stop overscroll from
      reaching the underlying page. */
   overscroll-behavior: none;
@@ -2450,7 +2450,7 @@ textarea.hai-input {
   pointer-events: none;
 }
 .hai-lightbox-controls--top    { top: env(safe-area-inset-top); }
-.hai-lightbox-controls--bottom { bottom: env(safe-area-inset-bottom); }
+.hai-lightbox-controls--bottom { bottom: var(--hai-safe-bottom); }
 .hai-lightbox-controls > * { pointer-events: auto; }
 .hai-lightbox__btn {
   display: inline-flex;
@@ -2484,7 +2484,7 @@ textarea.hai-input {
 .hai-lightbox__pager {
   position: absolute;
   inset-inline: 0;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--hai-space-6));
+  bottom: calc(var(--hai-safe-bottom, 0px) + var(--hai-space-6));
   display: flex;
   align-items: center;
   justify-content: center;

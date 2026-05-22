@@ -178,7 +178,7 @@ export default function BottomNav({
         // Full-width background on tablets/iPad so the tab bar spans
         // the screen like a standard system bar, instead of floating as
         // a 480px pill with empty gutters on either side.
-        paddingBottom: 'max(env(safe-area-inset-bottom), var(--hai-space-2))',
+        paddingBottom: 'max(var(--hai-safe-bottom), var(--hai-space-2))',
         background: 'var(--hai-surface-1)',
         borderTop: '1px solid var(--hai-border)',
         boxShadow: 'var(--hai-shadow-md)',
@@ -294,7 +294,7 @@ export default function BottomNav({
             // Stop pointer events on the sheet itself from bubbling up
             // to the backdrop's dismiss handler.
             onPointerDown={(e) => e.stopPropagation()}
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.25rem)' }}
+            style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 1.25rem)' }}
           >
             {/* Drag handle area — touchmove on this element drives
                 the swipe-down dismiss. Made tall enough (touch-none on

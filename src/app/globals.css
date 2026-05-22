@@ -652,9 +652,18 @@ html.dark .hai-directory-screen {
   top: env(safe-area-inset-top, 0px) !important;
 }
 
+/* Bottom safe-area inset, indirected through a variable. Android's
+   WebView reports env(safe-area-inset-bottom) as 0 even in edge-to-edge
+   (unlike iOS's home indicator), so every env()-based bottom padding was
+   a no-op on Android — buttons sat on the system nav bar. This var
+   defaults to env() (correct on iOS/web) and is overridden on Android by
+   native WindowInsets injection (exact) + a JS fallback (current binary).
+   Every bottom padding in the app reads var(--hai-safe-bottom). */
+:root { --hai-safe-bottom: env(safe-area-inset-bottom, 0px); }
+
 /* Pages with bottom nav need extra bottom padding for home indicator */
 .pb-safe {
-  padding-bottom: calc(6rem + env(safe-area-inset-bottom)) !important;
+  padding-bottom: calc(6rem + var(--hai-safe-bottom)) !important;
 }
 
 /* ── Inner-scroll shell ─────────────────────────────────────────────────

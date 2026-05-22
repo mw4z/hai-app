@@ -381,7 +381,7 @@ export default function AppSplash() {
         /* ── Loader ───────────────────────────────────────── */
         ._sp-ld {
           position: absolute;
-          bottom: max(env(safe-area-inset-bottom, 20px), 44px);
+          bottom: max(var(--hai-safe-bottom, 20px), 44px);
           /* Absolute children ignore the flex parent's
              align-items/justify-content, so without an explicit
              horizontal anchor this dot row defaulted to left:0 —

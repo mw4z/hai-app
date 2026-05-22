@@ -28,6 +28,22 @@ export default function CapacitorBridge() {
 
     if (!window.Capacitor?.isNativePlatform()) return
 
+    // Android's WebView reports env(safe-area-inset-bottom) as 0 even in
+    // edge-to-edge mode (the system nav bar isn't exposed as a CSS inset
+    // the way iOS exposes the home indicator), so every env()-based bottom
+    // padding was a no-op on Android and footer buttons sat on the nav
+    // bar. Feed the inset through --hai-safe-bottom: honor env() when a
+    // device DOES report it, else floor at 1.5rem so footers/sheets clear
+    // the nav bar. iOS keeps the pure env() :root default untouched.
+    try {
+      if ((window.Capacitor?.getPlatform?.() || '') === 'android') {
+        document.documentElement.style.setProperty(
+          '--hai-safe-bottom',
+          'max(env(safe-area-inset-bottom, 0px), 1.5rem)',
+        )
+      }
+    } catch {}
+
     // Read cookie first (matches inline head script), then localStorage.
     function readThemeCookie(): string | null {
       const m = document.cookie.match(/(?:^|; )hai_theme=([^;]*)/)

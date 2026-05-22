@@ -144,7 +144,7 @@ export default function DetailClient({
   return (
     <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-[#19232a]">
       <DirectoryHeader title={place.name} backHref="/directory" />
-      <div className="max-w-[640px] mx-auto px-4 pt-4 space-y-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
+      <div className="max-w-[640px] mx-auto px-4 pt-4 space-y-4" style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 1.5rem)' }}>
         {/* Back link removed — DirectoryHeader provides the back button */}
 
         <header className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-2">
@@ -702,7 +702,7 @@ function GoogleLinkSheet({
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-full sm:max-w-md bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[88vh]"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        style={{ paddingBottom: 'var(--hai-safe-bottom, 0px)' }}
       >
         <div className="flex-shrink-0 px-5 pt-3 pb-3 border-b border-gray-100 dark:border-gray-800">
           <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-2.5" />
@@ -877,7 +877,7 @@ function socialHref(platform: 'instagram' | 'snapchat' | 'tiktok' | 'x', raw: st
 function SheetShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[480px] bg-white dark:bg-gray-800 rounded-t-3xl p-4 space-y-2" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[480px] bg-white dark:bg-gray-800 rounded-t-3xl p-4 space-y-2" style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 1rem)' }}>
         <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-3" />
         <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-1">{title}</h3>
         {children}

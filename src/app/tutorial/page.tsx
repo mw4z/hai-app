@@ -117,7 +117,7 @@ export default function TutorialPage() {
       </div>
 
       {/* Text + controls — compact at bottom */}
-      <div className="bg-white rounded-t-3xl px-6 pt-5 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 2rem)' }}>
+      <div className="bg-white rounded-t-3xl px-6 pt-5 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]" style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 2rem)' }}>
         {/* Title */}
         <h1 className="text-xl font-bold text-gray-900 mb-2 text-center">
           {isAr ? slide.titleAr : slide.titleEn}

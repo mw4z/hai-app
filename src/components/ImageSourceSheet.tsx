@@ -47,7 +47,7 @@ export default function ImageSourceSheet({ open, onClose, onCamera, onGallery }:
       <div
         className="w-full max-w-[480px] bg-white dark:bg-gray-800 rounded-t-3xl p-4 pb-6 space-y-2 animate-slide-up"
         onPointerDown={(e) => e.stopPropagation()}
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+        style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 1rem)' }}
       >
         <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-3" />
         <button

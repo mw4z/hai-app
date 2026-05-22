@@ -130,7 +130,7 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-[520px] max-h-[80vh] flex flex-col bg-white dark:bg-gray-900 rounded-t-3xl"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        style={{ paddingBottom: 'var(--hai-safe-bottom, 0px)' }}
       >
         {/* Header — drag handle + title + close */}
         <div className="px-4 pt-3 pb-2 flex-shrink-0 border-b border-gray-100 dark:border-gray-800">

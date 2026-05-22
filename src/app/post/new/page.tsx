@@ -1006,7 +1006,7 @@ export default function NewPostPage() {
             LOST_FOUND get an amber ring + warmer surface
             (cat.important). */}
         {step === 'category' && (
-          <div className="space-y-4 pb-24" data-tour="post-categories" data-guide="post-category" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
+          <div className="space-y-4 pb-24" data-tour="post-categories" data-guide="post-category" style={{ paddingBottom: 'calc(6rem + var(--hai-safe-bottom, 0px))' }}>
             {/* Top guidance — primary instruction + helper. Larger
                 font for older users; lang switches Arabic/English. */}
             <div className="space-y-1">
@@ -1597,7 +1597,7 @@ export default function NewPostPage() {
           <div
             className="w-full max-w-[480px] bg-white dark:bg-gray-800 rounded-t-3xl p-4 space-y-2 animate-slide-up"
             onClick={(e) => e.stopPropagation()}
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+            style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 1rem)' }}
           >
             <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-3" />
             <p className="text-center text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1">

@@ -1080,7 +1080,7 @@ export default function RideDetailClient({ rideId, currentUserId }: Props) {
 
       {/* Chat + Cancel (anchored at bottom) */}
       {chatAllowed && isParticipant && (
-        <div className="fixed bottom-0 left-0 right-0 z-10 bg-gray-900/95 backdrop-blur-sm" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className="fixed bottom-0 left-0 right-0 z-10 bg-gray-900/95 backdrop-blur-sm" style={{ paddingBottom: 'var(--hai-safe-bottom)' }}>
           {/* Messages */}
           <div className="max-h-36 overflow-y-auto px-4 py-2 space-y-1.5" style={{ maskImage: 'linear-gradient(to bottom, transparent 0%, black 20%, black 100%)', WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 20%, black 100%)' }}>
             {messages.slice(-10).map((msg: any) => (

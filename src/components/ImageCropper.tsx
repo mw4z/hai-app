@@ -61,7 +61,7 @@ export default function ImageCropper({ image, aspect, outputWidth, outputHeight,
       </div>
 
       {/* Controls */}
-      <div className="bg-black px-6 py-5 flex items-center justify-between gap-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)' }}>
+      <div className="bg-black px-6 py-5 flex items-center justify-between gap-4" style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 20px)' }}>
         <button
           onClick={onCancel}
           className="px-6 py-3 rounded-xl text-white/70 font-medium text-sm"

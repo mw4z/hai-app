@@ -430,7 +430,7 @@ export default function ChatClient({
     const isIos = platform === 'ios'
     const isAndroid = platform === 'android'
 
-    const safePad = 'calc(env(safe-area-inset-bottom, 0px) + 10px)'
+    const safePad = 'calc(var(--hai-safe-bottom, 0px) + 10px)'
     const setComposerPad = (pad: string) => {
       if (composerRef.current) composerRef.current.style.paddingBottom = pad
     }
@@ -1734,7 +1734,7 @@ export default function ChatClient({
             <div ref={profileSheetDrag.handleRef} className="px-5 pt-3 pb-3 touch-none">
               <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto" />
             </div>
-            <div className="px-5" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.25rem)' }}>
+            <div className="px-5" style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 1.25rem)' }}>
 
               {loadingProfile ? (
                 <div className="flex flex-col items-center py-8 gap-3">
@@ -1825,7 +1825,7 @@ export default function ChatClient({
                 {lang === 'en' ? 'Chat Wallpaper' : 'خلفية المحادثة'}
               </h3>
             </div>
-            <div className="px-5" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
+            <div className="px-5" style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 1.5rem)' }}>
               <div className="grid grid-cols-4 gap-3">
                 {CHAT_WALLPAPERS.map(wp => (
                   <button
@@ -1973,7 +1973,7 @@ export default function ChatClient({
           </div>
         )
       ) : (
-        <div ref={composerRef} className="glass-bottom px-4 w-full z-20 flex-shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
+        <div ref={composerRef} className="glass-bottom px-4 w-full z-20 flex-shrink-0" style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 10px)' }}>
           {/* Reply preview bar */}
           {replyingTo && (
             <div className="flex items-center gap-2 px-1 pt-2 pb-1">
@@ -2061,7 +2061,7 @@ export default function ChatClient({
           <div
             className="w-full max-w-[480px] bg-white dark:bg-gray-800 rounded-t-3xl p-4 pb-6 space-y-2 animate-slide-up"
             onClick={(e) => e.stopPropagation()}
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+            style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 1rem)' }}
           >
             <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-3" />
             <button

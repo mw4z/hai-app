@@ -118,7 +118,7 @@ export default function DirectoryBandColorPicker() {
           <div
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-[480px] bg-white dark:bg-gray-900 rounded-t-3xl p-4 space-y-3"
-            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+            style={{ paddingBottom: 'max(1rem, var(--hai-safe-bottom))' }}
             dir="rtl"
           >
             <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto" />

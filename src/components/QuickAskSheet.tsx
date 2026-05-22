@@ -282,7 +282,7 @@ export default function QuickAskSheet({
         ref={drag.sheetRef}
         className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-[1001] bg-white rounded-t-3xl shadow-2xl"
         style={{
-          paddingBottom: 'env(safe-area-inset-bottom)',
+          paddingBottom: 'var(--hai-safe-bottom)',
           transform: open ? 'translateY(0)' : 'translateY(110%)',
           pointerEvents: open ? 'auto' : 'none',
         }}

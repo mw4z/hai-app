@@ -431,7 +431,7 @@ function EmergencyCreateModal({
       <div
         className="bg-white dark:bg-gray-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
-        style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: 'max(1.25rem, var(--hai-safe-bottom))' }}
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-gray-900 dark:text-white text-lg flex items-center gap-2">

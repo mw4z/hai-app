@@ -172,7 +172,7 @@ export default function NeighborhoodSheet({
         }`}
         style={{
           height: '82vh',
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          paddingBottom: 'var(--hai-safe-bottom, 0px)',
         }}
       >
         {/* Header */}

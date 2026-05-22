@@ -283,7 +283,7 @@ export default function DirectoryClient({
             )}
           </div>
         ) : (
-          <div className="space-y-2.5" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 2rem)' }}>
+          <div className="space-y-2.5" style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 2rem)' }}>
             {places.map((p) => <PlaceCard key={p.id} place={p} />)}
           </div>
         )}
