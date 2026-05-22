@@ -89,6 +89,17 @@ export default function ModDirectoryClient({ data }: Props) {
           <TabBtn active={tab === 'review-reports'} onClick={() => setTab('review-reports')} label={tr('Review reports', 'بلاغات التقييمات', 'جائزہ شکایات')} count={reviewReportGroups.length} />
         </div>
 
+        {/* Service contacts (خدمات وأرقام) have their own queue page —
+            pending / hidden / reported with approve / hide / remove /
+            dismiss. */}
+        <Link
+          href="/mod/directory/services"
+          className="flex items-center justify-between rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 active:scale-[0.99] transition-transform"
+        >
+          <span className="text-sm font-bold text-gray-900 dark:text-white">📇 {tr('Service contacts queue', 'مراجعة خدمات وأرقام', 'خدمات کی قطار')}</span>
+          <span className="text-gray-400 text-lg">‹</span>
+        </Link>
+
         {tab === 'places' && (
           <div className="space-y-3">
             {pendingPlaces.length === 0
