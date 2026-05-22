@@ -10,6 +10,7 @@ import { getCategoryMeta } from '@/lib/places/categories'
 import PlaceStatusBadge from '@/components/places/PlaceStatusBadge'
 import PlacePill from '@/components/places/PlacePill'
 import PlaceReviewsSection from '@/components/places/PlaceReviewsSection'
+import SuggestCorrectionSheet from '@/components/places/SuggestCorrectionSheet'
 import GoogleReviewsSection from '@/components/places/GoogleReviewsSection'
 import PlaceSourceBadge from '@/components/places/PlaceSourceBadge'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
@@ -77,6 +78,7 @@ export default function DetailClient({
     lang === 'en' ? cat.labelEn : lang === 'ur' ? cat.labelUr : cat.labelAr
 
   const [reportOpen, setReportOpen] = useState(false)
+  const [suggestOpen, setSuggestOpen] = useState(false)
   const [claimOpen, setClaimOpen] = useState(false)
   const [photoEditOpen, setPhotoEditOpen] = useState(false)
   const [infoEditOpen, setInfoEditOpen] = useState(false)
@@ -553,6 +555,19 @@ export default function DetailClient({
           </button>
         </div>
 
+        {/* Suggest a correction — residents propose structured edits that a
+            mod reviews; approved changes earn the suggester reputation.
+            Owners edit directly, so it's hidden for them. */}
+        {!isOwner && (
+          <button
+            type="button"
+            onClick={() => setSuggestOpen(true)}
+            className="w-full py-2.5 rounded-xl border border-primary-200 dark:border-primary-800/60 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 text-xs font-semibold active:scale-95 transition-transform"
+          >
+            ✏️ {tr('Suggest a correction', 'اقترح تصحيحًا', 'تصحیح تجویز کریں')}
+          </button>
+        )}
+
         {/* Mod/admin — remove (soft-delete) a published place. Asks
             for a reason; the row goes to REMOVED (hidden) and the
             submitter is notified. */}
@@ -576,6 +591,23 @@ export default function DetailClient({
         {reportOpen && (
           <ReportSheet placeId={place.id} onClose={() => setReportOpen(false)} />
         )}
+        <SuggestCorrectionSheet
+          open={suggestOpen}
+          onClose={() => setSuggestOpen(false)}
+          place={{
+            id: place.id,
+            name: place.name,
+            category: place.category,
+            description: (place as any).description ?? null,
+            addressText: place.addressText ?? null,
+            phone: place.phone ?? null,
+            whatsapp: (place as any).whatsapp ?? null,
+            website: place.website ?? null,
+            instagram: place.instagram ?? null,
+            latitude: place.latitude ?? null,
+            longitude: place.longitude ?? null,
+          }}
+        />
         {/* Photo-edit sheet — mounted for any allowed editor
             (claimed owner, creator pre-claim, mod-of-nbhd / admin
             pre-claim). onSaved updates the local override so the

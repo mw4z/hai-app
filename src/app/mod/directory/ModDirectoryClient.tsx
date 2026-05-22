@@ -62,7 +62,7 @@ interface Props {
   }
 }
 
-type Tab = 'places' | 'claims' | 'reports' | 'review-reports'
+type Tab = 'places' | 'claims' | 'reports' | 'review-reports' | 'suggestions'
 
 export default function ModDirectoryClient({ data }: Props) {
   const { lang } = useLanguage()
@@ -73,6 +73,17 @@ export default function ModDirectoryClient({ data }: Props) {
   const [pendingPlaces, setPendingPlaces] = useState(data.pendingPlaces)
   const [pendingClaims, setPendingClaims] = useState(data.pendingClaims)
   const [reviewReportGroups, setReviewReportGroups] = useState(data.reviewReportGroups)
+  // Resident correction suggestions — lazy-fetched + grouped by groupId.
+  const [suggestions, setSuggestions] = useState<SuggestionItem[] | null>(null)
+  const loadSuggestions = () => {
+    fetch('/api/mod/directory/suggestions', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => setSuggestions(Array.isArray(d.suggestions) ? d.suggestions : []))
+      .catch(() => setSuggestions([]))
+  }
+  useEffect(() => { if (tab === 'suggestions' && suggestions === null) loadSuggestions() }, [tab, suggestions])
+  const suggestionGroups = groupSuggestions(suggestions ?? [])
+  const suggestionCount = suggestions === null ? undefined : suggestionGroups.length
 
   return (
     <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -87,6 +98,7 @@ export default function ModDirectoryClient({ data }: Props) {
           <TabBtn active={tab === 'claims'}  onClick={() => setTab('claims')}  label={tr('Pending claims', 'طلبات الإدارة', 'انتظامی دعوے')} count={pendingClaims.length} />
           <TabBtn active={tab === 'reports'} onClick={() => setTab('reports')} label={tr('Place reports', 'بلاغات الأماكن', 'جگہ کی شکایات')} count={data.recentReports.length} />
           <TabBtn active={tab === 'review-reports'} onClick={() => setTab('review-reports')} label={tr('Review reports', 'بلاغات التقييمات', 'جائزہ شکایات')} count={reviewReportGroups.length} />
+          <TabBtn active={tab === 'suggestions'} onClick={() => setTab('suggestions')} label={tr('Suggestions', 'اقتراحات التصحيح', 'تجاویز')} count={suggestionCount} />
         </div>
 
         {/* Service contacts (خدمات وأرقام) have their own queue page —
@@ -145,12 +157,30 @@ export default function ModDirectoryClient({ data }: Props) {
             onRefresh={(next) => setReviewReportGroups(next)}
           />
         )}
+
+        {tab === 'suggestions' && (
+          suggestions === null
+            ? <Empty label={tr('Loading…', 'جاري التحميل…', '…')} />
+            : suggestionGroups.length === 0
+              ? <Empty label={tr('No correction suggestions', 'لا توجد اقتراحات تصحيح', 'کوئی تجویز نہیں')} />
+              : (
+                <div className="space-y-3">
+                  {suggestionGroups.map((g) => (
+                    <SuggestionGroupCard
+                      key={g.groupId}
+                      group={g}
+                      onDone={(ids) => setSuggestions((prev) => (prev ?? []).filter((s) => !ids.includes(s.id)))}
+                    />
+                  ))}
+                </div>
+              )
+        )}
       </div>
     </main>
   )
 }
 
-function TabBtn({ active, onClick, label, count }: { active: boolean; onClick: () => void; label: string; count: number }) {
+function TabBtn({ active, onClick, label, count }: { active: boolean; onClick: () => void; label: string; count?: number }) {
   return (
     <button
       type="button"
@@ -159,13 +189,103 @@ function TabBtn({ active, onClick, label, count }: { active: boolean; onClick: (
         active ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
       }`}
     >
-      {label}{count > 0 ? ` (${count})` : ''}
+      {label}{(count ?? 0) > 0 ? ` (${count})` : ''}
     </button>
   )
 }
 
 function Empty({ label }: { label: string }) {
   return <p className="text-center text-sm text-gray-500 py-8">{label}</p>
+}
+
+// ── Resident correction suggestions ───────────────────────────────
+interface SuggestionField { key: string; oldValue: unknown; suggestedValue: unknown }
+interface SuggestionItem {
+  id: string; type: string; groupId: string; note: string | null
+  fields: SuggestionField[]; placeId: string | null; placeName: string | null
+  contributor: string | null; createdAt: string
+}
+interface SuggestionGroup {
+  groupId: string; placeName: string | null; contributor: string | null
+  ids: string[]; note: string | null; fields: SuggestionField[]
+}
+function groupSuggestions(items: SuggestionItem[]): SuggestionGroup[] {
+  const map = new Map<string, SuggestionGroup>()
+  for (const it of items) {
+    const g = map.get(it.groupId) ?? {
+      groupId: it.groupId, placeName: it.placeName, contributor: it.contributor,
+      ids: [], note: it.note, fields: [],
+    }
+    g.ids.push(it.id)
+    g.fields.push(...(Array.isArray(it.fields) ? it.fields : []))
+    if (!g.note && it.note) g.note = it.note
+    map.set(it.groupId, g)
+  }
+  return Array.from(map.values())
+}
+const FIELD_LABEL: Record<string, [ar: string, en: string]> = {
+  name: ['الاسم', 'Name'], category: ['التصنيف', 'Category'], description: ['الوصف', 'Description'],
+  addressText: ['العنوان', 'Address'], phone: ['الهاتف', 'Phone'], whatsapp: ['واتساب', 'WhatsApp'],
+  website: ['الموقع', 'Website'], instagram: ['انستغرام', 'Instagram'],
+  latitude: ['خط العرض', 'Latitude'], longitude: ['خط الطول', 'Longitude'],
+}
+
+function SuggestionGroupCard({ group, onDone }: { group: SuggestionGroup; onDone: (ids: string[]) => void }) {
+  const { lang } = useLanguage()
+  const promptDialog = usePrompt()
+  const tr = (en: string, ar: string, ur: string) => (lang === 'en' ? en : lang === 'ur' ? ur : ar)
+  const [busy, setBusy] = useState(false)
+
+  async function act(action: 'approve' | 'reject') {
+    if (busy) return
+    let note = ''
+    if (action === 'reject') {
+      const r = await promptDialog({ title: tr('Reject', 'رفض الاقتراح', 'مسترد'), message: tr('Why?', 'السبب', '') })
+      if (r === null) return
+      note = r
+    }
+    setBusy(true)
+    try {
+      const res = await fetch('/api/mod/directory/suggestions/action', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: group.ids, action, note }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(d.error || tr('Failed', 'فشل', 'ناکام')); return }
+      toast.success(d.awarded > 0 ? tr(`Applied · +${d.awarded}`, `طُبّق · +${d.awarded}`, 'ہو گیا') : tr('Done', 'تم', 'ہو گیا'))
+      onDone(group.ids)
+    } catch { toast.error(tr('Connection error', 'خطأ بالاتصال', 'کنکشن خرابی')) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-3.5 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <Link href={group.fields.length && group.placeName ? `/directory/${group.ids[0]}` : '#'} className="text-sm font-bold text-gray-900 dark:text-white truncate">
+          {group.placeName || tr('Place', 'مكان', 'جگہ')}
+        </Link>
+        <span className="text-[10px] text-gray-400 flex-shrink-0">{group.contributor || '—'}</span>
+      </div>
+      <div className="space-y-1.5">
+        {group.fields.map((f, i) => {
+          const lbl = FIELD_LABEL[f.key]
+          return (
+            <div key={i} className="text-[12px]">
+              <span className="text-gray-500 dark:text-gray-400">{lbl ? (lang === 'en' ? lbl[1] : lbl[0]) : f.key}: </span>
+              <span className="text-gray-400 line-through">{String(f.oldValue ?? '—')}</span>
+              <span className="text-gray-400"> → </span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{String(f.suggestedValue ?? '')}</span>
+            </div>
+          )
+        })}
+      </div>
+      {group.note && <p className="text-[11px] text-gray-500 dark:text-gray-400 italic">“{group.note}”</p>}
+      <div className="flex gap-2 pt-1">
+        <button onClick={() => act('approve')} disabled={busy} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold disabled:opacity-50">{tr('Approve & apply', 'قبول وتطبيق', 'منظور')}</button>
+        <button onClick={() => act('reject')} disabled={busy} className="flex-1 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold disabled:opacity-50">{tr('Reject', 'رفض', 'مسترد')}</button>
+      </div>
+    </div>
+  )
 }
 
 function PlaceRow({ place, onResolve }: { place: ModPlace; onResolve: (id: string) => void }) {
