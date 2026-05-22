@@ -636,7 +636,11 @@ export default function FeedClient({
           the user's home neighborhood). Tapping an item scrolls to the
           matching #post-<id> anchor in the post list below. */}
       {!isReadOnly && (
-        <HighlightsSection items={highlights} neighborhoodId={isReadOnly && browseNeighborhood ? browseNeighborhood.id : user.neighborhoodId} />
+        <HighlightsSection
+          items={highlights}
+          neighborhoodId={isReadOnly && browseNeighborhood ? browseNeighborhood.id : user.neighborhoodId}
+          canManage={['SUPER_ADMIN', 'PLATFORM_MOD', 'NEIGHBORHOOD_MOD'].includes(user.role || '') && !isReadOnly}
+        />
       )}
 
       {/* Delivery requests strip — DELIVERY-typed RideRequests surfaced

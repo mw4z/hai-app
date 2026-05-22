@@ -102,23 +102,53 @@ interface Props {
   autoOpenForFirstTime?: boolean
   /** Enables the "المثبتات" tab (resident pinned references). */
   neighborhoodId?: string | null
+  /** When true (mod viewing own hood), shows inline remove controls. */
+  canManage?: boolean
 }
 
-export default function HighlightsSection({ items, autoOpenForFirstTime = true, neighborhoodId = null }: Props) {
+export default function HighlightsSection({ items, autoOpenForFirstTime = true, neighborhoodId = null, canManage = false }: Props) {
   const { t, lang } = useLanguage()
   const confirmDialog = useConfirm()
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<'highlights' | 'pinned'>('highlights')
   const [pinned, setPinned] = useState<PinnedItemPayload[] | null>(null)
+  // Local copy of highlights so a mod removal updates the list in place.
+  const [highlightItems, setHighlightItems] = useState(items)
+  useEffect(() => { setHighlightItems(items) }, [items])
 
-  // Lazy-load pinned items the first time the Pinned tab is opened.
+  // (Re)load pinned items every time the Pinned tab is opened — so a pin
+  // made elsewhere (e.g. a post menu) shows up without a page reload.
   useEffect(() => {
-    if (tab !== 'pinned' || !neighborhoodId || pinned !== null) return
+    if (!open || tab !== 'pinned' || !neighborhoodId) return
+    let aborted = false
     fetch(`/api/neighborhoods/${neighborhoodId}/pinned-items`)
       .then((r) => r.json())
-      .then((d) => setPinned(Array.isArray(d.items) ? d.items : []))
-      .catch(() => setPinned([]))
-  }, [tab, neighborhoodId, pinned])
+      .then((d) => { if (!aborted) setPinned(Array.isArray(d.items) ? d.items : []) })
+      .catch(() => { if (!aborted) setPinned((p) => p ?? []) })
+    return () => { aborted = true }
+  }, [open, tab, neighborhoodId])
+
+  // Remove a pinned reference (mod) — DELETE marks it REMOVED; drop locally.
+  async function removePinned(id: string) {
+    if (!neighborhoodId) return
+    const ok = await confirmDialog({ title: lang === 'en' ? 'Remove' : 'إزالة', message: lang === 'en' ? 'Remove from Pinned items?' : 'إزالته من المثبتات؟' })
+    if (!ok) return
+    setPinned((prev) => (prev ?? []).filter((x) => x.id !== id))
+    try { await fetch(`/api/mod/neighborhoods/${neighborhoodId}/pinned-items/${id}`, { method: 'DELETE' }) } catch { /* */ }
+  }
+
+  // Remove a highlighted post (mod) — unpins from Highlights; drop locally.
+  async function removeHighlight(postId: string) {
+    const ok = await confirmDialog({ title: lang === 'en' ? 'Remove' : 'إزالة', message: lang === 'en' ? 'Remove from Highlights?' : 'إزالته من الأبرز؟' })
+    if (!ok) return
+    setHighlightItems((prev) => prev.filter((x) => x.id !== postId))
+    try {
+      await fetch('/api/admin/action', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'highlight_unpin', targetId: postId }),
+      })
+    } catch { /* */ }
+  }
   // Hydrate after mount — SSR can't read localStorage, and starting
   // null keeps server/first-client markup identical (no hydration
   // mismatch).
@@ -142,7 +172,9 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true, 
     } catch { /* ignore */ }
   }, [autoOpenForFirstTime, items.length, barHiddenAt])
 
-  if (items.length === 0) return null
+  // Show the bar if there are highlights OR a neighborhood that may have
+  // pinned items (so المثبتات is reachable even with zero highlights).
+  if (items.length === 0 && !neighborhoodId) return null
   if (barHiddenAt !== null) return null
 
   async function hideBar() {
@@ -205,10 +237,7 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true, 
         >
           <FiStar className="w-4 h-4 text-amber-500 flex-shrink-0" />
           <span className="text-sm font-semibold text-amber-900 dark:text-amber-200 truncate flex-1 text-start">
-            📌 {t('highlights_title')}
-          </span>
-          <span className="text-xs text-amber-700 dark:text-amber-300 flex-shrink-0">
-            {items.length}
+            📌 {neighborhoodId ? (lang === 'en' ? 'Highlights & Pinned' : 'الأبرز والمثبتات') : t('highlights_title')}
           </span>
         </button>
         <button
@@ -281,15 +310,25 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true, 
             {/* List */}
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain">
               {tab === 'pinned' ? (
-                <PinnedList items={pinned} lang={lang} />
+                <PinnedList items={pinned} lang={lang} canManage={canManage} onRemove={removePinned} />
+              ) : highlightItems.length === 0 ? (
+                <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-10">{lang === 'en' ? 'No highlights right now.' : 'لا توجد أبرز حالياً.'}</p>
               ) : (
               <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-                {items.map((it) => {
+                {highlightItems.map((it) => {
                   const bk = badgeKey(it.badge)
                   const icon = CATEGORY_ICON[it.category] || '💬'
                   const thumb = it.imageUrls?.[0]
                   return (
-                    <li key={it.id}>
+                    <li key={it.id} className="relative">
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); removeHighlight(it.id) }}
+                          aria-label={lang === 'en' ? 'Remove' : 'إزالة'}
+                          className="absolute top-2 end-2 z-10 w-6 h-6 flex items-center justify-center rounded-full bg-white/90 dark:bg-gray-700 text-gray-500 dark:text-gray-300 text-xs shadow active:scale-90"
+                        >✕</button>
+                      )}
                       <button
                         type="button"
                         onClick={() => go(it.id)}
@@ -382,7 +421,7 @@ const PIN_TYPE_BADGE: Record<string, { ar: string; en: string; emoji: string }> 
   MANUAL_NOTE: { ar: 'ملاحظة', en: 'Note',   emoji: '📌' },
 }
 
-function PinnedList({ items, lang }: { items: PinnedItemPayload[] | null; lang: string }) {
+function PinnedList({ items, lang, canManage = false, onRemove }: { items: PinnedItemPayload[] | null; lang: string; canManage?: boolean; onRemove?: (id: string) => void }) {
   const tr = (en: string, ar: string) => (lang === 'en' ? en : ar)
   if (items === null) {
     return <p className="text-center text-sm text-gray-400 py-10">{tr('Loading…', 'جاري التحميل…')}</p>
@@ -413,6 +452,9 @@ function PinnedList({ items, lang }: { items: PinnedItemPayload[] | null; lang: 
                   {it.expiresAt && <span>⏳ {fmt(it.expiresAt)}</span>}
                   {href && actionLabel && (
                     <a href={href} target={it.fileUrl || it.linkUrl ? '_blank' : undefined} rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 font-semibold">{actionLabel}</a>
+                  )}
+                  {canManage && onRemove && (
+                    <button onClick={() => onRemove(it.id)} className="text-red-500 font-semibold ms-auto">{tr('Remove', 'إزالة')}</button>
                   )}
                 </div>
               </div>

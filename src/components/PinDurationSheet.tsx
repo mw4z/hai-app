@@ -3,6 +3,7 @@
 import { createPortal } from 'react-dom'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 
 const DURATIONS = [
   { key: '24h', ar: '٢٤ ساعة', en: '24 hours' },
@@ -18,17 +19,22 @@ export default function PinDurationSheet({
 }: { open: boolean; onClose: () => void; onSelect: (duration: string) => void; busy?: boolean }) {
   const { lang } = useLanguage()
   useBodyScrollLock(open)
+  const drag = useDragToDismiss<HTMLDivElement, HTMLDivElement>({ open, onDismiss: onClose })
   const tr = (en: string, ar: string) => (lang === 'en' ? en : ar)
   if (!open || typeof document === 'undefined') return null
 
   return createPortal(
     <div className="fixed inset-0 z-[1200] bg-black/50 flex items-end justify-center" onClick={onClose} role="dialog" aria-modal="true">
       <div
+        ref={drag.sheetRef}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[420px] bg-white dark:bg-gray-900 rounded-t-3xl p-4 space-y-2"
+        className="w-full max-w-[420px] bg-white dark:bg-gray-900 rounded-t-3xl p-4 space-y-2 will-change-transform"
         style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 1rem)' }}
       >
-        <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-1" />
+        {/* Drag handle — swipe down to dismiss. */}
+        <div ref={drag.handleRef} className="py-1.5 -mt-1.5 cursor-grab touch-none">
+          <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto" />
+        </div>
         <h2 className="text-sm font-bold text-gray-900 dark:text-white text-center">{tr('Pin duration', 'مدة التثبيت')}</h2>
         <p className="text-[11px] text-gray-500 dark:text-gray-400 text-center mb-1.5">
           {tr('It will appear under "Pinned items" for residents.', 'سيظهر في قسم "المثبتات" للسكان.')}
