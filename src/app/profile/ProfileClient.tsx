@@ -1738,8 +1738,9 @@ export default function ProfileClient({ user, postCount }: Props) {
         </Link>
       )}
 
-      {/* Admin panel link — only for admin roles */}
-      {['SUPER_ADMIN', 'PLATFORM_MOD', 'NEIGHBORHOOD_MOD'].includes(user.role) && (
+      {/* Admin portal link — SUPER_ADMIN only. Moderators use the Mod
+          Dashboard (/mod) above; the full platform portal is not theirs. */}
+      {user.role === 'SUPER_ADMIN' && (
         <div className="mx-4 mt-4">
           <button
             onClick={() => router.push('/admin')}

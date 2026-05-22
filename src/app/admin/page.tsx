@@ -2,9 +2,8 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { getAdminDashboardData } from '@/lib/adminDashboard'
+import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import AdminClient from './AdminClient'
-
-const ADMIN_ROLES = ['NEIGHBORHOOD_MOD', 'PLATFORM_MOD', 'SUPER_ADMIN']
 
 export default async function AdminPage() {
   const session = await getSession()
@@ -15,7 +14,13 @@ export default async function AdminPage() {
     select: { role: true, name: true, lastName: true },
   })
 
-  if (!user || !ADMIN_ROLES.includes(user.role)) redirect('/feed')
+  // The admin portal is SUPER_ADMIN only. Moderators have their own
+  // neighborhood-scoped dashboard at /mod — send them there rather than
+  // exposing the full platform portal.
+  if (!user) redirect('/login')
+  if (!isSuperAdminRole(user.role)) {
+    redirect(user.role === 'RESIDENT' ? '/feed' : '/mod')
+  }
 
   // Server-render the overview stats + recent logs so the dashboard's
   // first screen is populated on first paint — no fetch-then-pop-in.
