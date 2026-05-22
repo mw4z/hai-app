@@ -142,9 +142,9 @@ export default function DetailClient({
     lang === 'en' ? en : lang === 'ur' ? ur : ar
 
   return (
-    <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-gray-900">
+    <main className="hai-directory-screen min-h-screen bg-gray-50 dark:bg-[#19232a]">
       <DirectoryHeader title={place.name} backHref="/directory" />
-      <div className="max-w-[640px] mx-auto px-4 py-4 space-y-4">
+      <div className="max-w-[640px] mx-auto px-4 pt-4 space-y-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}>
         {/* Back link removed — DirectoryHeader provides the back button */}
 
         <header className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-2">
