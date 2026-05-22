@@ -625,6 +625,15 @@ html.dark::before {
 html:has(.hai-screen) {
   --hai-safe-top-bg: var(--hai-bg);
 }
+/* On auth screens (.hai-screen: login / register / verify / OTP) the
+   inputs sit directly on the page bg (var(--hai-bg)), not on a card — so
+   their default --hai-surface-1 fill (#101619 in dark) reads as a separate
+   darker box against the #19232a page. Match inputs to the page bg so the
+   field blends; the 1px border still delineates it. */
+html.dark .hai-screen .hai-input-group,
+html.dark .hai-screen .hai-input {
+  background: var(--hai-bg);
+}
 /* Same idea for Neighborhood Directory pages. The wrappers use
    bg-gray-50 (light) / bg-gray-900 (dark) for a slightly recessed
    feel vs the white card surfaces inside; without this override
