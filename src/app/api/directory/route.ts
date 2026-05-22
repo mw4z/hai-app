@@ -180,7 +180,10 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Rate limit ─────────────────────────────────────────────────
-  if (!isSuper) {
+  // Moderators/admins (NEIGHBORHOOD_MOD / PLATFORM_MOD / SUPER_ADMIN) add
+  // to the directory without any per-week cap — only normal residents are
+  // limited.
+  if (!isDirectoryModerator(user.role)) {
     const since = new Date(Date.now() - PLACE_LIMIT_WINDOW_MS)
     const recent = await db.placeListing.count({
       where: { createdByUserId: user.id, createdAt: { gte: since } },

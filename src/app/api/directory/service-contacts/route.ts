@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { Prisma } from '@prisma/client'
 import { gatePublicRoute } from '@/lib/places/routeGate'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
+import { isDirectoryModerator } from '@/lib/places/isDirectoryModerator'
 import { requireUserReady } from '@/lib/requireUserReady'
 import { matchesArabic } from '@/lib/arabicNormalize'
 import { toE164 } from '@/lib/services/phoneFormat'
@@ -130,7 +131,9 @@ export async function POST(req: NextRequest) {
   const neighborhoodId = user.neighborhoodId
 
   // ── Rate limit: rolling 24h additions per user ──
-  if (!isSuper) {
+  // Moderators/admins add without any daily cap — only normal residents
+  // are limited.
+  if (!isDirectoryModerator(user.role)) {
     const since = new Date(Date.now() - 24 * 3600_000)
     const recent = await db.directoryServiceContact.count({
       where: { createdByUserId: user.id, createdAt: { gte: since } },
