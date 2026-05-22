@@ -7,7 +7,7 @@ import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { requireUserReady } from '@/lib/requireUserReady'
 import { matchesArabic } from '@/lib/arabicNormalize'
 import { toE164 } from '@/lib/services/phoneFormat'
-import { phoneHash, encryptPhone } from '@/lib/services/phone'
+import { phoneHash, encryptPhone, serviceContactCryptoReady } from '@/lib/services/phone'
 import { isValidServiceCategory } from '@/lib/services/serviceCategories'
 import { SERVICE_CONTACT_MAX_PER_DAY } from '@/lib/services/serviceContactSafety'
 import { resolveServiceContact, resolutionResponse } from '@/lib/services/resolveServiceContact'
@@ -83,6 +83,13 @@ export async function GET(req: NextRequest) {
  * the submitter's own neighborhood.
  */
 export async function POST(req: NextRequest) {
+  // Fail closed in production: never hash with a default pepper or store a
+  // plaintext phone if the secrets aren't provisioned.
+  if (process.env.NODE_ENV === 'production' && !serviceContactCryptoReady()) {
+    console.error('[SERVICE_CONTACT] missing SERVICE_PHONE_KEY / SERVICE_PHONE_PEPPER in production')
+    return NextResponse.json({ error: 'الخدمة غير متاحة مؤقتاً', code: 'SERVICE_MISCONFIGURED' }, { status: 503 })
+  }
+
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
