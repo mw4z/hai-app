@@ -234,6 +234,16 @@ export default function NewPlaceClient() {
             'آپ کی درخواست کا جائزہ موڈریٹر لے گا۔',
           )}
         </p>
+        <div className="flex items-start gap-2 rounded-xl bg-primary-50 dark:bg-primary-900/20 border border-primary-100 dark:border-primary-800/50 px-3 py-2.5">
+          <span className="text-base leading-none mt-0.5" aria-hidden>⭐</span>
+          <p className="text-xs text-primary-700 dark:text-primary-300 flex-1">
+            {tr(
+              'Help build your neighborhood directory. Once your contribution is reviewed and approved, you will earn reputation points.',
+              'ساعد في بناء دليل حيّك. بعد مراجعة مساهمتك والموافقة عليها، ستحصل على نقاط سمعة.',
+              'اپنے محلے کی ڈائریکٹری بنانے میں مدد کریں۔ منظوری کے بعد آپ کو ساکھ پوائنٹس ملیں گے۔',
+            )}
+          </p>
+        </div>
 
         {/* Google Places search — type the business name, pick it,
             and name/address/phone/website/coords autofill below.

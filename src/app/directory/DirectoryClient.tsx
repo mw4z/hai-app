@@ -198,6 +198,14 @@ export default function DirectoryClient({
           </button>
         </div>
 
+        {/* My directory contributions (reputation history). Own-nbhd only. */}
+        {!isReadOnly && (
+          <Link href="/directory/contributions" className="flex items-center justify-between rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3.5 py-2.5 active:scale-[0.99] transition-transform">
+            <span className="text-[13px] font-medium text-gray-700 dark:text-gray-200">⭐ {tr('My contributions', 'مساهماتي ونقاطي', 'میری شراکتیں')}</span>
+            <span className="text-gray-400 text-lg leading-none">{lang === 'en' ? '›' : '‹'}</span>
+          </Link>
+        )}
+
         {tab === 'services' ? (
           <ServiceContactsPanel
             isReadOnly={isReadOnly}
