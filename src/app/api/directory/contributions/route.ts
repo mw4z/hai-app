@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { DIRECTORY_DAILY_CAP, DIRECTORY_SOURCE_TYPE } from '@/lib/reputation/directoryRewards'
+import { extractChangedFields, dailyCapEarned } from '@/lib/directory/contributions'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * GET /api/directory/contributions — the caller's own Directory
- * contribution history (pending / approved / needs-edit / rejected /
- * duplicate), newest first, with the points actually awarded (from the
- * idempotent ReputationEvent) so the UI can show "+5" next to approved
- * rows. Scoped strictly to the current user.
+ * GET /api/directory/contributions — the caller's own contribution history
+ * plus a summary header. Scoped strictly to the current user; returns ONLY
+ * safe fields (no contributorId / reviewedById / neighborhoodId / groupId /
+ * potentialDuplicate / identity). reviewNote is exposed only for
+ * REJECTED/DUPLICATE rows (the rejection reason is meant for the user).
  */
 export async function GET() {
   const session = await getSession()
@@ -18,36 +20,55 @@ export async function GET() {
   const rows = await db.directoryContribution.findMany({
     where: { contributorId: session.userId },
     orderBy: { createdAt: 'desc' },
-    take: 100,
+    take: 150,
     select: {
-      id: true, type: true, status: true, potentialDuplicate: true,
+      id: true, type: true, status: true, payloadJson: true,
       reviewNote: true, reviewedAt: true, createdAt: true,
-      place: { select: { id: true, name: true } },
+      place: { select: { name: true } },
+      neighborhood: { select: { name: true } },
     },
   })
 
-  // Points awarded per contribution (idempotent ReputationEvent rows).
+  // Points per contribution + lifetime + today (idempotent ReputationEvent).
   const ids = rows.map((r) => r.id)
   const events = ids.length
     ? await db.reputationEvent.findMany({
-        where: { sourceType: 'directory_contribution', sourceId: { in: ids } },
+        where: { sourceType: DIRECTORY_SOURCE_TYPE, sourceId: { in: ids } },
         select: { sourceId: true, points: true },
       })
     : []
   const pointsBySource = new Map(events.map((e) => [e.sourceId, e.points]))
 
-  return NextResponse.json({
-    contributions: rows.map((r) => ({
+  const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
+  const [lifetime, today] = await Promise.all([
+    db.reputationEvent.aggregate({ where: { userId: session.userId, sourceType: DIRECTORY_SOURCE_TYPE }, _sum: { points: true } }),
+    db.reputationEvent.aggregate({ where: { userId: session.userId, sourceType: DIRECTORY_SOURCE_TYPE, createdAt: { gte: startOfDay } }, _sum: { points: true } }),
+  ])
+
+  const summary = {
+    totalPoints: lifetime._sum.points || 0,
+    pending: rows.filter((r) => r.status === 'PENDING_REVIEW' || r.status === 'NEEDS_EDIT').length,
+    approved: rows.filter((r) => r.status === 'APPROVED').length,
+    rejected: rows.filter((r) => r.status === 'REJECTED' || r.status === 'DUPLICATE').length,
+    total: rows.length,
+  }
+  const dailyCap = { earnedToday: dailyCapEarned(today._sum.points || 0, DIRECTORY_DAILY_CAP), cap: DIRECTORY_DAILY_CAP }
+
+  const contributions = rows.map((r) => {
+    const showNote = r.status === 'REJECTED' || r.status === 'DUPLICATE'
+    return {
       id: r.id,
       type: r.type,
       status: r.status,
       placeName: r.place?.name ?? null,
-      placeId: r.place?.id ?? null,
-      potentialDuplicate: r.potentialDuplicate,
-      reviewNote: r.reviewNote,
+      neighborhoodName: r.neighborhood?.name ?? null,
       points: pointsBySource.get(r.id) ?? 0,
+      reviewNote: showNote ? r.reviewNote : null,
+      changedFields: extractChangedFields(r.payloadJson),
       createdAt: r.createdAt.toISOString(),
       reviewedAt: r.reviewedAt?.toISOString() ?? null,
-    })),
+    }
   })
+
+  return NextResponse.json({ summary, dailyCap, contributions })
 }
