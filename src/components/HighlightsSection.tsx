@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { useConfirm } from '@/components/ConfirmProvider'
-import { FiX, FiStar, FiHeart, FiMessageSquare, FiClock } from 'react-icons/fi'
+import { FiX, FiStar, FiHeart, FiMessageSquare, FiClock, FiSearch } from 'react-icons/fi'
 import type { TranslationKey } from '@/lib/i18n'
 import { buildDisplayTitle } from '@/lib/posts/displayTitle'
 
@@ -112,6 +112,7 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true, 
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<'highlights' | 'pinned'>('highlights')
   const [pinned, setPinned] = useState<PinnedItemPayload[] | null>(null)
+  const [pinnedQuery, setPinnedQuery] = useState('')
   // Local copy of highlights so a mod removal updates the list in place.
   const [highlightItems, setHighlightItems] = useState(items)
   useEffect(() => { setHighlightItems(items) }, [items])
@@ -307,10 +308,38 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true, 
               </div>
             )}
 
+            {/* Search — pinned tab only, when there's something to search. */}
+            {tab === 'pinned' && (pinned?.length ?? 0) > 0 && (
+              <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800">
+                  <FiSearch className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <input
+                    value={pinnedQuery}
+                    onChange={(e) => setPinnedQuery(e.target.value)}
+                    placeholder={lang === 'en' ? 'Search pinned…' : 'ابحث في المثبتات…'}
+                    className="flex-1 min-w-0 bg-transparent text-sm focus:outline-none text-gray-900 dark:text-white"
+                  />
+                  {pinnedQuery && (
+                    <button onClick={() => setPinnedQuery('')} aria-label={lang === 'en' ? 'Clear' : 'مسح'} className="text-gray-400 active:opacity-60">
+                      <FiX className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* List */}
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain">
               {tab === 'pinned' ? (
-                <PinnedList items={pinned} lang={lang} canManage={canManage} onRemove={removePinned} />
+                <PinnedList
+                  items={pinned === null ? null : (pinnedQuery.trim()
+                    ? pinned.filter((p) => (`${p.title} ${p.summary ?? ''}`).toLowerCase().includes(pinnedQuery.trim().toLowerCase()))
+                    : pinned)}
+                  lang={lang}
+                  canManage={canManage}
+                  onRemove={removePinned}
+                  emptyLabel={pinnedQuery.trim() ? (lang === 'en' ? 'No results' : 'لا نتائج') : undefined}
+                />
               ) : highlightItems.length === 0 ? (
                 <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-10">{lang === 'en' ? 'No highlights right now.' : 'لا توجد أبرز حالياً.'}</p>
               ) : (
@@ -421,13 +450,13 @@ const PIN_TYPE_BADGE: Record<string, { ar: string; en: string; emoji: string }> 
   MANUAL_NOTE: { ar: 'ملاحظة', en: 'Note',   emoji: '📌' },
 }
 
-function PinnedList({ items, lang, canManage = false, onRemove }: { items: PinnedItemPayload[] | null; lang: string; canManage?: boolean; onRemove?: (id: string) => void }) {
+function PinnedList({ items, lang, canManage = false, onRemove, emptyLabel }: { items: PinnedItemPayload[] | null; lang: string; canManage?: boolean; onRemove?: (id: string) => void; emptyLabel?: string }) {
   const tr = (en: string, ar: string) => (lang === 'en' ? en : ar)
   if (items === null) {
     return <p className="text-center text-sm text-gray-400 py-10">{tr('Loading…', 'جاري التحميل…')}</p>
   }
   if (items.length === 0) {
-    return <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-10">{tr('No pinned items yet.', 'لا توجد مثبتات بعد.')}</p>
+    return <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-10">{emptyLabel ?? tr('No pinned items yet.', 'لا توجد مثبتات بعد.')}</p>
   }
   const fmt = (iso: string) => new Date(iso).toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-SA', { month: 'short', day: 'numeric' })
   return (
