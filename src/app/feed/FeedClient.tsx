@@ -621,15 +621,11 @@ export default function FeedClient({
         )}
       </header>
 
-      {/* Inner scroll container — only this bounces. Header above
-          stays glued to the top. */}
-      <div className="hai-app-shell__scroll pb-24">
-      {/* Neighborhood Highlights — the single source of truth for
-          pinned + HIGH/CRITICAL + popular important posts. Hidden when
-          empty. Auto-opens once per device for first-time users.
-          Skipped in read-only browse mode (the highlights bundle is
-          the user's home neighborhood). Tapping an item scrolls to the
-          matching #post-<id> anchor in the post list below. */}
+      {/* Neighborhood Highlights — glued below the header as a flex item of
+          .hai-app-shell (NOT position:sticky, which leaves a gap inside the
+          iOS momentum-scroll container). Stays put while the feed scrolls
+          beneath it. Skipped in read-only browse. Tapping an item scrolls
+          to the matching #post-<id> anchor in the list below. */}
       {!isReadOnly && (
         <HighlightsSection
           items={highlights}
@@ -638,8 +634,11 @@ export default function FeedClient({
         />
       )}
 
-      {/* Pull-to-refresh portal target — below the highlights banner, so
-          the refresh indicator pushes the list down beneath the banner. */}
+      {/* Inner scroll container — only this bounces. Header + highlights
+          above stay glued to the top. */}
+      <div className="hai-app-shell__scroll pb-24">
+      {/* Pull-to-refresh portal target — first child so the indicator
+          appears at the top of the scrolling list. */}
       <div id="hai-pull-target" />
 
       {/* Delivery requests strip — DELIVERY-typed RideRequests surfaced
