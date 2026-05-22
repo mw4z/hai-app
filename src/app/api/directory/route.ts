@@ -332,6 +332,41 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── Reputation contribution record ────────────────────────────
+  // Track manually-typed submissions as a reviewable CREATE_PLACE
+  // contribution so the submitter earns reputation ONLY after a mod
+  // approves it (see awardDirectoryReputation, wired into the approve
+  // route). Google-sourced places are auto-verified (skip the queue), so
+  // they create no rewardable contribution — that also avoids rewarding
+  // low-effort Google picks. Duplicate detection (same normalized name +
+  // category in the neighborhood) flags near-matches for the reviewer; it
+  // never blocks submission.
+  if (place.status === 'PENDING') {
+    try {
+      const dupCount = await db.placeListing.count({
+        where: {
+          neighborhoodId: user.neighborhoodId,
+          category: v.value.category,
+          nameNormalized: v.value.nameNormalized,
+          status: { in: PUBLIC_PLACE_STATUSES },
+          id: { not: place.id },
+        },
+      })
+      await db.directoryContribution.create({
+        data: {
+          type: 'CREATE_PLACE',
+          status: 'PENDING_REVIEW',
+          contributorId: user.id,
+          placeId: place.id,
+          neighborhoodId: user.neighborhoodId,
+          potentialDuplicate: dupCount > 0,
+        },
+      })
+    } catch (err) {
+      console.error('[POST /api/directory] contribution create failed:', err)
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     place: toPublicPlace(place),

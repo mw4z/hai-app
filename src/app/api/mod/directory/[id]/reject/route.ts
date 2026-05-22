@@ -71,5 +71,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }).catch(() => {})
   }
 
+  // Mark the CREATE_PLACE contribution REJECTED — awards 0 points, and
+  // counts toward the rejected-contributions restriction window.
+  try {
+    await db.directoryContribution.updateMany({
+      where: { placeId: place.id, type: 'CREATE_PLACE', status: { in: ['PENDING_REVIEW', 'NEEDS_EDIT'] } },
+      data: { status: 'REJECTED', reviewNote: reason, reviewedById: user.id, reviewedAt: new Date() },
+    })
+  } catch (err) {
+    console.error('[reject] contribution update failed:', err)
+  }
+
   return NextResponse.json({ ok: true })
 }

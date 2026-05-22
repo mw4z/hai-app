@@ -4,6 +4,8 @@ import { getSession } from '@/lib/auth'
 import { gateModRoute } from '@/lib/places/routeGate'
 import { logModAction } from '@/lib/modAudit'
 import { createNotification } from '@/lib/notifications'
+import { awardDirectoryReputation } from '@/lib/reputation/awardDirectoryReputation'
+import { assessPlaceQuality } from '@/lib/reputation/directoryRewards'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,6 +81,42 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       postId: place.id,
       postTitle: `تمت الموافقة على إضافة "${place.name}" إلى دليل الحي`,
     }).catch(() => { /* notification failure shouldn't block approval */ })
+  }
+
+  // ── Reputation ────────────────────────────────────────────────
+  // Mark the CREATE_PLACE contribution APPROVED and award the submitter.
+  // Idempotent twice over: only PENDING/NEEDS_EDIT contributions are
+  // picked up (a re-approve finds none), and awardDirectoryReputation
+  // itself no-ops if a ReputationEvent for this source already exists.
+  try {
+    const contribution = await db.directoryContribution.findFirst({
+      where: { placeId: place.id, type: 'CREATE_PLACE', status: { in: ['PENDING_REVIEW', 'NEEDS_EDIT'] } },
+      select: { id: true, contributorId: true, potentialDuplicate: true },
+    })
+    if (contribution) {
+      const full = await db.placeListing.findUnique({
+        where: { id: place.id },
+        select: {
+          name: true, category: true, latitude: true, longitude: true,
+          addressText: true, description: true, phone: true, whatsapp: true,
+          website: true, instagram: true,
+        },
+      })
+      const highQuality = !!full && assessPlaceQuality({ ...full, potentialDuplicate: contribution.potentialDuplicate })
+      await db.directoryContribution.update({
+        where: { id: contribution.id },
+        data: { status: 'APPROVED', reviewedById: user.id, reviewedAt: new Date() },
+      })
+      await awardDirectoryReputation({
+        contributionId: contribution.id,
+        userId: contribution.contributorId,
+        type: 'CREATE_PLACE',
+        placeId: place.id,
+        highQuality,
+      })
+    }
+  } catch (err) {
+    console.error('[approve] reputation award failed:', err)
   }
 
   return NextResponse.json({ ok: true, id: updated.id, status: newStatus })
