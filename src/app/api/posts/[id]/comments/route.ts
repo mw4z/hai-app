@@ -16,12 +16,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const comments = await db.comment.findMany({
     where: { postId: params.id, parentId: null },
     include: {
-      author: { select: { id: true, name: true, lastName: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true } },
+      author: { select: { id: true, name: true, lastName: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true, coverUrl: true, role: true, gender: true, createdAt: true, bio: true, serviceDescription: true, serviceAddress: true, serviceLat: true, serviceLng: true, neighborhood: { select: { name: true, nameEn: true } }, _count: { select: { posts: true } } } },
       likes: { select: { userId: true } },
       _count: { select: { likes: true } },
       replies: {
         include: {
-          author: { select: { id: true, name: true, lastName: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true } },
+          author: { select: { id: true, name: true, lastName: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true, coverUrl: true, role: true, gender: true, createdAt: true, bio: true, serviceDescription: true, serviceAddress: true, serviceLat: true, serviceLng: true, neighborhood: { select: { name: true, nameEn: true } }, _count: { select: { posts: true } } } },
           likes: { select: { userId: true } },
           _count: { select: { likes: true } },
         },
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       parentId: parentId || null,
     },
     include: {
-      author: { select: { id: true, name: true, lastName: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true } },
+      author: { select: { id: true, name: true, lastName: true, reputation: true, accountType: true, providerStatus: true, avatarUrl: true, coverUrl: true, role: true, gender: true, createdAt: true, bio: true, serviceDescription: true, serviceAddress: true, serviceLat: true, serviceLng: true, neighborhood: { select: { name: true, nameEn: true } }, _count: { select: { posts: true } } } },
       replies: { include: { author: { select: { id: true, name: true, lastName: true, reputation: true } } } },
     },
   })

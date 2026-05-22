@@ -19,7 +19,20 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
     if (!comment) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (comment.postId !== params.id) return NextResponse.json({ error: 'Mismatch' }, { status: 400 })
-    if (comment.authorId !== session.userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    // The author can delete their own comment; mods/admins can remove
+    // others' comments within scope (PLATFORM_MOD / SUPER_ADMIN anywhere;
+    // NEIGHBORHOOD_MOD only in their own neighborhood).
+    if (comment.authorId !== session.userId) {
+      const [me, post] = await Promise.all([
+        db.user.findUnique({ where: { id: session.userId }, select: { role: true, neighborhoodId: true } }),
+        db.post.findUnique({ where: { id: comment.postId }, select: { neighborhoodId: true } }),
+      ])
+      const canModerate = !!me && (
+        me.role === 'SUPER_ADMIN' || me.role === 'PLATFORM_MOD' ||
+        (me.role === 'NEIGHBORHOOD_MOD' && !!post && post.neighborhoodId === me.neighborhoodId)
+      )
+      if (!canModerate) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     // Collect reply IDs first so we can clean up notifications that
     // referenced them too — Prisma cascades delete the rows but

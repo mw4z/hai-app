@@ -381,6 +381,9 @@ export default function PostCard({
     })
   }
   const [showFullAvatar, setShowFullAvatar] = useState(false)
+  // The user shown in the profile popup: null = the post author; otherwise
+  // a comment author (so tapping a commenter opens THEIR profile).
+  const [popupUser, setPopupUser] = useState<any | null>(null)
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(post.title)
   const [editBody, setEditBody] = useState(post.body)
@@ -1055,7 +1058,7 @@ export default function PostCard({
 
       {/* Header */}
       <div className="hai-row-2 hai-justify-between hai-items-start hai-mb-2">
-        <div className="hai-row-2 hai-cursor-pointer" onClick={() => setShowUserPopup(true)}>
+        <div className="hai-row-2 hai-cursor-pointer" onClick={() => { setPopupUser(null); setShowUserPopup(true) }}>
           <div className="hai-avatar hai-avatar--sm">
             {post.author.avatarUrl
               ? <img src={post.author.avatarUrl} alt="" />
@@ -2048,15 +2051,15 @@ export default function PostCard({
                   <div key={c.id}>
                     <div className="hai-comment">
                       {c.author.avatarUrl ? (
-                        <img src={c.author.avatarUrl} alt="" className="hai-avatar hai-avatar--sm" />
+                        <img src={c.author.avatarUrl} alt="" className="hai-avatar hai-avatar--sm cursor-pointer" onClick={() => { setPopupUser(c.author); setShowUserPopup(true) }} />
                       ) : (
-                        <div className="hai-avatar hai-avatar--sm">
+                        <div className="hai-avatar hai-avatar--sm cursor-pointer" onClick={() => { setPopupUser(c.author); setShowUserPopup(true) }}>
                           {c.author.name?.[0] || '؟'}
                         </div>
                       )}
                       <div className="hai-comment__body">
                         <div className="hai-comment__meta">
-                          <span className="hai-comment__author">{fullName(c.author) || t('post_neighbor')}</span>
+                          <span className="hai-comment__author cursor-pointer" onClick={() => { setPopupUser(c.author); setShowUserPopup(true) }}>{fullName(c.author) || t('post_neighbor')}</span>
                           <UserBadgeDisplay accountType={c.author.accountType} providerStatus={c.author.providerStatus} reputation={c.author.reputation} />
                           <span className="hai-comment__time">
                             {(() => {
@@ -2167,6 +2170,15 @@ export default function PostCard({
                               {lang === 'en' ? 'Report' : lang === 'ur' ? 'رپورٹ' : 'إبلاغ'}
                             </button>
                           )}
+                          {/* Mod/admin — remove another user's comment. */}
+                          {isAdmin && c.author.id !== currentUserId && (
+                            <button
+                              onClick={() => deleteComment(c.id, post.id)}
+                              className="hai-comment__action is-danger"
+                            >
+                              {lang === 'en' ? 'Delete' : 'حذف'}
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2177,15 +2189,15 @@ export default function PostCard({
                         {c.replies.map((reply: any) => (
                           <div key={reply.id} className="hai-comment-reply">
                             {reply.author.avatarUrl ? (
-                              <img src={reply.author.avatarUrl} alt="" className="hai-avatar hai-avatar--xs" />
+                              <img src={reply.author.avatarUrl} alt="" className="hai-avatar hai-avatar--xs cursor-pointer" onClick={() => { setPopupUser(reply.author); setShowUserPopup(true) }} />
                             ) : (
-                              <div className="hai-avatar hai-avatar--xs">
+                              <div className="hai-avatar hai-avatar--xs cursor-pointer" onClick={() => { setPopupUser(reply.author); setShowUserPopup(true) }}>
                                 {reply.author.name?.[0] || '؟'}
                               </div>
                             )}
                             <div className="hai-comment__body">
                               <div className="hai-comment__meta">
-                                <span className="hai-comment__author">{fullName(reply.author) || t('post_neighbor')}</span>
+                                <span className="hai-comment__author cursor-pointer" onClick={() => { setPopupUser(reply.author); setShowUserPopup(true) }}>{fullName(reply.author) || t('post_neighbor')}</span>
                                 <UserBadgeDisplay accountType={reply.author.accountType} providerStatus={reply.author.providerStatus} reputation={reply.author.reputation} />
                               </div>
                               {reply.body && (() => {
@@ -2247,6 +2259,15 @@ export default function PostCard({
                                     className="hai-comment__action is-danger"
                                   >
                                     {lang === 'en' ? 'Report' : lang === 'ur' ? 'رپورٹ' : 'إبلاغ'}
+                                  </button>
+                                )}
+                                {/* Mod/admin — remove another user's reply. */}
+                                {isAdmin && reply.author.id !== currentUserId && (
+                                  <button
+                                    onClick={() => deleteComment(reply.id, post.id)}
+                                    className="hai-comment__action is-danger"
+                                  >
+                                    {lang === 'en' ? 'Delete' : 'حذف'}
                                   </button>
                                 )}
                               </div>
@@ -2436,7 +2457,7 @@ export default function PostCard({
       )}
 
       {/* User Profile Popup */}
-      {showUserPopup && (() => {
+      {showUserPopup && ((post: any) => {
         const rep = post.author.reputation
         const level = getRepLevel(rep)
         const levelLabel = { new: lang === 'en' ? 'New' : lang === 'ur' ? 'نیا' : 'جديد', active: lang !== 'en' ? 'نشط' : 'Active', trusted: lang !== 'en' ? 'موثوق' : 'Trusted', top: lang !== 'en' ? 'متميّز' : 'Top' }[level]
@@ -2660,7 +2681,7 @@ export default function PostCard({
             </div>
           </div>
         )
-      })()}
+      })(popupUser ? { ...post, author: popupUser } : post)}
 
       {/* Fullscreen Avatar */}
       {/* Mod / admin: Edit category sheet — bypasses the keyword
