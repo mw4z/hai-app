@@ -350,18 +350,12 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true, 
                   const icon = CATEGORY_ICON[it.category] || '💬'
                   const thumb = it.imageUrls?.[0]
                   return (
-                    <li key={it.id} className="relative">
-                      {canManage && (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); removeHighlight(it.id) }}
-                          className="absolute top-2 end-2 z-10 px-2 py-0.5 rounded-full bg-white/90 dark:bg-gray-700 text-red-500 text-[11px] font-semibold shadow active:scale-90"
-                        >{lang === 'en' ? 'Remove' : 'إزالة'}</button>
-                      )}
-                      <button
-                        type="button"
+                    <li key={it.id}>
+                      <div
+                        role="button"
+                        tabIndex={0}
                         onClick={() => go(it.id)}
-                        className="w-full text-start flex gap-3 px-4 py-3 active:bg-gray-50 dark:active:bg-gray-800"
+                        className="w-full text-start flex gap-3 px-4 py-3 active:bg-gray-50 dark:active:bg-gray-800 cursor-pointer"
                       >
                         {/* Thumbnail OR category icon */}
                         {thumb ? (
@@ -425,9 +419,16 @@ export default function HighlightsSection({ items, autoOpenForFirstTime = true, 
                                 {it.commentCount}
                               </span>
                             )}
+                            {canManage && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); removeHighlight(it.id) }}
+                                className="text-red-500 font-semibold ms-auto active:opacity-60"
+                              >{lang === 'en' ? 'Remove' : 'إزالة'}</button>
+                            )}
                           </div>
                         </div>
-                      </button>
+                      </div>
                     </li>
                   )
                 })}
@@ -486,7 +487,7 @@ function PinnedList({ items, lang, canManage = false, onRemove, onOpenPost, empt
                     <button type="button" onClick={() => it.sourceId && onOpenPost?.(it.sourceId)} className="text-primary-600 dark:text-primary-400 font-semibold">{actionLabel}</button>
                   ) : null}
                   {canManage && onRemove && (
-                    <button onClick={() => onRemove(it.id)} className="text-red-500 font-semibold ms-auto">{tr('Remove', 'إزالة')}</button>
+                    <button type="button" onClick={() => onRemove(it.id)} className="text-red-500 font-semibold ms-auto active:opacity-60">{tr('Remove', 'إزالة')}</button>
                   )}
                 </div>
               </div>
