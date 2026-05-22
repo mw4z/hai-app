@@ -19,6 +19,7 @@ import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import { useAttachContact } from '@/hooks/useAttachContact'
+import { formatContactSnippet } from '@/lib/contactPicker'
 import { playSend } from '@/lib/sound'
 import SmartText from '@/components/SmartText'
 import SmartTextWithPlacePreviews from '@/components/SmartTextWithPlacePreviews'
@@ -1894,12 +1895,15 @@ export default function ChatClient({
         <PlacePickerSheet
           open={showPlacePicker}
           onClose={() => setShowPlacePicker(false)}
-          onSelect={(place) => {
-            const link = `/directory/${place.id}`
+          onSelect={(item) => {
+            const text = item.kind === 'service'
+              ? formatContactSnippet({ name: item.name, phone: item.phone })
+              : `/directory/${item.id}`
+            if (!text) return
             setText((prev) => {
-              if (!prev) return link
-              if (prev.includes(link)) return prev
-              return `${prev.trimEnd()}\n${link}`
+              if (!prev) return text
+              if (prev.includes(text)) return prev
+              return `${prev.trimEnd()}\n${text}`
             })
             try { textInputRef.current?.focus() } catch {}
           }}

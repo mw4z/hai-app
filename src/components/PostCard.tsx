@@ -41,6 +41,7 @@ import { StatePill } from '@/lib/state-render'
 import { fullName } from '@/lib/displayName'
 import { directoryUIVisible } from '@/lib/places/featureFlag'
 import { extractServiceContact } from '@/lib/services/extractContact'
+import { formatContactSnippet } from '@/lib/contactPicker'
 
 /**
  * v2 category → semantic label + icon.
@@ -1888,20 +1889,25 @@ export default function PostCard({
         <PlacePickerSheet
           open={placePickerFor !== null}
           onClose={() => setPlacePickerFor(null)}
-          onSelect={(place) => {
-            const link = `/directory/${place.id}`
+          onSelect={(item) => {
+            // Places insert a /directory/<id> link (place preview card);
+            // service contacts insert a callable "📱 name — phone" snippet.
+            const text = item.kind === 'service'
+              ? formatContactSnippet({ name: item.name, phone: item.phone })
+              : `/directory/${item.id}`
+            if (!text) return
             const target = placePickerFor
             if (target === 'comment') {
               setCommentText((prev) => {
-                if (!prev) return link
-                if (prev.includes(link)) return prev
-                return `${prev.trimEnd()}\n${link}`
+                if (!prev) return text
+                if (prev.includes(text)) return prev
+                return `${prev.trimEnd()}\n${text}`
               })
             } else if (target === 'reply') {
               setReplyText((prev) => {
-                if (!prev) return link
-                if (prev.includes(link)) return prev
-                return `${prev.trimEnd()}\n${link}`
+                if (!prev) return text
+                if (prev.includes(text)) return prev
+                return `${prev.trimEnd()}\n${text}`
               })
             }
           }}

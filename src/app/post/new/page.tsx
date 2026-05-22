@@ -20,6 +20,7 @@ import { playSuccess, playError } from '@/lib/sound'
 import { FiX } from 'react-icons/fi'
 import ContextualGuide from '@/components/ContextualGuide'
 import PlacePickerSheet from '@/components/places/PlacePickerSheet'
+import { formatContactSnippet } from '@/lib/contactPicker'
 import { directoryUIVisible } from '@/lib/places/featureFlag'
 
 /** نَبْضي post-create guide steps. Mirrors the user spec — three
@@ -1638,12 +1639,15 @@ export default function NewPostPage() {
         <PlacePickerSheet
           open={placePickerOpen}
           onClose={() => setPlacePickerOpen(false)}
-          onSelect={(place) => {
-            const link = `/directory/${place.id}`
+          onSelect={(item) => {
+            const text = item.kind === 'service'
+              ? formatContactSnippet({ name: item.name, phone: item.phone })
+              : `/directory/${item.id}`
+            if (!text) return
             setBody((prev) => {
-              if (!prev) return link
-              if (prev.includes(link)) return prev
-              return `${prev.trimEnd()}\n${link}`
+              if (!prev) return text
+              if (prev.includes(text)) return prev
+              return `${prev.trimEnd()}\n${text}`
             })
           }}
         />
