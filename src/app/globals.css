@@ -634,6 +634,20 @@ html.dark .hai-screen .hai-input,
 html.dark .hai-screen .hai-input-group .hai-input-affix {
   background: var(--hai-surface-1);
 }
+/* The inner <input> of the group is `background: transparent`, but iOS
+   WKWebView paints its OWN light native text-field background on top of
+   that — which left the number half lighter than the +966 half. Force
+   appearance:none + an explicit dark fill (and the same on autofill) so
+   the whole box is one uniform dark. */
+html.dark .hai-screen .hai-input-group input {
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--hai-surface-1) !important;
+}
+html.dark .hai-screen .hai-input-group input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--hai-surface-1) inset;
+  -webkit-text-fill-color: var(--hai-text);
+}
 /* Same idea for Neighborhood Directory pages. The wrappers use
    bg-gray-50 (light) / bg-gray-900 (dark) for a slightly recessed
    feel vs the white card surfaces inside; without this override
