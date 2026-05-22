@@ -142,6 +142,11 @@ export default function NotificationsClient({
   function getLink(n: Notification): string {
     if (n.rideRequestId) return `/rides/${n.rideRequestId}`
     if (n.threadId) return `/threads/${n.threadId}`
+    // Owner-confirmation prompt for a service-contact number matched to
+    // this user → the "is this your number?" claim screen.
+    if (n.type === 'SYSTEM' && (n.title?.includes('اقتراح رقمك') || n.titleEn?.includes('suggested as a service'))) {
+      return '/directory/services/claim'
+    }
     if (n.postId) return `/feed`
     return '/feed'
   }
