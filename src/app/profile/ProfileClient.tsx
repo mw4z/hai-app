@@ -11,6 +11,7 @@ import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useLanguage, LANGUAGE_CHANGE_EVENT } from '@/hooks/useLanguage'
 import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
 import { pushBackHandler } from '@/lib/backHandler'
+import { clearLocalStoragePreservingPrefs } from '@/lib/clearStorageOnLogout'
 import { useConfirm } from '@/components/ConfirmProvider'
 import {
   FiMapPin, FiStar, FiFileText, FiLogOut, FiCamera,
@@ -331,8 +332,11 @@ export default function ProfileClient({ user, postCount }: Props) {
     } catch { /* not on Capacitor or older version */ }
 
     // 3. Wipe storages — clears any cached user-id / preset / language
-    //    state so the next login starts clean.
-    try { localStorage.clear() } catch {}
+    //    state so the next login starts clean. PRESERVES device-level UX
+    //    "seen" flags (first-run guide / tours / theme) so they don't
+    //    replay on every re-login — step 2's clearAllCookies() also wiped
+    //    the cookie mirror, so localStorage is now the durable marker.
+    clearLocalStoragePreservingPrefs()
     try { sessionStorage.clear() } catch {}
 
     // 4. Hard reload to /. Bypasses the router cache so no SSR'd
