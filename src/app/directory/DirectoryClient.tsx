@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { FiSliders, FiX } from 'react-icons/fi'
 import type { PlaceCategory } from '@prisma/client'
 import { useLanguage } from '@/hooks/useLanguage'
 import type { PublicPlace } from '@/lib/places/serialize'
 import PlaceCard from '@/components/places/PlaceCard'
+import ServiceContactsPanel from '@/components/places/ServiceContactsPanel'
 import CategoryChips from '@/components/places/CategoryChips'
 import DirectoryHeader from '@/components/places/DirectoryHeader'
 import ContextualGuide from '@/components/ContextualGuide'
@@ -78,6 +80,14 @@ export default function DirectoryClient({
   const { lang } = useLanguage()
   const tr = (en: string, ar: string, ur: string) =>
     lang === 'en' ? en : lang === 'ur' ? ur : ar
+
+  const searchParams = useSearchParams()
+  // Two surfaces under one "دليل الحي": map-based places vs lightweight
+  // service contacts/numbers. The add-service flow routes back with
+  // ?tab=services so the user lands on the right tab.
+  const [tab, setTab] = useState<'places' | 'services'>(
+    searchParams?.get('tab') === 'services' ? 'services' : 'places',
+  )
 
   const [q, setQ] = useState('')
   const [category, setCategory] = useState<PlaceCategory | null>(null)
@@ -170,6 +180,31 @@ export default function DirectoryClient({
           </div>
         )}
 
+        {/* Places vs Service contacts — two surfaces under دليل الحي. */}
+        <div className="flex gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => setTab('places')}
+            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${tab === 'places' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
+          >
+            🏘️ {tr('Places', 'أماكن', 'جگہیں')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('services')}
+            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${tab === 'services' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
+          >
+            📇 {tr('Services & numbers', 'خدمات وأرقام', 'خدمات و نمبر')}
+          </button>
+        </div>
+
+        {tab === 'services' ? (
+          <ServiceContactsPanel
+            isReadOnly={isReadOnly}
+            browseNeighborhoodId={isReadOnly ? (browseNeighborhood?.id ?? null) : null}
+          />
+        ) : (
+        <>
         <p className="text-sm text-gray-500 dark:text-gray-400 pt-1">{headerSubtitle}</p>
 
         <div className="flex items-center gap-2">
@@ -286,6 +321,8 @@ export default function DirectoryClient({
           <div className="space-y-2.5" style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 2rem)' }}>
             {places.map((p) => <PlaceCard key={p.id} place={p} />)}
           </div>
+        )}
+        </>
         )}
       </div>
       {/* Directory guide — only mount in own-neighborhood mode.

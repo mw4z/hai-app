@@ -39,6 +39,8 @@ import RiyalIcon from './RiyalIcon'
 import UserBadgeDisplay, { TierLabel } from './UserBadge'
 import { StatePill } from '@/lib/state-render'
 import { fullName } from '@/lib/displayName'
+import { directoryUIVisible } from '@/lib/places/featureFlag'
+import { extractServiceContact } from '@/lib/services/extractContact'
 
 /**
  * v2 category → semantic label + icon.
@@ -1205,6 +1207,31 @@ export default function PostCard({
                     </span>
                   </button>
                 )}
+                {/* Add an extracted phone to the directory (خدمات وأرقام).
+                    Shown only when the directory is enabled and the post
+                    text holds a Saudi number — the user reviews + confirms
+                    on the next screen, and the server resolves-or-creates
+                    (links to an existing provider/contact, never auto-
+                    exposes a normal user). */}
+                {directoryUIVisible() && (() => {
+                  const found = extractServiceContact(post.body || '')
+                  if (found.phones.length === 0) return null
+                  const first = found.phones[0]
+                  const params = new URLSearchParams({ phone: first.raw, sourcePostId: post.id })
+                  if (found.suggestedName) params.set('name', found.suggestedName)
+                  if (found.suggestedCategory) params.set('category', found.suggestedCategory)
+                  return (
+                    <button
+                      onClick={() => { setShowMenu(false); router.push(`/directory/services/new?${params.toString()}`) }}
+                      className="hai-menu-item"
+                    >
+                      <span className="hai-icon-sm hai-menu-item__icon" aria-hidden>📇</span>
+                      <span className="hai-menu-item__label">
+                        {lang === 'en' ? 'Add number to directory' : lang === 'ur' ? 'نمبر ڈائریکٹری میں شامل کریں' : 'إضافة الرقم للدليل'}
+                      </span>
+                    </button>
+                  )
+                })()}
                 {/* Report post */}
                 {post.author.id !== currentUserId && (
                   <button

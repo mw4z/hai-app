@@ -37,6 +37,7 @@ model Neighborhood {
   emergencyAlertRequests EmergencyAlertRequest[]
   pollRequests           PollRequest[]
   placeListings          PlaceListing[]
+  serviceContacts        DirectoryServiceContact[]
   createdAt DateTime @default(now())
 }
 
@@ -186,6 +187,10 @@ model User {
   placeReportsFiled     PlaceReport[]       @relation("PlaceReportsFiled")
   placeReviewsAuthored  PlaceReview[]       @relation("PlaceReviewsAuthored")
   placeReviewsReplied   PlaceReview[]       @relation("PlaceReviewsReplied")
+  serviceContactsCreated     DirectoryServiceContact[] @relation("ServiceContactsCreated")
+  serviceIdentitiesLinked    ServiceIdentity[]         @relation("ServiceIdentityLinked")
+  serviceIdentitiesOwned     ServiceIdentity[]         @relation("ServiceIdentityOwner")
+  serviceContactReportsFiled ServiceContactReport[]    @relation("ServiceContactReportsFiled")
   placeReviewReportsFiled    PlaceReviewReport[] @relation("PlaceReviewReporter")
   placeReviewReportsResolved PlaceReviewReport[] @relation("PlaceReviewReportResolver")
 
@@ -1952,4 +1957,164 @@ model PlaceReviewReport {
   @@index([reviewId, status])
   // Mod-dashboard query — pending reports ordered by recency.
   @@index([status, createdAt])
+}
+
+// ── Service-contact directory ─────────────────────────────────────
+// Phone identity is SEPARATED from the public listing so (a) one number
+// can back listings in several neighborhoods and (b) a number that
+// belongs to a normal app user is never turned into a public profile
+// without that user's consent.
+//
+//   ServiceIdentity         — the phone itself: hashed for dedup/match
+//                             (never reversible) + E.164 stored encrypted
+//                             at rest when SERVICE_PHONE_KEY is set.
+//                             linkedUserId = we MATCHED the phone to a
+//                             user (a marker ONLY — never permission to
+//                             expose them); ownerUserId = a user who
+//                             EXPLICITLY accepted ownership.
+//   DirectoryServiceContact — a public listing for that identity in one
+//                             neighborhood + category, with display data.
+model ServiceIdentity {
+  id            String   @id @default(cuid())
+  // HMAC-SHA256(e164, pepper) — the dedup / match key. Not reversible.
+  phoneHash     String   @unique
+  // E.164, AES-256-GCM encrypted when SERVICE_PHONE_KEY is set (plaintext
+  // fallback otherwise). Decrypted server-side only when building a
+  // PUBLIC contact card (community contacts display the number).
+  phoneEnc      String
+
+  // Set when the phone matched an existing app user. PRIVACY: a match
+  // marker ONLY — must NEVER expose the user's name/profile or the fact
+  // that the number is theirs.
+  linkedUserId  String?
+  linkedUser    User?    @relation("ServiceIdentityLinked", fields: [linkedUserId], references: [id])
+  // Set only when that user EXPLICITLY accepted ownership.
+  ownerUserId   String?
+  ownerUser     User?    @relation("ServiceIdentityOwner", fields: [ownerUserId], references: [id])
+
+  contacts      DirectoryServiceContact[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([linkedUserId])
+  @@index([ownerUserId])
+}
+
+model DirectoryServiceContact {
+  id                String           @id @default(cuid())
+
+  serviceIdentityId String
+  serviceIdentity   ServiceIdentity  @relation(fields: [serviceIdentityId], references: [id], onDelete: Cascade)
+
+  neighborhoodId    String
+  neighborhood      Neighborhood     @relation(fields: [neighborhoodId], references: [id])
+
+  category          ServiceCategory
+  displayName       String
+  description       String?          // short description of the service
+  whatsapp          Boolean          @default(false) // WhatsApp on the same number
+  serviceArea       String?          // free-text area covered ("شمال جدة")
+  notes             String?
+
+  source            ServiceContactSource @default(COMMUNITY_ADDED)
+  verification      ServiceVerification  @default(UNVERIFIED)
+  status            ServiceContactStatus @default(ACTIVE)
+
+  // Submitter — NEVER exposed in public API responses.
+  createdByUserId   String?
+  createdByUser     User?            @relation("ServiceContactsCreated", fields: [createdByUserId], references: [id])
+
+  // Audit: when the number was extracted from a post/comment, keep the
+  // origin id (not exposed publicly) so abuse can be traced back.
+  sourcePostId      String?
+  sourceCommentId   String?
+
+  reportCount       Int              @default(0)
+  reports           ServiceContactReport[]
+
+  // Denormalized community-review summary. 0/0 renders cleanly, no JOIN.
+  ratingAvg         Float            @default(0)
+  ratingCount       Int              @default(0)
+
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  // Dedup: one listing per identity per (neighborhood, category). The
+  // SAME identity may appear in multiple neighborhoods (separate rows).
+  @@unique([serviceIdentityId, neighborhoodId, category])
+  @@index([neighborhoodId, category, status])
+  @@index([neighborhoodId, status, createdAt])
+  @@index([serviceIdentityId])
+  @@index([createdByUserId])
+}
+
+model ServiceContactReport {
+  id        String                     @id @default(cuid())
+
+  contactId String
+  contact   DirectoryServiceContact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User                       @relation("ServiceContactReportsFiled", fields: [userId], references: [id])
+
+  reason    ServiceContactReportReason
+  message   String?
+
+  createdAt DateTime                   @default(now())
+
+  // One report per (reporter, contact).
+  @@unique([contactId, userId])
+  @@index([contactId])
+  @@index([userId, createdAt])
+}
+
+// How the listing entered the directory.
+enum ServiceContactSource {
+  COMMUNITY_ADDED   // مضاف من السكان
+  OWNER_SUBMITTED   // submitted by the number's owner
+}
+
+// Trust ladder for a service contact (independent of moderation status).
+enum ServiceVerification {
+  UNVERIFIED                  // غير موثق
+  PENDING_OWNER_CONFIRMATION  // بانتظار تأكيد صاحب الرقم (matched a user)
+  CLAIMED                     // owner accepted ownership
+  VERIFIED                    // owner completed verification → "مزود خدمة موثق"
+}
+
+// Moderation / visibility status.
+enum ServiceContactStatus {
+  ACTIVE          // publicly visible
+  PENDING_REVIEW  // queued (moderation OR owner-confirmation) — not public
+  HIDDEN          // auto-hidden after reports / mod-hidden
+  REMOVED         // mod-removed
+}
+
+// Service trades — distinct from PlaceCategory (place TYPES) because a
+// service contact is about WHAT the person does, not a venue type.
+enum ServiceCategory {
+  PLUMBER          // سباك
+  ELECTRICIAN      // كهربائي
+  CARPENTER        // نجار
+  PAINTER          // دهان
+  AC_TECH          // فني تكييف
+  CLEANING         // عمالة نظافة
+  MOVING           // نقل عفش
+  TUTOR            // مدرّس / تأسيس
+  TAILOR           // خياط
+  HOME_FOOD        // طبخ منزلي / أسر منتجة
+  CAR_SERVICE      // خدمة سيارات متنقلة
+  TECH_REPAIR      // صيانة أجهزة
+  HEALTH_HOME      // خدمات صحية منزلية
+  OTHER            // أخرى
+}
+
+// Report reasons specific to service contacts (people/phone-based),
+// distinct from PlaceReportType which is venue-oriented.
+enum ServiceContactReportReason {
+  WRONG_PHONE       // رقم غير صحيح
+  NOT_THIS_PERSON   // لا يخص هذا الشخص
+  FRAUD_OR_ABUSE    // احتيال أو إزعاج
+  INAPPROPRIATE     // محتوى غير مناسب
 }
