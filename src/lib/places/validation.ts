@@ -3,20 +3,16 @@ import { isValidPlacePhone } from '@/lib/phone'
 import { normalizePlaceName } from './normalize'
 
 /**
- * Reputation threshold for elevated place-creation limits.
- *
- *   reputation < 150 → 3 places per rolling 7 days
- *   reputation ≥ 150 → 7 places per rolling 7 days
- *
- * Picked to match the existing "trusted resident" floor used
- * elsewhere in the codebase (post limits, etc. — see
- * src/lib/reputation*.ts).
+ * Place-creation limit for normal residents: a flat 10 places per rolling
+ * 24 hours, regardless of reputation. (Mods/admins bypass the limit
+ * entirely — see the directory POST route.) The reputation threshold is
+ * retained for any other callers but no longer changes the place limit.
  */
 export const DIRECTORY_TRUSTED_REPUTATION = 150
 
-export const PLACE_LIMIT_NORMAL = 3
-export const PLACE_LIMIT_TRUSTED = 7
-export const PLACE_LIMIT_WINDOW_MS = 7 * 24 * 3600 * 1000
+export const PLACE_LIMIT_NORMAL = 10
+export const PLACE_LIMIT_TRUSTED = 10
+export const PLACE_LIMIT_WINDOW_MS = 24 * 3600 * 1000
 
 export const CLAIM_PENDING_MAX = 3
 export const REPORT_DAILY_MAX = 10

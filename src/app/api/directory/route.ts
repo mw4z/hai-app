@@ -131,8 +131,8 @@ export async function GET(req: NextRequest) {
  * imageUrls is silently stripped — Phase 1.5 will reintroduce
  * image uploads through a dedicated path.
  *
- * Rate limit: 3 / 7 days for normal residents, 7 / 7 days when
- * reputation ≥ 150. SUPER_ADMIN / directory mods bypass.
+ * Rate limit: 10 places / day for all normal residents. SUPER_ADMIN /
+ * directory mods bypass entirely.
  *
  * Initial status: PENDING. Once we have a "neighborhood has no
  * active mods" signal we can flip new submissions to
@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
     const limit = placeLimitForUser(user.reputation)
     if (recent >= limit) {
       return NextResponse.json(
-        { error: 'وصلت الحد الأقصى لإضافة الأماكن هذا الأسبوع' },
+        { error: 'وصلت الحد الأقصى لإضافة الأماكن اليوم' },
         { status: 429 },
       )
     }
