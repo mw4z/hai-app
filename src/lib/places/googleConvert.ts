@@ -61,6 +61,15 @@ const TYPE_MAP: Record<string, PlaceCategory> = {
   barber_shop: 'SALON',
   spa: 'SALON',
 
+  // استراحات وقاعات — event/venue halls + rest houses (chalets). Google has
+  // no precise "rest house" type; these are the closest signals.
+  event_venue: 'RESTHOUSE_HALL',
+  banquet_hall: 'RESTHOUSE_HALL',
+  wedding_venue: 'RESTHOUSE_HALL',
+  convention_center: 'RESTHOUSE_HALL',
+  community_center: 'RESTHOUSE_HALL',
+  resort_hotel: 'RESTHOUSE_HALL',
+
   store: 'SHOP_SERVICES',
   shopping_mall: 'SHOP_SERVICES',
   clothing_store: 'SHOP_SERVICES',

@@ -25,6 +25,7 @@ export const PLACE_CATEGORIES: PlaceCategoryMeta[] = [
   { key: 'SHOP_SERVICES',       emoji: '🛍️', labelAr: 'محلات وخدمات',     labelEn: 'Shops & services',    labelUr: 'دکانیں اور خدمات' },
   { key: 'GYM_CENTER',          emoji: '🏋️', labelAr: 'نوادي ومراكز',     labelEn: 'Gyms & centers',      labelUr: 'جم اور مراکز' },
   { key: 'SALON',               emoji: '💇', labelAr: 'صالونات',           labelEn: 'Salons',              labelUr: 'سیلون' },
+  { key: 'RESTHOUSE_HALL',      emoji: '🏡', labelAr: 'استراحات وقاعات',   labelEn: 'Rest houses & halls', labelUr: 'ریسٹ ہاؤسز اور ہالز' },
   { key: 'OTHER',               emoji: '📍', labelAr: 'أخرى',              labelEn: 'Other',               labelUr: 'دیگر' },
 ]
 

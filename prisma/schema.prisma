@@ -1679,6 +1679,7 @@ enum PlaceCategory {
   SHOP_SERVICES
   GYM_CENTER
   SALON
+  RESTHOUSE_HALL
   OTHER
 }
 
