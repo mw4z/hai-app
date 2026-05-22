@@ -58,8 +58,8 @@ export default async function ModDirectoryPage() {
     }),
     db.placeReport.findMany({
       where: cross
-        ? {}
-        : { place: { neighborhoodId: user.neighborhoodId ?? '__none__' } },
+        ? { status: 'PENDING' }
+        : { status: 'PENDING', place: { neighborhoodId: user.neighborhoodId ?? '__none__' } },
       orderBy: { createdAt: 'desc' },
       take: 50,
       include: {

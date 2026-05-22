@@ -640,8 +640,11 @@ function ReviewReportRow({
 
 function ReportRow({ report }: { report: RecentReport }) {
   const { lang } = useLanguage()
+  const promptDialog = usePrompt()
   const tr = (en: string, ar: string, ur: string) => (lang === 'en' ? en : lang === 'ur' ? ur : ar)
   const cat = getCategoryMeta(report.place.category)
+  const [resolved, setResolved] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   const TYPE_LABELS: Record<PlaceReportType, [ar: string, en: string]> = {
     WRONG_INFO:     ['معلومة خاطئة', 'Wrong info'],
     CLOSED:         ['المكان مغلق', 'Closed'],
@@ -652,23 +655,61 @@ function ReportRow({ report }: { report: RecentReport }) {
     OTHER:          ['أخرى', 'Other'],
   }
   const [ar, en] = TYPE_LABELS[report.type]
+  // Accepting / actioning these two types rewards the reporter (+3).
+  const rewardable = report.type === 'DUPLICATE' || report.type === 'CLOSED'
+
+  async function act(action: 'accept' | 'dismiss' | 'actioned') {
+    if (busy) return
+    let note = ''
+    if (action === 'dismiss' || action === 'actioned') {
+      const r = await promptDialog({
+        title: action === 'dismiss' ? tr('Dismiss report', 'رفض البلاغ', 'مسترد') : tr('Mark actioned', 'تم اتخاذ إجراء', 'اقدام'),
+        message: action === 'dismiss'
+          ? tr('Why is this report invalid?', 'لماذا البلاغ غير صحيح؟', '')
+          : tr('What correction was applied? (removed / merged / marked closed)', 'ما التصحيح الذي طُبّق؟ (حذف / دمج / تم وضعه مغلق)', ''),
+      })
+      if (r === null) return
+      note = r
+    }
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/mod/directory/reports/${report.id}/action`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, note, ...(action === 'actioned' ? { actionType: note.slice(0, 60) } : {}) }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(d.error || tr('Failed', 'فشل', 'ناکام')); return }
+      setResolved(action)
+      toast.success(d.awarded > 0
+        ? tr(`Done · +${d.awarded} to reporter`, `تم · +${d.awarded} للمبلِّغ`, 'ہو گیا')
+        : tr('Done', 'تم', 'ہو گیا'))
+    } catch { toast.error(tr('Connection error', 'خطأ بالاتصال', 'کنکشن خرابی')) }
+    finally { setBusy(false) }
+  }
+
+  if (resolved) return null
 
   return (
-    <Link
-      href={`/directory/${report.place.id}`}
-      className="block bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-3.5 space-y-1"
-    >
-      <div className="flex items-start gap-3">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-3.5 space-y-2">
+      <Link href={`/directory/${report.place.id}`} className="flex items-start gap-3">
         <span className="text-2xl">{cat.emoji}</span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{report.place.name}</p>
-          <p className="text-xs text-rose-600 dark:text-rose-400">{lang === 'en' ? en : ar}</p>
+          <p className="text-xs text-rose-600 dark:text-rose-400">
+            {lang === 'en' ? en : ar}
+            {rewardable && <span className="text-emerald-600 dark:text-emerald-400"> · {tr('+3 on accept', 'قبول = +3 للمبلِّغ', '')}</span>}
+          </p>
           {report.message && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{report.message}</p>}
           <p className="text-[10px] text-gray-400 mt-1">
             {tr('Reported by', 'بلّغ:', 'شکایت کنندہ:')} {report.reporter.name ?? '—'}
           </p>
         </div>
+      </Link>
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => act('accept')} disabled={busy} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold disabled:opacity-50">{tr('Accept', 'قبول', 'قبول')}</button>
+        <button onClick={() => act('actioned')} disabled={busy} className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-semibold disabled:opacity-50">{tr('Mark actioned', 'تم اتخاذ إجراء', 'اقدام')}</button>
+        <button onClick={() => act('dismiss')} disabled={busy} className="px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold disabled:opacity-50">{tr('Dismiss', 'رفض', 'مسترد')}</button>
       </div>
-    </Link>
+    </div>
   )
 }

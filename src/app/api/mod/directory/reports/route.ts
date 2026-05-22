@@ -28,8 +28,8 @@ export async function GET(_req: NextRequest) {
 
   const reports = await db.placeReport.findMany({
     where: cross
-      ? {}
-      : { place: { neighborhoodId: user.neighborhoodId ?? '__none__' } },
+      ? { status: 'PENDING' }
+      : { status: 'PENDING', place: { neighborhoodId: user.neighborhoodId ?? '__none__' } },
     orderBy: { createdAt: 'desc' },
     take: 50,
     include: {

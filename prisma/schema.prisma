@@ -186,6 +186,7 @@ model User {
   placeClaimsSubmitted  PlaceClaimRequest[] @relation("PlaceClaimsSubmitted")
   placeClaimsReviewed   PlaceClaimRequest[] @relation("PlaceClaimsReviewed")
   placeReportsFiled     PlaceReport[]       @relation("PlaceReportsFiled")
+  placeReportsReviewed  PlaceReport[]       @relation("PlaceReportsReviewed")
   placeReviewsAuthored  PlaceReview[]       @relation("PlaceReviewsAuthored")
   placeReviewsReplied   PlaceReview[]       @relation("PlaceReviewsReplied")
   serviceContactsCreated     DirectoryServiceContact[] @relation("ServiceContactsCreated")
@@ -1878,10 +1879,32 @@ model PlaceReport {
   type      PlaceReportType
   message   String?
 
+  // Lifecycle. PENDING until a mod acts. ACCEPTED = confirmed valid;
+  // ACTIONED = a real directory correction was applied (removal / merge /
+  // marked-closed / corrected); DISMISSED = invalid/no action. Reputation
+  // is awarded (for DUPLICATE/CLOSED only) on ACCEPTED or ACTIONED.
+  status        PlaceReportStatus @default(PENDING)
+  reviewedById  String?
+  reviewedBy    User?           @relation("PlaceReportsReviewed", fields: [reviewedById], references: [id])
+  reviewedAt    DateTime?
+  reviewNote    String?
+  // What correction was applied, when ACTIONED (e.g. "removed",
+  // "marked_closed", "merged", "corrected"). Free-form, mod-set.
+  actionType    String?
+
   createdAt DateTime        @default(now())
 
   @@index([placeId])
+  @@index([placeId, status])
   @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+enum PlaceReportStatus {
+  PENDING
+  ACCEPTED
+  DISMISSED
+  ACTIONED
 }
 
 // ── Directory reviews ─────────────────────────────────────────
