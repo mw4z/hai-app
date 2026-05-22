@@ -24,7 +24,7 @@ const IOS_STORE_URL =
   'https://apps.apple.com/us/app/%D8%AD%D9%8A/id6761731680'
 const ANDROID_STORE_URL =
   process.env.NEXT_PUBLIC_ANDROID_STORE_URL ||
-  'https://play.google.com/store/apps/details?id=net.hai_app.hai'
+  'https://play.google.com/store/apps/details?id=com.hai.app'
 
 function detectPlatform(): 'ios' | 'android' | 'other' {
   if (typeof navigator === 'undefined') return 'other'
@@ -88,6 +88,14 @@ export default function InviteLandingPage({
     // the invite flow looks like it "went nowhere".
     if (isNativeAppUA()) {
       const t = setTimeout(() => router.replace('/'), 2200)
+      return () => clearTimeout(t)
+    }
+
+    // Plain Android browser → transfer to Google Play automatically (the
+    // invite code was saved above). Brief delay so the "you're invited"
+    // preview shows first. iOS keeps its existing button flow.
+    if (detectPlatform() === 'android') {
+      const t = setTimeout(() => { window.location.href = ANDROID_STORE_URL }, 1400)
       return () => clearTimeout(t)
     }
   }, [params.code, router])
