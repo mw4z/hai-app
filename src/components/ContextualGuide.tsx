@@ -85,6 +85,21 @@ function storageKey(guideId: string) {
   return `hai:context-guide:${guideId}:v1`
 }
 
+// Seen-state is mirrored to a cookie so it survives logout's
+// localStorage.clear() — otherwise these guides re-ran on every login.
+// Cookie names can't contain ':' — map to a token-safe name. onboarding/
+// clears both for new accounts.
+function cookieName(k: string) { return k.replace(/[^a-zA-Z0-9]/g, '_') }
+function cookieHas(k: string) {
+  try { return typeof document !== 'undefined' && document.cookie.includes(cookieName(k) + '=1') } catch { return false }
+}
+function cookieSet(k: string) {
+  try { document.cookie = `${cookieName(k)}=1; path=/; max-age=315360000; SameSite=Lax` } catch { /* ignore */ }
+}
+function cookieClear(k: string) {
+  try { document.cookie = `${cookieName(k)}=; path=/; max-age=0; SameSite=Lax` } catch { /* ignore */ }
+}
+
 function isInputLike(el: Element | null): boolean {
   if (!el) return false
   const tag = el.tagName
@@ -121,20 +136,24 @@ export default function ContextualGuide({
 
     function tryStart() {
       if (cancelled || startedRef.current) return
+      // Seen-state: check cookie too — it survives logout's
+      // localStorage.clear() so the guide never repeats on re-login.
       try {
         if (localStorage.getItem(GLOBAL_KILL_KEY)) return
         if (localStorage.getItem(key)) return
       } catch {
-        // localStorage unavailable — show the guide; better than
-        // silently skipping for users in private mode.
+        // localStorage unavailable — fall through to cookie check.
       }
+      if (cookieHas(GLOBAL_KILL_KEY) || cookieHas(key)) return
 
-      // Don't sit on top of an emergency / warning banner.
-      const hasEmergency = !!document.querySelector(
-        '[data-state="emergency"], [data-state="warning"]',
+      // Don't sit on top of an open window — an emergency / warning
+      // banner OR a modal overlay (e.g. the "أهم ما في الحي" highlights
+      // modal, data-overlay="true"). Hold until it's dismissed.
+      const blocked = !!document.querySelector(
+        '[data-state="emergency"], [data-state="warning"], [data-overlay="true"]',
       )
-      if (hasEmergency) {
-        timer = setTimeout(tryStart, 1500)
+      if (blocked) {
+        timer = setTimeout(tryStart, 800)
         return
       }
       setEmergencyClear(true)
@@ -146,6 +165,10 @@ export default function ContextualGuide({
       }
       timer = setTimeout(() => {
         if (cancelled) return
+        // Mark seen the moment it starts so abandoning it (navigate away /
+        // logout mid-guide) still counts — no repeat.
+        try { localStorage.setItem(key, 'started') } catch { /* ignore */ }
+        cookieSet(key)
         setStepIndex(0)
       }, autoStartDelay)
     }
@@ -173,6 +196,8 @@ export default function ContextualGuide({
       } catch {
         // ignore
       }
+      cookieClear(key)
+      cookieClear(GLOBAL_KILL_KEY)
       startedRef.current = false
       setEmergencyClear(false)
       setStepIndex(-1)
@@ -188,6 +213,7 @@ export default function ContextualGuide({
     } catch {
       // best-effort
     }
+    cookieSet(key)
     setStepIndex(-1)
   }, [key])
 
@@ -198,6 +224,8 @@ export default function ContextualGuide({
     } catch {
       // ignore
     }
+    cookieSet(GLOBAL_KILL_KEY)
+    cookieSet(key)
     setStepIndex(-1)
   }, [key])
 
@@ -210,6 +238,7 @@ export default function ContextualGuide({
         } catch {
           // ignore
         }
+        cookieSet(key)
         return -1
       }
       return i + 1

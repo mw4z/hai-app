@@ -310,10 +310,28 @@ export default function OnboardingPage() {
         ]
         for (const k of tourKeys) localStorage.removeItem(k)
         localStorage.removeItem('hai_splash')
-        // Also clear the seen-COOKIES (they survive logout's
-        // localStorage.clear), otherwise a brand-new account on a device a
-        // previous user already toured would never see the tour.
-        for (const k of tourKeys) {
+        // First-run + contextual guides (مرشد حي): clear localStorage too.
+        localStorage.removeItem('hai:first-run-guide-v1')
+        localStorage.removeItem('hai:context-guides-disabled-v1')
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i)
+          if (k && k.startsWith('hai:context-guide:')) localStorage.removeItem(k)
+        }
+        // Also expire the seen-COOKIES — they survive logout's
+        // localStorage.clear(), so without this a brand-new account on a
+        // device a previous user already toured/guided would never see
+        // the tour or guides. Cookie names mirror the localStorage keys
+        // with non-token chars replaced by '_'.
+        const cookieNames = [
+          ...tourKeys,
+          'hai_first_run_guide_v1',
+          'hai_context_guides_disabled_v1',
+        ]
+        for (const c of document.cookie.split(';')) {
+          const name = c.split('=')[0].trim()
+          if (name.startsWith('hai_context_guide_')) cookieNames.push(name)
+        }
+        for (const k of cookieNames) {
           document.cookie = `${k}=; path=/; max-age=0; SameSite=Lax`
         }
       } catch {}

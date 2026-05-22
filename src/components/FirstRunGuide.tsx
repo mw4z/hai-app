@@ -26,6 +26,18 @@ import HaiGuideMascot from '@/components/HaiGuideMascot'
  */
 
 const STORAGE_KEY = 'hai:first-run-guide-v1'
+// Seen-state mirror in a cookie. Logout does localStorage.clear(), which
+// wiped STORAGE_KEY and made the guide re-run on every login. A cookie
+// survives that, so once seen it never repeats. Cookie names can't hold
+// ':' — use a token-safe name. onboarding/ clears BOTH for new accounts.
+const SEEN_COOKIE = 'hai_first_run_guide_v1'
+function seenInCookie(): boolean {
+  try { return typeof document !== 'undefined' && document.cookie.includes(SEEN_COOKIE + '=1') } catch { return false }
+}
+function markSeen(): void {
+  try { localStorage.setItem(STORAGE_KEY, 'done') } catch { /* ignore */ }
+  try { document.cookie = `${SEEN_COOKIE}=1; path=/; max-age=315360000; SameSite=Lax` } catch { /* ignore */ }
+}
 
 interface Step {
   /** Target selector, or null for a centered welcome bubble. */
@@ -112,22 +124,21 @@ export default function FirstRunGuide({ enabled = true }: Props) {
 
     function tryStart() {
       if (cancelled || startedRef.current) return
-      // Persistence gate — set once, permanent at v1.
-      try {
-        if (localStorage.getItem(STORAGE_KEY)) return
-      } catch {
-        // localStorage unavailable — show the guide; better than
-        // silently skipping for everyone in private mode.
-      }
-      // Don't cover an emergency banner. The banner returns null
-      // when there are no active alerts, so the absence of an
-      // element with data-state="emergency" / "warning" means we're
-      // safe to paint.
-      const hasEmergency = !!document.querySelector(
-        '[data-state="emergency"], [data-state="warning"]',
+      // Persistence gate — set once, permanent at v1. Check the cookie
+      // too: it survives logout (localStorage.clear()) so the guide never
+      // repeats on re-login.
+      let seen = false
+      try { seen = !!localStorage.getItem(STORAGE_KEY) } catch { /* private mode */ }
+      if (seen || seenInCookie()) return
+
+      // Don't paint on top of an open window: an emergency/warning banner
+      // OR a modal overlay (e.g. the "أهم ما في الحي" highlights modal,
+      // data-overlay="true"). Hold and re-poll until it's dismissed.
+      const blocked = !!document.querySelector(
+        '[data-state="emergency"], [data-state="warning"], [data-overlay="true"]',
       )
-      if (hasEmergency) {
-        pollTimer = setTimeout(tryStart, 1500)
+      if (blocked) {
+        pollTimer = setTimeout(tryStart, 800)
         return
       }
       setEmergencyClear(true)
@@ -136,6 +147,9 @@ export default function FirstRunGuide({ enabled = true }: Props) {
       // bottom nav are hydrated and have measurable rects.
       pollTimer = setTimeout(() => {
         if (cancelled) return
+        // Mark seen the moment it starts, so abandoning it (navigate away
+        // / logout mid-tour) still counts — no repeat.
+        markSeen()
         setStepIndex(0)
       }, 700)
     }
@@ -148,12 +162,8 @@ export default function FirstRunGuide({ enabled = true }: Props) {
     }
   }, [enabled])
 
-  const finish = useCallback((completed: boolean) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, completed ? 'done' : 'skipped')
-    } catch {
-      // best-effort
-    }
+  const finish = useCallback((_completed: boolean) => {
+    markSeen()
     setStepIndex(-1)
   }, [])
 
@@ -161,12 +171,7 @@ export default function FirstRunGuide({ enabled = true }: Props) {
     setStepIndex((i) => {
       if (i < 0) return i
       if (i >= STEPS.length - 1) {
-        // last step → mark done
-        try {
-          localStorage.setItem(STORAGE_KEY, 'done')
-        } catch {
-          // ignore
-        }
+        markSeen() // last step → mark done (localStorage + cookie)
         return -1
       }
       return i + 1
