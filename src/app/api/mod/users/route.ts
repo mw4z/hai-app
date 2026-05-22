@@ -27,6 +27,9 @@ export async function GET(req: NextRequest) {
   const isPlatform = me.role === 'PLATFORM_MOD' || me.role === 'SUPER_ADMIN'
 
   const where: any = {
+    // Only real members — hide incomplete signups (OTP-only rows with a
+    // phone but no name yet).
+    name: { not: null },
     ...(isPlatform ? {} : { neighborhoodId: me.neighborhoodId ?? '__none__' }),
     ...(q
       ? {
@@ -50,7 +53,7 @@ export async function GET(req: NextRequest) {
   })
 
   return NextResponse.json({
-    users: users.map((u) => ({
+    users: users.filter((u) => (u.name ?? '').trim().length > 0).map((u) => ({
       id: u.id,
       name: [u.name?.trim(), u.lastName?.trim()].filter(Boolean).join(' ') || u.name || null,
       phone: u.phone,

@@ -100,13 +100,17 @@ export async function GET(req: NextRequest) {
       // wire for admin search; correctness for Arabic-name lookups.
       const dbTake = q ? 500 : 50
       const rows = await db.user.findMany({
-        where: { ...userNbhdFilter },
+        // Only real members — exclude incomplete signups (OTP-only rows
+        // created with a phone but no name yet).
+        where: { ...userNbhdFilter, name: { not: null } },
         select: { id: true, name: true, lastName: true, phone: true, email: true, role: true, status: true, neighborhoodId: true, reputation: true, accountType: true, providerStatus: true },
         orderBy: { createdAt: 'desc' },
         take: dbTake,
       })
+      // Belt-and-suspenders: also drop blank/whitespace names.
+      const named = rows.filter((u) => (u.name ?? '').trim().length > 0)
       const users = q
-        ? rows
+        ? named
             .filter(
               (u) =>
                 (u.phone ?? '').includes(q) ||
@@ -115,7 +119,7 @@ export async function GET(req: NextRequest) {
                 matchesArabic(u.lastName, q),
             )
             .slice(0, 50)
-        : rows
+        : named
       return NextResponse.json(users)
     }
 
