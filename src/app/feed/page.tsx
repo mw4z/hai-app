@@ -367,12 +367,19 @@ export default async function FeedPage({
   }
   if (pickedIdForCookie) {
     const next = [pickedIdForCookie, ...Array.from(seenIds)].slice(0, 10).join(',')
-    cookies().set('hai_req_seen', next, {
-      maxAge: 6 * 3600,
-      sameSite: 'lax',
-      httpOnly: false,
-      path: '/',
-    })
+    // Writing a cookie during a Server Component render now THROWS in
+    // current Next.js ("Cookies can only be modified in a Server Action or
+    // Route Handler") — which was crashing the whole /feed page. Swallow
+    // it: the feed must render regardless. Worst case the request-boost
+    // dedupe doesn't persist across refreshes, which is purely cosmetic.
+    try {
+      cookies().set('hai_req_seen', next, {
+        maxAge: 6 * 3600,
+        sameSite: 'lax',
+        httpOnly: false,
+        path: '/',
+      })
+    } catch { /* RSC render can't set cookies — ignore */ }
   }
 
   // Chip indicator: presence-only dot scoped to the last 6 hours.
