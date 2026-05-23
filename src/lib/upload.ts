@@ -7,9 +7,22 @@ const JPEG_QUALITY = 0.75
  * Resizes to max 1200x1200 and converts to JPEG at 75% quality.
  * Typical 3-5MB phone photo → 100-300KB output.
  */
+// Types the upload API accepts as-is (src/app/api/upload). Anything else
+// (HEIC/HEIF from iPhones, GIF, BMP, TIFF…) MUST be re-encoded to JPEG or
+// the server rejects it with "نوع غير مدعوم".
+const SERVER_OK_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
 function compressImage(file: File): Promise<File> {
   return new Promise((resolve) => {
-    if (!file.type.startsWith('image/') || file.size < 50_000) {
+    // Non-images pass through (handled / rejected by the caller's flow).
+    if (!file.type.startsWith('image/')) {
+      resolve(file)
+      return
+    }
+    // Already a server-accepted type AND small → no re-encode needed.
+    // A NON-accepted type (e.g. HEIC) always gets re-encoded below,
+    // regardless of size, so it never reaches the server unconverted.
+    if (SERVER_OK_TYPES.includes(file.type) && file.size < 50_000) {
       resolve(file)
       return
     }
