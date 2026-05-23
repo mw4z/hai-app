@@ -49,23 +49,27 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   }
 
   try {
-    // First view by this user → create the row + bump the counter
-    // atomically. The unique constraint makes a re-view throw P2002,
-    // which we treat as "already counted".
-    const [, updated] = await db.$transaction([
-      db.postView.create({ data: { postId: post.id, userId: session.userId } }),
-      db.post.update({
-        where: { id: post.id },
-        data: { viewCount: { increment: 1 } },
-        select: { viewCount: true },
-      }),
-    ])
-    return NextResponse.json({ ok: true, viewCount: updated.viewCount })
-  } catch (err: any) {
-    // Already viewed (unique violation) — return the unchanged count.
-    if (err?.code === 'P2002') {
+    // First view by this user → insert the row, then bump the counter.
+    // createMany({ skipDuplicates }) is a no-op (count: 0) on a re-view
+    // instead of throwing P2002 — so re-opening a post doesn't spam the
+    // logs with a caught "Unique constraint failed" error. It's also
+    // race-safe: two concurrent first-views both call createMany, but
+    // only one actually inserts (count: 1), so only one increments.
+    const inserted = await db.postView.createMany({
+      data: [{ postId: post.id, userId: session.userId }],
+      skipDuplicates: true,
+    })
+    if (inserted.count === 0) {
+      // Already viewed — count unchanged.
       return NextResponse.json({ ok: true, viewCount: post.viewCount })
     }
+    const updated = await db.post.update({
+      where: { id: post.id },
+      data: { viewCount: { increment: 1 } },
+      select: { viewCount: true },
+    })
+    return NextResponse.json({ ok: true, viewCount: updated.viewCount })
+  } catch {
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
