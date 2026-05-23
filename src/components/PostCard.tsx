@@ -2139,14 +2139,6 @@ export default function PostCard({
                         )}
                         <div className="hai-comment__actions">
                           <button
-                            onClick={() => handleCommentLike(c.id)}
-                            data-selected={c.isLiked ? 'true' : 'false'}
-                            className="hai-comment__action is-liked"
-                          >
-                            <FiHeart className={`hai-icon-sm ${c.isLiked ? 'hai-fill-current' : ''}`} />
-                            {(c.likeCount || 0) > 0 && <span>{c.likeCount}</span>}
-                          </button>
-                          <button
                             onClick={() => setReplyingTo(replyingTo?.id === c.id ? null : { id: c.id, name: fullName(c.author) || t('post_neighbor') })}
                             className="hai-comment__action"
                           >
@@ -2205,6 +2197,17 @@ export default function PostCard({
                           )}
                         </div>
                       </div>
+                      {/* Instagram-style: like on the trailing edge of the
+                          comment row, count beneath it. */}
+                      <button
+                        type="button"
+                        onClick={() => handleCommentLike(c.id)}
+                        aria-label="like"
+                        className="flex flex-col items-center gap-0.5 flex-shrink-0 self-start pt-1 active:scale-90 transition-transform"
+                      >
+                        <FiHeart className={`hai-icon-sm ${c.isLiked ? 'hai-fill-current text-red-500' : 'text-gray-400'}`} />
+                        {(c.likeCount || 0) > 0 && <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-none">{c.likeCount}</span>}
+                      </button>
                     </div>
 
                     {/* Replies */}
@@ -2258,14 +2261,6 @@ export default function PostCard({
                                 </div>
                               )}
                               <div className="hai-comment__actions">
-                                <button
-                                  onClick={() => handleCommentLike(reply.id)}
-                                  data-selected={reply.isLiked ? 'true' : 'false'}
-                                  className="hai-comment__action is-liked"
-                                >
-                                  <FiHeart className={`hai-icon-xs ${reply.isLiked ? 'hai-fill-current' : ''}`} />
-                                  {(reply.likeCount || 0) > 0 && <span>{reply.likeCount}</span>}
-                                </button>
                                 {reply.author.id === currentUserId && (
                                   <button
                                     onClick={() => deleteComment(reply.id, post.id)}
@@ -2306,6 +2301,15 @@ export default function PostCard({
                                 )}
                               </div>
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => handleCommentLike(reply.id)}
+                              aria-label="like"
+                              className="flex flex-col items-center gap-0.5 flex-shrink-0 self-start pt-0.5 active:scale-90 transition-transform"
+                            >
+                              <FiHeart className={`hai-icon-xs ${reply.isLiked ? 'hai-fill-current text-red-500' : 'text-gray-400'}`} />
+                              {(reply.likeCount || 0) > 0 && <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-none">{reply.likeCount}</span>}
+                            </button>
                           </div>
                         ))}
                       </div>
