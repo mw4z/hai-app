@@ -11,6 +11,7 @@ export interface AdminDashboardData {
     reportedPosts: number
     hiddenPosts: number
     totalUsers: number
+    allUsers: number
     bannedUsers: number
     totalPosts: number
     pendingUserReports: number
@@ -55,6 +56,7 @@ export async function getAdminDashboardData(userId: string): Promise<AdminDashbo
     reportedPosts,
     hiddenPosts,
     totalUsers,
+    allUsers,
     bannedUsers,
     livePostsRaw,
     recentLogs,
@@ -68,6 +70,9 @@ export async function getAdminDashboardData(userId: string): Promise<AdminDashbo
     db.post.count({ where: { ...nbhdFilter, ...womenOnlyFilter, status: 'HIDDEN' } }),
     db.post.count({ where: { ...nbhdFilter, ...womenOnlyFilter, status: 'REMOVED' } }),
     db.user.count({ where: activeUserFilter }),
+    // All real (non-seed) registered users — not just the active/verified
+    // subset above. Neighborhood-scoped for non-platform mods.
+    db.user.count({ where: { deletedAt: null, isSeed: false, ...(nbhdFilter.neighborhoodId ? { neighborhoodId: nbhdFilter.neighborhoodId } : {}) } }),
     db.user.count({ where: { status: { in: ['BANNED_TEMP', 'BANNED_PERM'] }, deletedAt: null, isSeed: false, isVerified: true, addressVerified: true, ...(nbhdFilter.neighborhoodId ? { neighborhoodId: nbhdFilter.neighborhoodId } : {}) } }),
     db.post.findMany({
       where: { ...nbhdFilter, status: { in: ['ACTIVE', 'IN_PROGRESS'] }, author: { isSeed: false, isVerified: true, addressVerified: true } },
@@ -131,7 +136,7 @@ export async function getAdminDashboardData(userId: string): Promise<AdminDashbo
 
   return JSON.parse(JSON.stringify({
     role: admin.role,
-    stats: { pendingRequests, reportedPosts, hiddenPosts, totalUsers, bannedUsers, totalPosts, pendingUserReports, pendingModReports },
+    stats: { pendingRequests, reportedPosts, hiddenPosts, totalUsers, allUsers, bannedUsers, totalPosts, pendingUserReports, pendingModReports },
     recentLogs,
     adminUsers,
     neighborhoodStats,

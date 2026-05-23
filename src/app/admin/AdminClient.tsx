@@ -314,6 +314,7 @@ export default function AdminClient({
           stats ? (
             <div className="grid grid-cols-2 gap-3">
               <StatCard label={t('admin_active_posts')} value={stats.totalPosts} />
+              <StatCard label={lang === 'en' ? 'All users' : 'إجمالي المستخدمين'} value={stats.allUsers} />
               <StatCard label={t('admin_users_count')} value={stats.totalUsers} />
               <StatCard label={t('admin_pending_reports')} value={stats.reportedPosts} color="amber" />
               <StatCard label={t('admin_transfer_reqs')} value={stats.pendingRequests} color="blue" />
@@ -598,7 +599,7 @@ export default function AdminClient({
               {users.map((u: any) => (
                 <div key={u.id} className="bg-white rounded-xl p-3 border border-gray-100">
                   <div className="flex items-center gap-2 mb-1">
-                    <p className="text-sm font-medium text-gray-800 flex-1">{u.name || t('admin_no_name')}</p>
+                    <p className="text-sm font-medium text-gray-800 flex-1">{[u.name, u.lastName].filter(Boolean).join(' ') || t('admin_no_name')}</p>
                     {u.status !== 'ACTIVE' && (
                       <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">{u.status}</span>
                     )}
