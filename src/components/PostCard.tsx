@@ -1914,7 +1914,13 @@ export default function PostCard({
                   )}
                   <div className="flex-1 min-w-0">
                     <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">{fullName(top.author) || top.author.name}</span>
-                    <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-snug line-clamp-2">{top.body}</p>
+                    {parseStickerRef(top.imageUrl) ? (
+                      <div className="mt-0.5"><Sticker id={parseStickerRef(top.imageUrl)!} size={46} /></div>
+                    ) : top.body ? (
+                      <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-snug line-clamp-2">{top.body}</p>
+                    ) : top.imageUrl ? (
+                      <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-snug">📷 {lang === 'en' ? 'Photo' : 'صورة'}</p>
+                    ) : null}
                   </div>
                   {(top.likeCount || 0) > 0 && (
                     <span className="text-[10px] text-gray-400 flex items-center gap-0.5 flex-shrink-0 mt-1">
