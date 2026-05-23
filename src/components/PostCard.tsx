@@ -604,6 +604,10 @@ export default function PostCard({
   const [submittingReply, setSubmittingReply] = useState(false)
   // Sticker picker target: 'comment' (top-level composer) or 'reply'.
   const [stickerTarget, setStickerTarget] = useState<'comment' | 'reply' | null>(null)
+  // Which comment/reply has its secondary-actions (⋮) menu open. Only the
+  // prominent رد action stays inline; edit/delete/report/translate tuck
+  // behind this kebab so each row reads clean.
+  const [openActionsFor, setOpenActionsFor] = useState<string | null>(null)
   const v2Category = post.category
   const style = V2_CATEGORY_STYLES[v2Category] || V2_CATEGORY_STYLES.GENERAL
   // REQUEST intent gets a small secondary marker on the card.
@@ -2215,6 +2219,15 @@ export default function PostCard({
                             <FiCornerDownRight className="w-3.5 h-3.5" />
                             {t('post_reply')}
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => setOpenActionsFor(openActionsFor === c.id ? null : c.id)}
+                            className="hai-comment__action"
+                            aria-label={lang === 'en' ? 'More' : 'المزيد'}
+                          >
+                            <FiMoreVertical className="hai-icon-sm" />
+                          </button>
+                          {openActionsFor === c.id && (<>
                           {c.author.id === currentUserId && (
                             <>
                               {Date.now() - new Date(c.createdAt).getTime() < 30 * 60_000 && (
@@ -2266,6 +2279,7 @@ export default function PostCard({
                               {lang === 'en' ? 'Delete' : 'حذف'}
                             </button>
                           )}
+                          </>)}
                         </div>
                       </div>
                       {/* Instagram-style: like on the trailing edge of the
@@ -2336,6 +2350,15 @@ export default function PostCard({
                                 </div>
                               )}
                               <div className="hai-comment__actions">
+                                <button
+                                  type="button"
+                                  onClick={() => setOpenActionsFor(openActionsFor === reply.id ? null : reply.id)}
+                                  className="hai-comment__action"
+                                  aria-label={lang === 'en' ? 'More' : 'المزيد'}
+                                >
+                                  <FiMoreVertical className="hai-icon-sm" />
+                                </button>
+                                {openActionsFor === reply.id && (<>
                                 {reply.author.id === currentUserId && (
                                   <button
                                     onClick={() => deleteComment(reply.id, post.id)}
@@ -2374,6 +2397,7 @@ export default function PostCard({
                                     {lang === 'en' ? 'Delete' : 'حذف'}
                                   </button>
                                 )}
+                                </>)}
                               </div>
                             </div>
                             <button
