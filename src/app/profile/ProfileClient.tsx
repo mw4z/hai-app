@@ -682,10 +682,10 @@ export default function ProfileClient({ user, postCount, visibleReputation }: Pr
           <div className="text-2xl font-bold text-primary-600">{visibleReputation ?? user.reputation}</div>
           <div className="text-xs text-gray-400 mt-0.5">{t('profile_reputation')}</div>
         </div>
-        <div>
-          <div className="text-2xl font-bold text-gray-800">{postCount}</div>
-          <div className="text-xs text-gray-400 mt-0.5">{t('profile_posts')}</div>
-        </div>
+        <Link href="/profile/posts" className="block active:scale-95 transition-transform">
+          <div className="text-2xl font-bold text-primary-600">{postCount}</div>
+          <div className="text-xs text-gray-400 mt-0.5">{t('profile_posts')} ›</div>
+        </Link>
         <div>
           <div className="text-2xl font-bold text-gray-800">{joinYear}</div>
           <div className="text-xs text-gray-400 mt-0.5">{t('profile_joined')}</div>
