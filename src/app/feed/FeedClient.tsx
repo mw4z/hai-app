@@ -277,8 +277,23 @@ export default function FeedClient({
             const freshMap = new Map<string, Post>(data.posts.map((p: Post) => [p.id, p]))
             // Update existing posts with fresh data (reactions, etc.)
             const updated = prev.map(p => freshMap.get(p.id) || p)
-            // Prepend truly new posts that weren't in the list
-            const brandNew = data.posts.filter((p: Post) => !prevIds.has(p.id))
+            // Prepend ONLY genuinely new posts — those created AFTER the
+            // newest post we already have. The server page is RANKED, so a
+            // fresh comment/reaction can lift an OLD post back into the top
+            // page; without the createdAt guard that old post counted as
+            // "new" and got yanked to position 0 of the recommended feed
+            // until the app was restarted. Older posts that re-enter the
+            // top page just get their data refreshed in place (above) and
+            // surface at their real rank, not pinned to the top.
+            const newestExisting = prev.reduce(
+              (max, p) => Math.max(max, new Date(p.createdAt).getTime()),
+              0,
+            )
+            const brandNew = data.posts.filter(
+              (p: Post) =>
+                !prevIds.has(p.id) &&
+                new Date(p.createdAt).getTime() > newestExisting,
+            )
             return [...brandNew, ...updated]
           })
           // Don't touch hasMore — only loadMore should control that
