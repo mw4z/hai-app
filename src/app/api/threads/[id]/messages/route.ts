@@ -8,6 +8,7 @@ import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { kickNotifCron } from '@/lib/kickNotifCron'
 import { sendDmPushNow } from '@/app/api/cron/process-notifs/route'
 import { fullName } from '@/lib/displayName'
+import { parseStickerRef, toStickerRef } from '@/lib/stickers/catalog'
 
 // GET /api/threads/[id]/messages
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -195,14 +196,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       })
     } else if (type === 'IMAGE') {
       const { imageUrl } = body
-      if (!imageUrl) return NextResponse.json({ error: 'Image URL required' }, { status: 400 })
+      // Stickers ride on the IMAGE type with imageUrl = `sticker:<id>`.
+      const stickerId = parseStickerRef(imageUrl)
+      if (!stickerId && !imageUrl) return NextResponse.json({ error: 'Image URL required' }, { status: 400 })
       message = await db.message.create({
         data: {
           threadId: params.id,
           senderId: session.userId,
           type: 'IMAGE',
-          text: '📷',
-          imageUrl,
+          text: stickerId ? '🌟' : '📷',
+          imageUrl: stickerId ? toStickerRef(stickerId) : imageUrl,
           ...replyData,
         },
         include: { replyTo: { select: { id: true, text: true, senderId: true, type: true } } },
@@ -292,7 +295,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const snippet = type === 'LOCATION'
       ? '📍'
       : type === 'IMAGE'
-        ? '📷'
+        ? (parseStickerRef(body.imageUrl) ? 'ملصق 🌟' : '📷')
         : (text?.trim().slice(0, 120) || '')
 
     // Phone push — DMs are the highest-priority push class in the app,

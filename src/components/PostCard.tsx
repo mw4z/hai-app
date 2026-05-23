@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiBell, FiBellOff, FiImage, FiUser, FiPaperclip, FiEye } from 'react-icons/fi'
+import { FiFlag, FiMoreVertical, FiMessageCircle, FiSend, FiCornerDownRight, FiMail, FiHeart, FiShare2, FiMapPin, FiX, FiCalendar, FiEdit2, FiTrash2, FiBookmark, FiBell, FiBellOff, FiImage, FiUser, FiPaperclip, FiEye, FiSmile } from 'react-icons/fi'
 import AttachmentMenu from './AttachmentMenu'
 import PlacePickerSheet from './places/PlacePickerSheet'
 import { canAttachDirectoryPlace } from '@/lib/places/canAttachPlace'
@@ -22,6 +22,9 @@ import PdfTile from '@/components/PdfTile'
 import { buildDisplayTitle } from '@/lib/posts/displayTitle'
 import { useAttachContact } from '@/hooks/useAttachContact'
 import ImageLightbox from './ImageLightbox'
+import Sticker from './Sticker'
+import StickerPicker from './StickerPicker'
+import { parseStickerRef, toStickerRef } from '@/lib/stickers/catalog'
 import SmartText from './SmartText'
 import SmartTextWithPlacePreviews from './SmartTextWithPlacePreviews'
 import { parseMessageSegments } from './ContactChip'
@@ -589,6 +592,8 @@ export default function PostCard({
   const [following, setFollowing] = useState(initialFollowing)
   const [replyText, setReplyText] = useState('')
   const [submittingReply, setSubmittingReply] = useState(false)
+  // Sticker picker target: 'comment' (top-level composer) or 'reply'.
+  const [stickerTarget, setStickerTarget] = useState<'comment' | 'reply' | null>(null)
   const v2Category = post.category
   const style = V2_CATEGORY_STYLES[v2Category] || V2_CATEGORY_STYLES.GENERAL
   // REQUEST intent gets a small secondary marker on the card.
@@ -865,6 +870,47 @@ export default function PostCard({
     } catch (err) {
       toast.error(isOfflineError(err) || (err instanceof TypeError) ? offlineMessage() : t('common_error'))
     } finally {
+      setSubmittingReply(false)
+    }
+  }
+
+  // Send a sticker as a comment or reply. A sticker is a comment whose
+  // imageUrl is the `sticker:<id>` sentinel (no text body).
+  async function sendSticker(stickerId: string) {
+    const target = stickerTarget
+    if (!target) return
+    if (blockIfOffline()) return
+    const ref = toStickerRef(stickerId)
+    try {
+      if (target === 'reply') {
+        if (!replyingTo) return
+        setSubmittingReply(true)
+        const res = await fetch(`/api/posts/${post.id}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: ref, parentId: replyingTo.id }),
+        })
+        if (!res.ok) { await showApiError(res, lang); return }
+        const reply = await res.json()
+        playSend()
+        setComments(prev => prev.map(c => c.id === replyingTo.id ? { ...c, replies: [...c.replies, reply] } : c))
+        setReplyingTo(null)
+      } else {
+        setSubmitting(true)
+        const res = await fetch(`/api/posts/${post.id}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: ref }),
+        })
+        if (!res.ok) { await showApiError(res, lang); return }
+        const comment = await res.json()
+        playSend()
+        setComments(prev => [...prev, { ...comment, replies: comment.replies || [] }])
+      }
+    } catch (err) {
+      toast.error(isOfflineError(err) || (err instanceof TypeError) ? offlineMessage() : t('common_error'))
+    } finally {
+      setSubmitting(false)
       setSubmittingReply(false)
     }
   }
@@ -2122,14 +2168,18 @@ export default function PostCard({
                                 </p>
                               )
                             })()}
-                            {c.imageUrl && (
+                            {c.imageUrl && (parseStickerRef(c.imageUrl) ? (
+                              <div className="mt-1.5">
+                                <Sticker id={parseStickerRef(c.imageUrl)!} size={118} />
+                              </div>
+                            ) : (
                               <img
                                 src={c.imageUrl}
                                 alt=""
                                 className="hai-comment__image"
                                 onClick={() => setCommentLightbox(c.imageUrl!)}
                               />
-                            )}
+                            ))}
                             {c.pdfUrl && (
                               <div className="mt-1.5">
                                 <PdfTile url={c.pdfUrl} name={c.pdfName} variant="comment" />
@@ -2247,14 +2297,18 @@ export default function PostCard({
                                   </p>
                                 )
                               })()}
-                              {reply.imageUrl && (
+                              {reply.imageUrl && (parseStickerRef(reply.imageUrl) ? (
+                                <div className="mt-1.5">
+                                  <Sticker id={parseStickerRef(reply.imageUrl)!} size={100} />
+                                </div>
+                              ) : (
                                 <img
                                   src={reply.imageUrl}
                                   alt=""
                                   className="hai-comment__image"
                                   onClick={() => setCommentLightbox(reply.imageUrl!)}
                                 />
-                              )}
+                              ))}
                               {reply.pdfUrl && (
                                 <div className="mt-1.5">
                                   <PdfTile url={reply.pdfUrl} name={reply.pdfName} variant="comment" />
@@ -2384,6 +2438,15 @@ export default function PostCard({
                           <input type="file" accept="image/*" ref={replyImgRef} onChange={e => handleCommentImageSelect(e, 'reply')} className="hai-hidden" />
                           <button
                             type="button"
+                            onClick={() => { hapticLight(); setStickerTarget('reply') }}
+                            className="hai-comment-input__attach-btn"
+                            aria-label={lang === 'en' ? 'Stickers' : 'ملصقات'}
+                            title={lang === 'en' ? 'Stickers' : 'ملصقات'}
+                          >
+                            <FiSmile className="hai-icon-sm" />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => { hapticLight(); setShowAttachMenu('reply') }}
                             className="hai-comment-input__attach-btn"
                             aria-label={lang === 'en' ? 'Attach' : lang === 'ur' ? 'منسلک کریں' : 'إرفاق'}
@@ -2474,6 +2537,15 @@ export default function PostCard({
                 <input type="file" accept="image/*" ref={commentImgRef} onChange={e => handleCommentImageSelect(e, 'comment')} className="hai-hidden" />
                 <button
                   type="button"
+                  onClick={() => { hapticLight(); setStickerTarget('comment') }}
+                  className="hai-comment-input__attach-btn"
+                  aria-label={lang === 'en' ? 'Stickers' : 'ملصقات'}
+                  title={lang === 'en' ? 'Stickers' : 'ملصقات'}
+                >
+                  <FiSmile className="hai-icon-md" />
+                </button>
+                <button
+                  type="button"
                   onClick={() => { hapticLight(); setShowAttachMenu('comment') }}
                   className="hai-comment-input__attach-btn"
                   aria-label={lang === 'en' ? 'Attach' : lang === 'ur' ? 'منسلک کریں' : 'إرفاق'}
@@ -2489,6 +2561,11 @@ export default function PostCard({
                   <FiSend className="hai-icon-md" />
                 </button>
               </form>
+              <StickerPicker
+                open={!!stickerTarget}
+                onPick={sendSticker}
+                onClose={() => setStickerTarget(null)}
+              />
             </div>
           </div>
         </div>

@@ -8,6 +8,7 @@ import { requireUserReady } from '@/lib/requireUserReady'
 import { kickNotifCron } from '@/lib/kickNotifCron'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { fullName } from '@/lib/displayName'
+import { parseStickerRef, toStickerRef } from '@/lib/stickers/catalog'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
@@ -89,7 +90,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const { body, parentId, imageUrl, pdfUrl: pdfUrlRaw, pdfName: pdfNameRaw } = await req.json()
   const hasText = !!body?.trim() && body.trim().length >= 2
-  const hasImage = typeof imageUrl === 'string' && imageUrl.startsWith('https://') && imageUrl.length < 500
+  // A sticker arrives in `imageUrl` as the sentinel `sticker:<id>`. Only
+  // ids from the in-house catalog are accepted — anything else is dropped.
+  const stickerId = parseStickerRef(imageUrl)
+  const hasSticker = !!stickerId
+  const hasImage = !hasSticker && typeof imageUrl === 'string' && imageUrl.startsWith('https://') && imageUrl.length < 500
   // PDF attachment validation matches the post-route pattern: trust
   // the composer's MIME / size gate, but cap URL + filename lengths
   // server-side so a malicious caller can't write huge strings into
@@ -103,7 +108,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     ? (typeof pdfNameRaw === 'string' ? pdfNameRaw.trim().slice(0, 200) : '') || 'document.pdf'
     : null
 
-  if (!hasText && !hasImage && !hasPdf) {
+  if (!hasText && !hasImage && !hasPdf && !hasSticker) {
     return NextResponse.json({ error: 'التعليق فارغ' }, { status: 400 })
   }
   if (body && body.length > 500) return NextResponse.json({ error: 'التعليق طويل جداً' }, { status: 400 })
@@ -155,7 +160,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       postId: params.id,
       authorId: session.userId,
       body: censoredBody,
-      imageUrl: hasImage ? imageUrl : null,
+      imageUrl: hasSticker ? toStickerRef(stickerId!) : (hasImage ? imageUrl : null),
       pdfUrl,
       pdfName,
       parentId: parentId || null,

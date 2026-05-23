@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useNetworkStatus, isOfflineError } from '@/lib/network'
 import { useConfirm } from '@/components/ConfirmProvider'
-import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, FiTrash2, FiCheck, FiCopy, FiFlag, FiImage, FiUser, FiPaperclip, FiMoreVertical } from 'react-icons/fi'
+import { FiArrowRight, FiArrowLeft, FiSend, FiMapPin, FiX, FiCamera, FiEdit2, FiTrash2, FiCheck, FiCopy, FiFlag, FiImage, FiUser, FiPaperclip, FiMoreVertical, FiSmile } from 'react-icons/fi'
 import AttachmentMenu from '@/components/AttachmentMenu'
 import { CHAT_WALLPAPERS, getWallpaper } from '@/lib/chatWallpapers'
 import { hapticLight } from '@/lib/haptic'
@@ -26,6 +26,9 @@ import SmartTextWithPlacePreviews from '@/components/SmartTextWithPlacePreviews'
 import PlacePickerSheet from '@/components/places/PlacePickerSheet'
 import { canAttachDirectoryPlace } from '@/lib/places/canAttachPlace'
 import ImageLightbox from '@/components/ImageLightbox'
+import Sticker from '@/components/Sticker'
+import StickerPicker from '@/components/StickerPicker'
+import { parseStickerRef, toStickerRef } from '@/lib/stickers/catalog'
 import ReportUserSheet from '@/components/ReportUserSheet'
 import { showApiError } from '@/lib/apiError'
 import { fullName } from '@/lib/displayName'
@@ -510,6 +513,7 @@ export default function ChatClient({
   const [selectedMsg, setSelectedMsg] = useState<string | null>(null)
   const [showLocationConfirm, setShowLocationConfirm] = useState(false)
   const [showAttachMenu, setShowAttachMenu] = useState(false)
+  const [showStickers, setShowStickers] = useState(false)
   // Place picker — opened from AttachmentMenu when the user chooses
   // "مكان من دليل الحي". Gated on canAttachDirectoryPlace(role) so
   // residents only see the row when the directory is publicly
@@ -922,6 +926,22 @@ export default function ChatClient({
       else { await showApiError(res, lang as 'ar' | 'en' | 'ur') }
     } catch { toast.error(t('common_error')) }
     finally { setSendingImage(false); if (imgInputRef.current) imgInputRef.current.value = '' }
+  }
+
+  // Send a sticker — rides on the IMAGE message type with imageUrl set to
+  // the `sticker:<id>` sentinel (no upload step).
+  async function sendSticker(stickerId: string) {
+    const replyId = replyingTo?.id || null
+    setReplyingTo(null)
+    try {
+      const res = await fetch(`/api/threads/${threadId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'IMAGE', imageUrl: toStickerRef(stickerId), replyToId: replyId }),
+      })
+      if (res.ok) { const msg = await res.json(); setMessages(prev => [...prev, msg]); playSend() }
+      else { await showApiError(res, lang as 'ar' | 'en' | 'ur') }
+    } catch { toast.error(t('common_error')) }
   }
 
   /**
@@ -2016,6 +2036,12 @@ export default function ChatClient({
               className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50 flex-shrink-0">
               <FiPaperclip className={`w-5 h-5 ${(sendingImage || sendingLocation) ? 'animate-pulse' : ''}`} />
             </button>
+            <button
+              onClick={() => { hapticLight(); setShowStickers(true) }}
+              aria-label={lang === 'en' ? 'Stickers' : 'ملصقات'}
+              className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-primary-400 active:scale-90 transition-all flex-shrink-0">
+              <FiSmile className="w-5 h-5" />
+            </button>
             {/* Voice note recorder — mic button + record/preview overlay. */}
             <VoiceComposer onSend={sendVoice} disabled={sendingImage || sendingLocation} />
             <form onSubmit={sendText} className="flex-1 min-w-0 flex items-center gap-2">
@@ -2054,6 +2080,13 @@ export default function ChatClient({
         initialIndex={0}
         open={lightboxUrl !== null}
         onClose={() => setLightboxUrl(null)}
+      />
+
+      {/* Sticker picker */}
+      <StickerPicker
+        open={showStickers}
+        onPick={sendSticker}
+        onClose={() => setShowStickers(false)}
       />
 
       {/* Camera/Gallery chooser sheet */}
@@ -2395,6 +2428,15 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
               </div>
             )
           })()
+        ) : msg.type === 'IMAGE' && parseStickerRef(msg.imageUrl) ? (
+          <div className="max-w-[85%]" data-msg-id={msg.id} {...longPress}>
+            {replyQuote && <div className="mb-1">{replyQuote}</div>}
+            <Sticker id={parseStickerRef(msg.imageUrl)!} size={132} />
+            <p className={`text-[10px] mt-1 px-1 flex items-center gap-0.5 ${isMe ? 'text-gray-400 justify-start' : 'text-gray-400 justify-end'}`}>
+              {timeStr}
+              <MsgStatus msg={msg} isMe={isMe} />
+            </p>
+          </div>
         ) : msg.type === 'IMAGE' && (msg.imageUrl || (msg as any).localPreview) ? (
           <div className={`max-w-[85%]`} data-msg-id={msg.id} {...longPress}>
             {replyQuote && <div className="mb-1">{replyQuote}</div>}
