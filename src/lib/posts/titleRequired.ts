@@ -40,6 +40,9 @@ export function isTitleRequired(
       // get blocked there separately.
       return true
     case 'HOME_BUSINESSES':
+      // الأسر المنتجة — الموضوع (subject) is OPTIONAL for all intents. The
+      // body + photo carry the listing; we don't force a headline.
+      return false
     case 'SERVICES':
     case 'REAL_ESTATE':
       // OFFER side needs a headline; REQUEST side ("looking for…")

@@ -733,21 +733,21 @@ export default function NewPostPage() {
       toast.error(
         lang === 'en'
           ? missing === 'title'
-            ? 'Please add a title.'
+            ? 'Please add a subject.'
             : missing === 'body'
               ? 'Please add details in the body.'
-              : 'Please add a title and details.'
+              : 'Please add a subject and details.'
           : lang === 'ur'
             ? missing === 'title'
-              ? 'عنوان درج کریں۔'
+              ? 'موضوع درج کریں۔'
               : missing === 'body'
                 ? 'تفصیل درج کریں۔'
-                : 'عنوان اور تفصیل دونوں درج کریں۔'
+                : 'موضوع اور تفصیل دونوں درج کریں۔'
             : missing === 'title'
-              ? 'أدخل عنواناً للمنشور.'
+              ? 'أدخل موضوعاً للمنشور.'
               : missing === 'body'
                 ? 'أدخل تفاصيل المنشور.'
-                : 'أدخل العنوان والتفاصيل.',
+                : 'أدخل الموضوع والتفاصيل.',
       )
       return
     }
@@ -1182,7 +1182,7 @@ export default function NewPostPage() {
             {titleRequired ? (
               <input
                 type="text"
-                placeholder={lang === 'en' ? 'Title' : lang === 'ur' ? 'عنوان' : 'العنوان'}
+                placeholder={lang === 'en' ? 'Subject' : lang === 'ur' ? 'موضوع' : 'الموضوع'}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="input-field font-semibold"
@@ -1195,10 +1195,10 @@ export default function NewPostPage() {
                   type="text"
                   placeholder={
                     lang === 'en'
-                      ? 'Title (optional)'
+                      ? 'Subject (optional)'
                       : lang === 'ur'
-                        ? 'عنوان (اختیاری)'
-                        : 'العنوان (اختياري)'
+                        ? 'موضوع (اختیاری)'
+                        : 'الموضوع (اختياري)'
                   }
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -1209,7 +1209,7 @@ export default function NewPostPage() {
                 <button
                   type="button"
                   onClick={() => { setTitle(''); setShowOptionalTitle(false) }}
-                  aria-label={lang === 'en' ? 'Remove title' : 'إزالة العنوان'}
+                  aria-label={lang === 'en' ? 'Remove subject' : 'إزالة الموضوع'}
                   className="absolute top-1/2 -translate-y-1/2 end-2 w-7 h-7 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 active:scale-95 transition-transform flex items-center justify-center"
                 >
                   <FiX className="w-4 h-4" />
@@ -1223,7 +1223,7 @@ export default function NewPostPage() {
               >
                 <span>+</span>
                 <span>
-                  {lang === 'en' ? 'Add a title (optional)' : lang === 'ur' ? 'عنوان شامل کریں (اختیاری)' : 'إضافة عنوان (اختياري)'}
+                  {lang === 'en' ? 'Add a subject (optional)' : lang === 'ur' ? 'موضوع شامل کریں (اختیاری)' : 'إضافة موضوع (اختياري)'}
                 </span>
               </button>
             )}

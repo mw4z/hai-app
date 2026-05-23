@@ -49,15 +49,15 @@ export async function PATCH(
       // SERVICES etc. keep their original title — the author
       // can't accidentally strip the listing's headline.
       if (isTitleRequired(post.category, post.intent, post.marketplaceType)) {
-        return NextResponse.json({ error: 'هذا القسم يحتاج عنواناً' }, { status: 400 })
+        return NextResponse.json({ error: 'هذا القسم يحتاج موضوعاً' }, { status: 400 })
       }
       updates.title = ''
     } else {
       if (t.length < 3) {
-        return NextResponse.json({ error: 'العنوان قصير جداً' }, { status: 400 })
+        return NextResponse.json({ error: 'الموضوع قصير جداً' }, { status: 400 })
       }
       if (t.length > 200) {
-        return NextResponse.json({ error: 'العنوان طويل جداً' }, { status: 400 })
+        return NextResponse.json({ error: 'الموضوع طويل جداً' }, { status: 400 })
       }
       updates.title = t
     }
