@@ -129,6 +129,9 @@ interface Props {
    *  instead of fetching on mount. The 30s refresh keeps them current. */
   initialRides?: any[]
   initialPolls?: any[]
+  /** When arriving from a notification (/feed?post=<id>), scroll to and
+   *  flash that post so the user sees exactly which one it's about. */
+  highlightPostId?: string
 }
 
 export default function FeedClient({
@@ -149,6 +152,7 @@ export default function FeedClient({
   deliveryRequests = [],
   initialRides = [],
   initialPolls = [],
+  highlightPostId,
 }: Props) {
   const router = useRouter()
   const { t, lang } = useLanguage()
@@ -184,6 +188,29 @@ export default function FeedClient({
   // will raise the keyboard. Android Chrome WebView is lenient about
   // this; iOS isn't.
   const askTextareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Notification deep-link: when /feed?post=<id> is opened (tapping a
+  // comment/reaction notification), scroll to that post and flash it so the
+  // user immediately sees which post the notification was about — like
+  // Instagram. Retries briefly to cover async list paint.
+  useEffect(() => {
+    if (!highlightPostId) return
+    let tries = 0
+    let timer: ReturnType<typeof setTimeout>
+    const tryScroll = () => {
+      const el = document.getElementById(`post-${highlightPostId}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.classList.add('hai-highlight-flash')
+        setTimeout(() => el.classList.remove('hai-highlight-flash'), 1800)
+        return
+      }
+      if (++tries < 16) timer = setTimeout(tryScroll, 250) // ~4s window
+    }
+    timer = setTimeout(tryScroll, 200)
+    return () => clearTimeout(timer)
+  }, [highlightPostId])
+
   const [openRides, setOpenRides] = useState<any[]>(initialRides)
   const [polls, setPolls] = useState<any[]>(initialPolls)
   const [showFilter, setShowFilter] = useState(false)

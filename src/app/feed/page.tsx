@@ -19,7 +19,7 @@ const V2_FILTER_VALUES: readonly string[] = [
 export default async function FeedPage({
   searchParams,
 }: {
-  searchParams: { category?: string; neighborhood?: string }
+  searchParams: { category?: string; neighborhood?: string; post?: string }
 }) {
   const session = await getSession()
   if (!session) redirect('/login')
@@ -463,6 +463,7 @@ export default async function FeedPage({
       deliveryRequests={JSON.parse(JSON.stringify(deliveryRequests))}
       initialRides={JSON.parse(JSON.stringify(initialOpenRides))}
       initialPolls={JSON.parse(JSON.stringify(pollsRaw))}
+      highlightPostId={typeof searchParams.post === 'string' ? searchParams.post : undefined}
     />
   )
 }

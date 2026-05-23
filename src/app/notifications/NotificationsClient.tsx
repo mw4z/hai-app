@@ -147,7 +147,9 @@ export default function NotificationsClient({
     if (n.type === 'SYSTEM' && (n.title?.includes('اقتراح رقمك') || n.titleEn?.includes('suggested as a service'))) {
       return '/directory/services/claim'
     }
-    if (n.postId) return `/feed`
+    // Deep-link to the exact post so the feed scrolls to + flashes it
+    // (so the user sees which post the comment/reaction was on).
+    if (n.postId) return `/feed?post=${n.postId}`
     return '/feed'
   }
 
