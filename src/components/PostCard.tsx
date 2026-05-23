@@ -2974,6 +2974,7 @@ function ServiceCatalog({ userId, lang }: { userId: string; lang: string }) {
   const [loaded, setLoaded] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [selected, setSelected] = useState<any>(null)
+  const [catalogLightbox, setCatalogLightbox] = useState(false)
 
   useEffect(() => {
     fetch(`/api/service-items?userId=${userId}`)
@@ -3033,7 +3034,7 @@ function ServiceCatalog({ userId, lang }: { userId: string; lang: string }) {
           >
             {/* Image */}
             {selected.imageUrl ? (
-              <img src={selected.imageUrl} alt="" className="w-full h-48 object-cover" />
+              <img src={selected.imageUrl} alt="" className="w-full h-48 object-cover cursor-pointer" onClick={() => setCatalogLightbox(true)} />
             ) : (
               <div className="w-full h-32 bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-4xl text-gray-300">📦</div>
             )}
@@ -3078,6 +3079,14 @@ function ServiceCatalog({ userId, lang }: { userId: string; lang: string }) {
           </div>
         </div>
       )}
+      {/* Tap the catalog item photo → full-screen lightbox (sits above the
+          z-[9998] detail modal via --hai-z-lightbox). */}
+      <ImageLightbox
+        images={selected?.imageUrl ? [selected.imageUrl] : []}
+        initialIndex={0}
+        open={catalogLightbox && !!selected?.imageUrl}
+        onClose={() => setCatalogLightbox(false)}
+      />
     </div>
   )
 }

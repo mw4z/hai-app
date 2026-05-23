@@ -151,7 +151,7 @@
   --hai-z-overlay:   70;
   --hai-z-travel:    80;
   --hai-z-toast:     90;
-  --hai-z-lightbox:  100;
+  --hai-z-lightbox:  10000;
   --hai-z-emergency: 1000;
 
   /* ═══════════════════════════════════════════════════════════════════
