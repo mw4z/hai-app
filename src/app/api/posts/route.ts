@@ -13,6 +13,7 @@ import { moderateContent } from '@/lib/moderation'
 import { kickNotifCron } from '@/lib/kickNotifCron'
 import { requireUserReady } from '@/lib/requireUserReady'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
+import { isDirectoryModerator } from '@/lib/places/isDirectoryModerator'
 import { fullName } from '@/lib/displayName'
 import { isTitleRequired } from '@/lib/posts/titleRequired'
 import { buildNotifTitle } from '@/lib/posts/displayTitle'
@@ -440,19 +441,29 @@ export async function POST(req: NextRequest) {
       // "similar" to nothing and would also match any past post that
       // happened to have an empty title, creating false positives.
       // The body-similarity arm still catches the real duplicate case.
-      const threeHoursAgo = new Date(Date.now() - 3 * 3600_000)
-      const recentUserPosts = await db.post.findMany({
-        where: { authorId: user.id, createdAt: { gte: threeHoursAgo } },
-        select: { title: true, body: true },
-      })
-      for (const p of recentUserPosts) {
-        const titleMatch = titleProvided && isSimilar(title.trim(), p.title)
-        if (titleMatch || isSimilar(body.trim(), p.body)) {
-          console.log(`[SPAM] duplicate detected: user=${user.id}`)
-          return NextResponse.json(
-            { error: 'DUPLICATE_POST' },
-            { status: 409 },
-          )
+      // Mods/admins are never blocked by duplicate detection (e.g. they
+      // remove a post then re-add the same one). And for everyone, REMOVED/
+      // HIDDEN posts no longer count — a post that's gone isn't a live
+      // duplicate, so re-adding after a removal is allowed.
+      if (!isDirectoryModerator(user.role)) {
+        const threeHoursAgo = new Date(Date.now() - 3 * 3600_000)
+        const recentUserPosts = await db.post.findMany({
+          where: {
+            authorId: user.id,
+            createdAt: { gte: threeHoursAgo },
+            status: { notIn: ['REMOVED', 'HIDDEN'] },
+          },
+          select: { title: true, body: true },
+        })
+        for (const p of recentUserPosts) {
+          const titleMatch = titleProvided && isSimilar(title.trim(), p.title)
+          if (titleMatch || isSimilar(body.trim(), p.body)) {
+            console.log(`[SPAM] duplicate detected: user=${user.id}`)
+            return NextResponse.json(
+              { error: 'DUPLICATE_POST' },
+              { status: 409 },
+            )
+          }
         }
       }
     }
