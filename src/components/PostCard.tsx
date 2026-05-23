@@ -2161,6 +2161,14 @@ export default function PostCard({
                               return lang === 'en' ? `${Math.floor(hrs/24)}d` : `${Math.floor(hrs/24)}ي`
                             })()}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => setOpenActionsFor(openActionsFor === c.id ? null : c.id)}
+                            className="ms-auto -me-1 p-1 text-gray-400 active:scale-90 transition-transform"
+                            aria-label={lang === 'en' ? 'More' : 'المزيد'}
+                          >
+                            <FiMoreVertical className="hai-icon-sm" />
+                          </button>
                         </div>
                         {editingCommentId === c.id ? (
                           <div className="hai-comment__edit-form">
@@ -2218,14 +2226,6 @@ export default function PostCard({
                           >
                             <FiCornerDownRight className="w-3.5 h-3.5" />
                             {t('post_reply')}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setOpenActionsFor(openActionsFor === c.id ? null : c.id)}
-                            className="hai-comment__action"
-                            aria-label={lang === 'en' ? 'More' : 'المزيد'}
-                          >
-                            <FiMoreVertical className="hai-icon-sm" />
                           </button>
                           {openActionsFor === c.id && (<>
                           {c.author.id === currentUserId && (
@@ -2321,6 +2321,14 @@ export default function PostCard({
                                     return lang === 'en' ? `${Math.floor(hrs / 24)}d` : `${Math.floor(hrs / 24)}ي`
                                   })()}
                                 </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setOpenActionsFor(openActionsFor === reply.id ? null : reply.id)}
+                                  className="ms-auto -me-1 p-1 text-gray-400 active:scale-90 transition-transform"
+                                  aria-label={lang === 'en' ? 'More' : 'المزيد'}
+                                >
+                                  <FiMoreVertical className="hai-icon-xs" />
+                                </button>
                               </div>
                               {reply.body && (() => {
                                 const tx = commentTx[reply.id]
@@ -2349,16 +2357,8 @@ export default function PostCard({
                                   <PdfTile url={reply.pdfUrl} name={reply.pdfName} variant="comment" />
                                 </div>
                               )}
+                              {openActionsFor === reply.id && (
                               <div className="hai-comment__actions">
-                                <button
-                                  type="button"
-                                  onClick={() => setOpenActionsFor(openActionsFor === reply.id ? null : reply.id)}
-                                  className="hai-comment__action"
-                                  aria-label={lang === 'en' ? 'More' : 'المزيد'}
-                                >
-                                  <FiMoreVertical className="hai-icon-sm" />
-                                </button>
-                                {openActionsFor === reply.id && (<>
                                 {reply.author.id === currentUserId && (
                                   <button
                                     onClick={() => deleteComment(reply.id, post.id)}
@@ -2397,8 +2397,8 @@ export default function PostCard({
                                     {lang === 'en' ? 'Delete' : 'حذف'}
                                   </button>
                                 )}
-                                </>)}
                               </div>
+                              )}
                             </div>
                             <button
                               type="button"
