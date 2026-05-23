@@ -33,6 +33,9 @@ export async function GET() {
         socialLinks: true,
         role: true,
         neighborhoodId: true,
+        // Neighborhood center — used as the "near me" search bias for the
+        // rides location picker (so place suggestions start from nearest).
+        neighborhood: { select: { lat: true, lng: true } },
       },
     })
 

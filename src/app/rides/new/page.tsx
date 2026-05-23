@@ -56,6 +56,22 @@ export default function NewRidePage() {
   const [itemDescription, setItemDescription] = useState('')
   const [pickup, setPickup] = useState<Location | null>(null)
   const [dropoff, setDropoff] = useState<Location | null>(null)
+  // User's neighborhood center — the "near me" anchor so place-search
+  // suggestions start from the nearest places (instead of a country-wide
+  // default). Fetched once on mount.
+  const [baseLat, setBaseLat] = useState<number | undefined>(undefined)
+  const [baseLng, setBaseLng] = useState<number | undefined>(undefined)
+  useEffect(() => {
+    fetch('/api/profile')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.neighborhood?.lat != null && d?.neighborhood?.lng != null) {
+          setBaseLat(d.neighborhood.lat)
+          setBaseLng(d.neighborhood.lng)
+        }
+      })
+      .catch(() => {})
+  }, [])
   const [isImmediate, setIsImmediate] = useState(true)
   const [scheduledAt, setScheduledAt] = useState('')
   const [notes, setNotes] = useState('')
@@ -199,12 +215,12 @@ export default function NewRidePage() {
           value={pickup}
           onChange={setPickup}
           mode={requestType === 'DELIVERY' ? 'delivery' : 'ride'}
-          // In DELIVERY, the user's GPS lives on the dropoff field
-          // (where they want the item brought). Pass it here so the
-          // pickup search can rank results by distance from that
-          // anchor — otherwise nearby stores would never bubble up.
-          userLat={requestType === 'DELIVERY' ? dropoff?.lat : undefined}
-          userLng={requestType === 'DELIVERY' ? dropoff?.lng : undefined}
+          // Search bias anchor → "nearest first". DELIVERY: the dropoff
+          // (where the item goes) once set, else the user's neighborhood.
+          // RIDE: the user's neighborhood center (was undefined → defaulted
+          // to a country-wide point, so suggestions weren't local).
+          userLat={requestType === 'DELIVERY' ? (dropoff?.lat ?? baseLat) : baseLat}
+          userLng={requestType === 'DELIVERY' ? (dropoff?.lng ?? baseLng) : baseLng}
         />
         </div>
 
@@ -222,12 +238,12 @@ export default function NewRidePage() {
           value={dropoff}
           onChange={setDropoff}
           mode={requestType === 'DELIVERY' ? 'delivery' : 'ride'}
-          // RIDE: dropoff search is anchored to pickup (rank results
-          // by distance from the user's start). DELIVERY: dropoff is
-          // the user's GPS — the search panel doesn't render here, so
-          // these props are unused, but kept consistent.
-          userLat={requestType === 'DELIVERY' ? undefined : pickup?.lat}
-          userLng={requestType === 'DELIVERY' ? undefined : pickup?.lng}
+          // RIDE: dropoff search is anchored to pickup (rank by distance
+          // from the user's start), falling back to the neighborhood
+          // center. DELIVERY: dropoff is the user's GPS — the search panel
+          // doesn't render here, so these are unused but kept consistent.
+          userLat={requestType === 'DELIVERY' ? baseLat : (pickup?.lat ?? baseLat)}
+          userLng={requestType === 'DELIVERY' ? baseLng : (pickup?.lng ?? baseLng)}
         />
         </div>
 
