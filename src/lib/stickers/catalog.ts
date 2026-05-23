@@ -56,7 +56,6 @@ const G = {
 export const STICKERS: StickerDef[] = [
   // ── مجاملات إسلامية (Islamic compliments) ────────────────────────────
   { id: 'mashallah',      category: 'blessing', emoji: '🌟', lines: ['ما شاء الله'],            grad: G.gold,    keywords: ['mashallah', 'اعجاب', 'حلو'] },
-  { id: 'tabarakallah',   category: 'blessing', emoji: '✨', lines: ['تبارك الله'],            grad: G.teal },
   { id: 'mashallah_tabarak', category: 'blessing', emoji: '🌟', lines: ['ما شاء الله', 'تبارك الله'], grad: G.emerald },
   { id: 'jazak',          category: 'blessing', emoji: '🤲', lines: ['جزاك الله', 'خير'],       grad: G.emerald },
   { id: 'barakallah',     category: 'blessing', emoji: '🌿', lines: ['بارك الله', 'فيك'],       grad: G.green2 },
