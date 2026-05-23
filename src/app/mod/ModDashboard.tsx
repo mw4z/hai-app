@@ -349,7 +349,7 @@ export default function ModDashboard({ data }: Props) {
   }
 
   return (
-    <div className="min-h-dvh bg-gray-50 dark:bg-gray-900 pb-4">
+    <div className="min-h-dvh bg-gray-50 dark:bg-gray-900" style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 6rem)' }}>
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-4 py-3">
         <div className="flex items-center gap-3">

@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
   const users = await db.user.findMany({
     where,
     orderBy: { createdAt: 'desc' },
-    take: q ? 60 : 40,
+    take: 500, // show the full neighborhood roster, not just the latest 40
     select: {
       id: true, name: true, lastName: true, phone: true, role: true,
       status: true, reputation: true, neighborhood: { select: { name: true } },
