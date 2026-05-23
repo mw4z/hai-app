@@ -303,7 +303,10 @@ export default async function FeedPage({
       : p.category === 'NEIGHBORHOOD_REPORTS' && p.priority === 'HIGH' ? 15
       : 0
     const repBoost = getFeedBoost(p.author.reputation)
-    return { ...p, _score: (50 + engagement + boost + intentBoost + priorityBoost + repBoost) / (hoursAgo + 2) }
+    // Softer time decay: pow(hoursAgo+2, 0.75) instead of a linear divide,
+    // so fresh posts still rank up but genuinely useful older posts don't
+    // sink as aggressively (better for a low-volume neighborhood feed).
+    return { ...p, _score: (50 + engagement + boost + intentBoost + priorityBoost + repBoost) / Math.pow(hoursAgo + 2, 0.75) }
   }).sort((a, b) => b._score - a._score)
 
   // Anti-domination: max 2 consecutive posts per same author

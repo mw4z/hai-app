@@ -237,9 +237,13 @@ export default function FeedClient({
     }
     return new Set()
   })
-  const [sortMode, setSortMode] = useState<'newest' | 'popular'>(() => {
-    if (typeof window !== 'undefined') return (localStorage.getItem('hai_feed_sort') as any) || 'newest'
-    return 'newest'
+  // 'recommended' (default) = the SSR ranked feed (fresh + useful +
+  // important). 'latest' = strict chronological. 'popular' = engagement.
+  const [sortMode, setSortMode] = useState<'recommended' | 'latest' | 'popular'>(() => {
+    if (typeof window === 'undefined') return 'recommended'
+    const stored = localStorage.getItem('hai_feed_sort')
+    // Migrate the old 'newest' value (which was actually the ranked feed).
+    return stored === 'latest' || stored === 'popular' ? stored : 'recommended'
   })
 
   // Sync posts + the SSR'd rides strip / polls when the server
@@ -429,13 +433,21 @@ export default function FeedClient({
     let result = selectedCategory === 'ALL' && hiddenCategories.size > 0
       ? posts.filter((p: any) => !hiddenCategories.has(p.category))
       : posts
-    if (sortMode === 'popular' && selectedCategory === 'ALL') {
+    if (sortMode === 'latest') {
+      // True chronological — NO ranked scoring. Product policy: pinned
+      // posts stay on top (mod-curated), then strict createdAt desc.
+      result = [...result].sort((a: any, b: any) => {
+        if (!!a.isPinned !== !!b.isPinned) return a.isPinned ? -1 : 1
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      })
+    } else if (sortMode === 'popular' && selectedCategory === 'ALL') {
       result = [...result].sort((a: any, b: any) => {
         const aScore = (a._count?.reactions || 0) + (a._count?.comments || 0) * 2
         const bScore = (b._count?.reactions || 0) + (b._count?.comments || 0) * 2
         return bScore - aScore
       })
     }
+    // 'recommended' → keep the SSR ranked order as-is.
     return result
   }, [posts, selectedCategory, hiddenCategories, sortMode])
 
@@ -532,7 +544,7 @@ export default function FeedClient({
           {/* Filter icon — always visible */}
           <button
             onClick={() => setShowFilter(!showFilter)}
-            data-active={showFilter || hiddenCategories.size > 0 || sortMode !== 'newest' ? 'true' : 'false'}
+            data-active={showFilter || hiddenCategories.size > 0 || sortMode !== 'recommended' ? 'true' : 'false'}
             className="hai-btn-icon hai-btn-icon--sm hai-btn-icon--outlined hai-shrink-0"
           >
             <FiFilter className="hai-icon-md" />
@@ -597,7 +609,8 @@ export default function FeedClient({
                 <p className="hai-h6 hai-tc-muted hai-mb-2">{lang === 'en' ? 'Sort by' : lang === 'ur' ? 'ترتیب' : 'الترتيب'}</p>
                 <div className="hai-row-2">
                   {[
-                    { key: 'newest', ar: 'الأحدث', en: 'Newest' },
+                    { key: 'recommended', ar: 'الأهم', en: 'Top' },
+                    { key: 'latest', ar: 'الأحدث', en: 'Latest' },
                     { key: 'popular', ar: 'الأكثر تفاعلاً', en: 'Most Popular' },
                   ].map(s => (
                     <button
@@ -635,9 +648,9 @@ export default function FeedClient({
                   })}
                 </div>
               </div>
-              {(hiddenCategories.size > 0 || sortMode !== 'newest') && (
+              {(hiddenCategories.size > 0 || sortMode !== 'recommended') && (
                 <button
-                  onClick={() => { setHiddenCategories(new Set()); setSortMode('newest'); localStorage.removeItem('hai_feed_hidden_cats'); localStorage.removeItem('hai_feed_sort') }}
+                  onClick={() => { setHiddenCategories(new Set()); setSortMode('recommended'); localStorage.removeItem('hai_feed_hidden_cats'); localStorage.removeItem('hai_feed_sort') }}
                   className="hai-link hai-tc-danger hai-meta"
                 >
                   {lang === 'en' ? 'Reset' : lang === 'ur' ? 'ری سیٹ' : 'إعادة ضبط'}
