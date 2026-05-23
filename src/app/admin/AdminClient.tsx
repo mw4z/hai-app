@@ -605,6 +605,9 @@ export default function AdminClient({
                     )}
                   </div>
                   <p className="text-xs text-gray-400 mb-1">{u.phone} · {u.role}{u.email ? ` · ${u.email}` : ''}</p>
+                  {u.neighborhood && (
+                    <p className="text-[11px] text-gray-400 mb-1">📍 {lang === 'en' ? (u.neighborhood.nameEn || u.neighborhood.name) : u.neighborhood.name}{u.neighborhood.city ? ` — ${lang === 'en' ? (u.neighborhood.city.nameEn || u.neighborhood.city.name) : u.neighborhood.city.name}` : ''}</p>
+                  )}
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     {(() => {
                       const p = getPrimaryBadge(u.accountType || 'NORMAL', (u as any).providerStatus)
