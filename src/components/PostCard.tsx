@@ -24,11 +24,13 @@ import { useAttachContact } from '@/hooks/useAttachContact'
 import ImageLightbox from './ImageLightbox'
 import SmartText from './SmartText'
 import SmartTextWithPlacePreviews from './SmartTextWithPlacePreviews'
+import { parseMessageSegments } from './ContactChip'
+import { extractPlaceLinks } from '@/lib/places/extractPlaceLinks'
 import ReportUserSheet from './ReportUserSheet'
 import SocialChips from './SocialChips'
 import { showApiError } from '@/lib/apiError'
 import { detectLang } from '@/lib/detectLang'
-import { HaiSpinner } from './HaiLoader'
+import HaiLoader, { HaiSpinner } from './HaiLoader'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
 import { pushBackHandler } from '@/lib/backHandler'
@@ -384,6 +386,22 @@ export default function PostCard({
   // The user shown in the profile popup: null = the post author; otherwise
   // a comment author (so tapping a commenter opens THEIR profile).
   const [popupUser, setPopupUser] = useState<any | null>(null)
+  // Full profile for the popup, fetched on open so bio/service/stats are
+  // complete (the feed slims the author payload). Null = still loading →
+  // the popup shows a loader instead of a half-empty card.
+  const [popupProfile, setPopupProfile] = useState<any | null>(null)
+  useEffect(() => {
+    if (!showUserPopup) { setPopupProfile(null); return }
+    const id = popupUser?.id || post.author?.id
+    if (!id) return
+    setPopupProfile(null)
+    let aborted = false
+    fetch(`/api/users/${id}/profile`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => { if (!aborted) setPopupProfile(p || popupUser || post.author) })
+      .catch(() => { if (!aborted) setPopupProfile(popupUser || post.author) })
+    return () => { aborted = true }
+  }, [showUserPopup, popupUser])
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(post.title)
   const [editBody, setEditBody] = useState(post.body)
@@ -452,6 +470,12 @@ export default function PostCard({
         ? postData.title
         : buildDisplayTitle({ title: '', body: postData.body, category: post.category as any }, lang as 'ar' | 'en' | 'ur'))
   const displayBody  = showTranslated && translated ? translated.body  : postData.body
+  // A body with a contact card or directory preview must NOT be line-clamped
+  // — clamping cuts the card mid-way and shows "عرض المزيد" over it. When a
+  // rich embed is present we render the body in full and skip the clamp.
+  const hasRichEmbed =
+    parseMessageSegments(displayBody).some((s) => s.kind === 'contact') ||
+    extractPlaceLinks(displayBody).length > 0
 
   // Detect whether the clamped body actually overflows, so we only
   // show "See more / عرض المزيد" when there's more content to reveal.
@@ -1486,12 +1510,12 @@ export default function PostCard({
             ref={bodyRef}
             dir="auto"
             className={`hai-body hai-tc-sub selectable-text whitespace-pre-wrap ${
-              bodyExpanded ? '' : 'line-clamp-5'
+              bodyExpanded || hasRichEmbed ? '' : 'line-clamp-5'
             }`}
           >
             <SmartTextWithPlacePreviews text={displayBody} />
           </p>
-          {bodyOverflows && (
+          {bodyOverflows && !hasRichEmbed && (
             <button
               type="button"
               onClick={() => setBodyExpanded((v) => !v)}
@@ -2457,7 +2481,7 @@ export default function PostCard({
       )}
 
       {/* User Profile Popup */}
-      {showUserPopup && ((post: any) => {
+      {showUserPopup && (popupProfile ? ((post: any) => {
         const rep = post.author.reputation
         const level = getRepLevel(rep)
         const levelLabel = { new: lang === 'en' ? 'New' : lang === 'ur' ? 'نیا' : 'جديد', active: lang !== 'en' ? 'نشط' : 'Active', trusted: lang !== 'en' ? 'موثوق' : 'Trusted', top: lang !== 'en' ? 'متميّز' : 'Top' }[level]
@@ -2681,7 +2705,21 @@ export default function PostCard({
             </div>
           </div>
         )
-      })(popupUser ? { ...post, author: popupUser } : post)}
+      })({ ...post, author: popupProfile }) : (
+        // Profile still loading — show the branded loader so the user never
+        // sees a half-empty card pop its bio/details in late.
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowUserPopup(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-800 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-sm mx-auto py-20 flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <HaiLoader size="md" />
+          </div>
+        </div>
+      ))}
 
       {/* Fullscreen Avatar */}
       {/* Mod / admin: Edit category sheet — bypasses the keyword
