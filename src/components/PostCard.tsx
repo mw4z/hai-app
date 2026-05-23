@@ -467,6 +467,16 @@ export default function PostCard({
   // the AUTHOR explicitly provided a title — see the {hasAuthorTitle
   // && <h3>...} gate below.
   const hasAuthorTitle = postData.title.trim().length > 0
+  // Some posts (older "ask" submissions, or any flow that synthesized a
+  // headline from the first line of the body) stored a title that is just
+  // a prefix of the body — rendering it as both the <h3> headline AND the
+  // body paragraph shows the same text twice. Detect that and drop the
+  // redundant headline; the body alone carries the message.
+  const normalizeForCompare = (s: string) => s.replace(/\s+/g, ' ').trim()
+  const titleDuplicatesBody =
+    hasAuthorTitle &&
+    normalizeForCompare(postData.body).startsWith(normalizeForCompare(postData.title))
+  const showTitleHeadline = hasAuthorTitle && !titleDuplicatesBody
   const displayTitle = showTranslated && translated
     ? translated.title
     : (hasAuthorTitle
@@ -1542,7 +1552,7 @@ export default function PostCard({
               text carry the message — no synthesized "headline" in
               the card. displayTitle (with body-excerpt fallback) is
               still used for share / clipboard / push subject paths. */}
-          {hasAuthorTitle && (
+          {showTitleHeadline && (
             <h3 className="hai-body-strong hai-mb-1 selectable-text">{displayTitle}</h3>
           )}
           {/* Body — clamped to 5 lines by default. The toggle reveals

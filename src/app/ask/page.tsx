@@ -18,6 +18,7 @@ import toast from 'react-hot-toast'
 import { FiArrowRight, FiArrowLeft, FiSend, FiImage, FiX } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useNetworkStatus } from '@/lib/network'
+import { isTitleRequired } from '@/lib/posts/titleRequired'
 import { translateApiError } from '@/lib/apiError'
 import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { playSuccess, playError } from '@/lib/sound'
@@ -421,12 +422,21 @@ export default function AskNeighborsPage() {
           return
         }
       }
-      // Title is the first line / first 60 chars; body is the full
-      // input. The server enforces classify defaults (priority: HIGH
-      // for LOST_FOUND/NEIGHBORHOOD_REPORTS) — we just send the v2
-      // category + REQUEST intent and let classifyPost handle the rest.
+      // The ask flow is body-only — the user just types their request.
+      // Only synthesize a headline for categories that REQUIRE a title
+      // (MARKETPLACE). For optional-title asks (service / real-estate
+      // requests, general questions, reports…) we send an EMPTY title so
+      // the card renders body-only; sending a first-line title made a
+      // short one-line ask show the same text twice (headline + body).
+      // buildDisplayTitle still derives a headline at runtime for the
+      // share sheet / push subject.
       const firstLine = trimmed.split(/\r?\n/)[0]
-      const title = firstLine.slice(0, 60)
+      const needsTitle = isTitleRequired(
+        category as any,
+        'REQUEST' as any,
+        (isOutside ? null : marketplaceType) as any,
+      )
+      const title = needsTitle ? firstLine.slice(0, 60) : ''
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
