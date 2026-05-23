@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import { FiMapPin, FiLoader, FiCheck, FiArrowRight, FiArrowLeft, FiRefreshCw, FiSettings, FiSearch } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useGPSLocation } from '@/hooks/useGPSLocation'
-import { tryRedeemPendingInvite } from '@/lib/pendingInvite'
+import { tryRedeemPendingInvite, getPendingInviteCode, savePendingInviteCode, isValidInviteCode } from '@/lib/pendingInvite'
 
 type Step = 'name' | 'gender' | 'account_type' | 'location'
 
@@ -47,6 +47,19 @@ export default function OnboardingPage() {
   const [lastName, setLastName] = useState('')
   const [gender, setGender] = useState<'MALE' | 'FEMALE' | 'UNSPECIFIED'>('MALE')
   const [accountType, setAccountType] = useState<'NORMAL' | 'SERVICE_PROVIDER'>('NORMAL')
+  // Invite code — prefilled from a code captured by /i/<code> when the
+  // invite was opened in THIS webview, but always manually enterable so a
+  // fresh app install (where the code lived in the external browser, not
+  // here) can still type the code that's printed in the invite message.
+  const [inviteCode, setInviteCode] = useState('')
+  const [inviteAutoCaptured, setInviteAutoCaptured] = useState(false)
+  useEffect(() => {
+    const pending = getPendingInviteCode()
+    if (pending) {
+      setInviteCode(pending.code)
+      setInviteAutoCaptured(true)
+    }
+  }, [])
 
   const [locationStep, setLocationStep] = useState<LocationStep>('ask')
   const [detectedNeighborhood, setDetectedNeighborhood] = useState<DetectedNeighborhood | null>(null)
@@ -338,6 +351,15 @@ export default function OnboardingPage() {
 
       try { window.dispatchEvent(new CustomEvent('hai:auth-ready')) } catch {}
 
+      // Persist whatever code the user typed (or the prefilled one) so the
+      // shared redeem path picks it up. savePendingInviteCode validates the
+      // HAI-XXXX format and no-ops on anything malformed — which is how a
+      // fresh install (code only in the invite message, never in this
+      // webview's storage) still gets attributed.
+      const typedInvite = inviteCode.trim().toUpperCase()
+      const hasTypedInvite = !!typedInvite
+      if (hasTypedInvite) savePendingInviteCode(typedInvite)
+
       tryRedeemPendingInvite()
         .then((result) => {
           if (result.status === 'success') {
@@ -349,6 +371,11 @@ export default function OnboardingPage() {
                 ? 'Invite linked successfully'
                 : 'تم ربط الدعوة بنجاح'
             toast.success(msg, { duration: 3500 })
+          } else if (hasTypedInvite && (result.status === 'skip' || result.status === 'cleared')) {
+            // The user explicitly entered a code but it didn't apply
+            // (bad format → never saved, or not-found / self / too-late).
+            // 'retry' (transient) stays silent — the code is kept.
+            toast.error(t('onboard_invite_invalid'))
           }
         })
         .catch(() => { /* silent */ })
@@ -399,6 +426,24 @@ export default function OnboardingPage() {
             className="hai-input"
             maxLength={50}
           />
+          <input
+            type="text"
+            inputMode="text"
+            autoCapitalize="characters"
+            placeholder={t('onboard_invite_label')}
+            value={inviteCode}
+            onChange={(e) => {
+              setInviteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 14))
+              setInviteAutoCaptured(false)
+            }}
+            className="hai-input"
+            maxLength={14}
+          />
+          <p className="hai-caption" style={{ marginTop: '-0.5rem' }}>
+            {inviteAutoCaptured && isValidInviteCode(inviteCode)
+              ? t('onboard_invite_applied')
+              : t('onboard_invite_hint')}
+          </p>
           <button
             onClick={() => { if (!name.trim()) { toast.error(t('onboard_name_required')); return } setStep('gender') }}
             className="hai-btn-primary hai-btn-block"

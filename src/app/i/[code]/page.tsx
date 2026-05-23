@@ -52,6 +52,19 @@ export default function InviteLandingPage({
   const [preview, setPreview] = useState<Preview | null>(null)
   const [platform, setPlatform] = useState<'ios' | 'android' | 'other'>('other')
   const [inNativeApp, setInNativeApp] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  // The code is right here in the URL — show it so a user who taps the
+  // link (and never saw the message text) can still type it at signup.
+  const displayCode = decodeURIComponent(params.code || '').trim().toUpperCase()
+
+  async function copyCode() {
+    try {
+      await navigator.clipboard?.writeText(displayCode)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {}
+  }
 
   useEffect(() => {
     setPlatform(detectPlatform())
@@ -145,6 +158,28 @@ export default function InviteLandingPage({
           </div>
         ) : (
           <div className="mt-8 space-y-3">
+            {/* The invite code, copyable — they'll enter it when they sign
+                up in the app (deferred deep linking isn't available, so the
+                code is carried by the user, not the install). */}
+            {isValidInviteCode(displayCode) && (
+              <div className="rounded-xl border border-primary-200 dark:border-primary-800/60 bg-primary-50 dark:bg-primary-900/20 p-3">
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-1">
+                  {lang === 'en' ? 'Your invite code' : 'كود دعوتك'}
+                </p>
+                <button
+                  type="button"
+                  onClick={copyCode}
+                  className="w-full font-mono text-lg font-bold tracking-wider text-primary-700 dark:text-primary-300 active:scale-[0.98] transition-transform"
+                >
+                  {displayCode}
+                </button>
+                <p className="text-[10px] text-primary-600 dark:text-primary-400 mt-1">
+                  {copied
+                    ? (lang === 'en' ? 'Copied ✓' : 'تم النسخ ✓')
+                    : (lang === 'en' ? 'Tap to copy — enter it when you sign up' : 'اضغط للنسخ — أدخله عند التسجيل')}
+                </p>
+              </div>
+            )}
             {storeUrl && (
               <a
                 href={storeUrl}
@@ -171,8 +206,8 @@ export default function InviteLandingPage({
             )}
             <p className="text-[11px] text-gray-500 dark:text-gray-400 pt-2">
               {lang === 'en'
-                ? 'Your invite code is saved. Open the app to finish joining.'
-                : 'تم حفظ رمز الدعوة. افتح التطبيق لإكمال الانضمام.'}
+                ? 'Install the app, then enter your code at sign-up to finish joining.'
+                : 'ثبّت التطبيق ثم أدخل الكود عند التسجيل لإكمال الانضمام.'}
             </p>
           </div>
         )}
