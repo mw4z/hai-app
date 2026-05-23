@@ -2206,8 +2206,13 @@ export default function PostCard({
                         <div className="hai-comment__actions">
                           <button
                             onClick={() => setReplyingTo(replyingTo?.id === c.id ? null : { id: c.id, name: fullName(c.author) || t('post_neighbor') })}
-                            className="hai-comment__action"
+                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[12px] font-bold active:scale-95 transition-transform ${
+                              replyingTo?.id === c.id
+                                ? 'bg-primary-600 text-white'
+                                : 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-500/10'
+                            }`}
                           >
+                            <FiCornerDownRight className="w-3.5 h-3.5" />
                             {t('post_reply')}
                           </button>
                           {c.author.id === currentUserId && (
@@ -2485,7 +2490,9 @@ export default function PostCard({
               )}
             </div>
 
-            {/* Pinned footer — contact picker + input, safe-area aware */}
+            {/* Pinned footer — comment composer. Hidden while an inline
+                reply box is open so we never show two input bars at once. */}
+            {!replyingTo && (
             <div className="hai-sheet__footer">
               {/* Pick contact from phone — only for LOOKING_FOR on supported devices */}
               {commentImagePreview && (
@@ -2577,12 +2584,15 @@ export default function PostCard({
                   <FiSend className="hai-icon-md" />
                 </button>
               </form>
-              <StickerPicker
-                open={!!stickerTarget}
-                onPick={sendSticker}
-                onClose={() => setStickerTarget(null)}
-              />
             </div>
+            )}
+            {/* Sticker picker — mounted outside the footer so it stays
+                available whether the comment or a reply composer is open. */}
+            <StickerPicker
+              open={!!stickerTarget}
+              onPick={sendSticker}
+              onClose={() => setStickerTarget(null)}
+            />
           </div>
         </div>
       )}
