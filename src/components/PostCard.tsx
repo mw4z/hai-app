@@ -2203,7 +2203,7 @@ export default function PostCard({
                         type="button"
                         onClick={() => handleCommentLike(c.id)}
                         aria-label="like"
-                        className="flex flex-col items-center gap-0.5 flex-shrink-0 self-start pt-1 active:scale-90 transition-transform"
+                        className="flex flex-col items-center gap-0.5 flex-shrink-0 self-center active:scale-90 transition-transform"
                       >
                         <FiHeart className={`hai-icon-sm ${c.isLiked ? 'hai-fill-current text-red-500' : 'text-gray-400'}`} />
                         {(c.likeCount || 0) > 0 && <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-none">{c.likeCount}</span>}
@@ -2305,7 +2305,7 @@ export default function PostCard({
                               type="button"
                               onClick={() => handleCommentLike(reply.id)}
                               aria-label="like"
-                              className="flex flex-col items-center gap-0.5 flex-shrink-0 self-start pt-0.5 active:scale-90 transition-transform"
+                              className="flex flex-col items-center gap-0.5 flex-shrink-0 self-center active:scale-90 transition-transform"
                             >
                               <FiHeart className={`hai-icon-xs ${reply.isLiked ? 'hai-fill-current text-red-500' : 'text-gray-400'}`} />
                               {(reply.likeCount || 0) > 0 && <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-none">{reply.likeCount}</span>}
