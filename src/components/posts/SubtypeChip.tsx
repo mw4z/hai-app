@@ -62,7 +62,10 @@ export default function SubtypeChip(props: SubtypeChipProps) {
   const { lang } = useLanguage()
 
   let label = ''
-  if (props.category === 'REAL_ESTATE' && props.realEstateType && RE_LABELS[props.realEstateType]) {
+  // WANTED is redundant with the "طلب" (request) intent chip the card
+  // already shows — rendering both ("طلب" + "مطلوب") just clutters the
+  // header, so skip the subtype here and let the intent chip carry it.
+  if (props.category === 'REAL_ESTATE' && props.realEstateType && props.realEstateType !== 'WANTED' && RE_LABELS[props.realEstateType]) {
     const l = RE_LABELS[props.realEstateType]
     label = lang === 'en' ? l.en : lang === 'ur' ? l.ur : l.ar
   } else if (props.category === 'NEIGHBORHOOD_REPORTS' && props.civicType && CIVIC_LABELS[props.civicType]) {
