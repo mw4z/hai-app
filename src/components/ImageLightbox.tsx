@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { FiX, FiDownload } from 'react-icons/fi'
 import { hapticLight } from '@/lib/haptic'
 import { saveImageToDevice } from '@/lib/saveImage'
@@ -412,8 +413,14 @@ export default function ImageLightbox({
   }, [images, index, lang])
 
   if (!mounted) return null
+  // Portal to <body> so an ancestor stacking context (e.g. a glass /
+  // backdrop-blur surface, or being rendered inside another z-[9998]
+  // modal like the catalog item sheet) can never trap the lightbox —
+  // its close button + dismiss gestures must always sit at the true
+  // top of the z-order.
+  if (typeof document === 'undefined') return null
 
-  return (
+  return createPortal(
     <div
       data-overlay="true"
       className="hai-lightbox-overlay hai-lightbox-overlay--flush hai-lightbox-root"
@@ -509,6 +516,7 @@ export default function ImageLightbox({
           ))}
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   )
 }
