@@ -61,8 +61,14 @@ export async function PATCH(req: NextRequest) {
     const data: Record<string, unknown> = {}
 
     if (name !== undefined) {
-      if (!name?.trim()) return NextResponse.json({ error: 'الاسم مطلوب' }, { status: 400 })
-      data.name = name.trim()
+      // Mirror the DB CHECK (User_name_format_check: trimmed length >= 2)
+      // so a 1-char name returns a clean 400 instead of a 500 constraint
+      // violation.
+      const trimmedName = (name ?? '').trim()
+      if (trimmedName.length < 2) {
+        return NextResponse.json({ error: 'الاسم يجب أن يكون حرفين على الأقل' }, { status: 400 })
+      }
+      data.name = trimmedName
     }
 
     if (lastName !== undefined) {
