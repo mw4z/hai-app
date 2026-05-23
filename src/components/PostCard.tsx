@@ -2223,6 +2223,16 @@ export default function PostCard({
                               <div className="hai-comment__meta">
                                 <span className="hai-comment__author cursor-pointer" onClick={() => { setPopupUser(reply.author); setShowUserPopup(true) }}>{fullName(reply.author) || t('post_neighbor')}</span>
                                 <UserBadgeDisplay accountType={reply.author.accountType} providerStatus={reply.author.providerStatus} reputation={reply.author.reputation} />
+                                <span className="hai-comment__time">
+                                  {(() => {
+                                    const mins = Math.floor((Date.now() - new Date(reply.createdAt).getTime()) / 60000)
+                                    if (mins < 1) return lang === 'en' ? 'now' : 'الآن'
+                                    if (mins < 60) return lang === 'en' ? `${mins}m` : `${mins}د`
+                                    const hrs = Math.floor(mins / 60)
+                                    if (hrs < 24) return lang === 'en' ? `${hrs}h` : `${hrs}س`
+                                    return lang === 'en' ? `${Math.floor(hrs / 24)}d` : `${Math.floor(hrs / 24)}ي`
+                                  })()}
+                                </span>
                               </div>
                               {reply.body && (() => {
                                 const tx = commentTx[reply.id]
