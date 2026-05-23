@@ -2161,14 +2161,6 @@ export default function PostCard({
                               return lang === 'en' ? `${Math.floor(hrs/24)}d` : `${Math.floor(hrs/24)}ي`
                             })()}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => setOpenActionsFor(openActionsFor === c.id ? null : c.id)}
-                            className="ms-auto -me-1 p-1 text-gray-400 active:scale-90 transition-transform"
-                            aria-label={lang === 'en' ? 'More' : 'المزيد'}
-                          >
-                            <FiMoreVertical className="hai-icon-sm" />
-                          </button>
                         </div>
                         {editingCommentId === c.id ? (
                           <div className="hai-comment__edit-form">
@@ -2282,17 +2274,28 @@ export default function PostCard({
                           </>)}
                         </div>
                       </div>
-                      {/* Instagram-style: like on the trailing edge of the
-                          comment row, count beneath it. */}
-                      <button
-                        type="button"
-                        onClick={() => handleCommentLike(c.id)}
-                        aria-label="like"
-                        className="flex flex-col items-center gap-0.5 flex-shrink-0 self-center active:scale-90 transition-transform"
-                      >
-                        <FiHeart className={`hai-icon-sm ${c.isLiked ? 'hai-fill-current text-red-500' : 'text-gray-400'}`} />
-                        {(c.likeCount || 0) > 0 && <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-none">{c.likeCount}</span>}
-                      </button>
+                      {/* Trailing column on the comment's edge: the ⋮ menu
+                          aligned above the like heart, with breathing room
+                          between them. */}
+                      <div className="flex flex-col items-center gap-3 flex-shrink-0 self-center">
+                        <button
+                          type="button"
+                          onClick={() => setOpenActionsFor(openActionsFor === c.id ? null : c.id)}
+                          className="p-1 text-gray-400 active:scale-90 transition-transform"
+                          aria-label={lang === 'en' ? 'More' : 'المزيد'}
+                        >
+                          <FiMoreVertical className="hai-icon-sm" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCommentLike(c.id)}
+                          aria-label="like"
+                          className="flex flex-col items-center gap-0.5 active:scale-90 transition-transform"
+                        >
+                          <FiHeart className={`hai-icon-sm ${c.isLiked ? 'hai-fill-current text-red-500' : 'text-gray-400'}`} />
+                          {(c.likeCount || 0) > 0 && <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-none">{c.likeCount}</span>}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Replies */}
@@ -2321,14 +2324,6 @@ export default function PostCard({
                                     return lang === 'en' ? `${Math.floor(hrs / 24)}d` : `${Math.floor(hrs / 24)}ي`
                                   })()}
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setOpenActionsFor(openActionsFor === reply.id ? null : reply.id)}
-                                  className="ms-auto -me-1 p-1 text-gray-400 active:scale-90 transition-transform"
-                                  aria-label={lang === 'en' ? 'More' : 'المزيد'}
-                                >
-                                  <FiMoreVertical className="hai-icon-xs" />
-                                </button>
                               </div>
                               {reply.body && (() => {
                                 const tx = commentTx[reply.id]
@@ -2400,15 +2395,25 @@ export default function PostCard({
                               </div>
                               )}
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => handleCommentLike(reply.id)}
-                              aria-label="like"
-                              className="flex flex-col items-center gap-0.5 flex-shrink-0 self-center active:scale-90 transition-transform"
-                            >
-                              <FiHeart className={`hai-icon-xs ${reply.isLiked ? 'hai-fill-current text-red-500' : 'text-gray-400'}`} />
-                              {(reply.likeCount || 0) > 0 && <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-none">{reply.likeCount}</span>}
-                            </button>
+                            <div className="flex flex-col items-center gap-3 flex-shrink-0 self-center">
+                              <button
+                                type="button"
+                                onClick={() => setOpenActionsFor(openActionsFor === reply.id ? null : reply.id)}
+                                className="p-1 text-gray-400 active:scale-90 transition-transform"
+                                aria-label={lang === 'en' ? 'More' : 'المزيد'}
+                              >
+                                <FiMoreVertical className="hai-icon-xs" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleCommentLike(reply.id)}
+                                aria-label="like"
+                                className="flex flex-col items-center gap-0.5 active:scale-90 transition-transform"
+                              >
+                                <FiHeart className={`hai-icon-xs ${reply.isLiked ? 'hai-fill-current text-red-500' : 'text-gray-400'}`} />
+                                {(reply.likeCount || 0) > 0 && <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-none">{reply.likeCount}</span>}
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
