@@ -8,6 +8,7 @@ import { pickImageOrFallback } from '@/lib/imagePicker'
 import { useLanguage } from '@/hooks/useLanguage'
 import { FiArrowRight, FiArrowLeft, FiPlus, FiTrash2, FiCamera } from 'react-icons/fi'
 import { HaiSpinner } from '@/components/HaiLoader'
+import ImageLightbox from '@/components/ImageLightbox'
 
 const DEFAULT_LIMIT = 3 // Matches FREE plan. Actual enforcement is in API.
 
@@ -36,6 +37,7 @@ export default function CatalogClient({ initialItems, claimedPlace }: Props) {
   const dn = (ar: string, en: string) => lang === 'en' ? en : ar
 
   const [items, setItems] = useState<Item[]>(initialItems)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [bulkBusy, setBulkBusy] = useState(false)
@@ -179,6 +181,8 @@ export default function CatalogClient({ initialItems, claimedPlace }: Props) {
 
   const atLimit = items.length >= DEFAULT_LIMIT
   const showPlaceControls = !!claimedPlace
+  // Catalog images (in display order) for the full-screen lightbox.
+  const catalogImages = items.filter((i) => i.imageUrl).map((i) => i.imageUrl as string)
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -312,7 +316,7 @@ export default function CatalogClient({ initialItems, claimedPlace }: Props) {
             {items.map(item => (
               <div key={item.id} className="bg-white dark:bg-gray-800 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700">
                 {item.imageUrl ? (
-                  <img src={item.imageUrl} alt="" className="w-full h-28 object-cover" />
+                  <img src={item.imageUrl} alt="" className="w-full h-28 object-cover cursor-pointer" onClick={() => setLightboxIndex(catalogImages.indexOf(item.imageUrl!))} />
                 ) : (
                   <div className="w-full h-20 bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-2xl text-gray-300">📦</div>
                 )}
@@ -375,6 +379,13 @@ export default function CatalogClient({ initialItems, claimedPlace }: Props) {
           </p>
         )}
       </div>
+
+      <ImageLightbox
+        images={catalogImages}
+        initialIndex={lightboxIndex ?? 0}
+        open={lightboxIndex !== null}
+        onClose={() => setLightboxIndex(null)}
+      />
     </div>
   )
 }

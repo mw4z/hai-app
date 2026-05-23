@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
       // NEIGHBORHOOD_MOD; capped to 500 for SUPER_ADMIN) and apply
       // matchesArabic in JS. Trade: slightly more bytes off the
       // wire for admin search; correctness for Arabic-name lookups.
-      const dbTake = q ? 500 : 50
+      const dbTake = q ? 1000 : 500
       const rows = await db.user.findMany({
         // Only real members — exclude incomplete signups (OTP-only rows
         // created with a phone but no name yet).
@@ -118,7 +118,7 @@ export async function GET(req: NextRequest) {
                 matchesArabic(u.name, q) ||
                 matchesArabic(u.lastName, q),
             )
-            .slice(0, 50)
+            .slice(0, 200)
         : named
       return NextResponse.json(users)
     }
