@@ -95,7 +95,7 @@ export default async function MarketPage({
       // Deals the user explicitly marked (🏷️). The dedicated isOffer
       // flag — the same one the feed's Offers chip filters on — so this
       // tab and that chip always agree.
-      tabFilter = { isOffer: true, category: { in: OFFER_CATEGORIES_ALL } }
+      tabFilter = { isOffer: true, intent: { not: 'REQUEST' }, category: { in: OFFER_CATEGORIES_ALL } }
       break
     case 'ALL':
     default:

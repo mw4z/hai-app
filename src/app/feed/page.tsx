@@ -78,8 +78,10 @@ export default async function FeedPage({
     // Explicitly user-marked offers ("عروض") across categories. Uses the
     // dedicated isOffer flag — NOT intent=OFFER, which is far broader
     // (the offer-vs-request "side") and used to leak reports into this
-    // chip. MUST mirror the /api/feed branch.
-    categoryFilter = { isOffer: true }
+    // chip. An offer is never a request, so REQUEST posts are excluded
+    // defensively (guards legacy rows that were marked isOffer while
+    // still intent=REQUEST). MUST mirror the /api/feed branch.
+    categoryFilter = { isOffer: true, intent: { not: 'REQUEST' } }
   } else if (category === 'MARKETPLACE') {
     categoryFilter = { category: 'MARKETPLACE' as PostCategory, intent: 'OFFER' }
   } else if (V2_FILTER_VALUES.includes(category)) {

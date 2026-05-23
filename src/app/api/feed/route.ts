@@ -141,8 +141,9 @@ export async function GET(req: NextRequest) {
   } else if (category === 'OFFERS') {
     // Explicitly user-marked offers ("عروض") across categories — the
     // dedicated isOffer flag, NOT the broad intent=OFFER side (which
-    // leaked reports into this chip). Mirrors /feed/page.tsx.
-    categoryFilter = { isOffer: true }
+    // leaked reports into this chip). An offer is never a request, so
+    // REQUEST posts are excluded. Mirrors /feed/page.tsx.
+    categoryFilter = { isOffer: true, intent: { not: 'REQUEST' } }
   } else if (category === 'MARKETPLACE') {
     categoryFilter = { category: 'MARKETPLACE' as PostCategory, intent: 'OFFER' }
   } else if (V2_FILTER_VALUES.includes(category)) {
