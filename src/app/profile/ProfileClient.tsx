@@ -878,11 +878,11 @@ export default function ProfileClient({ user, postCount, visibleReputation }: Pr
                   type="tel"
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  placeholder="000000"
+                  placeholder="0000"
                   value={phoneCode}
-                  onChange={e => setPhoneCode(e.target.value)}
+                  onChange={e => setPhoneCode(e.target.value.replace(/\D/g, ''))}
                   className="input-field text-center text-lg tracking-widest"
-                  maxLength={6}
+                  maxLength={4}
                   dir="ltr"
                   autoFocus
                 />
@@ -907,7 +907,7 @@ export default function ProfileClient({ user, postCount, visibleReputation }: Pr
                       } catch { toast.error(t('common_error')) }
                       finally { setSaving(false) }
                     }}
-                    disabled={saving || phoneCode.length < 6}
+                    disabled={saving || phoneCode.length < 4}
                     className="flex-1 bg-primary-600 text-white text-sm font-medium py-2 rounded-xl disabled:opacity-50"
                   >
                     {saving ? <HaiSpinner /> : t('phone_verify')}
