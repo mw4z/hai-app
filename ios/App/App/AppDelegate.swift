@@ -22,6 +22,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // mixWithOthers in options is implied by `.ambient` but set
         // explicitly so a future iOS revision can't quietly change
         // the default.
+        pinAmbientAudioSession()
+        return true
+    }
+
+    /// Force the shared audio session back to `.ambient` (mixable, never
+    /// records). Must be RE-applied on every activation: declaring the mic
+    /// (for chat voice notes) lets iOS / WKWebView re-escalate the session
+    /// to `.playAndRecord` after a recording or audio-context init, which
+    /// the user hears as echoey system / call audio. Pinning once at launch
+    /// isn't enough — we re-assert it whenever the app comes to the front.
+    private func pinAmbientAudioSession() {
         do {
             try AVAudioSession.sharedInstance().setCategory(
                 .ambient,
@@ -33,7 +44,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             // Non-fatal — UI sounds still play, the session just
             // stays at whatever WKWebView's default is.
         }
-        return true
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
@@ -47,11 +57,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
-        // Called as part of the transition from the background to the active state; here you can undo many of the changes made on entering the background.
+        // Re-assert the ambient audio session — see pinAmbientAudioSession().
+        pinAmbientAudioSession()
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+        // Re-assert the ambient audio session every time the app becomes
+        // active, so a prior voice-note recording can't leave the WKWebView
+        // stuck on `.playAndRecord` (the echo cause).
+        pinAmbientAudioSession()
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
