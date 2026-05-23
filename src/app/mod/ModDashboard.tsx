@@ -192,6 +192,33 @@ export default function ModDashboard({ data }: Props) {
     finally { setActionLoading(null) }
   }
 
+  // Permanently delete a user (SUPER_ADMIN only — the API enforces this and
+  // refuses to delete another SUPER_ADMIN). Cascades their content.
+  async function deleteUser(userId: string) {
+    if (actionLoading) return
+    const ok = await confirmDialog({
+      title: dn('حذف المستخدم نهائياً', 'Delete user permanently'),
+      message: dn('سيُحذف الحساب وكل محتواه نهائياً. لا يمكن التراجع.', 'The account and all its content are permanently removed. This cannot be undone.'),
+      confirmText: dn('حذف', 'Delete'),
+    })
+    if (!ok) return
+    setActionLoading('user-' + userId)
+    try {
+      const res = await fetch('/api/admin/action', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_user', targetId: userId }),
+      })
+      if (res.ok) {
+        toast.success(dn('تم الحذف', 'Deleted'))
+        setUserList((cur) => (cur || []).filter((u) => u.id !== userId))
+      } else {
+        const d = await res.json().catch(() => ({}))
+        toast.error(d.error || dn('غير مسموح', 'Not allowed'))
+      }
+    } catch { toast.error('Error') }
+    finally { setActionLoading(null) }
+  }
+
   // Poll-request queue. Fetched lazily when the user opens the tab so
   // the SSR payload stays small. Polled every 30s while the tab is
   // visible — same cadence as the rest of the dashboard.
@@ -752,6 +779,10 @@ export default function ModDashboard({ data }: Props) {
                       </div>
                     ) : (
                       <p className="text-[10px] text-gray-400 mt-2">{dn('لا يمكنك التحكم بهذا الحساب', 'You cannot act on this account')}</p>
+                    )}
+                    {/* Permanent delete — SUPER_ADMIN only, never another super. */}
+                    {role === 'SUPER_ADMIN' && u.role !== 'SUPER_ADMIN' && (
+                      <button onClick={() => deleteUser(u.id)} disabled={!!actionLoading} className="w-full mt-2 py-1.5 rounded-lg border border-rose-300 dark:border-rose-900/60 text-rose-700 dark:text-rose-300 text-xs font-semibold disabled:opacity-50 active:scale-[0.98]">🗑️ {dn('حذف نهائي', 'Delete permanently')}</button>
                     )}
                   </div>
                 )
