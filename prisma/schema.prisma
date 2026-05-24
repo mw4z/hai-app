@@ -363,6 +363,10 @@ model Post {
   // الحي", and never boosted/pushed. Defaults RESIDENT for all existing
   // rows + every normal in-neighborhood post.
   originScope    PostOriginScope  @default(RESIDENT)
+  // How the post entered Hai. APP = created in-app (default for every
+  // existing + organic post); WHATSAPP_BRIDGE = published via the WhatsApp
+  // bridge after explicit sender confirmation (labeled "نُشر عبر واتساب").
+  origin         PostOrigin       @default(APP)
   // Subtype for category=MARKETPLACE only. Ignored otherwise. SELL is
   // the default so every existing Marketplace row keeps its meaning.
   marketplaceType MarketplaceType @default(SELL)
@@ -489,6 +493,52 @@ enum NeighborhoodClaimStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+// How a post entered Hai.
+enum PostOrigin {
+  APP             // created in-app (organic / default for all existing rows)
+  WHATSAPP_BRIDGE // bridged from a WhatsApp group after sender confirmation
+}
+
+// Lifecycle of a WhatsApp bridge message (audit + idempotency).
+enum WhatsappBridgeStatus {
+  DETECTED   // classified as useful, not yet prompted
+  PROMPTED   // sender was asked to confirm
+  CONFIRMED  // sender confirmed (button/text)
+  PUBLISHED  // a Hai post was created
+  IGNORED    // not useful / risky / declined
+  FAILED     // post creation failed
+  EXPIRED    // confirmation window elapsed
+}
+
+// Audit + idempotency record for the WhatsApp→Hai bridge. NEVER stores a
+// plain phone number — only senderHash. Not exposed to normal users.
+model WhatsappBridgeMessage {
+  id                 String   @id @default(cuid())
+  sourceChatId       String   // WhatsApp group/chat id
+  sourceMessageId    String   // WhatsApp message id
+  senderHash         String   // HMAC of sender phone — never the plain number
+  senderDisplayName  String?  // group display name, if privacy-safe
+  originalText       String
+  classifiedType     String?  // classifier output (service_request, etc.)
+  confirmationMethod String?  // 'BUTTON' | 'TEXT'
+  confirmedBySender  Boolean  @default(false)
+  confirmedAt        DateTime?
+  createdPostId      String?  // the Hai post, once published
+  neighborhoodId     String
+  status             WhatsappBridgeStatus @default(DETECTED)
+  failureReason      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Idempotency: one record per (chat, message, sender). A repeated
+  // "انشر" or re-delivery can't create a second post.
+  @@unique([sourceChatId, sourceMessageId, senderHash])
+  @@index([status])
+  @@index([createdPostId])
+  @@index([neighborhoodId])
+  @@index([createdAt])
 }
 
 // Canonical category enum (renamed from PostCategoryV2 in Phase 4).

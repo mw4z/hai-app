@@ -130,6 +130,7 @@ interface Post {
   // OUTSIDE_REQUEST when the author wasn't a resident of this hood at
   // post time → renders a subtle "من خارج الحي" badge.
   originScope?: 'RESIDENT' | 'OUTSIDE_REQUEST'
+  origin?: 'APP' | 'WHATSAPP_BRIDGE'
   imageUrls: string[]
   pdfUrl?: string | null
   pdfName?: string | null
@@ -1149,12 +1150,25 @@ export default function PostCard({
           </div>
           <div>
             <div className="hai-row-1">
-              <span className="hai-body-strong">{fullName(post.author) || t('post_neighbor')}</span>
-              <UserBadgeDisplay accountType={post.author.accountType} providerStatus={post.author.providerStatus} reputation={post.author.reputation} role={post.author.role} />
-              <MembershipPill membership={post.author.membership as any} />
+              {post.origin === 'WHATSAPP_BRIDGE' ? (
+                // Bridge posts: never expose the WhatsApp sender. Show a
+                // neutral resident label + the origin chip.
+                <span className="hai-body-strong">{lang === 'en' ? 'A neighbor' : 'أحد سكان الحي'}</span>
+              ) : (
+                <>
+                  <span className="hai-body-strong">{fullName(post.author) || t('post_neighbor')}</span>
+                  <UserBadgeDisplay accountType={post.author.accountType} providerStatus={post.author.providerStatus} reputation={post.author.reputation} role={post.author.role} />
+                  <MembershipPill membership={post.author.membership as any} />
+                </>
+              )}
             </div>
             <div className="hai-row-1">
               <span className="hai-meta">{timeAgo(post.createdAt)}</span>
+              {post.origin === 'WHATSAPP_BRIDGE' && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                  {lang === 'en' ? 'via WhatsApp' : 'نُشر عبر واتساب'}
+                </span>
+              )}
               <TierLabel reputation={post.author.reputation} compact />
               {post.isFeatured && (
                 <StatePill state="featured" label={lang !== 'en' ? 'بارز' : 'Featured'} />
