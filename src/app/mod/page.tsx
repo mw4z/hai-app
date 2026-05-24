@@ -12,10 +12,13 @@ export default async function ModPage() {
 
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { role: true, neighborhoodId: true, name: true, lastName: true, neighborhood: { select: { name: true, nameEn: true } } },
+    select: { role: true, status: true, neighborhoodId: true, name: true, lastName: true, neighborhood: { select: { name: true, nameEn: true } } },
   })
   if (!user || user.role === 'RESIDENT') redirect('/feed')
   if (!user.neighborhoodId) redirect('/feed')
+  // A stopped/banned mod loses dashboard access — the gate previously
+  // checked role only, so a "stopped" mod kept full moderator access.
+  if (user.status === 'BANNED_TEMP' || user.status === 'BANNED_PERM') redirect('/feed')
 
   // Fetch mod dashboard data (scoped to their neighborhood)
   const nbId = user.neighborhoodId

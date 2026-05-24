@@ -84,10 +84,15 @@ export async function POST(req: NextRequest) {
 
   const admin = await db.user.findUnique({
     where: { id: session.userId },
-    select: { role: true, name: true, lastName: true, neighborhoodId: true, modApprovedAt: true },
+    select: { role: true, name: true, lastName: true, neighborhoodId: true, modApprovedAt: true, status: true },
   })
   if (!admin || !ADMIN_ROLES.includes(admin.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  // A stopped/banned mod loses all mod powers — without this a "stopped"
+  // mod kept calling this API because only their role was checked.
+  if (admin.status === 'BANNED_TEMP' || admin.status === 'BANNED_PERM') {
+    return NextResponse.json({ error: 'حسابك موقوف' }, { status: 403 })
   }
 
   const body = await req.json()
