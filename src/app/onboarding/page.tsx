@@ -755,6 +755,21 @@ export default function OnboardingPage() {
                     <FiRefreshCw className="hai-icon-xs" />
                     {lang !== 'en' ? 'إعادة تحديد الموقع' : 'Retry location'}
                   </button>
+                  {/* Escape to the full searchable list — for users whose
+                      neighborhood isn't among the GPS-nearby ones (e.g.
+                      currently outside their home neighborhood). Picking
+                      here links as CLAIMED_RESIDENT (limited until verified). */}
+                  <button
+                    onClick={enterManualPicker}
+                    className="hai-link hai-link--brand hai-link--underline hai-row-1 hai-justify-center"
+                  >
+                    <FiSearch className="hai-icon-xs" />
+                    {lang === 'en'
+                      ? "My neighborhood isn't listed — browse all"
+                      : lang === 'ur'
+                        ? 'میرا محلہ یہاں نہیں — تمام دیکھیں'
+                        : 'حيّي غير موجود؟ تصفّح كل الأحياء'}
+                  </button>
                 </>
               )}
             </div>
