@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
-import { FiMapPin, FiNavigation } from 'react-icons/fi'
+import { FiMapPin, FiNavigation, FiSearch } from 'react-icons/fi'
 import BackButton from '@/components/BackButton'
 import { HaiSpinner } from '@/components/HaiLoader'
 
@@ -37,6 +37,12 @@ export default function ChangeNeighborhoodClient({
   const [reason, setReason] = useState('')
   const [customReason, setCustomReason] = useState('')
   const [loading, setLoading] = useState(false)
+  // Manual "browse all neighborhoods" picker — lets a user correct a wrong
+  // choice by selecting any neighborhood instead of relying on GPS.
+  const [allList, setAllList] = useState<Array<{ id: string; name: string; nameEn: string; cityName: string; cityNameEn: string }>>([])
+  const [allLoading, setAllLoading] = useState(false)
+  const [manualSearch, setManualSearch] = useState('')
+  const [showManual, setShowManual] = useState(false)
   // SSR'd — the info banner renders on first paint, no fetch-then-pop-in.
   const info = initialInfo
 
@@ -193,6 +199,44 @@ export default function ChangeNeighborhoodClient({
     )
   }
 
+  async function loadAllNeighborhoods() {
+    if (allList.length > 0) return
+    setAllLoading(true)
+    try {
+      const res = await fetch('/api/neighborhoods/all')
+      const data = await res.json()
+      setAllList(
+        (Array.isArray(data) ? data : []).map((n: any) => ({
+          id: n.id,
+          name: n.name,
+          nameEn: n.nameEn,
+          cityName: n.cityName || n.city?.name || '',
+          cityNameEn: n.cityNameEn || n.city?.nameEn || '',
+        })),
+      )
+    } catch {
+      setAllList([])
+    } finally {
+      setAllLoading(false)
+    }
+  }
+
+  function openManualPicker() {
+    setShowManual(true)
+    loadAllNeighborhoods()
+  }
+
+  function pickManual(n: { id: string; name: string; nameEn: string; cityName: string; cityNameEn: string }) {
+    // A manual pick replaces any GPS result. confidence:'manual' so the card
+    // labels it as chosen (not GPS-detected). The change API trusts the
+    // neighborhoodId the same way it does for the GPS path.
+    setDetected({ id: n.id, name: n.name, nameEn: n.nameEn, cityName: n.cityName, cityNameEn: n.cityNameEn, confidence: 'manual' })
+    setGpsError('')
+    setPermissionDenied(false)
+    setShowManual(false)
+    setManualSearch('')
+  }
+
   async function handleSubmit() {
     if (!detected) { toast.error(lang === 'en' ? 'Detect your location first' : lang === 'ur' ? 'پہلے اپنا مقام معلوم کریں' : 'حدد موقعك أولاً'); return }
     if (!reason) { toast.error(t('nbhd_change_reason')); return }
@@ -270,6 +314,71 @@ export default function ChangeNeighborhoodClient({
             )}
           </button>
 
+          {/* Manual picker — choose any neighborhood (e.g. to fix a wrong
+              choice) without relying on GPS. */}
+          {!showManual ? (
+            <button
+              type="button"
+              onClick={openManualPicker}
+              className="w-full flex items-center justify-center gap-2 text-sm text-primary-600 dark:text-primary-400 font-medium py-1.5 active:opacity-70"
+            >
+              <FiSearch className="w-4 h-4" />
+              {lang === 'en' ? 'Or choose a neighborhood manually' : lang === 'ur' ? 'یا دستی طور پر محلہ منتخب کریں' : 'أو اختر الحي يدوياً'}
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={manualSearch}
+                  onChange={(e) => setManualSearch(e.target.value)}
+                  placeholder={lang === 'en' ? 'Search neighborhood...' : lang === 'ur' ? 'محلہ تلاش کریں...' : 'ابحث عن حي...'}
+                  className="input-field flex-1"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => { setShowManual(false); setManualSearch('') }}
+                  className="text-sm text-gray-500 px-2 py-1 active:opacity-70 flex-shrink-0"
+                >
+                  {lang === 'en' ? 'Close' : lang === 'ur' ? 'بند کریں' : 'إغلاق'}
+                </button>
+              </div>
+              <div className="max-h-72 overflow-y-auto overscroll-contain space-y-2">
+                {allLoading ? (
+                  <div className="flex justify-center py-6"><HaiSpinner /></div>
+                ) : (
+                  allList
+                    .filter((n) => {
+                      const q = manualSearch.trim().toLowerCase()
+                      if (!q) return true
+                      return (
+                        n.name.toLowerCase().includes(q) ||
+                        n.nameEn.toLowerCase().includes(q) ||
+                        n.cityName.toLowerCase().includes(q) ||
+                        n.cityNameEn.toLowerCase().includes(q)
+                      )
+                    })
+                    .map((n) => (
+                      <button
+                        key={n.id}
+                        type="button"
+                        onClick={() => pickManual(n)}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors ${
+                          detected?.id === n.id
+                            ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                            : 'border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white'
+                        }`}
+                      >
+                        <span className="text-xs text-gray-400">{dn(n.cityName, n.cityNameEn)}</span>
+                        <span className="font-medium">{dn(n.name, n.nameEn)}</span>
+                      </button>
+                    ))
+                )}
+              </div>
+            </div>
+          )}
+
           {/* GPS Error */}
           {gpsError && (
             <div className="bg-red-50 dark:bg-red-900/30 rounded-xl p-3">
@@ -302,7 +411,9 @@ export default function ChangeNeighborhoodClient({
               <div className="flex items-center gap-2 mb-2">
                 <FiMapPin className="w-4 h-4 text-green-600 dark:text-green-400" />
                 <span className="text-sm font-semibold text-green-800 dark:text-green-300">
-                  {lang === 'en' ? 'Neighborhood detected' : lang === 'ur' ? 'آپ کا محلہ معلوم ہو گیا' : 'تم تحديد حيّك'}
+                  {detected.confidence === 'manual'
+                    ? (lang === 'en' ? 'Selected neighborhood' : lang === 'ur' ? 'منتخب محلہ' : 'الحي المختار')
+                    : (lang === 'en' ? 'Neighborhood detected' : lang === 'ur' ? 'آپ کا محلہ معلوم ہو گیا' : 'تم تحديد حيّك')}
                 </span>
               </div>
               <p className="text-lg font-bold text-gray-900 dark:text-white">{dn(detected.name, detected.nameEn)}</p>
