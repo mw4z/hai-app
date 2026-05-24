@@ -108,28 +108,26 @@ export async function POST(req: NextRequest) {
         neighborhood,
       )
       if (verdict === 'rejected') {
-        // Don't log lat/lng — even on a rejection, that's the user's
-        // precise location and would end up in Vercel logs accessible
-        // to anyone with project access.
-        console.warn('[COMPLETE_PROFILE] neighborhood verify rejected', {
+        // Coords didn't confirm the chosen neighborhood — but the user is
+        // ALLOWED to claim it as home (CLAIMED_RESIDENT, limited rights
+        // until verified by GPS or a mod). This is the "choose your
+        // neighborhood even while outside it" path: we DON'T block, we
+        // just leave addressVerified=false so membership becomes CLAIMED.
+        // (Don't log lat/lng — it's the user's precise location.)
+        console.log('[COMPLETE_PROFILE] coords did not confirm — linking as claimed', {
           userId: session.userId,
           neighborhoodId,
           accuracy,
         })
-        return NextResponse.json(
-          {
-            error: 'neighborhood_mismatch',
-            message: 'الحي لا يتطابق مع موقعك',
-          },
-          { status: 403 },
-        )
+        // addressVerified stays false → CLAIMED_RESIDENT below.
+      } else {
+        addressVerified = true
+        console.log('[COMPLETE_PROFILE] neighborhood verify ok', {
+          userId: session.userId,
+          neighborhoodId,
+          verdict,
+        })
       }
-      addressVerified = true
-      console.log('[COMPLETE_PROFILE] neighborhood verify ok', {
-        userId: session.userId,
-        neighborhoodId,
-        verdict,
-      })
     } else {
       // Legacy clients / re-runs without coordinates: allow (existence
       // check still applies) but do NOT mark addressVerified true.
