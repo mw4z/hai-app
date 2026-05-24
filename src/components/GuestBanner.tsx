@@ -16,9 +16,20 @@ export default function GuestBanner({ show }: { show: boolean }) {
   if (!show) return null
 
   return (
+    <>
+      {/* Paint the top safe-area with the SAME amber as this banner so the
+          status-bar strip reads as one continuous band with it (no dark gap
+          above). Mirrors the read-only banner: opaque #362822 (amber-900
+          pre-composited over the dark page bg) on BOTH the cover and the
+          banner so they match exactly. Reverts automatically when the banner
+          unmounts (show=false). */}
+      <style>{`
+        html { --hai-safe-top-bg: rgb(255 251 235) !important; }
+        html.dark { --hai-safe-top-bg: #362822 !important; }
+      `}</style>
     <Link
       href="/verify-location"
-      className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 px-4 py-2 active:bg-amber-100 dark:active:bg-amber-900/40 transition-colors"
+      className="flex items-center gap-2 bg-amber-50 dark:bg-[#362822] border-b border-amber-200 dark:border-amber-800 px-4 py-2 active:bg-amber-100 dark:active:bg-amber-900/40 transition-colors"
     >
       <FiMapPin className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
       <span className="flex-1 text-[11px] text-amber-800 dark:text-amber-300 font-medium">
@@ -32,5 +43,6 @@ export default function GuestBanner({ show }: { show: boolean }) {
         {lang === 'en' ? 'Confirm →' : 'تأكيد ←'}
       </span>
     </Link>
+    </>
   )
 }
