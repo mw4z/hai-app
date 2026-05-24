@@ -98,6 +98,13 @@ export default function OnboardingPage() {
   const [allNeighborhoods, setAllNeighborhoods] = useState<Array<{ id: string; name: string; nameEn: string; cityName: string; cityNameEn: string }>>([])
   const [manualSearch, setManualSearch] = useState('')
   const [manualLoading, setManualLoading] = useState(false)
+  // Where the full-list (manual) picker was opened from, so its back button
+  // returns there (nearby/denied/timeout) instead of jumping out a step.
+  const [manualReturnStep, setManualReturnStep] = useState<LocationStep>('ask')
+  // GPS coords stashed when opening the full list (which deliberately drops
+  // them so a manual pick is "claimed"); restored if the user backs out so
+  // the nearby picker can still verify.
+  const [manualSavedCoords, setManualSavedCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null)
 
   const gps = useGPSLocation()
 
@@ -177,6 +184,14 @@ export default function OnboardingPage() {
   }
 
   function enterManualPicker() {
+    // Remember where we came from + stash coords, so backing out returns to
+    // that screen with GPS verification still possible.
+    setManualReturnStep(locationStep)
+    setManualSavedCoords(
+      userLat != null && userLng != null
+        ? { lat: userLat, lng: userLng, accuracy: userAccuracy ?? 9999 }
+        : null,
+    )
     setLocationStep('manual')
     setUserLat(null)
     setUserLng(null)
@@ -185,6 +200,31 @@ export default function OnboardingPage() {
       setManualLoading(true)
       loadAllNeighborhoods()
     }
+  }
+
+  function goBackFromManual() {
+    // Restore the coords we dropped when opening the full list.
+    if (manualSavedCoords) {
+      setUserLat(manualSavedCoords.lat)
+      setUserLng(manualSavedCoords.lng)
+      setUserAccuracy(manualSavedCoords.accuracy)
+    }
+    // If returning to the nearby picker, re-select a nearby item (the manual
+    // list may have left an off-list neighborhood selected).
+    if (manualReturnStep === 'nearby' && nearbyList.length > 0 &&
+        !nearbyList.some((n) => n.id === selectedNeighborhoodId)) {
+      const first = nearbyList[0]
+      setSelectedNeighborhoodId(first.id)
+      setDetectedNeighborhood({
+        id: first.id,
+        name: first.name,
+        nameEn: first.nameEn,
+        distanceKm: first.distanceKm,
+        confidence: 'low',
+        city: { id: '', name: first.city.name, nameEn: first.city.nameEn },
+      })
+    }
+    setLocationStep(manualReturnStep)
   }
 
   useEffect(() => {
@@ -834,7 +874,7 @@ export default function OnboardingPage() {
           {/* F. Manual neighborhood picker */}
           {locationStep === 'manual' && (
             <div className="hai-flex-1 hai-stack-4">
-              <BackBtn onClick={() => setLocationStep('ask')} />
+              <BackBtn onClick={goBackFromManual} />
               <div className="hai-stack-1">
                 <h1 className="hai-h2">
                   {lang === 'en' ? 'Choose your neighborhood' : lang === 'ur' ? 'اپنا محلہ منتخب کریں' : 'اختر حيّك'}
