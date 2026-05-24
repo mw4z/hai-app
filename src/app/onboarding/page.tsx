@@ -7,6 +7,8 @@ import { FiMapPin, FiLoader, FiCheck, FiArrowRight, FiArrowLeft, FiRefreshCw, Fi
 import { useLanguage } from '@/hooks/useLanguage'
 import { useGPSLocation } from '@/hooks/useGPSLocation'
 import { tryRedeemPendingInvite, getPendingInviteCode, savePendingInviteCode, isValidInviteCode } from '@/lib/pendingInvite'
+import { useConfirm } from '@/components/ConfirmProvider'
+import { clearLocalStoragePreservingPrefs } from '@/lib/clearStorageOnLogout'
 
 type Step = 'name' | 'gender' | 'account_type' | 'location'
 
@@ -42,7 +44,30 @@ export default function OnboardingPage() {
   const router = useRouter()
   const { t, lang } = useLanguage()
   const dn = (ar: string, en: string) => (lang === 'en' && en) ? en : ar
+  const confirmDialog = useConfirm()
   const [step, setStep] = useState<Step>('name')
+
+  // Escape hatch from the first onboarding step: a verified-but-incomplete
+  // user is otherwise trapped here (the profile gate forces onboarding, and
+  // "رجوع" → '/' just loops back). Sign out → return to phone entry so they
+  // can change the number. Mirrors ProfileClient.handleLogout().
+  async function changePhoneNumber() {
+    const ok = await confirmDialog({
+      title: dn('تغيير رقم الجوال', 'Change phone number'),
+      message: dn('سيتم تسجيل خروجك للعودة إلى إدخال رقم جوال جديد.', "You'll be signed out to enter a new phone number."),
+      confirmText: dn('تغيير الرقم', 'Change number'),
+      cancelText: dn('إلغاء', 'Cancel'),
+    })
+    if (!ok) return
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
+    try {
+      const { CapacitorCookies } = await import('@capacitor/core')
+      await (CapacitorCookies as any)?.clearAllCookies?.()
+    } catch { /* not on Capacitor */ }
+    try { clearLocalStoragePreservingPrefs() } catch {}
+    try { sessionStorage.clear() } catch {}
+    window.location.href = '/'
+  }
   const [name, setName] = useState('')
   const [lastName, setLastName] = useState('')
   const [gender, setGender] = useState<'MALE' | 'FEMALE' | 'UNSPECIFIED'>('MALE')
@@ -412,7 +437,7 @@ export default function OnboardingPage() {
       {/* Step: Name */}
       {step === 'name' && (
         <div className="hai-flex-1 hai-stack-3">
-          <BackBtn onClick={() => router.push('/')} />
+          <BackBtn onClick={changePhoneNumber} />
           <h1 className="hai-h2">{t('onboard_hello')}</h1>
           <p className="hai-caption hai-mb-4">{t('onboard_your_name')}</p>
           <input
