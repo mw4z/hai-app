@@ -629,7 +629,7 @@ export default function OnboardingPage() {
           {/* C. Precise match — confirm detected neighborhood */}
           {locationStep === 'confirm' && detectedNeighborhood && (
             <div className="hai-flex-1 hai-stack-4">
-              <BackBtn onClick={() => setStep('account_type')} />
+              <BackBtn onClick={() => setLocationStep('ask')} />
               <div className="hai-stack-1">
                 <h1 className="hai-h2">
                   {lang !== 'en' ? 'تم تحديد موقعك' : 'Location detected'}
@@ -681,7 +681,7 @@ export default function OnboardingPage() {
           {/* D. Nearby picker */}
           {locationStep === 'nearby' && (
             <div className="hai-flex-1 hai-stack-4">
-              <BackBtn onClick={() => setStep('account_type')} />
+              <BackBtn onClick={() => setLocationStep('ask')} />
               <div className="hai-stack-1">
                 <h1 className="hai-h2">
                   {lang !== 'en' ? 'اختر حيّك' : 'Choose your neighborhood'}
@@ -822,7 +822,7 @@ export default function OnboardingPage() {
                       : 'تصفّح الأحياء (وصول محدود)'}
                 </button>
                 <button
-                  onClick={() => setStep('account_type')}
+                  onClick={() => setLocationStep('ask')}
                   className="hai-link hai-link--muted hai-link--underline hai-self-center"
                 >
                   {t('common_back')}
@@ -834,7 +834,7 @@ export default function OnboardingPage() {
           {/* F. Manual neighborhood picker */}
           {locationStep === 'manual' && (
             <div className="hai-flex-1 hai-stack-4">
-              <BackBtn onClick={() => setStep('account_type')} />
+              <BackBtn onClick={() => setLocationStep('ask')} />
               <div className="hai-stack-1">
                 <h1 className="hai-h2">
                   {lang === 'en' ? 'Choose your neighborhood' : lang === 'ur' ? 'اپنا محلہ منتخب کریں' : 'اختر حيّك'}
@@ -948,7 +948,7 @@ export default function OnboardingPage() {
                     : 'تصفّح الأحياء (وصول محدود)'}
               </button>
               <button
-                onClick={() => setStep('account_type')}
+                onClick={() => setLocationStep('ask')}
                 className="hai-link hai-link--muted hai-link--underline hai-self-center"
               >
                 {t('common_back')}
