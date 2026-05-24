@@ -34,10 +34,10 @@ export default function GuestBanner({ show }: { show: boolean }) {
       <FiMapPin className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
       <span className="flex-1 text-[11px] text-amber-800 dark:text-amber-300 font-medium">
         {lang === 'en'
-          ? 'Linked to your neighborhood — confirm your location to unlock full resident permissions'
+          ? "Linked to your neighborhood — confirm you're inside it, or request moderator review, to unlock full permissions."
           : lang === 'ur'
-            ? 'محلے سے منسلک — مکمل رہائشی اختیارات کیلئے اپنا مقام تصدیق کریں'
-            : 'مرتبط بالحي — أكّد سكنك داخل الحي لتفعيل كامل صلاحيات الساكن، أو سيراجع المشرف طلبك'}
+            ? 'محلے سے منسلک — مکمل اختیارات کیلئے اپنی موجودگی کی تصدیق کریں یا ناظم سے جائزے کی درخواست کریں۔'
+            : 'مرتبط بالحي — أكّد وجودك داخل الحي أو اطلب مراجعة المشرف لتفعيل كامل الصلاحيات.'}
       </span>
       <span className="text-[10px] text-amber-700 dark:text-amber-400 font-bold whitespace-nowrap">
         {lang === 'en' ? 'Confirm →' : 'تأكيد ←'}
