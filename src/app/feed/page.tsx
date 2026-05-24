@@ -113,6 +113,7 @@ export default async function FeedPage({
             select: {
               id: true, name: true, lastName: true,
               reputation: true, accountType: true, providerStatus: true,
+              membership: true,
               role: true, avatarUrl: true, gender: true, showGender: true,
               createdAt: true,
               neighborhood: { select: { name: true, nameEn: true } },

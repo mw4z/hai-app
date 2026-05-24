@@ -61,3 +61,4 @@ tsconfig.tsbuildinfo
 .vercel
 .env*.local
 stickers-preview.html
+membership-preview.html

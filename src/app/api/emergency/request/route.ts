@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   // resident can't trigger a neighborhood-wide alert.
   if (!bypass && !canCreateEmergencyAlert(ready.user.membership)) {
     return NextResponse.json(
-      { error: 'membership_required', message: 'أكّد سكنك في الحي لإرسال تنبيه طوارئ' },
+      { error: 'membership_required', message: 'هذه الميزة متاحة للسكان المؤكدين فقط. أكّد سكنك داخل الحي أو اطلب مراجعة المشرف.' },
       { status: 403 },
     )
   }

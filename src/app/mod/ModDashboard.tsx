@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 import { useLanguage } from '@/hooks/useLanguage'
-import { FiArrowRight, FiArrowLeft, FiAlertTriangle, FiEyeOff, FiUserX, FiActivity, FiFileText, FiShield, FiSearch, FiSlash, FiPauseCircle } from 'react-icons/fi'
+import { FiArrowRight, FiArrowLeft, FiAlertTriangle, FiEyeOff, FiUserX, FiActivity, FiFileText, FiShield, FiSearch, FiSlash, FiPauseCircle, FiMapPin, FiCheck, FiX } from 'react-icons/fi'
 import { useConfirm, usePrompt } from '@/components/ConfirmProvider'
 import { canVerifyProviders, canModerateUsers } from '@/lib/modPermissions'
 import EmergencyCreator from '@/components/EmergencyCreator'
@@ -38,7 +38,15 @@ const ACTION_LABELS: Record<string, { ar: string; en: string }> = {
   CONFLICT_BLOCKED: { ar: 'تم حظر الإجراء (تعارض)', en: 'Action blocked (conflict)' },
 }
 
-type Tab = 'reports' | 'user_reports' | 'poll_requests' | 'hidden' | 'banned' | 'activity' | 'verify' | 'users'
+type Tab = 'reports' | 'user_reports' | 'poll_requests' | 'claimed_residents' | 'hidden' | 'banned' | 'activity' | 'verify' | 'users'
+
+interface ClaimRow {
+  id: string
+  note: string | null
+  createdAt: string
+  user: { id: string; name: string | null; lastName: string | null; phone: string; reputation: number; avatarUrl: string | null }
+  neighborhood: { id: string; name: string; nameEn: string }
+}
 
 interface PollRequestRow {
   id: string
@@ -296,6 +304,61 @@ export default function ModDashboard({ data }: Props) {
     finally { setPollRequestBusy(null) }
   }
 
+  // Claimed-resident review queue (طلبات تأكيد السكن). Same lazy-fetch +
+  // 30s poll pattern. The API scopes neighborhood mods to their own hood.
+  const [claims, setClaims] = useState<ClaimRow[] | null>(null)
+  const [claimBusy, setClaimBusy] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (tab !== 'claimed_residents') return
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch('/api/mod/claims', { cache: 'no-store' })
+        if (!res.ok) return
+        const d = await res.json()
+        if (!cancelled && Array.isArray(d.claims)) setClaims(d.claims)
+      } catch { /* */ }
+    }
+    load()
+    const id = setInterval(() => { if (document.visibilityState === 'visible') load() }, 30_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [tab])
+
+  async function reviewClaim(claimId: string, action: 'approve' | 'reject') {
+    if (claimBusy) return
+    if (action === 'reject') {
+      // Note recommended on reject (shown to nobody yet, but logged).
+      const note = await promptDialog({
+        title: dn('سبب الرفض (اختياري)', 'Reason for rejection (optional)'),
+        message: dn('يُسجَّل للمراجعة. الحد 300 حرف.', 'Logged for audit. Max 300 chars.'),
+        placeholder: dn('اكتب السبب...', 'Type the reason...'),
+        confirmText: dn('رفض', 'Reject'),
+        cancelText: dn('إلغاء', 'Cancel'),
+        multiline: true,
+      })
+      // promptDialog returns null on cancel; empty string is an allowed
+      // (note-less) reject, so only bail on an explicit cancel.
+      if (note === null) return
+    }
+    setClaimBusy(action + '-' + claimId)
+    try {
+      const res = await fetch('/api/mod/claims', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimId, action }),
+      })
+      if (res.ok) {
+        toast.success(action === 'approve' ? dn('تم التأكيد — ساكن مؤكد', 'Approved — verified resident') : dn('تم الرفض', 'Rejected'))
+        setClaims(prev => prev?.filter(c => c.id !== claimId) ?? null)
+      } else {
+        const d = await res.json().catch(() => ({}))
+        toast.error(d?.error || 'Error')
+      }
+    } catch { toast.error('Error') }
+    finally { setClaimBusy(null) }
+  }
+
   async function modAction(action: string, payload: Record<string, any>) {
     if (actionLoading) return
     setActionLoading(action + JSON.stringify(payload))
@@ -346,6 +409,7 @@ export default function ModDashboard({ data }: Props) {
     // been opened once (lazy-fetched); a Phase 1.5 pass can fold the
     // count into the SSR payload if it becomes load-bearing.
     { key: 'poll_requests', icon: <FiFileText className="w-4 h-4" />, ar: 'اقتراحات استفتاء', en: 'Poll requests', count: pollRequests?.length },
+    ...(canModerateUsers(role) ? [{ key: 'claimed_residents' as Tab, icon: <FiMapPin className="w-4 h-4" />, ar: 'طلبات تأكيد السكن', en: 'Residency claims', count: claims?.length }] : []),
     { key: 'hidden', icon: <FiEyeOff className="w-4 h-4" />, ar: 'المخفية', en: 'Hidden', count: data.hiddenPosts.length },
     { key: 'banned', icon: <FiUserX className="w-4 h-4" />, ar: 'المحظورين', en: 'Banned', count: data.bannedUsers.length },
     // User list (block / stop only) — all mod roles, neighborhood-scoped.
@@ -650,6 +714,46 @@ export default function ModDashboard({ data }: Props) {
                 </div>
               </div>
             ))
+          )
+        )}
+
+        {/* Claimed-residents (residency claims) Tab */}
+        {tab === 'claimed_residents' && (
+          claims === null ? (
+            <div className="py-6"><HaiLoader size="md" /></div>
+          ) : claims.length === 0 ? (
+            <EmptyState icon="📍" text={dn('لا توجد طلبات تأكيد سكن', 'No residency claims')} />
+          ) : (
+            claims.map(c => {
+              const name = [c.user.name?.trim(), c.user.lastName?.trim()].filter(Boolean).join(' ') || c.user.phone
+              return (
+                <div key={c.id} className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{name}</p>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                      {dn('يطلب الارتباط بـ', 'Claiming')}{' '}
+                      <span className="font-medium text-gray-700 dark:text-gray-300">{c.neighborhood.name}</span>
+                    </p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">
+                      <span className="text-amber-700 dark:text-amber-300">📍 {dn('مرتبط بالحي', 'Claimed')}</span>
+                      {' · '}
+                      {new Date(c.createdAt).toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-SA', { month: 'short', day: 'numeric' })}
+                      {c.note ? ` · ${c.note}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    <button onClick={() => reviewClaim(c.id, 'reject')} disabled={!!claimBusy}
+                      className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 active:scale-95 disabled:opacity-50">
+                      <FiX className="w-3.5 h-3.5" /> {dn('رفض', 'Reject')}
+                    </button>
+                    <button onClick={() => reviewClaim(c.id, 'approve')} disabled={!!claimBusy}
+                      className="flex-1 flex items-center justify-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg bg-primary-600 text-white active:scale-95 disabled:opacity-50">
+                      <FiCheck className="w-3.5 h-3.5" /> {dn('تأكيد الساكن', 'Verify resident')}
+                    </button>
+                  </div>
+                </div>
+              )
+            })
           )
         )}
 

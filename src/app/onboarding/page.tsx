@@ -313,6 +313,12 @@ export default function OnboardingPage() {
         toast.error(t('onboard_error'))
         return
       }
+      // Claimed (selected while outside, GPS didn't confirm) → explain the
+      // limited-rights state and the path to full permissions.
+      const profileResult = await res.json().catch(() => ({} as { addressVerified?: boolean }))
+      if (profileResult && profileResult.addressVerified === false) {
+        toast(t('claim_linked_toast'), { icon: '📍', duration: 6000 })
+      }
       try {
         const tourKeys = [
           'hai_tour_seen',
@@ -792,7 +798,7 @@ export default function OnboardingPage() {
               </div>
 
               <div className="hai-callout hai-callout--warning">
-                ⚠️ {lang === 'en' ? 'Limited access — enable location later in Settings to unlock full features' : lang === 'ur' ? 'محدود رسائی — مکمل خصوصیات کیلئے بعد میں مقام فعال کریں' : 'وصول محدود — فعّل الموقع لاحقاً من الإعدادات لفتح جميع المزايا'}
+                📍 {t('claim_outside_hint')}
               </div>
 
               {manualLoading ? (

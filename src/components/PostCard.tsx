@@ -24,6 +24,7 @@ import { useAttachContact } from '@/hooks/useAttachContact'
 import ImageLightbox from './ImageLightbox'
 import Sticker from './Sticker'
 import StickerPicker from './StickerPicker'
+import MembershipPill from './MembershipPill'
 import { parseStickerRef, toStickerRef } from '@/lib/stickers/catalog'
 import SmartText from './SmartText'
 import SmartTextWithPlacePreviews from './SmartTextWithPlacePreviews'
@@ -146,6 +147,7 @@ interface Post {
     reputation: number
     accountType?: string
     providerStatus?: string | null
+    membership?: string | null
     role?: string
     avatarUrl?: string | null
     coverUrl?: string | null
@@ -1149,6 +1151,7 @@ export default function PostCard({
             <div className="hai-row-1">
               <span className="hai-body-strong">{fullName(post.author) || t('post_neighbor')}</span>
               <UserBadgeDisplay accountType={post.author.accountType} providerStatus={post.author.providerStatus} reputation={post.author.reputation} role={post.author.role} />
+              <MembershipPill membership={post.author.membership as any} />
             </div>
             <div className="hai-row-1">
               <span className="hai-meta">{timeAgo(post.createdAt)}</span>
@@ -2660,6 +2663,7 @@ export default function PostCard({
                 {/* Identity badges (verification, role) */}
                 <div className="flex items-center gap-1.5 mt-1">
                   <UserBadgeDisplay accountType={post.author.accountType} providerStatus={post.author.providerStatus} reputation={rep} role={post.author.role} showLabel />
+                  <MembershipPill membership={post.author.membership as any} showVerified />
                 </div>
 
                 {/* Tier pill (reputation) */}

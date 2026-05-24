@@ -5,9 +5,11 @@ import { FiMapPin, FiChevronRight } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 
 /**
- * Persistent banner shown to users with addressVerified=false.
- * Only rendered when the `show` prop is true (passed from the server
- * component that has access to the user's verification status).
+ * Persistent banner shown to a CLAIMED resident (addressVerified=false,
+ * has a home). Explains the limited-rights state without shaming, and
+ * points to the fastest upgrade path (confirm location via GPS). A mod
+ * also reviews their pending claim, so verifying isn't the only route.
+ * Only rendered when `show` is true (server passes the membership state).
  */
 export default function GuestBanner({ show }: { show: boolean }) {
   const { lang } = useLanguage()
@@ -21,13 +23,13 @@ export default function GuestBanner({ show }: { show: boolean }) {
       <FiMapPin className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
       <span className="flex-1 text-[11px] text-amber-800 dark:text-amber-300 font-medium">
         {lang === 'en'
-          ? 'Limited access — verify your location to unlock full features'
+          ? 'Linked to your neighborhood — confirm your location to unlock full resident permissions'
           : lang === 'ur'
-            ? 'محدود رسائی — مکمل خصوصیات کیلئے مقام کی تصدیق کریں'
-            : 'وصول محدود — تحقّق من موقعك لفتح جميع المزايا'}
+            ? 'محلے سے منسلک — مکمل رہائشی اختیارات کیلئے اپنا مقام تصدیق کریں'
+            : 'مرتبط بالحي — أكّد سكنك داخل الحي لتفعيل كامل صلاحيات الساكن، أو سيراجع المشرف طلبك'}
       </span>
       <span className="text-[10px] text-amber-700 dark:text-amber-400 font-bold whitespace-nowrap">
-        {lang === 'en' ? 'Verify →' : 'تحقّق ←'}
+        {lang === 'en' ? 'Confirm →' : 'تأكيد ←'}
       </span>
     </Link>
   )
