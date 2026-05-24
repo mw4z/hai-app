@@ -772,7 +772,7 @@ export default function OnboardingPage() {
                       ? "My neighborhood isn't listed — browse all"
                       : lang === 'ur'
                         ? 'میرا محلہ یہاں نہیں — تمام دیکھیں'
-                        : 'حيّي غير موجود؟ تصفّح كل الأحياء'}
+                        : 'حيّك غير موجود؟ تصفّح كل الأحياء'}
                   </button>
                 </>
               )}
