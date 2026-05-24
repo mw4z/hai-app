@@ -154,6 +154,11 @@ export async function POST(req: NextRequest) {
         }
       : {}
 
+    // Membership: GPS-verified → VERIFIED_RESIDENT; manual pick while
+    // outside → CLAIMED_RESIDENT (limited rights until verified). Mirror
+    // is kept so addressVerified ⟺ VERIFIED_RESIDENT.
+    const membership = addressVerified ? 'VERIFIED_RESIDENT' : 'CLAIMED_RESIDENT'
+
     await db.user.update({
       where: { id: session.userId },
       data: {
@@ -164,13 +169,23 @@ export async function POST(req: NextRequest) {
         providerStatus,
         neighborhoodId,
         addressVerified,
+        membership,
+        ...(addressVerified ? {} : { homeClaimedAt: new Date() }),
         ...providerFields,
       },
     })
 
+    // Queue a claimed resident for mod review (so they can be upgraded to
+    // verified). Skip if already verified.
+    if (!addressVerified) {
+      await db.neighborhoodClaim.create({
+        data: { userId: session.userId, neighborhoodId, status: 'PENDING', note: 'onboarding' },
+      }).catch(() => { /* non-fatal: queue entry is best-effort */ })
+    }
+
     cacheDelete(`user:${session.userId}`)
 
-    return NextResponse.json({ success: true, addressVerified })
+    return NextResponse.json({ success: true, addressVerified, membership })
   } catch (error) {
     console.error('complete-profile error:', error)
     return NextResponse.json({ error: 'خطأ في الخادم' }, { status: 500 })

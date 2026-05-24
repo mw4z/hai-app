@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { requireUserReady } from '@/lib/requireUserReady'
+import { canVote } from '@/lib/membership'
 
 /** POST — Vote on a poll */
 export async function POST(
@@ -13,6 +14,13 @@ export async function POST(
 
   const ready = await requireUserReady(session.userId)
   if (!ready.ok) return ready.response
+  // Voting is a trust-sensitive resident-only action — VERIFIED only.
+  if (ready.user.role !== 'SUPER_ADMIN' && !canVote(ready.user.membership)) {
+    return NextResponse.json(
+      { error: 'membership_required', message: 'أكّد سكنك في الحي للتصويت' },
+      { status: 403 },
+    )
+  }
 
   const poll = await db.poll.findUnique({ where: { id: params.id } })
   if (!poll) return NextResponse.json({ error: 'Not found' }, { status: 404 })

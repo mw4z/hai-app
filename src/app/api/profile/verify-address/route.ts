@@ -56,15 +56,25 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // GPS confirmed inside the polygon → upgrade to VERIFIED_RESIDENT and
+  // clear the claim cooldown (they're now verified, not just claimed).
   await db.user.update({
     where: { id: session.userId },
     data: {
       neighborhoodId,
       addressVerified: true,
+      membership: 'VERIFIED_RESIDENT',
+      homeChangeCooldownUntil: null,
     },
   })
 
+  // Resolve any pending claim for this hood as auto-approved (GPS upgrade).
+  await db.neighborhoodClaim.updateMany({
+    where: { userId: session.userId, neighborhoodId, status: 'PENDING' },
+    data: { status: 'APPROVED', reviewedAt: new Date() },
+  }).catch(() => { /* non-fatal */ })
+
   cacheDelete(`user:${session.userId}`)
 
-  return NextResponse.json({ success: true, verdict })
+  return NextResponse.json({ success: true, verdict, membership: 'VERIFIED_RESIDENT' })
 }

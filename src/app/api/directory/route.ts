@@ -151,6 +151,7 @@ export async function POST(req: NextRequest) {
       status: true,
       neighborhoodId: true,
       reputation: true,
+      membership: true,
     },
   })
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
@@ -275,7 +276,9 @@ export async function POST(req: NextRequest) {
       // the data came from. Manually typed places still go through
       // mod review (PENDING). A claim-as-owner request, when present,
       // is still reviewed separately below regardless of this status.
-      status: snap ? 'MOD_VERIFIED' : 'PENDING',
+      // Auto-verify only when the creator is a verified resident (or super).
+      // A CLAIMED (unverified) resident's suggestions always go to review.
+      status: (snap && (isSuper || user.membership === 'VERIFIED_RESIDENT')) ? 'MOD_VERIFIED' : 'PENDING',
       createdByUserId: user.id,
       // Google provenance + snapshot (LOCAL when no place_id).
       source: snap ? 'GOOGLE' : 'LOCAL',

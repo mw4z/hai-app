@@ -93,7 +93,7 @@ export async function requireUserReady(
 ): Promise<UserReadyResult> {
   const user = await db.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, role: true, addressVerified: true },
+    select: { id: true, name: true, role: true, addressVerified: true, membership: true },
   })
   const decision = requireUserReadyDecision(user, opts)
   if (decision.ok) return decision

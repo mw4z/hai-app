@@ -18,11 +18,14 @@ export type UserReadyErrorCode =
   | 'LOCATION_UNVERIFIED'
   | 'UNAUTHORIZED'
 
+export type Membership = 'VERIFIED_RESIDENT' | 'CLAIMED_RESIDENT' | 'OUTSIDE'
+
 export interface UserReadyUser {
   id: string
   name: string | null
   role: string
   addressVerified: boolean
+  membership: Membership
 }
 
 export type UserReadyDecision =
@@ -39,6 +42,7 @@ interface UserSnapshot {
   name: string | null
   role: string
   addressVerified: boolean
+  membership?: Membership
 }
 
 /**
@@ -74,7 +78,15 @@ export function requireUserReadyDecision(
   }
 
   if (opts.requireLocation !== false && !isSuperAdmin) {
-    if (!user.addressVerified) {
+    // The bar to ACT in a neighborhood is a home claim (verified OR
+    // claimed). OUTSIDE (no claim) can't post/comment yet. CLAIMED users
+    // pass here; trust-sensitive routes add their own VERIFIED-only check
+    // (see src/lib/membership.ts). Legacy data without membership falls
+    // back to addressVerified so nothing regresses pre-migration.
+    const hasClaim = user.membership
+      ? user.membership !== 'OUTSIDE'
+      : user.addressVerified
+    if (!hasClaim) {
       return { ok: false, code: 'LOCATION_UNVERIFIED' }
     }
   }
@@ -86,6 +98,7 @@ export function requireUserReadyDecision(
       name: user.name,
       role: user.role,
       addressVerified: user.addressVerified,
+      membership: user.membership ?? (user.addressVerified ? 'VERIFIED_RESIDENT' : 'OUTSIDE'),
     },
   }
 }

@@ -40,6 +40,7 @@ model Neighborhood {
   serviceContacts        DirectoryServiceContact[]
   directoryContributions DirectoryContribution[]
   pinnedItems            NeighborhoodPinnedItem[]
+  neighborhoodClaims     NeighborhoodClaim[] @relation("neighborhoodClaims")
   createdAt DateTime @default(now())
 }
 
@@ -69,6 +70,14 @@ model User {
   isVerified       Boolean       @default(false)  // phone OTP verified
   addressVerified  Boolean       @default(false)  // address/neighborhood verified
   addressProofUrl  String?       // uploaded lease/utility bill photo
+  // ── Neighborhood membership (see Membership enum). `addressVerified`
+  //    is kept mirrored: VERIFIED_RESIDENT ⟺ addressVerified=true, so all
+  //    legacy reads keep working while membership is the richer source.
+  membership              Membership @default(OUTSIDE)
+  homeClaimedAt           DateTime?  // when CLAIMED_RESIDENT was set (manual claim)
+  homeChangeCooldownUntil DateTime?  // can't change claimed home before this
+  neighborhoodClaims      NeighborhoodClaim[] @relation("claimant")
+  reviewedClaims          NeighborhoodClaim[] @relation("claimReviewer")
   reputation       Int           @default(0)
   accountType      AccountType   @default(NORMAL)
   providerStatus           ProviderStatus @default(NONE)  // visibility gate for provider listings (separate from accountType)
@@ -439,6 +448,46 @@ model PostView {
 
   @@unique([postId, userId])
   @@index([postId])
+}
+
+// A user's manual claim to a home neighborhood, made while outside its
+// polygon (can't pass GPS right now). Doubles as the mod review queue AND
+// the audit log of home-neighborhood changes — one row per claim attempt,
+// `status` tracks the decision.
+model NeighborhoodClaim {
+  id             String   @id @default(cuid())
+  user           User     @relation("claimant", fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  neighborhood   Neighborhood @relation("neighborhoodClaims", fields: [neighborhoodId], references: [id])
+  neighborhoodId String
+  status         NeighborhoodClaimStatus @default(PENDING)
+  note           String?  // optional user note / proof reference
+  reviewedBy     User?    @relation("claimReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedById   String?
+  reviewedAt     DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([status])
+  @@index([neighborhoodId, status])
+  @@index([userId])
+}
+
+// Neighborhood membership state.
+//   VERIFIED_RESIDENT — GPS- or mod-confirmed resident; full rights.
+//   CLAIMED_RESIDENT  — selected this hood as home while outside; limited
+//                       rights (feed + comment + REQUEST-only posts) until
+//                       verified via GPS or mod approval.
+//   OUTSIDE           — no resident claim (visitor / pre-onboarding).
+enum Membership {
+  VERIFIED_RESIDENT
+  CLAIMED_RESIDENT
+  OUTSIDE
+}
+
+enum NeighborhoodClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 // Canonical category enum (renamed from PostCategoryV2 in Phase 4).

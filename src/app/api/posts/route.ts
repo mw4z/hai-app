@@ -193,16 +193,26 @@ export async function POST(req: NextRequest) {
     // posting to a hood that isn't their home gets REQUEST-only, a tiny
     // category allowlist, no marketplace, no raised priority. Rejections
     // are explicit (not silent coercion) so a manipulated client is told.
+    // A CLAIMED resident (picked this hood as home but not yet GPS/mod-
+    // verified) gets the SAME content restrictions as an outside request —
+    // REQUEST-only in the allowlisted categories, no marketplace, no raised
+    // priority — even in their own home. Verified residents are unaffected.
+    const claimedRestricted = !bypass && ready.user.membership === 'CLAIMED_RESIDENT'
     const originScope: PostOriginScope = isOutside ? 'OUTSIDE_REQUEST' : 'RESIDENT'
     const outsideGate = evaluateOutsideRequest({
-      isOutside,
+      isOutside: isOutside || claimedRestricted,
       intentInput,
       category,
       marketplaceTypeInput,
       priorityInput,
     })
     if (!outsideGate.ok) {
-      return NextResponse.json(apiError(outsideGate.messageAr, 403, outsideGate.code), { status: 403 })
+      // When the block is due to unverified (claimed) residence rather than
+      // being geographically outside, use a claimed-appropriate message.
+      const msg = claimedRestricted && !isOutside
+        ? 'أكّد سكنك في الحي لتفعيل كامل صلاحيات النشر'
+        : outsideGate.messageAr
+      return NextResponse.json(apiError(msg, 403, outsideGate.code), { status: 403 })
     }
 
     // Server-side priority clamp — gates the URGENT_ONLY intent override

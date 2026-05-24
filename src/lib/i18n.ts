@@ -175,6 +175,9 @@ export const translations = {
   onboard_invite_hint:  { ar: 'إذا دعاك جار، أدخل كوده هنا', en: 'If a neighbor invited you, enter their code', ur: 'اگر کسی پڑوسی نے دعوت دی ہو تو کوڈ درج کریں' },
   onboard_invite_applied: { ar: '✓ تم تطبيق كود الدعوة', en: '✓ Invite code applied', ur: '✓ دعوتی کوڈ لاگو ہو گیا' },
   onboard_invite_invalid: { ar: 'كود دعوة غير صالح', en: "Invite code couldn't be applied", ur: 'دعوتی کوڈ لاگو نہیں ہو سکا' },
+  // Claimed-resident (outside) neighborhood selection.
+  claim_outside_hint:    { ar: 'إذا كنت خارج الحي حاليًا، يمكنك اختيار حيّك ومتابعته. بعض صلاحيات النشر تحتاج تأكيد السكن.', en: 'If you are currently outside the neighborhood, you can still pick and follow it. Some posting permissions need residence confirmation.', ur: 'اگر آپ ابھی محلے سے باہر ہیں تو بھی اپنا محلہ منتخب کر کے فالو کر سکتے ہیں۔ کچھ پوسٹنگ اختیارات کے لیے رہائش کی تصدیق درکار ہے۔' },
+  claim_linked_toast:    { ar: 'تم ربط حسابك بالحي. لتفعيل كامل الصلاحيات، أكّد وجودك داخل الحي لاحقًا أو اطلب مراجعة المشرف.', en: 'Your account is linked to the neighborhood. To unlock full permissions, confirm you are inside it later or request mod review.', ur: 'آپ کا اکاؤنٹ محلے سے منسلک ہو گیا۔ مکمل اختیارات کے لیے بعد میں اپنی موجودگی کی تصدیق کریں یا موڈ ریویو کی درخواست کریں۔' },
   onboard_next:         { ar: 'التالي',             en: 'Next'              , ur: 'اگلا' },
   onboard_finish:       { ar: 'ابدأ',               en: 'Start'             , ur: 'شروع کریں' },
   onboard_gender:       { ar: 'الجنس',             en: 'Gender'            , ur: 'جنس' },

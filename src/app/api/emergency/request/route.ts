@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { requireUserReady } from '@/lib/requireUserReady'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { kickNotifCron } from '@/lib/kickNotifCron'
+import { canCreateEmergencyAlert } from '@/lib/membership'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +49,14 @@ export async function POST(req: NextRequest) {
   }
   if (!user.neighborhoodId) {
     return NextResponse.json({ error: 'no_neighborhood' }, { status: 400 })
+  }
+  // Emergency alerts are VERIFIED_RESIDENT only — a claimed (unverified)
+  // resident can't trigger a neighborhood-wide alert.
+  if (!bypass && !canCreateEmergencyAlert(ready.user.membership)) {
+    return NextResponse.json(
+      { error: 'membership_required', message: 'أكّد سكنك في الحي لإرسال تنبيه طوارئ' },
+      { status: 403 },
+    )
   }
 
   const raw = (await req.json().catch(() => null)) as Record<string, unknown> | null
