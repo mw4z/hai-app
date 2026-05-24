@@ -154,12 +154,12 @@ export default function VerifyLocationPage() {
               <FiMapPin className="w-10 h-10 text-primary-600" />
             </div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-              {lang === 'en' ? 'Unlock full access' : 'افتح جميع المزايا'}
+              {lang === 'en' ? 'Confirm your residence' : 'تأكيد سكنك في الحي'}
             </h2>
             <p className="text-gray-500 dark:text-gray-400 text-sm max-w-xs leading-relaxed">
               {lang === 'en'
-                ? "We'll use your location to verify your neighborhood. This unlocks posting, comments, messaging, and all community features."
-                : 'سنستخدم موقعك للتحقق من حيّك. يفتح هذا النشر والتعليقات والرسائل وجميع مزايا المجتمع.'}
+                ? "You can already take part with your neighbors. Confirming you're inside the neighborhood enables trusted features like alerts, voting, and the marketplace — and helps keep the neighborhood trusted."
+                : 'يمكنك المشاركة مع أهل الحي الآن. تأكيد موقعك داخل الحي يفعّل المزايا الموثوقة مثل التنبيهات والتصويت والسوق، ويساعدنا نحافظ على موثوقية الحي.'}
             </p>
             <button onClick={start} className="btn-primary mt-4 w-full max-w-xs flex items-center justify-center gap-2">
               <FiMapPin className="w-4 h-4" />
