@@ -12,6 +12,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   evaluateOutsideRequest,
+  evaluateClaimedPost,
   OUTSIDE_MAX_PER_HOOD_PER_DAY,
   OUTSIDE_MAX_TOTAL_PER_DAY,
 } from './outsideGate'
@@ -101,6 +102,44 @@ test('manipulated outside SERVICES OFFER is rejected', () => {
   const r = evaluateOutsideRequest({ isOutside: true, intentInput: 'OFFER', category: 'SERVICES', marketplaceTypeInput: 'JOB', priorityInput: 'CRITICAL' })
   assert.equal(r.ok, false)
   assert.equal(r.ok === false && r.code, 'OUTSIDE_REQUEST_ONLY')
+})
+
+// ── CLAIMED resident (own hood, unverified): normal content + requests
+//    allowed; only marketplace/offer/raised-priority blocked ───────────
+
+test('CLAIMED CAN create a normal GENERAL post', () => {
+  assert.equal(evaluateClaimedPost({ category: 'GENERAL', intentInput: 'NORMAL' }).ok, true)
+})
+
+test('CLAIMED CAN create a REQUEST (GENERAL + SERVICES)', () => {
+  assert.equal(evaluateClaimedPost({ category: 'GENERAL', intentInput: 'REQUEST' }).ok, true)
+  assert.equal(evaluateClaimedPost({ category: 'SERVICES', intentInput: 'REQUEST' }).ok, true)
+})
+
+test('CLAIMED CAN post with no explicit intent (defaults), incl. LOST_FOUND', () => {
+  assert.equal(evaluateClaimedPost({ category: 'GENERAL' }).ok, true)
+  assert.equal(evaluateClaimedPost({ category: 'LOST_FOUND' }).ok, true)
+})
+
+test('CLAIMED CANNOT create a marketplace listing', () => {
+  const r = evaluateClaimedPost({ category: 'MARKETPLACE', marketplaceTypeInput: 'SELL' })
+  assert.equal(r.ok, false)
+  assert.equal(r.ok === false && r.code, 'CLAIMED_MARKETPLACE_BLOCKED')
+})
+
+test('CLAIMED CANNOT create a commercial OFFER', () => {
+  const r = evaluateClaimedPost({ category: 'SERVICES', intentInput: 'OFFER' })
+  assert.equal(r.ok, false)
+  assert.equal(r.ok === false && r.code, 'CLAIMED_OFFER_BLOCKED')
+})
+
+test('CLAIMED CANNOT raise priority to HIGH or CRITICAL', () => {
+  const high = evaluateClaimedPost({ category: 'GENERAL', priorityInput: 'HIGH' })
+  assert.equal(high.ok, false)
+  assert.equal(high.ok === false && high.code, 'CLAIMED_PRIORITY_BLOCKED')
+  const critical = evaluateClaimedPost({ category: 'GENERAL', priorityInput: 'CRITICAL' })
+  assert.equal(critical.ok, false)
+  assert.equal(critical.ok === false && critical.code, 'CLAIMED_PRIORITY_BLOCKED')
 })
 
 // ── Rate-limit constants (the enforced caps live in the route; these

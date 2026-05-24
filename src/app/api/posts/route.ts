@@ -17,7 +17,7 @@ import { isDirectoryModerator } from '@/lib/places/isDirectoryModerator'
 import { fullName } from '@/lib/displayName'
 import { isTitleRequired } from '@/lib/posts/titleRequired'
 import { buildNotifTitle } from '@/lib/posts/displayTitle'
-import { evaluateOutsideRequest, OUTSIDE_MAX_PER_HOOD_PER_DAY, OUTSIDE_MAX_TOTAL_PER_DAY } from '@/lib/posts/outsideGate'
+import { evaluateOutsideRequest, evaluateClaimedPost, OUTSIDE_MAX_PER_HOOD_PER_DAY, OUTSIDE_MAX_TOTAL_PER_DAY } from '@/lib/posts/outsideGate'
 
 const DEFAULT_POST_LIMIT = 5
 const POST_COOLDOWN_SECONDS = 60
@@ -193,26 +193,30 @@ export async function POST(req: NextRequest) {
     // posting to a hood that isn't their home gets REQUEST-only, a tiny
     // category allowlist, no marketplace, no raised priority. Rejections
     // are explicit (not silent coercion) so a manipulated client is told.
-    // A CLAIMED resident (picked this hood as home but not yet GPS/mod-
-    // verified) gets the SAME content restrictions as an outside request —
-    // REQUEST-only in the allowlisted categories, no marketplace, no raised
-    // priority — even in their own home. Verified residents are unaffected.
-    const claimedRestricted = !bypass && ready.user.membership === 'CLAIMED_RESIDENT'
     const originScope: PostOriginScope = isOutside ? 'OUTSIDE_REQUEST' : 'RESIDENT'
     const outsideGate = evaluateOutsideRequest({
-      isOutside: isOutside || claimedRestricted,
+      isOutside,
       intentInput,
       category,
       marketplaceTypeInput,
       priorityInput,
     })
     if (!outsideGate.ok) {
-      // When the block is due to unverified (claimed) residence rather than
-      // being geographically outside, use a claimed-appropriate message.
-      const msg = claimedRestricted && !isOutside
-        ? 'أكّد سكنك في الحي لتفعيل كامل صلاحيات النشر'
-        : outsideGate.messageAr
-      return NextResponse.json(apiError(msg, 403, outsideGate.code), { status: 403 })
+      return NextResponse.json(apiError(outsideGate.messageAr, 403, outsideGate.code), { status: 403 })
+    }
+
+    // ── Claimed-resident posting gate ───────────────────────────────────
+    // A CLAIMED resident (picked this hood as home but not yet GPS/mod-
+    // verified) posting in their OWN hood may post normal content + requests,
+    // but NOT marketplace/offers or raised priority — those stay verified-only.
+    // (Posting to a DIFFERENT hood already went through the outside gate
+    // above as isOutside, so claimedRestricted excludes that case.)
+    const claimedRestricted = !bypass && !isOutside && ready.user.membership === 'CLAIMED_RESIDENT'
+    if (claimedRestricted) {
+      const claimedGate = evaluateClaimedPost({ category, intentInput, marketplaceTypeInput, priorityInput })
+      if (!claimedGate.ok) {
+        return NextResponse.json(apiError(claimedGate.messageAr, 403, claimedGate.code), { status: 403 })
+      }
     }
 
     // Server-side priority clamp — gates the URGENT_ONLY intent override
@@ -369,6 +373,13 @@ export async function POST(req: NextRequest) {
       priority: isOutside ? 'NORMAL' : priority,
       audience: isOutside ? 'ALL' : audience,
     })
+
+    // Claimed residents never post at raised priority — clamp any classifier
+    // auto-escalation (LOST_FOUND / NEIGHBORHOOD_REPORTS → HIGH) back to NORMAL.
+    const effectivePriority =
+      claimedRestricted && (c.priority === 'HIGH' || c.priority === 'CRITICAL')
+        ? 'NORMAL'
+        : c.priority
 
     // Women-only audience check (SUPER_ADMIN bypasses).
     if (!bypass && c.audience === 'WOMEN' && user.gender !== 'FEMALE') {
@@ -609,7 +620,7 @@ export async function POST(req: NextRequest) {
         body: finalBody,
         category: c.category,
         intent:   c.intent,
-        priority: c.priority,
+        priority: effectivePriority,
         audience: c.audience,
         originScope, // RESIDENT, or OUTSIDE_REQUEST for cross-hood asks
         marketplaceType, // SELL by default, validated above for MARKETPLACE

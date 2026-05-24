@@ -19,7 +19,8 @@ import {
   canSetHighPriority,
   canVote,
   countsAsVerifiedResident,
-  postsRestrictedToRequest,
+  canCreateMarketplaceListing,
+  canMakeCommercialOffer,
   directorySuggestionNeedsReview,
   membershipBadge,
   hasHomeClaim,
@@ -40,7 +41,8 @@ const baseUser = (membership: Membership) => ({
 test('VERIFIED_RESIDENT has full rights', () => {
   assert.equal(canComment(VERIFIED), true)
   assert.equal(canCreatePost(VERIFIED), true)
-  assert.equal(postsRestrictedToRequest(VERIFIED), false)
+  assert.equal(canCreateMarketplaceListing(VERIFIED), true)
+  assert.equal(canMakeCommercialOffer(VERIFIED), true)
   assert.equal(canCreateEmergencyAlert(VERIFIED), true)
   assert.equal(canSetHighPriority(VERIFIED), true)
   assert.equal(canVote(VERIFIED), true)
@@ -64,10 +66,11 @@ test('CLAIMED_RESIDENT cannot create emergency or high/critical priority', () =>
   assert.equal(countsAsVerifiedResident(CLAIMED), false)
 })
 
-// ── 4. Claimed CAN create limited REQUEST posts ────────────────────────
-test('CLAIMED_RESIDENT can post but restricted to REQUEST', () => {
+// ── 4. Claimed CAN post normal content + requests, NOT marketplace/offer ─
+test('CLAIMED_RESIDENT can post normal content + requests, not marketplace/offer', () => {
   assert.equal(canCreatePost(CLAIMED), true)
-  assert.equal(postsRestrictedToRequest(CLAIMED), true)
+  assert.equal(canCreateMarketplaceListing(CLAIMED), false)
+  assert.equal(canMakeCommercialOffer(CLAIMED), false)
   assert.equal(directorySuggestionNeedsReview(CLAIMED), true)
 })
 

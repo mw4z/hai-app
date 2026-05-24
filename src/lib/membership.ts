@@ -6,8 +6,11 @@
  * calls these on the server.
  *
  *   VERIFIED_RESIDENT — GPS- or mod-confirmed; full rights.
- *   CLAIMED_RESIDENT  — picked this hood as home while outside; limited
- *                       (feed + comment + REQUEST-only posts) until verified.
+ *   CLAIMED_RESIDENT  — picked this hood as home but not yet GPS/mod-verified;
+ *                       may join normal conversation (feed + comment +
+ *                       normal/request posts) but NOT marketplace/offers,
+ *                       raised priority, emergency alerts, or polls/voting
+ *                       until verified.
  *   OUTSIDE           — no resident claim (visitor / pre-onboarding).
  */
 
@@ -34,12 +37,13 @@ export function canCreatePoll(m: Membership): boolean { return m === 'VERIFIED_R
 /** Counted as a real resident for trust-sensitive logic (quorum, etc.). */
 export function countsAsVerifiedResident(m: Membership): boolean { return m === 'VERIFIED_RESIDENT' }
 
-// CLAIMED + VERIFIED:
+// CLAIMED + VERIFIED may comment and post normal content + requests:
 export function canComment(m: Membership): boolean { return hasHomeClaim(m) }
 export function canCreatePost(m: Membership): boolean { return hasHomeClaim(m) }
-/** A claimed resident's posts are restricted exactly like an outside
- *  request: REQUEST intent only, no HIGH/CRITICAL, no marketplace. */
-export function postsRestrictedToRequest(m: Membership): boolean { return m === 'CLAIMED_RESIDENT' }
+// VERIFIED-only post extras. A CLAIMED resident may post normal/general
+// content and requests, but these stay verified-only (trust-/abuse-sensitive):
+export function canCreateMarketplaceListing(m: Membership): boolean { return m === 'VERIFIED_RESIDENT' }
+export function canMakeCommercialOffer(m: Membership): boolean { return m === 'VERIFIED_RESIDENT' }
 /** Directory suggestions from a claimed resident must be reviewed. */
 export function directorySuggestionNeedsReview(m: Membership): boolean { return m !== 'VERIFIED_RESIDENT' }
 

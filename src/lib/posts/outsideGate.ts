@@ -69,3 +69,40 @@ export function evaluateOutsideRequest(input: OutsideGateInput): OutsideGateResu
   }
   return { ok: true }
 }
+
+// ── Claimed-resident posting policy ───────────────────────────────────────
+// A CLAIMED resident (picked this hood as home but not yet GPS/mod-verified)
+// posting IN their own hood is treated MORE permissively than an outsider:
+// they may post normal/general content AND requests (so they can join the
+// conversation, e.g. during the WhatsApp transition). Only the trust-/abuse-
+// sensitive paths stay verified-only:
+//   - marketplace listings + commercial offers
+//   - raised priority (HIGH / CRITICAL)  ← also clamped to NORMAL server-side
+// Emergency alerts and polls/voting live on their own routes, gated there
+// (canCreateEmergencyAlert / canCreatePoll / canVote).
+export type ClaimedGateCode =
+  | 'CLAIMED_MARKETPLACE_BLOCKED'
+  | 'CLAIMED_OFFER_BLOCKED'
+  | 'CLAIMED_PRIORITY_BLOCKED'
+
+export type ClaimedGateResult =
+  | { ok: true }
+  | { ok: false; code: ClaimedGateCode; messageAr: string }
+
+export function evaluateClaimedPost(input: {
+  category: string
+  intentInput?: string
+  marketplaceTypeInput?: string
+  priorityInput?: string
+}): ClaimedGateResult {
+  if (input.category === 'MARKETPLACE' || input.marketplaceTypeInput) {
+    return { ok: false, code: 'CLAIMED_MARKETPLACE_BLOCKED', messageAr: 'أكّد سكنك في الحي لنشر إعلانات السوق' }
+  }
+  if (input.intentInput === 'OFFER') {
+    return { ok: false, code: 'CLAIMED_OFFER_BLOCKED', messageAr: 'أكّد سكنك في الحي لنشر العروض التجارية' }
+  }
+  if (input.priorityInput === 'HIGH' || input.priorityInput === 'CRITICAL') {
+    return { ok: false, code: 'CLAIMED_PRIORITY_BLOCKED', messageAr: 'أكّد سكنك في الحي لرفع أولوية المنشور' }
+  }
+  return { ok: true }
+}
