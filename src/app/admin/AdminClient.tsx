@@ -2,12 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiShield, FiUsers, FiFileText, FiMapPin, FiActivity, FiStar } from 'react-icons/fi'
+import { FiShield, FiUsers, FiFileText, FiMapPin, FiActivity, FiStar, FiMessageCircle, FiUser } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import HaiLoader, { HaiSpinner } from '@/components/HaiLoader'
 import { useConfirm, usePrompt } from '@/components/ConfirmProvider'
 import { getPrimaryBadge, getSecondaryBadge } from '@/lib/user-badge'
+import MembershipPill from '@/components/MembershipPill'
+import AdminUserSheet from '@/components/admin/AdminUserSheet'
+import { buildWhatsAppHref } from '@/lib/phone'
 import type { TranslationKey } from '@/lib/i18n'
 
 const ACTION_LABELS: Record<string, { ar: string; en: string }> = {
@@ -51,9 +55,12 @@ export default function AdminClient({
   initialDashboard?: { stats: any; recentLogs: any[] } | null
 }) {
   const { t, lang } = useLanguage()
+  const router = useRouter()
   const confirmDialog = useConfirm()
   const promptDialog = usePrompt()
   const [tab, setTab] = useState<Tab>('overview')
+  // Open user-profile sheet (admin quick-view + contact actions)
+  const [sheetUser, setSheetUser] = useState<any | null>(null)
   const [stats, setStats] = useState<any>(initialDashboard?.stats ?? null)
   const [reports, setReports] = useState<any[]>([])
   const [allPosts, setAllPosts] = useState<any[]>([])
@@ -236,6 +243,25 @@ export default function AdminClient({
   }
   function fetchUsers() {
     fetch(`/api/admin/lists?list=users&q=${userSearch}`).then(r => r.json()).then(setUsers).catch(() => {})
+  }
+
+  // Open (or create) a 1:1 in-app chat with a user, then navigate to it.
+  async function startChatWithUser(userId: string) {
+    try {
+      const res = await fetch('/api/threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.threadId) {
+        router.push(`/threads/${d.threadId}`)
+        return
+      }
+      toast.error(d.message || d.error || (lang !== 'en' ? 'تعذّر بدء المحادثة' : 'Could not start chat'))
+    } catch {
+      toast.error(lang !== 'en' ? 'خطأ في الاتصال' : 'Connection error')
+    }
   }
 
   async function doAction(action: string, targetId: string, reason?: string) {
@@ -596,19 +622,42 @@ export default function AdminClient({
               <button onClick={fetchUsers} className="bg-primary-600 text-white text-xs px-4 rounded-lg">{t('admin_search')}</button>
             </div>
             <div className="space-y-2">
-              {users.map((u: any) => (
+              {users.map((u: any) => {
+                const fullName = [u.name, u.lastName].filter(Boolean).join(' ') || t('admin_no_name')
+                const wa = buildWhatsAppHref(u.phone)
+                return (
                 <div key={u.id} className="bg-white rounded-xl p-3 border border-gray-100">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-sm font-medium text-gray-800 flex-1">{[u.name, u.lastName].filter(Boolean).join(' ') || t('admin_no_name')}</p>
-                    {u.status !== 'ACTIVE' && (
-                      <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">{u.status}</span>
-                    )}
+                  {/* Header: avatar + name + status pills (membership/role) */}
+                  <div className="flex items-start gap-3">
+                    <button
+                      onClick={() => setSheetUser(u)}
+                      className="w-11 h-11 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-lg overflow-hidden flex-shrink-0 active:scale-95"
+                    >
+                      {u.avatarUrl
+                        ? <img src={u.avatarUrl} alt="" className="w-full h-full object-cover" />
+                        : (fullName?.[0] || '؟')}
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{fullName}</p>
+                        {u.status !== 'ACTIVE' && (
+                          <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full">{u.status}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                        {/* Admin context: show ALL membership states incl. verified */}
+                        <MembershipPill membership={u.membership} showVerified />
+                        {u.role !== 'RESIDENT' && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">{u.role}</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-400 mb-1">{u.phone} · {u.role}{u.email ? ` · ${u.email}` : ''}</p>
+                  <p className="text-xs text-gray-400 mt-2">{u.phone}{u.email ? ` · ${u.email}` : ''}</p>
                   {u.neighborhood && (
-                    <p className="text-[11px] text-gray-400 mb-1">📍 {lang === 'en' ? (u.neighborhood.nameEn || u.neighborhood.name) : u.neighborhood.name}{u.neighborhood.city ? ` — ${lang === 'en' ? (u.neighborhood.city.nameEn || u.neighborhood.city.name) : u.neighborhood.city.name}` : ''}</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">📍 {lang === 'en' ? (u.neighborhood.nameEn || u.neighborhood.name) : u.neighborhood.name}{u.neighborhood.city ? ` — ${lang === 'en' ? (u.neighborhood.city.nameEn || u.neighborhood.city.name) : u.neighborhood.city.name}` : ''}</p>
                   )}
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     {(() => {
                       const p = getPrimaryBadge(u.accountType || 'NORMAL', (u as any).providerStatus)
                       const s = getSecondaryBadge(u.reputation || 0)
@@ -643,6 +692,32 @@ export default function AdminClient({
                       </button>
                     )}
                   </div>
+                  {/* Contact actions: profile sheet / in-app DM / WhatsApp */}
+                  <div className="flex items-center gap-1.5 mt-2.5">
+                    <button
+                      onClick={() => setSheetUser(u)}
+                      className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-700 active:scale-95"
+                    >
+                      <FiUser className="w-3.5 h-3.5" /> {lang === 'en' ? 'Profile' : 'الملف'}
+                    </button>
+                    <button
+                      onClick={() => startChatWithUser(u.id)}
+                      className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-primary-50 text-primary-700 active:scale-95"
+                    >
+                      <FiMessageCircle className="w-3.5 h-3.5" /> {lang === 'en' ? 'Message' : 'محادثة'}
+                    </button>
+                    {wa && (
+                      <a
+                        href={wa}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-[#25D366]/15 text-[#1da851] active:scale-95"
+                      >
+                        <FiMessageCircle className="w-3.5 h-3.5" /> {lang === 'en' ? 'WhatsApp' : 'واتساب'}
+                      </a>
+                    )}
+                  </div>
+
                   {(() => {
                     // Hide all actions if target outranks current admin
                     const ROLE_RANK: Record<string, number> = { RESIDENT: 0, NEIGHBORHOOD_MOD: 1, PLATFORM_MOD: 2, SUPER_ADMIN: 3 }
@@ -711,8 +786,18 @@ export default function AdminClient({
                     )
                   })()}
                 </div>
-              ))}
+                )
+              })}
             </div>
+            {sheetUser && (
+              <AdminUserSheet
+                userId={sheetUser.id}
+                fallbackName={[sheetUser.name, sheetUser.lastName].filter(Boolean).join(' ')}
+                phone={sheetUser.phone}
+                onClose={() => setSheetUser(null)}
+                onChat={(id) => { setSheetUser(null); startChatWithUser(id) }}
+              />
+            )}
           </div>
         )}
 
