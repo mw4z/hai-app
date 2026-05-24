@@ -222,16 +222,89 @@ export async function POST(req: NextRequest) {
       if (targetId === session.userId) return NextResponse.json({ error: 'لا يمكنك حذف نفسك' }, { status: 403 })
       const target3 = await db.user.findUnique({ where: { id: targetId }, select: { role: true, name: true, lastName: true, phone: true } })
       if (target3?.role === 'SUPER_ADMIN') return NextResponse.json({ error: 'لا يمكن حذف مدير عام' }, { status: 403 })
-      // Delete all user data in order
-      await db.notification.deleteMany({ where: { userId: targetId } })
-      await db.reaction.deleteMany({ where: { userId: targetId } })
-      await db.comment.deleteMany({ where: { authorId: targetId } })
-      await db.report.deleteMany({ where: { reporterId: targetId } })
-      await db.message.deleteMany({ where: { senderId: targetId } })
-      await db.thread.deleteMany({ where: { OR: [{ user1Id: targetId }, { user2Id: targetId }] } })
-      await db.post.deleteMany({ where: { authorId: targetId } })
-      await db.otpCode.deleteMany({ where: { userId: targetId } })
-      await db.user.delete({ where: { id: targetId } })
+
+      // Hard delete: User has ~40 FK references; CASCADE/SET-NULL ones are
+      // handled by the DB, but the RESTRICT / NO ACTION ones must be cleared
+      // here in dependency order (deepest children first) or the final
+      // user.delete() throws. Mods especially carry the heavy ones (pinned
+      // items + audit, place verifications, ride/poll subtrees). Wrapped in
+      // one transaction so a miss rolls back cleanly instead of half-deleting.
+      const t = targetId
+      try {
+        await db.$transaction(async (tx) => {
+          // ── Rides: RideRequest → Trip → RideRating/RideDispute ──────────
+          const reqIds = (await tx.rideRequest.findMany({ where: { requesterId: t }, select: { id: true } })).map(r => r.id)
+          const tripIds = reqIds.length
+            ? (await tx.trip.findMany({ where: { rideRequestId: { in: reqIds } }, select: { id: true } })).map(x => x.id)
+            : []
+          if (tripIds.length) {
+            await tx.rideRating.deleteMany({ where: { tripId: { in: tripIds } } })
+            await tx.rideDispute.deleteMany({ where: { tripId: { in: tripIds } } })
+          }
+          if (reqIds.length) {
+            await tx.trip.deleteMany({ where: { rideRequestId: { in: reqIds } } })
+            await tx.rideEvent.deleteMany({ where: { rideRequestId: { in: reqIds } } })
+            await tx.rideMessage.deleteMany({ where: { rideRequestId: { in: reqIds } } })
+          }
+          await tx.rideOffer.deleteMany({ where: { OR: [{ rideRequestId: { in: reqIds } }, { driverId: t }] } })
+          await tx.rideRequest.deleteMany({ where: { requesterId: t } })
+
+          // ── Polls: Poll → PollVote/PollComment/PollReaction ─────────────
+          const pollIds = (await tx.poll.findMany({ where: { authorId: t }, select: { id: true } })).map(p => p.id)
+          if (pollIds.length) {
+            await tx.pollVote.deleteMany({ where: { pollId: { in: pollIds } } })
+            await tx.pollComment.deleteMany({ where: { pollId: { in: pollIds } } })
+            await tx.pollReaction.deleteMany({ where: { pollId: { in: pollIds } } })
+          }
+          await tx.poll.deleteMany({ where: { authorId: t } })
+          await tx.pollRequest.deleteMany({ where: { userId: t } })
+
+          // ── Places: reviews/reports/claims + null out mod actions ───────
+          const reviewIds = (await tx.placeReview.findMany({ where: { userId: t }, select: { id: true } })).map(r => r.id)
+          await tx.placeReviewReport.deleteMany({ where: { OR: [{ reporterId: t }, ...(reviewIds.length ? [{ reviewId: { in: reviewIds } }] : [])] } })
+          await tx.placeReview.deleteMany({ where: { userId: t } })
+          await tx.placeReview.updateMany({ where: { ownerReplyByUserId: t }, data: { ownerReplyByUserId: null } })
+          await tx.placeReport.deleteMany({ where: { userId: t } })
+          await tx.placeClaimRequest.updateMany({ where: { reviewedById: t }, data: { reviewedById: null } })
+          await tx.placeClaimRequest.deleteMany({ where: { userId: t } })
+          await tx.placeListing.updateMany({ where: { createdByUserId: t }, data: { createdByUserId: null } })
+          await tx.placeListing.updateMany({ where: { verifiedByModId: t }, data: { verifiedByModId: null } })
+          await tx.placeListing.updateMany({ where: { claimedByUserId: t }, data: { claimedByUserId: null } })
+
+          // ── Pinned items + their audit (mod-heavy) ──────────────────────
+          await tx.neighborhoodPinnedItemAuditLog.deleteMany({ where: { actorId: t } })
+          await tx.neighborhoodPinnedItem.deleteMany({ where: { pinnedById: t } })
+
+          // ── Other owned content with RESTRICT/NO ACTION FKs ─────────────
+          await tx.postView.deleteMany({ where: { userId: t } })
+          await tx.bookmark.deleteMany({ where: { userId: t } })
+          await tx.postSubscription.deleteMany({ where: { userId: t } })
+          await tx.directoryContribution.deleteMany({ where: { contributorId: t } })
+          await tx.emergencyAlert.deleteMany({ where: { authorId: t } })
+          await tx.emergencyAlertRequest.deleteMany({ where: { requesterId: t } })
+          await tx.inviteRedemption.deleteMany({ where: { OR: [{ inviterId: t }, { inviteeId: t }] } })
+          await tx.serviceContactReport.deleteMany({ where: { userId: t } })
+          await tx.supportTicket.deleteMany({ where: { userId: t } })
+          await tx.report.deleteMany({ where: { OR: [{ reporterId: t }, { reportedUserId: t }] } })
+          await tx.userReport.deleteMany({ where: { OR: [{ reporterId: t }, { reportedUserId: t }] } })
+
+          // ── Original set (posts/comments/threads cascade their children) ─
+          await tx.notification.deleteMany({ where: { userId: t } })
+          await tx.reaction.deleteMany({ where: { userId: t } })
+          await tx.comment.deleteMany({ where: { authorId: t } })
+          await tx.message.deleteMany({ where: { senderId: t } })
+          await tx.thread.deleteMany({ where: { OR: [{ user1Id: t }, { user2Id: t }] } })
+          await tx.post.deleteMany({ where: { authorId: t } })
+          await tx.otpCode.deleteMany({ where: { userId: t } })
+
+          // Finally the user (CASCADE FKs — likes, tokens, prefs, invite
+          // code, reputation events — drop automatically here).
+          await tx.user.delete({ where: { id: t } })
+        }, { timeout: 30000, maxWait: 10000 })
+      } catch (err) {
+        console.error('[DELETE_USER] failed', err)
+        return NextResponse.json({ error: 'تعذّر حذف المستخدم — لديه بيانات مرتبطة' }, { status: 500 })
+      }
       await logAction(session.userId, admin.name, 'delete_user', 'user', targetId, reason, `phone=${target3?.phone}`)
       return NextResponse.json({ success: true })
     }
