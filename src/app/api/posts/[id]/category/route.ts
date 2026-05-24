@@ -101,6 +101,7 @@ export async function PATCH(
       priority: true,
       neighborhoodId: true,
       authorId: true,
+      status: true,
     },
   })
   if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -117,6 +118,14 @@ export async function PATCH(
   let finalMarketplaceType: MarketplaceType =
     data.marketplaceType ?? post.marketplaceType
   if (finalCategory !== 'MARKETPLACE') finalMarketplaceType = 'SELL'
+
+  // Keep coordinationMode in lockstep with the (category, intent) the post
+  // is being re-classified to — mirrors the POST /api/posts create rule.
+  // EXCLUSIVE only ever belongs to a ride REQUEST; anything else is OPEN.
+  // Without this, a ride request (EXCLUSIVE) later corrected to an OFFER
+  // kept its exclusive lock, so one tap of "تواصل" pinned it on
+  // "قيد التنسيق" forever and blocked everyone else from contacting.
+  const isRideRequest = finalCategory === 'RIDES' && finalIntent === 'REQUEST'
 
   // Priority clamp — moderators CAN'T promote a post to HIGH/CRITICAL
   // via this endpoint. If the post's current priority is HIGH and the
@@ -149,6 +158,12 @@ export async function PATCH(
       intent:          finalIntent,
       marketplaceType: finalMarketplaceType,
       priority:        finalPriority,
+      coordinationMode: isRideRequest ? 'EXCLUSIVE' : 'OPEN',
+      // No longer a ride request → release any exclusive lock so the post
+      // doesn't stay stuck on "قيد التنسيق", and revert the lock-induced
+      // IN_PROGRESS status back to ACTIVE.
+      ...(!isRideRequest ? { activeThreadId: null } : {}),
+      ...(!isRideRequest && post.status === 'IN_PROGRESS' ? { status: 'ACTIVE' as const } : {}),
       categoryEditedById: me.id,
       categoryEditedAt:   now,
     },
