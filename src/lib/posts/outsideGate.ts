@@ -95,14 +95,17 @@ export function evaluateClaimedPost(input: {
   marketplaceTypeInput?: string
   priorityInput?: string
 }): ClaimedGateResult {
+  // Restrictions surface ONLY here, when a sensitive feature is attempted —
+  // never as general "you're restricted" copy. Single neutral message.
+  const SENSITIVE_BLOCKED_AR = 'هذه الميزة تتطلب تأكيد السكن داخل الحي.'
   if (input.category === 'MARKETPLACE' || input.marketplaceTypeInput) {
-    return { ok: false, code: 'CLAIMED_MARKETPLACE_BLOCKED', messageAr: 'أكّد سكنك في الحي لنشر إعلانات السوق' }
+    return { ok: false, code: 'CLAIMED_MARKETPLACE_BLOCKED', messageAr: SENSITIVE_BLOCKED_AR }
   }
   if (input.intentInput === 'OFFER') {
-    return { ok: false, code: 'CLAIMED_OFFER_BLOCKED', messageAr: 'أكّد سكنك في الحي لنشر العروض التجارية' }
+    return { ok: false, code: 'CLAIMED_OFFER_BLOCKED', messageAr: SENSITIVE_BLOCKED_AR }
   }
   if (input.priorityInput === 'HIGH' || input.priorityInput === 'CRITICAL') {
-    return { ok: false, code: 'CLAIMED_PRIORITY_BLOCKED', messageAr: 'أكّد سكنك في الحي لرفع أولوية المنشور' }
+    return { ok: false, code: 'CLAIMED_PRIORITY_BLOCKED', messageAr: SENSITIVE_BLOCKED_AR }
   }
   return { ok: true }
 }

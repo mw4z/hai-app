@@ -469,7 +469,7 @@ export default function FeedClient({
   return (
     <div className="hai-app-shell bg-gray-50">
       {/* Guest mode banner — only for users with addressVerified=false */}
-      <GuestBanner show={addressVerified === false} />
+      <GuestBanner show={addressVerified === false} neighborhoodName={dn(user.neighborhood, user.neighborhoodEn)} />
 
       {/* Mod recruitment banner (max 3 shows, dismissable) */}
       {!isReadOnly && !hasNeighborhoodMod && user.role === 'RESIDENT' && showModBanner && (

@@ -105,6 +105,6 @@ test('gate: VERIFIED_RESIDENT passes', () => {
 
 test('membershipBadge returns localized labels per state', () => {
   assert.equal(membershipBadge(VERIFIED)?.ar, 'ساكن مؤكد')
-  assert.equal(membershipBadge(CLAIMED)?.ar, 'مرتبط بالحي')
+  assert.equal(membershipBadge(CLAIMED)?.ar, 'بانتظار التحقق')
   assert.equal(membershipBadge(OUTSIDE)?.ar, 'من خارج الحي')
 })

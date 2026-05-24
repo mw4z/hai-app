@@ -55,7 +55,7 @@ export function membershipBadge(m: Membership): MembershipBadge | null {
     case 'VERIFIED_RESIDENT':
       return { state: 'verified', ar: 'ساكن مؤكد', en: 'Verified resident', ur: 'تصدیق شدہ رہائشی' }
     case 'CLAIMED_RESIDENT':
-      return { state: 'claimed', ar: 'مرتبط بالحي', en: 'Linked to neighborhood', ur: 'محلے سے منسلک' }
+      return { state: 'claimed', ar: 'بانتظار التحقق', en: 'Pending verification', ur: 'تصدیق کے منتظر' }
     case 'OUTSIDE':
       return { state: 'outside', ar: 'من خارج الحي', en: 'Outside', ur: 'محلے سے باہر' }
   }

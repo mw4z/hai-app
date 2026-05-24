@@ -735,7 +735,7 @@ export default function ModDashboard({ data }: Props) {
                       <span className="font-medium text-gray-700 dark:text-gray-300">{c.neighborhood.name}</span>
                     </p>
                     <p className="text-[10px] text-gray-400 mt-0.5">
-                      <span className="text-amber-700 dark:text-amber-300">📍 {dn('مرتبط بالحي', 'Claimed')}</span>
+                      <span className="text-amber-700 dark:text-amber-300">📍 {dn('بانتظار التحقق', 'Pending verification')}</span>
                       {' · '}
                       {new Date(c.createdAt).toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-SA', { month: 'short', day: 'numeric' })}
                       {c.note ? ` · ${c.note}` : ''}

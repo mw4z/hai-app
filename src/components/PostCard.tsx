@@ -2663,7 +2663,9 @@ export default function PostCard({
                 {/* Identity badges (verification, role) */}
                 <div className="flex items-center gap-1.5 mt-1">
                   <UserBadgeDisplay accountType={post.author.accountType} providerStatus={post.author.providerStatus} reputation={rep} role={post.author.role} showLabel />
-                  <MembershipPill membership={post.author.membership as any} showVerified />
+                  {/* Verified residents look normal (no badge); only CLAIMED
+                      ("بانتظار التحقق") / OUTSIDE surface a status here. */}
+                  <MembershipPill membership={post.author.membership as any} />
                 </div>
 
                 {/* Tier pill (reputation) */}

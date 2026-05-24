@@ -9,8 +9,8 @@ There are three membership states:
 
 | State | Arabic label | What they can do |
 |-------|--------------|------------------|
-| **VERIFIED_RESIDENT** | ساكن مؤكد | Everything — full resident. |
-| **CLAIMED_RESIDENT** | مرتبط بالحي | View, comment, post **requests only**. No alerts/marketplace/voting. |
+| **VERIFIED_RESIDENT** | *(no badge by default)* — internally "ساكن مؤكد" | Everything — full resident. |
+| **CLAIMED_RESIDENT** | بانتظار التحقق | View, comment, **post normal content + requests**. No alerts / marketplace / commercial offers / raised priority / voting until verified. |
 | **OUTSIDE** | من خارج الحي | No resident actions; limited. |
 
 ---
@@ -18,8 +18,8 @@ There are three membership states:
 ## 1. Purpose
 
 Verify that after deploy, each state behaves as designed:
-- VERIFIED keeps full access,
-- CLAIMED gets limited (comment + REQUEST) access with friendly blocks,
+- VERIFIED keeps full access (and shows no badge by default),
+- CLAIMED can join normal conversation (comment + normal/request posts), with only the sensitive features verified-only,
 - OUTSIDE stays limited with no accidental resident privileges,
 - and a mod can review/approve residency claims.
 
@@ -64,20 +64,23 @@ FROM "User" WHERE phone='<phone>';
 ## 3. Checklist
 
 ### A. CLAIMED_RESIDENT
-- [ ] Their post / profile popup shows the badge **“مرتبط بالحي”**
+- [ ] Their post / profile popup shows the badge **“بانتظار التحقق”**
 - [ ] Can **comment** on a post
-- [ ] Can post a **limited REQUEST** (e.g. via أسأل / a general request)
-- [ ] **Cannot** post a marketplace offer
+- [ ] Can post a **normal GENERAL post** (not just a request)
+- [ ] Can post a **REQUEST** (e.g. via أسأل / a general request)
+- [ ] **Cannot** post a marketplace listing / commercial offer
+- [ ] **Cannot** set HIGH / CRITICAL priority
 - [ ] **Cannot** create an emergency alert
 - [ ] **Cannot** vote in a resident poll
-- [ ] Blocked actions show **friendly copy**, not a raw error
+- [ ] Normal/onboarding copy stays **neutral** (no "you're restricted" wording)
+- [ ] Only a blocked **sensitive** action shows **“هذه الميزة تتطلب تأكيد السكن داخل الحي.”**
 
 ### B. VERIFIED_RESIDENT
 - [ ] Full posting works
 - [ ] Marketplace works
 - [ ] Comments work
 - [ ] Polls / alerts behave as before
-- [ ] Verified badge is **hidden by default** (only shown where intended, e.g. profile popup)
+- [ ] Verified badge is **hidden everywhere by default** — verified residents look normal in feed AND profile popup (only an admin/mod context may show the status)
 
 ### C. OUTSIDE
 - [ ] Cannot post or comment as a resident
@@ -87,17 +90,17 @@ FROM "User" WHERE phone='<phone>';
 ### D. Mod dashboard
 - [ ] `/mod` shows the **“طلبات تأكيد السكن”** tab
 - [ ] A pending claim appears in it
-- [ ] **Approve** (تأكيد الساكن) upgrades the user to **VERIFIED_RESIDENT** (badge flips to ساكن مؤكد)
+- [ ] **Approve** (تأكيد الساكن) upgrades the user to **VERIFIED_RESIDENT** (the "بانتظار التحقق" badge disappears — verified shows no badge by default)
 - [ ] **Reject** (رفض) works, with the optional note prompt
 - [ ] A neighborhood mod only sees claims **in their own neighborhood**
 
 ### E. Arabic visual checks (in the real app, not terminal)
-- [ ] مرتبط بالحي
+- [ ] بانتظار التحقق
 - [ ] من خارج الحي
 - [ ] طلبات تأكيد السكن
 - [ ] تأكيد الساكن
 - [ ] رفض
-- [ ] هذه الميزة متاحة للسكان المؤكدين فقط. أكّد سكنك داخل الحي أو اطلب مراجعة المشرف.
+- [ ] هذه الميزة تتطلب تأكيد السكن داخل الحي.
 
 ---
 

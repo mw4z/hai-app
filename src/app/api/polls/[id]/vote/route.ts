@@ -17,7 +17,7 @@ export async function POST(
   // Voting is a trust-sensitive resident-only action — VERIFIED only.
   if (ready.user.role !== 'SUPER_ADMIN' && !canVote(ready.user.membership)) {
     return NextResponse.json(
-      { error: 'membership_required', message: 'هذه الميزة متاحة للسكان المؤكدين فقط. أكّد سكنك داخل الحي أو اطلب مراجعة المشرف.' },
+      { error: 'membership_required', message: 'هذه الميزة تتطلب تأكيد السكن داخل الحي.' },
       { status: 403 },
     )
   }

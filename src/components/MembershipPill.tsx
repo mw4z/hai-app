@@ -6,10 +6,11 @@ import { useLanguage } from '@/hooks/useLanguage'
 /**
  * Small pill showing a user's neighborhood-membership state:
  *   VERIFIED_RESIDENT → ساكن مؤكد   (green)
- *   CLAIMED_RESIDENT  → مرتبط بالحي (amber)
+ *   CLAIMED_RESIDENT  → بانتظار التحقق (amber)
  *   OUTSIDE           → من خارج الحي (gray)
- * Verified is the "default good" state, so it's only rendered when
- * `showVerified` is set (avoids badging the whole app green).
+ * Verified is the "default good" state and is NOT shown on normal
+ * user-facing surfaces (feed/profile) — it's only rendered when
+ * `showVerified` is explicitly set for an admin/mod context.
  */
 export default function MembershipPill({
   membership,
