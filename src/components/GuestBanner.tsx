@@ -27,15 +27,15 @@ export default function GuestBanner({
   const primary =
     lang === 'en'
       ? name
-        ? `Your neighborhood: ${name} — you can take part with your neighbors.`
-        : 'You can take part with your neighbors.'
+        ? `Your neighborhood: ${name} — verify your location for more features`
+        : 'Verify your location for more features'
       : lang === 'ur'
         ? name
-          ? `آپ کا محلہ: ${name} — آپ اپنے پڑوسیوں کے ساتھ شریک ہو سکتے ہیں۔`
-          : 'آپ اپنے پڑوسیوں کے ساتھ شریک ہو سکتے ہیں۔'
+          ? `آپ کا محلہ: ${name} — مزید مزایا کے لیے اپنے مقام کی تصدیق کریں`
+          : 'مزید مزایا کے لیے اپنے مقام کی تصدیق کریں'
         : name
-          ? `حيّك الحالي: ${name} — يمكنك المشاركة مع أهل الحي.`
-          : 'يمكنك المشاركة مع أهل الحي.'
+          ? `حيّك الحالي: ${name} — وثّق موقعك لمزايا أكثر`
+          : 'وثّق موقعك لمزايا أكثر'
   const helper =
     lang === 'en'
       ? 'Confirming your residence helps keep the neighborhood trusted.'
