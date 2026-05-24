@@ -595,7 +595,7 @@ export default function OnboardingPage() {
                 {lang !== 'en' ? 'استخدم موقعي' : 'Use my location'}
               </button>
               <button
-                onClick={() => setStep('gender')}
+                onClick={() => setStep('account_type')}
                 className="hai-link hai-link--muted hai-link--underline"
               >
                 {t('common_back')}
@@ -629,6 +629,7 @@ export default function OnboardingPage() {
           {/* C. Precise match — confirm detected neighborhood */}
           {locationStep === 'confirm' && detectedNeighborhood && (
             <div className="hai-flex-1 hai-stack-4">
+              <BackBtn onClick={() => setStep('account_type')} />
               <div className="hai-stack-1">
                 <h1 className="hai-h2">
                   {lang !== 'en' ? 'تم تحديد موقعك' : 'Location detected'}
@@ -680,6 +681,7 @@ export default function OnboardingPage() {
           {/* D. Nearby picker */}
           {locationStep === 'nearby' && (
             <div className="hai-flex-1 hai-stack-4">
+              <BackBtn onClick={() => setStep('account_type')} />
               <div className="hai-stack-1">
                 <h1 className="hai-h2">
                   {lang !== 'en' ? 'اختر حيّك' : 'Choose your neighborhood'}
@@ -758,12 +760,14 @@ export default function OnboardingPage() {
                   {/* Escape to the full searchable list — for users whose
                       neighborhood isn't among the GPS-nearby ones (e.g.
                       currently outside their home neighborhood). Picking
-                      here links as CLAIMED_RESIDENT (limited until verified). */}
+                      here links as CLAIMED_RESIDENT (limited until verified).
+                      Styled as a full button (like the no-GPS page) so it's
+                      obvious, not a faint link. */}
                   <button
                     onClick={enterManualPicker}
-                    className="hai-link hai-link--brand hai-link--underline hai-row-1 hai-justify-center"
+                    className="hai-btn-ghost hai-btn-block is-brand"
                   >
-                    <FiSearch className="hai-icon-xs" />
+                    <FiSearch className="hai-icon-md" />
                     {lang === 'en'
                       ? "My neighborhood isn't listed — browse all"
                       : lang === 'ur'
@@ -817,6 +821,12 @@ export default function OnboardingPage() {
                       ? 'محلے دیکھیں (محدود رسائی)'
                       : 'تصفّح الأحياء (وصول محدود)'}
                 </button>
+                <button
+                  onClick={() => setStep('account_type')}
+                  className="hai-link hai-link--muted hai-link--underline hai-self-center"
+                >
+                  {t('common_back')}
+                </button>
               </div>
             </div>
           )}
@@ -824,6 +834,7 @@ export default function OnboardingPage() {
           {/* F. Manual neighborhood picker */}
           {locationStep === 'manual' && (
             <div className="hai-flex-1 hai-stack-4">
+              <BackBtn onClick={() => setStep('account_type')} />
               <div className="hai-stack-1">
                 <h1 className="hai-h2">
                   {lang === 'en' ? 'Choose your neighborhood' : lang === 'ur' ? 'اپنا محلہ منتخب کریں' : 'اختر حيّك'}
@@ -924,6 +935,23 @@ export default function OnboardingPage() {
               >
                 <FiRefreshCw className="hai-icon-md" />
                 {lang !== 'en' ? 'أعد المحاولة' : 'Try Again'}
+              </button>
+              <button
+                onClick={enterManualPicker}
+                className="hai-btn-ghost hai-btn-block is-brand"
+              >
+                <FiSearch className="hai-icon-md" />
+                {lang === 'en'
+                  ? 'Browse neighborhoods (limited access)'
+                  : lang === 'ur'
+                    ? 'محلے دیکھیں (محدود رسائی)'
+                    : 'تصفّح الأحياء (وصول محدود)'}
+              </button>
+              <button
+                onClick={() => setStep('account_type')}
+                className="hai-link hai-link--muted hai-link--underline hai-self-center"
+              >
+                {t('common_back')}
               </button>
             </div>
           )}

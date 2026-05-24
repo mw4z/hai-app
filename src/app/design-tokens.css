@@ -1645,7 +1645,8 @@ textarea.hai-input {
   background: var(--hai-primary-500);
   color: var(--hai-text-invert);
 }
-.hai-option[data-active="true"] .hai-option__desc {
+.hai-option[data-active="true"] .hai-option__desc,
+.hai-option[data-active="true"] .hai-meta {
   color: var(--hai-primary-100);
 }
 .hai-option__desc {
