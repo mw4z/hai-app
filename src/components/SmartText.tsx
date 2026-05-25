@@ -2,6 +2,7 @@
 
 import ContactChip, { parseMessageSegments } from './ContactChip'
 import LocationChip from './LocationChip'
+import { openExternal } from '@/lib/openExternal'
 
 /**
  * Renders a text string with inline-segment substitutions:
@@ -56,7 +57,16 @@ export default function SmartText({ text, variant }: { text: string; variant?: '
                 target="_blank"
                 rel="noopener noreferrer"
                 className={linkClass}
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  // Route through openExternal so the Android WebView never
+                  // tries to load the link itself. http(s) → in-app Custom
+                  // Tab (which correctly hands off app-scheme redirects like
+                  // t.me → tg://); app schemes → native Intent. Without this,
+                  // a Telegram/WhatsApp link dies with ERR_UNKNOWN_URL_SCHEME.
+                  e.stopPropagation()
+                  e.preventDefault()
+                  void openExternal(seg.url)
+                }}
               >
                 {seg.url}
               </a>
