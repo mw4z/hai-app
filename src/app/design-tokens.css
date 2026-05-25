@@ -2011,7 +2011,10 @@ textarea.hai-input {
   align-items: center;
   justify-content: center;
   gap: var(--hai-space-1);
-  min-height: 32px;
+  /* Comfortable tap target — this is an icon-only button (no label), so it
+     needs an explicit min size, unlike the flex:1 labeled action buttons. */
+  min-height: 38px;
+  min-width: 44px;
   padding: 0 var(--hai-space-2);
   background: transparent;
   border: none;

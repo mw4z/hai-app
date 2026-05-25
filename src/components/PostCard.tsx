@@ -1763,7 +1763,7 @@ export default function PostCard({
               {/* Un-reacted: a muted outline smile (colorless, matches the
                   other action icons). Once the user reacts, show their
                   chosen (colored) emoji at the larger size. */}
-              {myReaction ?? <FiSmile className="hai-icon-md" />}
+              {myReaction ?? <FiSmile className="hai-icon-lg" />}
             </span>
           </button>
           {/* Change reaction button when already reacted */}
