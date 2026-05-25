@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useConfirm } from './ConfirmProvider'
 import { hapticLight, hapticMedium, hapticSuccess } from '@/lib/haptic'
-import { FiMessageCircle, FiSend, FiTrash2, FiX, FiEye, FiBell, FiHeart, FiCornerDownRight, FiSmile, FiImage, FiEdit2, FiPlus } from 'react-icons/fi'
+import { FiMessageCircle, FiSend, FiTrash2, FiX, FiEye, FiBell, FiHeart, FiCornerDownRight, FiSmile, FiImage, FiEdit2, FiPlus, FiShare2 } from 'react-icons/fi'
 import { fullName } from '@/lib/displayName'
 import SmartTextWithPlacePreviews from './SmartTextWithPlacePreviews'
 import UserBadgeDisplay from './UserBadge'
@@ -391,6 +391,22 @@ export default function PollCard({ poll, currentUserId, isSuperAdmin = false, is
     if (!commentsLoaded) void loadComments()
   }
 
+  // Share the poll — native share sheet, clipboard fallback. Mirrors PostCard.
+  async function sharePoll() {
+    hapticLight()
+    const url = `${window.location.origin}/feed?poll=${poll.id}`
+    const title = poll.question
+    const text = `${poll.question}\n${lang === 'en' ? 'Vote on Hai' : 'صوّت في حي'}`
+    if (navigator.share) {
+      try { await navigator.share({ title, text, url }) } catch { /* cancelled */ }
+    } else {
+      try {
+        await navigator.clipboard.writeText(`${title}\n${url}`)
+        toast.success(lang !== 'en' ? 'تم نسخ الرابط' : 'Link copied')
+      } catch { /* clipboard blocked */ }
+    }
+  }
+
   async function deletePoll() {
     const ok = await confirmDialog({
       message: lang === 'en' ? 'Delete this poll?' : lang === 'ur' ? 'ووٹنگ حذف کریں؟' : 'حذف هذا التصويت؟',
@@ -753,10 +769,15 @@ export default function PollCard({ poll, currentUserId, isSuperAdmin = false, is
             </button>
           )
         })}
-        <button onClick={openComments} className="flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-gray-50 dark:bg-gray-700 border border-transparent active:scale-90 mr-auto">
-          <FiMessageCircle className="w-3.5 h-3.5 text-gray-400" />
-          {commentCount > 0 && <span className="text-[10px] text-gray-400">{commentCount}</span>}
-        </button>
+        <div className="flex items-center gap-1.5 mr-auto">
+          <button onClick={openComments} className="flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-gray-50 dark:bg-gray-700 border border-transparent active:scale-90">
+            <FiMessageCircle className="w-3.5 h-3.5 text-gray-400" />
+            {commentCount > 0 && <span className="text-[10px] text-gray-400">{commentCount}</span>}
+          </button>
+          <button onClick={sharePoll} aria-label={lang === 'en' ? 'Share' : 'مشاركة'} className="flex items-center px-2 py-1 rounded-full text-xs bg-gray-50 dark:bg-gray-700 border border-transparent active:scale-90">
+            <FiShare2 className="w-3.5 h-3.5 text-gray-400" />
+          </button>
+        </div>
       </div>
 
       {/* Comments bottom sheet */}
