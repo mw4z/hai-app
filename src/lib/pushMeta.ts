@@ -21,7 +21,7 @@
  * trivial regardless of which content type the push refers to.
  */
 
-export type ContentType = 'post' | 'comment' | 'thread' | 'rideRequest'
+export type ContentType = 'post' | 'comment' | 'thread' | 'rideRequest' | 'poll'
 
 export interface ContentRef {
   contentType: ContentType
@@ -46,6 +46,7 @@ export function refFromPushData(
   if (data.commentId)     return { contentType: 'comment',     contentId: data.commentId }
   if (data.threadId)      return { contentType: 'thread',      contentId: data.threadId }
   if (data.rideRequestId) return { contentType: 'rideRequest', contentId: data.rideRequestId }
+  if (data.pollId)        return { contentType: 'poll',        contentId: data.pollId }
   if (data.postId)        return { contentType: 'post',        contentId: data.postId }
   return null
 }

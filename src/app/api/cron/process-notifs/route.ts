@@ -547,6 +547,83 @@ async function processNewPost(job: JobRow): Promise<JobOutcome> {
   return 'done'
 }
 
+/**
+ * Fan out a poll to its neighborhood — the poll equivalent of new_post.
+ * Used by the SUPER_ADMIN "re-push notification" action (polls don't notify
+ * on creation). Reuses resolveNewPostTokens (respects newPostInNbhd pref +
+ * quiet hours + excludes author). Deep-links to hai://feed?poll=<id>.
+ */
+async function processNewPoll(job: JobRow): Promise<JobOutcome> {
+  const p = (job.payload || {}) as {
+    pollId?: string
+    authorId?: string
+    authorName?: string | null
+    question?: string
+  }
+  const { pollId, authorId, authorName, question } = p
+
+  if (!pollId || !authorId || !question) {
+    console.log('[NOTIF_CRON] drop: invalid poll_new payload', { jobId: job.id })
+    return 'dropped'
+  }
+
+  const poll = await db.poll.findUnique({
+    where: { id: pollId },
+    select: {
+      id: true,
+      status: true,
+      neighborhoodId: true,
+      author: { select: { id: true, status: true } },
+    },
+  })
+  if (!poll) return 'dropped'
+  if (poll.status !== 'active') return 'dropped'
+  if (poll.author.status === 'BANNED_TEMP' || poll.author.status === 'BANNED_PERM') return 'dropped'
+  if (poll.neighborhoodId !== job.targetRef) return 'dropped'
+
+  // Polls have no audience targeting → ALL.
+  const { tokens, recipientUserCount } = await resolveNewPostTokens(job.targetRef, authorId, 'ALL')
+  if (tokens.length === 0) {
+    console.log('[NOTIF_CRON] drop: no recipients (poll_new)', { jobId: job.id })
+    return 'dropped'
+  }
+
+  const author = authorName?.trim() || 'جار'
+  const pushTitle = `${author} · 📊 تصويت`
+  const pushBody = question.slice(0, 180)
+
+  const result = await sendPushBatch(tokens, {
+    title: pushTitle,
+    body: pushBody,
+    priority: 'high',
+    refs: { contentType: 'poll', contentId: pollId },
+    collapseId: `poll:${pollId}`,
+    data: {
+      type: 'poll_new',
+      pollId,
+      deeplink: `hai://feed?poll=${pollId}`,
+    },
+  })
+
+  await cleanupInvalidTokens(result.invalidTokens, job.id, job.type)
+
+  console.log('[NOTIF_CRON] job delivered', {
+    jobId: job.id,
+    type: job.type,
+    targetRef: job.targetRef,
+    attempts: job.attempts,
+    recipients: recipientUserCount,
+    tokensSent: tokens.length,
+    success: result.success,
+    failed: result.failed,
+  })
+
+  if (result.success === 0 && result.failed > 0) {
+    throw new Error(result.firstError || 'all FCM sends failed')
+  }
+  return 'done'
+}
+
 async function processCommentOnPost(job: JobRow): Promise<JobOutcome> {
   const p = (job.payload || {}) as {
     postId?: string
@@ -1708,6 +1785,9 @@ async function handle(req: NextRequest) {
       switch (job.type) {
         case 'new_post':
           outcome = await processNewPost(job)
+          break
+        case 'poll_new':
+          outcome = await processNewPoll(job)
           break
         case 'comment_on_post':
           outcome = await processCommentOnPost(job)

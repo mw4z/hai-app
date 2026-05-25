@@ -870,7 +870,7 @@ export default function FeedClient({
       {polls.length > 0 && selectedCategory === 'ALL' && (
         <div className="px-4 pt-3 space-y-3">
           {polls.map((poll: any) => (
-            <PollCard key={poll.id} poll={poll} currentUserId={user.id} onDelete={() => setPolls(prev => prev.filter(p => p.id !== poll.id))} />
+            <PollCard key={poll.id} poll={poll} currentUserId={user.id} isSuperAdmin={user.role === 'SUPER_ADMIN'} onDelete={() => setPolls(prev => prev.filter(p => p.id !== poll.id))} />
           ))}
         </div>
       )}

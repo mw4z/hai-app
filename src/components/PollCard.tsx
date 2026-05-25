@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useConfirm } from './ConfirmProvider'
 import { hapticLight, hapticMedium, hapticSuccess } from '@/lib/haptic'
-import { FiMessageCircle, FiSend, FiTrash2, FiX, FiEye } from 'react-icons/fi'
+import { FiMessageCircle, FiSend, FiTrash2, FiX, FiEye, FiBell } from 'react-icons/fi'
 
 // Per-session dedup of recorded views (the server also dedups across
 // sessions via the unique PollView row). Mirrors PostCard's reportedViews.
@@ -33,14 +33,17 @@ interface Props {
     _count: { votes: number; comments: number }
   }
   currentUserId: string
+  /** SUPER_ADMIN only — shows the "re-send notification" action. */
+  isSuperAdmin?: boolean
   onDelete?: () => void
 }
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🙏']
 
-export default function PollCard({ poll, currentUserId, onDelete }: Props) {
+export default function PollCard({ poll, currentUserId, isSuperAdmin = false, onDelete }: Props) {
   const { t, lang } = useLanguage()
   const confirmDialog = useConfirm()
+  const [repushing, setRepushing] = useState(false)
   const voteSignature = JSON.stringify(poll.votes.map(v => `${v.userId}:${v.optionIndex}`).sort())
   const [votes, setVotes] = useState(poll.votes)
   const [totalVotes, setTotalVotes] = useState(poll._count.votes)
@@ -195,6 +198,33 @@ export default function PollCard({ poll, currentUserId, onDelete }: Props) {
     if (res.ok) { toast.success(lang === 'en' ? 'Deleted' : lang === 'ur' ? 'حذف ہو گیا' : 'تم الحذف'); onDelete?.() }
   }
 
+  // SUPER_ADMIN: re-send the neighborhood push for this poll (polls don't
+  // notify on creation; useful when one was missed, e.g. during an outage).
+  async function repush() {
+    if (repushing) return
+    const ok = await confirmDialog({
+      message: lang === 'en'
+        ? 'Re-send the notification for this poll to the neighborhood?'
+        : 'إعادة إرسال إشعار هذا التصويت لأهل الحي؟',
+      confirmText: lang === 'en' ? 'Send' : 'إرسال',
+    })
+    if (!ok) return
+    setRepushing(true)
+    try {
+      const res = await fetch(`/api/polls/${poll.id}/repush`, { method: 'POST' })
+      if (res.ok) {
+        hapticSuccess()
+        toast.success(lang === 'en' ? 'Notification sent' : 'تم إرسال الإشعار')
+      } else {
+        toast.error(lang === 'en' ? 'Failed to send' : 'تعذّر الإرسال')
+      }
+    } catch {
+      toast.error(lang === 'en' ? 'Connection error' : 'خطأ في الاتصال')
+    } finally {
+      setRepushing(false)
+    }
+  }
+
   const roleLabel = poll.author.role === 'SUPER_ADMIN' ? (lang === 'en' ? 'Admin' : lang === 'ur' ? 'سپر ایڈمن' : 'مدير عام') : poll.author.role === 'NEIGHBORHOOD_MOD' ? (lang === 'en' ? 'Mod' : lang === 'ur' ? 'محلے کا منتظم' : 'مشرف الحي') : ''
   const myReaction = reactions.find(r => r.userId === currentUserId)
 
@@ -219,6 +249,17 @@ export default function PollCard({ poll, currentUserId, onDelete }: Props) {
           <p className="text-[10px] text-gray-400">{timeAgo(poll.createdAt)}</p>
         </div>
         <span className="text-[10px] bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full font-bold">📊 {lang === 'en' ? 'Poll' : lang === 'ur' ? 'ووٹنگ' : 'تصويت'}</span>
+        {/* SUPER_ADMIN: re-send the neighborhood notification for this poll. */}
+        {isSuperAdmin && (
+          <button
+            onClick={repush}
+            disabled={repushing}
+            title={lang === 'en' ? 'Re-send notification' : 'إعادة إرسال الإشعار'}
+            className="text-gray-300 hover:text-primary-500 p-1 disabled:opacity-40"
+          >
+            <FiBell className="w-3.5 h-3.5" />
+          </button>
+        )}
         {isAuthor && (
           <button onClick={deletePoll} className="text-gray-300 hover:text-red-400 p-1"><FiTrash2 className="w-3.5 h-3.5" /></button>
         )}
