@@ -330,6 +330,22 @@ export default function PollCard({ poll, currentUserId, isSuperAdmin = false, is
     }
   }
 
+  // Pin / unpin a top-level comment (poll author or mod). Reload after so
+  // the server re-applies the pinned→creator→time ordering.
+  async function pinComment(id: string) {
+    const res = await fetch(`/api/polls/${poll.id}/comments/${id}/pin`, { method: 'POST' })
+    if (res.ok) {
+      const d = await res.json()
+      toast.success(d.pinned
+        ? (lang === 'en' ? 'Pinned to top' : 'تم التثبيت في الأعلى')
+        : (lang === 'en' ? 'Unpinned' : 'تم إلغاء التثبيت'))
+      loadComments()
+    } else {
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error || (lang === 'en' ? 'Failed' : 'تعذّر التثبيت'))
+    }
+  }
+
   async function saveEdit(id: string) {
     if (!editBody.trim()) return
     const res = await fetch(`/api/polls/${poll.id}/comments/${id}`, {
@@ -472,6 +488,16 @@ export default function PollCard({ poll, currentUserId, isSuperAdmin = false, is
               <span className="hai-comment__author cursor-pointer" onClick={openProfile}>{fullName(a) || a.name || t('post_neighbor')}</span>
               <UserBadgeDisplay accountType={a.accountType} providerStatus={a.providerStatus} reputation={a.reputation} />
               <MembershipPill membership={a.membership} />
+              {a.id === poll.authorId && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300">
+                  {lang === 'en' ? 'Author' : 'صاحب المنشور'}
+                </span>
+              )}
+              {!isReply && c.pinnedAt && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                  📌 {lang === 'en' ? 'Pinned' : 'مثبّت'}
+                </span>
+              )}
               <span className="hai-comment__time">{timeAgo(c.createdAt)}</span>
             </div>
 
@@ -514,6 +540,14 @@ export default function PollCard({ poll, currentUserId, isSuperAdmin = false, is
                 >
                   <FiCornerDownRight className="w-3.5 h-3.5" />
                   {t('post_reply')}
+                </button>
+              )}
+              {/* Pin/unpin — poll author or mod only, top-level comments. */}
+              {!isReply && (isAuthor || isAdmin) && (
+                <button onClick={() => pinComment(c.id)} className={`hai-comment__action ${c.pinnedAt ? 'is-active' : ''}`}>
+                  {c.pinnedAt
+                    ? (lang === 'en' ? 'Unpin' : 'إلغاء التثبيت')
+                    : (lang === 'en' ? 'Pin' : 'تثبيت')}
                 </button>
               )}
               {isMine && (

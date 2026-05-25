@@ -87,6 +87,7 @@ interface Comment {
   body: string
   imageUrl?: string | null
   createdAt: string
+  pinnedAt?: string | null
   author: { id: string; name: string | null; lastName?: string | null; reputation: number; accountType?: string; providerStatus?: string | null }
   likeCount?: number
   isLiked?: boolean
@@ -1077,6 +1078,24 @@ export default function PostCard({
       } else {
         const d = await res.json()
         toast.error(d.error || 'Error')
+      }
+    } catch { toast.error(t('common_error')) }
+  }
+
+  // Pin / unpin a top-level comment (post author or mod). Refetch after
+  // so the server re-applies the pinned→creator→time ordering.
+  async function pinComment(commentId: string) {
+    try {
+      const res = await fetch(`/api/posts/${post.id}/comments/${commentId}/pin`, { method: 'POST' })
+      if (res.ok) {
+        const d = await res.json()
+        toast.success(d.pinned
+          ? (lang === 'en' ? 'Pinned to top' : 'تم التثبيت في الأعلى')
+          : (lang === 'en' ? 'Unpinned' : 'تم إلغاء التثبيت'))
+        fetchComments()
+      } else {
+        const d = await res.json().catch(() => ({}))
+        toast.error(d.error || t('common_error'))
       }
     } catch { toast.error(t('common_error')) }
   }
@@ -2148,6 +2167,16 @@ export default function PostCard({
                         <div className="hai-comment__meta">
                           <span className="hai-comment__author cursor-pointer" onClick={() => { setPopupUser(c.author); setShowUserPopup(true) }}>{fullName(c.author) || t('post_neighbor')}</span>
                           <UserBadgeDisplay accountType={c.author.accountType} providerStatus={c.author.providerStatus} reputation={c.author.reputation} />
+                          {c.author.id === post.author.id && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300">
+                              {lang === 'en' ? 'Author' : 'صاحب المنشور'}
+                            </span>
+                          )}
+                          {c.pinnedAt && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                              📌 {lang === 'en' ? 'Pinned' : 'مثبّت'}
+                            </span>
+                          )}
                           <span className="hai-comment__time">
                             {(() => {
                               const mins = Math.floor((Date.now() - new Date(c.createdAt).getTime()) / 60000)
@@ -2216,6 +2245,17 @@ export default function PostCard({
                             <FiCornerDownRight className="w-3.5 h-3.5" />
                             {t('post_reply')}
                           </button>
+                          {/* Pin/unpin — post author or mod only. */}
+                          {(post.author.id === currentUserId || isAdmin) && (
+                            <button
+                              onClick={() => pinComment(c.id)}
+                              className={`hai-comment__action ${c.pinnedAt ? 'is-active' : ''}`}
+                            >
+                              {c.pinnedAt
+                                ? (lang === 'en' ? 'Unpin' : 'إلغاء التثبيت')
+                                : (lang === 'en' ? 'Pin' : 'تثبيت')}
+                            </button>
+                          )}
                           {c.author.id === currentUserId && (
                             <>
                               {Date.now() - new Date(c.createdAt).getTime() < 30 * 60_000 && (
@@ -2297,6 +2337,11 @@ export default function PostCard({
                               <div className="hai-comment__meta">
                                 <span className="hai-comment__author cursor-pointer" onClick={() => { setPopupUser(reply.author); setShowUserPopup(true) }}>{fullName(reply.author) || t('post_neighbor')}</span>
                                 <UserBadgeDisplay accountType={reply.author.accountType} providerStatus={reply.author.providerStatus} reputation={reply.author.reputation} />
+                                {reply.author.id === post.author.id && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300">
+                                    {lang === 'en' ? 'Author' : 'صاحب المنشور'}
+                                  </span>
+                                )}
                                 <span className="hai-comment__time">
                                   {(() => {
                                     const mins = Math.floor((Date.now() - new Date(reply.createdAt).getTime()) / 60000)

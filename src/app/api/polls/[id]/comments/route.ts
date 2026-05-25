@@ -21,6 +21,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Poll author drives the "OP" badge and the creator-first sort.
+  const pollRow = await db.poll.findUnique({
+    where: { id: params.id },
+    select: { authorId: true },
+  })
+  const pollAuthorId = pollRow?.authorId ?? null
+
   const comments = await db.pollComment.findMany({
     where: { pollId: params.id, parentId: null },
     include: {
@@ -50,6 +57,16 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       isLiked: r.likes.some((l: any) => l.userId === session.userId),
     })),
   }))
+
+  // Order: pinned first (newest pin on top), then the poll creator's own
+  // comments, then everyone else oldest-first.
+  const rank = (c: any) => (c.pinnedAt ? 0 : c.author?.id === pollAuthorId ? 1 : 2)
+  formatted.sort((a, b) => {
+    const ra = rank(a), rb = rank(b)
+    if (ra !== rb) return ra - rb
+    if (ra === 0) return (b.pinnedAt ? +new Date(b.pinnedAt) : 0) - (a.pinnedAt ? +new Date(a.pinnedAt) : 0)
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  })
 
   return NextResponse.json(formatted)
 }

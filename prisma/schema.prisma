@@ -818,6 +818,7 @@ model Comment {
   likes     CommentLike[]
   createdAt DateTime  @default(now())
   editedAt  DateTime?
+  pinnedAt  DateTime? // set when the post author/admin pins it to the top
 
   @@index([postId])
   @@index([parentId])
@@ -1113,6 +1114,7 @@ model PollComment {
   likes     PollCommentLike[]
   createdAt DateTime          @default(now())
   editedAt  DateTime?
+  pinnedAt  DateTime?         // set when the poll author/admin pins it to the top
 
   @@index([pollId, createdAt])
   @@index([parentId])

@@ -14,6 +14,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
 
+  // Post author drives both the "OP" badge and the creator-first sort.
+  const postRow = await db.post.findUnique({
+    where: { id: params.id },
+    select: { authorId: true },
+  })
+  const postAuthorId = postRow?.authorId ?? null
+
   const comments = await db.comment.findMany({
     where: { postId: params.id, parentId: null },
     include: {
@@ -45,6 +52,16 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       isLiked: r.likes.some((l: any) => l.userId === session.userId),
     })),
   }))
+
+  // Order top-level comments: pinned first (newest pin on top), then the
+  // post creator's own comments, then everyone else oldest-first.
+  const rank = (c: any) => (c.pinnedAt ? 0 : c.author?.id === postAuthorId ? 1 : 2)
+  formatted.sort((a, b) => {
+    const ra = rank(a), rb = rank(b)
+    if (ra !== rb) return ra - rb
+    if (ra === 0) return (b.pinnedAt ? +new Date(b.pinnedAt) : 0) - (a.pinnedAt ? +new Date(a.pinnedAt) : 0)
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  })
 
   return NextResponse.json(formatted)
 }
