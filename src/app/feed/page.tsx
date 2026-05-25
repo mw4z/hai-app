@@ -211,13 +211,13 @@ export default async function FeedPage({
     }).catch(() => []),
     // Active polls — SSR'd for the same reason. Mirrors GET /api/polls.
     db.poll.findMany({
-      // Active polls + recently-closed ones (still shown for 3h after their
-      // 24h expiry so neighbors can see results, then hidden completely).
+      // Active polls + recently-closed ones (still shown for 4h after their
+      // 48h expiry so neighbors can see results, then hidden completely).
       where: {
         neighborhoodId: activeNeighborhoodId,
         OR: [
           { status: 'active' },
-          { status: 'closed', expiresAt: { gt: new Date(Date.now() - 3 * 60 * 60 * 1000) } },
+          { status: 'closed', expiresAt: { gt: new Date(Date.now() - 4 * 60 * 60 * 1000) } },
         ],
       },
       include: {

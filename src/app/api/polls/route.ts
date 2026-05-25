@@ -39,9 +39,9 @@ export async function POST(req: NextRequest) {
       options: cleanOptions,
       authorId: session.userId,
       neighborhoodId: user.neighborhoodId,
-      // Polls auto-expire 24h after creation (closed by the expire-polls
+      // Polls auto-expire 48h after creation (closed by the expire-polls
       // sweep in the notif cron), unless an explicit expiresAt is passed.
-      expiresAt: expiresAt ? new Date(expiresAt) : new Date(Date.now() + 24 * 60 * 60 * 1000),
+      expiresAt: expiresAt ? new Date(expiresAt) : new Date(Date.now() + 48 * 60 * 60 * 1000),
     },
   })
 
@@ -64,10 +64,10 @@ export async function GET(req: NextRequest) {
   const polls = await db.poll.findMany({
     where: {
       neighborhoodId: neighborhoodId || undefined,
-      // Active + recently-closed (shown 3h after expiry, then hidden).
+      // Active + recently-closed (shown 4h after expiry, then hidden).
       OR: [
         { status: 'active' },
-        { status: 'closed', expiresAt: { gt: new Date(Date.now() - 3 * 60 * 60 * 1000) } },
+        { status: 'closed', expiresAt: { gt: new Date(Date.now() - 4 * 60 * 60 * 1000) } },
       ],
     },
     include: {

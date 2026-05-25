@@ -76,6 +76,7 @@ export default function PollCard({ poll, currentUserId, isSuperAdmin = false, is
   const [replyText, setReplyText] = useState('')
   const [animated, setAnimated] = useState(false)
   const [viewCount, setViewCount] = useState<number>(poll.viewCount ?? 0)
+  const [now, setNow] = useState<number>(() => Date.now()) // live clock for the countdown
   const [cardVisible, setCardVisible] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
@@ -95,6 +96,11 @@ export default function PollCard({ poll, currentUserId, isSuperAdmin = false, is
 
   useEffect(() => { setVotes(poll.votes); setTotalVotes(poll._count.votes); setReactions(poll.reactions); setCommentCount(poll._count.comments) }, [voteSignature, poll._count.comments])
   useEffect(() => { setTimeout(() => setAnimated(true), 100) }, [])
+  // Tick the countdown clock every 30s (cheap; minute-resolution label).
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   // Record this user's view ONCE the first time the card is ≥50% visible.
   useEffect(() => {
@@ -153,7 +159,26 @@ export default function PollCard({ poll, currentUserId, isSuperAdmin = false, is
 
   const myVote = votes.find(v => v.userId === currentUserId)
   const hasVoted = !!myVote
-  const isClosed = poll.status === 'closed' || !!(poll.expiresAt && new Date(poll.expiresAt) < new Date())
+  const isClosed = poll.status === 'closed' || !!(poll.expiresAt && new Date(poll.expiresAt).getTime() <= now)
+
+  // Live "time left to expire" label — ticks every 30s; flips to closed at 0.
+  function timeLeftLabel(): string | null {
+    if (!poll.expiresAt) return null
+    const ms = new Date(poll.expiresAt).getTime() - now
+    if (ms <= 0) return null
+    const totalMin = Math.floor(ms / 60000)
+    const d = Math.floor(totalMin / 1440)
+    const h = Math.floor((totalMin % 1440) / 60)
+    const m = totalMin % 60
+    if (lang === 'en') {
+      if (d > 0) return `${d}d ${h}h left`
+      if (h > 0) return `${h}h ${m}m left`
+      return `${m}m left`
+    }
+    if (d > 0) return `باقي ${d} ي و${h} س`
+    if (h > 0) return `باقي ${h} س و${m} د`
+    return `باقي ${m} د`
+  }
   const isAuthor = poll.authorId === currentUserId
   const voteCounts = pollOptions.map((_, i) => votes.filter(v => v.optionIndex === i).length)
   const canEditPoll = isAuthor || isSuperAdmin
@@ -671,7 +696,12 @@ export default function PollCard({ poll, currentUserId, isSuperAdmin = false, is
             <FiEye className="w-3.5 h-3.5" />{viewCount}
           </span>
         </div>
-        {isClosed && <span className="text-[10px] text-red-400 font-medium">{t('poll_closed')}</span>}
+        {isClosed ? (
+          <span className="text-[10px] text-red-400 font-medium">{t('poll_closed')}</span>
+        ) : (() => {
+          const tl = timeLeftLabel()
+          return tl ? <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1">⏳ {tl}</span> : null
+        })()}
       </div>
 
       {/* Reactions row */}
