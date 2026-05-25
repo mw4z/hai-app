@@ -10,7 +10,7 @@ import HaiLoader, { HaiSpinner } from '@/components/HaiLoader'
 import { useConfirm, usePrompt } from '@/components/ConfirmProvider'
 import { getPrimaryBadge, getSecondaryBadge } from '@/lib/user-badge'
 import MembershipPill from '@/components/MembershipPill'
-import AdminUserSheet from '@/components/admin/AdminUserSheet'
+import UserProfileSheet from '@/components/UserProfileSheet'
 import { buildWhatsAppHref } from '@/lib/phone'
 import type { TranslationKey } from '@/lib/i18n'
 
@@ -790,12 +790,29 @@ export default function AdminClient({
               })}
             </div>
             {sheetUser && (
-              <AdminUserSheet
-                userId={sheetUser.id}
-                fallbackName={[sheetUser.name, sheetUser.lastName].filter(Boolean).join(' ')}
-                phone={sheetUser.phone}
+              <UserProfileSheet
+                profileUserId={sheetUser.id}
                 onClose={() => setSheetUser(null)}
-                onChat={(id) => { setSheetUser(null); startChatWithUser(id) }}
+                extraActions={
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { const id = sheetUser.id; setSheetUser(null); startChatWithUser(id) }}
+                      className="flex-1 flex items-center justify-center gap-2 bg-primary-600 text-white rounded-xl py-2.5 text-sm font-semibold active:scale-95 transition-transform"
+                    >
+                      <FiMessageCircle className="w-4 h-4" /> {lang === 'en' ? 'Message' : 'محادثة'}
+                    </button>
+                    {buildWhatsAppHref(sheetUser.phone) && (
+                      <a
+                        href={buildWhatsAppHref(sheetUser.phone)!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 flex items-center justify-center gap-2 bg-[#25D366] text-white rounded-xl py-2.5 text-sm font-semibold active:scale-95 transition-transform"
+                      >
+                        <FiMessageCircle className="w-4 h-4" /> {lang === 'en' ? 'WhatsApp' : 'واتساب'}
+                      </a>
+                    )}
+                  </div>
+                }
               />
             )}
           </div>
