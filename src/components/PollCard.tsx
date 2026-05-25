@@ -394,7 +394,9 @@ export default function PollCard({ poll, currentUserId, isSuperAdmin = false, is
   // Share the poll — native share sheet, clipboard fallback. Mirrors PostCard.
   async function sharePoll() {
     hapticLight()
-    const url = `${window.location.origin}/feed?poll=${poll.id}`
+    // Share the PUBLIC preview page (rich link preview + "get the app" CTA),
+    // not /feed — browser visitors are bounced off /feed by the middleware.
+    const url = `${window.location.origin}/s/poll/${poll.id}`
     const title = poll.question
     const text = `${poll.question}\n${lang === 'en' ? 'Vote on Hai' : 'صوّت في حي'}`
     if (navigator.share) {
