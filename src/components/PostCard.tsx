@@ -1839,7 +1839,10 @@ export default function PostCard({
           {/* Share */}
           <button
             onClick={async () => {
-              const url = `${window.location.origin}/feed`
+              // Share the PUBLIC preview page (rich link preview + app CTA),
+              // not /feed — browser visitors are bounced off /feed by the
+              // middleware. Native-app users get redirected to the post.
+              const url = `${window.location.origin}/s/post/${post.id}`
               // For titleless posts use the body-excerpt headline so
               // the share sheet / clipboard preview isn't blank.
               const shareTitle = buildDisplayTitle(

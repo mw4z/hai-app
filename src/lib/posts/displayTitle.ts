@@ -64,6 +64,11 @@ function categoryFallback(category: PostCategory, lang: 'ar' | 'en' | 'ur'): str
   return map[category]?.[lang] ?? map[category]?.ar ?? 'منشور'
 }
 
+/** Public category label (AR/EN/UR). Used by the share-preview pages. */
+export function categoryLabel(category: PostCategory, lang: 'ar' | 'en' | 'ur' = 'ar'): string {
+  return categoryFallback(category, lang)
+}
+
 /**
  * Short variant used as the push-notification subject (max 80 chars
  * by long-standing convention in this codebase). Always returns
