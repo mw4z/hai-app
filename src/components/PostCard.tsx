@@ -1752,41 +1752,22 @@ export default function PostCard({
             document.body,
           )}
 
-          {/* Trigger button — tap own reaction to remove, long-press to change */}
+          {/* Single reaction control: your reaction (or a colorless smile)
+              + the total count inline. Tapping opens the picker — pick to
+              react/change, or tap your current emoji again to remove. Replaces
+              the old trigger + separate "+" + duplicate emoji-stack summary. */}
           <button
             ref={reactionTriggerRef}
-            onClick={() => myReaction ? handleReact(myReaction) : setShowReactionPicker(v => !v)}
+            onClick={() => setShowReactionPicker(v => !v)}
             className="hai-reaction-item"
             data-selected={myReaction ? 'true' : 'false'}
+            aria-label={lang === 'en' ? 'React' : 'تفاعل'}
           >
             <span className={`hai-reaction-item__icon ${myReaction ? 'hai-reaction-emoji-lg' : ''} ${bouncingReaction && myReaction ? 'reaction-bounce' : ''}`}>
-              {/* Un-reacted: a muted outline smile (colorless, matches the
-                  other action icons). Once the user reacts, show their
-                  chosen (colored) emoji at the larger size. */}
               {myReaction ?? <FiSmile className="hai-icon-lg" />}
             </span>
+            {totalReactions > 0 && <span className="hai-reaction-item__count">{totalReactions}</span>}
           </button>
-          {/* Change reaction button when already reacted */}
-          {myReaction && (
-            <button
-              onClick={() => setShowReactionPicker(v => !v)}
-              className="hai-reaction-item"
-            >
-              <span className="hai-reaction-item__count">+</span>
-            </button>
-          )}
-
-          {/* Reaction summary: unique emojis + total */}
-          {totalReactions > 0 && (
-            <div className="hai-row-1">
-              <span className="hai-reaction-stack">
-                {Object.keys(reactionCounts).filter(e => reactionCounts[e] > 0).slice(0, 3).map(e => (
-                  <span key={e} className="hai-reaction-stack__emoji">{e}</span>
-                ))}
-              </span>
-              <span className="hai-meta">{totalReactions}</span>
-            </div>
-          )}
         </div>
 
         <div className="hai-row-1">
