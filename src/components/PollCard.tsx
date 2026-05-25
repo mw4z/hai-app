@@ -571,17 +571,22 @@ export default function PollCard({ poll, currentUserId, isSuperAdmin = false, is
         </div>
         <span className="text-[10px] bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full font-bold">📊 {lang === 'en' ? 'Poll' : lang === 'ur' ? 'ووٹنگ' : 'تصويت'}</span>
         {isSuperAdmin && (
-          <button onClick={repush} disabled={repushing} title={lang === 'en' ? 'Re-send notification' : 'إعادة إرسال الإشعار'} className="text-gray-300 hover:text-primary-500 p-1 disabled:opacity-40">
-            <FiBell className="w-3.5 h-3.5" />
+          <button onClick={repush} disabled={repushing} title={lang === 'en' ? 'Re-send notification' : 'إعادة إرسال الإشعار'}
+            className="w-7 h-7 rounded-full flex items-center justify-center bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-300 active:scale-90 transition-transform disabled:opacity-40">
+            <FiBell className="w-4 h-4" />
           </button>
         )}
         {canEditPoll && !editingPoll && (
-          <button onClick={openPollEdit} title={lang === 'en' ? 'Edit poll' : 'تعديل التصويت'} className="text-gray-300 hover:text-primary-500 p-1">
-            <FiEdit2 className="w-3.5 h-3.5" />
+          <button onClick={openPollEdit} title={lang === 'en' ? 'Edit poll' : 'تعديل التصويت'}
+            className="w-7 h-7 rounded-full flex items-center justify-center bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-200 active:scale-90 transition-transform">
+            <FiEdit2 className="w-4 h-4" />
           </button>
         )}
         {isAuthor && (
-          <button onClick={deletePoll} className="text-gray-300 hover:text-red-400 p-1"><FiTrash2 className="w-3.5 h-3.5" /></button>
+          <button onClick={deletePoll} title={lang === 'en' ? 'Delete poll' : 'حذف التصويت'}
+            className="w-7 h-7 rounded-full flex items-center justify-center bg-red-50 dark:bg-red-900/20 text-red-500 active:scale-90 transition-transform">
+            <FiTrash2 className="w-4 h-4" />
+          </button>
         )}
       </div>
 

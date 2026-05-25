@@ -624,6 +624,80 @@ async function processNewPoll(job: JobRow): Promise<JobOutcome> {
   return 'done'
 }
 
+/**
+ * Close active polls past their expiry and enqueue a one-shot poll_closed
+ * fan-out. The updateMany guard (status='active') makes the active→closed
+ * transition atomic, so the notification fires exactly once per poll.
+ */
+async function expireDuePolls(): Promise<void> {
+  const now = new Date()
+  const due = await db.poll.findMany({
+    where: { status: 'active', expiresAt: { lt: now } },
+    select: { id: true, question: true, neighborhoodId: true, authorId: true },
+    take: 50,
+  })
+  for (const p of due) {
+    const flipped = await db.poll.updateMany({ where: { id: p.id, status: 'active' }, data: { status: 'closed' } })
+    if (flipped.count === 0) continue // already closed by a concurrent run
+    try {
+      await db.notifJob.create({
+        data: {
+          type: 'poll_closed',
+          priority: 'normal',
+          targetType: 'nbhd_topic',
+          targetRef: p.neighborhoodId,
+          payload: { pollId: p.id, authorId: p.authorId, question: p.question },
+        },
+      })
+    } catch (e) {
+      console.error('[NOTIF_CRON] enqueue poll_closed failed', e)
+    }
+  }
+}
+
+/**
+ * "📊 انتهى التصويت — شوف النتائج" — fan out a closed poll to its neighborhood.
+ * Mirrors processNewPoll (reuses resolveNewPostTokens; deep-links the poll).
+ */
+async function processPollClosed(job: JobRow): Promise<JobOutcome> {
+  const p = (job.payload || {}) as { pollId?: string; authorId?: string; question?: string }
+  const { pollId, authorId, question } = p
+  if (!pollId || !question) {
+    console.log('[NOTIF_CRON] drop: invalid poll_closed payload', { jobId: job.id })
+    return 'dropped'
+  }
+  const poll = await db.poll.findUnique({ where: { id: pollId }, select: { id: true, neighborhoodId: true } })
+  if (!poll) return 'dropped'
+  if (poll.neighborhoodId !== job.targetRef) return 'dropped'
+
+  const { tokens, recipientUserCount } = await resolveNewPostTokens(job.targetRef, authorId || '', 'ALL')
+  if (tokens.length === 0) {
+    console.log('[NOTIF_CRON] drop: no recipients (poll_closed)', { jobId: job.id })
+    return 'dropped'
+  }
+
+  const result = await sendPushBatch(tokens, {
+    title: '📊 انتهى التصويت',
+    body: `${question.slice(0, 140)} — شوف النتائج`,
+    priority: 'high',
+    refs: { contentType: 'poll', contentId: pollId },
+    collapseId: `poll-closed:${pollId}`,
+    data: { type: 'poll_closed', pollId, deeplink: `hai://feed?poll=${pollId}` },
+  })
+
+  await cleanupInvalidTokens(result.invalidTokens, job.id, job.type)
+
+  console.log('[NOTIF_CRON] job delivered', {
+    jobId: job.id, type: job.type, targetRef: job.targetRef, attempts: job.attempts,
+    recipients: recipientUserCount, tokensSent: tokens.length, success: result.success, failed: result.failed,
+  })
+
+  if (result.success === 0 && result.failed > 0) {
+    throw new Error(result.firstError || 'all FCM sends failed')
+  }
+  return 'done'
+}
+
 async function processCommentOnPost(job: JobRow): Promise<JobOutcome> {
   const p = (job.payload || {}) as {
     postId?: string
@@ -1725,6 +1799,11 @@ async function handle(req: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 
+  // Auto-expire polls (24h): close any active poll past expiresAt and enqueue
+  // a one-shot "poll closed — see results" fan-out. Runs before job claiming
+  // so those poll_closed jobs are processed in this same tick.
+  await expireDuePolls().catch((e) => console.error('[NOTIF_CRON] expireDuePolls failed', e))
+
   const summary = {
     ok: true,
     processed: 0,
@@ -1788,6 +1867,9 @@ async function handle(req: NextRequest) {
           break
         case 'poll_new':
           outcome = await processNewPoll(job)
+          break
+        case 'poll_closed':
+          outcome = await processPollClosed(job)
           break
         case 'comment_on_post':
           outcome = await processCommentOnPost(job)

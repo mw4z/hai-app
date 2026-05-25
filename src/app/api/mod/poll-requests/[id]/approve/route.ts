@@ -85,6 +85,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           authorId: me.id,
           neighborhoodId: pr.neighborhoodId,
           status: 'active',
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h auto-expiry
         },
         select: { id: true },
       }),

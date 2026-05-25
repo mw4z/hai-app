@@ -27,8 +27,9 @@ export async function POST(
   if (poll.status !== 'active') {
     return NextResponse.json({ error: 'التصويت مغلق' }, { status: 409 })
   }
+  // Reject votes on an expired poll, but DON'T close it here — the notif
+  // cron's expire sweep does the close + fires the "poll closed" push once.
   if (poll.expiresAt && new Date() > poll.expiresAt) {
-    await db.poll.update({ where: { id: params.id }, data: { status: 'closed' } })
     return NextResponse.json({ error: 'انتهت مدة التصويت' }, { status: 409 })
   }
 
