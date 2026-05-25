@@ -53,8 +53,21 @@ export async function POST(req: NextRequest) {
     for (const entry of body?.entry ?? []) {
       for (const change of entry?.changes ?? []) {
         const value = change?.value
+        // TEMP DEBUG: capture delivery-status events (sent/delivered/failed +
+        // error reason) into a debug row so we can diagnose non-delivery.
+        const statuses = value?.statuses
+        if (Array.isArray(statuses) && statuses.length) {
+          const s: any = statuses[statuses.length - 1]
+          const reason = String(s?.errors?.[0]?.title || s?.errors?.[0]?.message || s?.status || 'status')
+          await db.whatsappBridgeMessage.upsert({
+            where: { sourceChatId_sourceMessageId_senderHash: { sourceChatId: '__debug__', sourceMessageId: '__last_status__', senderHash: '__debug__' } },
+            create: { sourceChatId: '__debug__', sourceMessageId: '__last_status__', senderHash: '__debug__', originalText: JSON.stringify(s).slice(0, 1900), neighborhoodId: '__debug__', status: 'IGNORED', failureReason: reason },
+            update: { originalText: JSON.stringify(s).slice(0, 1900), failureReason: reason },
+          }).catch((e) => console.error('[BRIDGE] status debug failed', e))
+          continue
+        }
         const messages = value?.messages
-        if (!Array.isArray(messages)) continue // statuses/read receipts → ignore
+        if (!Array.isArray(messages)) continue // other non-message events → ignore
         const contacts = value?.contacts ?? []
         for (const msg of messages) {
           await handleMessage(msg, contacts).catch((e) => console.error('[BRIDGE] handleMessage error', e))
