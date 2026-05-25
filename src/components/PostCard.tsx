@@ -1759,8 +1759,11 @@ export default function PostCard({
             className="hai-reaction-item"
             data-selected={myReaction ? 'true' : 'false'}
           >
-            <span className={`hai-reaction-item__icon hai-reaction-emoji-lg ${bouncingReaction && myReaction ? 'reaction-bounce' : ''}`}>
-              {myReaction ?? '😊'}
+            <span className={`hai-reaction-item__icon ${myReaction ? 'hai-reaction-emoji-lg' : ''} ${bouncingReaction && myReaction ? 'reaction-bounce' : ''}`}>
+              {/* Un-reacted: a muted outline smile (colorless, matches the
+                  other action icons). Once the user reacts, show their
+                  chosen (colored) emoji at the larger size. */}
+              {myReaction ?? <FiSmile className="hai-icon-md" />}
             </span>
           </button>
           {/* Change reaction button when already reacted */}

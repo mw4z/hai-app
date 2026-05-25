@@ -691,7 +691,7 @@ export default function FeedClient({
 
       {/* Inner scroll container — only this bounces. Header + highlights
           above stay glued to the top. */}
-      <div className="hai-app-shell__scroll pb-24">
+      <div className="hai-app-shell__scroll" style={{ paddingBottom: 'calc(7rem + var(--hai-safe-bottom, 0px))' }}>
       {/* Pull-to-refresh portal target — first child so the indicator
           appears at the top of the scrolling list. */}
       <div id="hai-pull-target" />

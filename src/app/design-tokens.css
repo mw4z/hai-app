@@ -2588,6 +2588,14 @@ textarea.hai-input {
   padding-top: var(--hai-space-2);
   border-top: 1px solid var(--hai-border-soft);
 }
+/* The .hai-justify-between utility (defined earlier in the sheet) loses to
+   .hai-action-bar's `space-around` on source order. Re-assert it at higher
+   specificity so a bar that opts into space-between actually gets it —
+   otherwise a lone wrapped reaction item is CENTERED (space-around) instead
+   of sitting at the start of its line. */
+.hai-action-bar.hai-justify-between {
+  justify-content: space-between;
+}
 /* Direct children of the action bar must allow themselves to shrink
    below their content's intrinsic min-width — same flex-1 / min-w-0
    trick used to keep the chat composer send button on screen. */
