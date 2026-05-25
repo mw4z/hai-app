@@ -9,11 +9,13 @@ import { logModAction } from '@/lib/modAudit'
 
 export const dynamic = 'force-dynamic'
 
-async function gate(userId: string, contactNeighborhoodId: string) {
+async function gate(userId: string, contact: { neighborhoodId: string; ownerUserId: string | null }) {
+  // The listing's own owner can edit/remove it (provider self-manage / opt-out).
+  if (contact.ownerUserId && contact.ownerUserId === userId) return true
   const mod = await db.user.findUnique({ where: { id: userId }, select: { role: true, neighborhoodId: true } })
   if (!mod || !isDirectoryModerator(mod.role)) return false
   // NEIGHBORHOOD_MOD is scoped to their own hood; PLATFORM_MOD / SUPER_ADMIN are global.
-  if (mod.role === 'NEIGHBORHOOD_MOD') return mod.neighborhoodId === contactNeighborhoodId
+  if (mod.role === 'NEIGHBORHOOD_MOD') return mod.neighborhoodId === contact.neighborhoodId
   return true
 }
 
@@ -24,10 +26,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const contact = await db.directoryServiceContact.findUnique({
     where: { id: params.id },
-    select: { id: true, neighborhoodId: true },
+    select: { id: true, neighborhoodId: true, serviceIdentity: { select: { ownerUserId: true } } },
   })
   if (!contact) return NextResponse.json({ error: 'not_found' }, { status: 404 })
-  if (!(await gate(session.userId, contact.neighborhoodId))) {
+  if (!(await gate(session.userId, { neighborhoodId: contact.neighborhoodId, ownerUserId: contact.serviceIdentity.ownerUserId }))) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
 
@@ -82,10 +84,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   const contact = await db.directoryServiceContact.findUnique({
     where: { id: params.id },
-    select: { id: true, neighborhoodId: true },
+    select: { id: true, neighborhoodId: true, serviceIdentity: { select: { ownerUserId: true } } },
   })
   if (!contact) return NextResponse.json({ error: 'not_found' }, { status: 404 })
-  if (!(await gate(session.userId, contact.neighborhoodId))) {
+  if (!(await gate(session.userId, { neighborhoodId: contact.neighborhoodId, ownerUserId: contact.serviceIdentity.ownerUserId }))) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
 

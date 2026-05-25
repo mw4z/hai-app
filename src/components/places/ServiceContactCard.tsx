@@ -57,6 +57,8 @@ export default function ServiceContactCard({
   const catLabel = lang === 'en' ? cat.labelEn : lang === 'ur' ? cat.labelUr : cat.labelAr
   const trust = TRUST[contact.trust]
   const canDM = !!contact.messageableUserId && contact.messageableUserId !== currentUserId
+  const isOwner = !!contact.messageableUserId && contact.messageableUserId === currentUserId
+  const canManage = canModerate || isOwner // mods + the listing's own owner
 
   async function report(reason: string) {
     setReporting(false)
@@ -191,8 +193,8 @@ export default function ServiceContactCard({
         )}
       </div>
 
-      {/* Mod/admin controls */}
-      {canModerate && !editing && (
+      {/* Mod/admin + owner controls (edit / remove) */}
+      {canManage && !editing && (
         <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700/60">
           <button type="button" onClick={() => setEditing(true)} disabled={busy} className="flex items-center gap-1 text-[12px] font-medium text-gray-500 dark:text-gray-400 active:opacity-70">
             <FiEdit2 className="w-3.5 h-3.5" /> {tr('Edit', 'تعديل', 'ترمیم')}

@@ -4,6 +4,7 @@ import { getValidatedSession as getSession } from '@/lib/auth-server'
 import { log } from '@/lib/logger'
 import { computeProviderStatus } from '@/lib/provider'
 import { sanitizeSocialLinks } from '@/lib/socialLinks'
+import { ensureProviderListing } from '@/lib/services/ensureProviderListing'
 
 export async function GET() {
   try {
@@ -174,6 +175,12 @@ export async function PATCH(req: NextRequest) {
         bio: true,
       },
     })
+
+    // Auto-list active/verified providers in the neighborhood directory
+    // (idempotent; category guessed from their description). Fire-and-forget.
+    if (updated.providerStatus === 'ACTIVE' || updated.providerStatus === 'VERIFIED') {
+      void ensureProviderListing(session.userId)
+    }
 
     return NextResponse.json({ success: true, user: updated })
   } catch (error) {

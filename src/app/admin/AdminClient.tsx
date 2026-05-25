@@ -853,6 +853,34 @@ export default function AdminClient({
               </p>
             </div>
 
+            {/* One-time backfill: auto-list existing providers in the directory */}
+            <div className="bg-white rounded-xl p-4 border border-gray-100">
+              <p className="text-sm font-bold text-gray-800 mb-1">
+                {lang === 'en' ? '📇 Directory: backfill provider listings' : '📇 الدليل: إدراج مزودي الخدمة'}
+              </p>
+              <p className="text-[11px] text-gray-500 leading-relaxed mb-3">
+                {lang === 'en'
+                  ? "Create a directory listing for every active provider who doesn't have one yet (category guessed from their bio). Safe to re-run."
+                  : 'إنشاء إدراج في الدليل لكل مزود خدمة نشط لا يملك إدراجاً (الفئة تُستنتج من نبذته). آمن للتكرار.'}
+              </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  const tid = toast.loading(lang === 'en' ? 'Backfilling…' : 'جارٍ الإدراج…')
+                  try {
+                    const r = await fetch('/api/admin/backfill-provider-listings', { method: 'POST' })
+                    const d = await r.json()
+                    toast.dismiss(tid)
+                    if (r.ok) toast.success(lang === 'en' ? `Done — ${d.created} created, ${d.skipped} skipped` : `تم — ${d.created} جديد، ${d.skipped} موجود`)
+                    else toast.error(d.error || 'Error')
+                  } catch { toast.dismiss(tid); toast.error(lang === 'en' ? 'Failed' : 'فشل') }
+                }}
+                className="w-full py-2.5 bg-primary-600 text-white font-bold text-xs rounded-lg active:scale-95"
+              >
+                {lang === 'en' ? 'Backfill provider listings' : 'إدراج جميع مزودي الخدمة'}
+              </button>
+            </div>
+
             {/* Global stats */}
             {seedLoading && !seedStats ? (
               <div className="py-8"><HaiLoader size="md" /></div>

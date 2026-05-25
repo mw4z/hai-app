@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getValidatedSession as getSession } from '@/lib/auth-server'
 import { log } from '@/lib/logger'
 import { computeProviderStatus, isValidCoord, providerCooldownRemainingMs } from '@/lib/provider'
+import { ensureProviderListing } from '@/lib/services/ensureProviderListing'
 
 /**
  * POST /api/provider/apply
@@ -115,6 +116,10 @@ export async function POST(req: NextRequest) {
     })
 
     log.api('POST', '/api/provider/apply', session.userId)
+    // Auto-list newly active/verified providers in the directory (idempotent).
+    if (updated.providerStatus === 'ACTIVE' || updated.providerStatus === 'VERIFIED') {
+      void ensureProviderListing(session.userId)
+    }
     return NextResponse.json({ success: true, user: updated })
   } catch (error) {
     log.error('Handler failed', error, { route: '/api/provider/apply POST' })
