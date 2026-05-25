@@ -21,6 +21,13 @@ export interface PublicServiceContact {
   ratingAvg: number
   ratingCount: number
   trust: ServiceTrust
+  /**
+   * The registered user who EXPLICITLY owns this number (ownerUserId) — set
+   * only via self-add or an accepted claim, so exposing it is consented and
+   * lets the card offer an in-app DM. NEVER sourced from linkedUserId (the
+   * privacy marker that merely means "a number matched some app user").
+   */
+  messageableUserId: string | null
 }
 
 type ContactRow = {
@@ -34,13 +41,13 @@ type ContactRow = {
   ratingAvg: number
   ratingCount: number
   verification: string
-  serviceIdentity: { phoneEnc: string }
+  serviceIdentity: { phoneEnc: string; ownerUserId?: string | null }
 }
 
 /**
- * Public shape — deliberately omits createdByUserId, notes, status,
- * source, and EVERYTHING on serviceIdentity except the (decrypted) phone.
- * linkedUserId / ownerUserId are never read here, so a matched normal
+ * Public shape — deliberately omits createdByUserId, notes, status, source,
+ * and everything on serviceIdentity except the (decrypted) phone and the
+ * consented ownerUserId. linkedUserId is never read here, so a matched normal
  * user's identity can't leak through the listing.
  */
 export function toPublicServiceContact(c: ContactRow): PublicServiceContact {
@@ -56,5 +63,6 @@ export function toPublicServiceContact(c: ContactRow): PublicServiceContact {
     ratingAvg: c.ratingAvg,
     ratingCount: c.ratingCount,
     trust: serviceTrustBadge(c.verification),
+    messageableUserId: c.serviceIdentity.ownerUserId ?? null,
   }
 }

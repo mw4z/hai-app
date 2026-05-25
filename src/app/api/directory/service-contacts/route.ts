@@ -64,12 +64,20 @@ export async function GET(req: NextRequest) {
     },
     orderBy: [{ verification: 'desc' }, { ratingAvg: 'desc' }, { createdAt: 'desc' }],
     take: q ? PAGE_SIZE * 6 : PAGE_SIZE,
-    include: { serviceIdentity: { select: { phoneEnc: true } } },
+    include: { serviceIdentity: { select: { phoneEnc: true, ownerUserId: true } } },
   })
 
   let working = rows
   if (q) working = working.filter((c) => matchesArabic(c.displayName, q) || matchesArabic(c.serviceArea, q))
-  return NextResponse.json({ contacts: working.slice(0, PAGE_SIZE).map(toPublicServiceContact) })
+  // canModerate mirrors the [id] route gate: any directory moderator, but a
+  // NEIGHBORHOOD_MOD only in their own hood (not while browsing another).
+  const canModerate = isDirectoryModerator(user.role) &&
+    (user.role !== 'NEIGHBORHOOD_MOD' || targetNeighborhoodId === user.neighborhoodId)
+  return NextResponse.json({
+    contacts: working.slice(0, PAGE_SIZE).map(toPublicServiceContact),
+    viewerId: session.userId,
+    canModerate,
+  })
 }
 
 /**
@@ -160,11 +168,17 @@ export async function POST(req: NextRequest) {
       })
     : null
   const isProvider = !!matchedUser && (matchedUser.providerStatus === 'ACTIVE' || matchedUser.providerStatus === 'VERIFIED')
+  // The submitter adding their OWN number is the phone owner — never treat
+  // that as "already a provider in the directory" (MATCHED_PROVIDER blocks it)
+  // nor park it for review (GENERIC_PENDING_MATCH notifies them about their
+  // own number). It becomes a self-owned ACTIVE listing below. Fixes the bug
+  // where a service provider got "already added" while having no listing.
+  const isSelf = !!matchedUser && matchedUser.id === user.id
 
   const resolution = resolveServiceContact({
-    providerUserId: isProvider ? matchedUser!.id : null,
+    providerUserId: (isProvider && !isSelf) ? matchedUser!.id : null,
     existingContactId: existingContact?.id ?? null,
-    linkedUserId: matchedUser && !isProvider ? matchedUser.id : null,
+    linkedUserId: (matchedUser && !isProvider && !isSelf) ? matchedUser.id : null,
   })
   const resp = resolutionResponse(resolution)
 
@@ -183,9 +197,14 @@ export async function POST(req: NextRequest) {
     create: {
       phoneHash: hash,
       phoneEnc: encryptPhone(e164),
+      // Self-add → record explicit ownership (ownerUserId) so the listing is
+      // owned + DM-able. Generic match → linkedUserId (internal marker only).
+      ...(isSelf ? { ownerUserId: user.id, linkedUserId: user.id } : {}),
       ...(resolution.kind === 'GENERIC_PENDING_MATCH' ? { linkedUserId: resolution.linkedUserId } : {}),
     },
-    update: resolution.kind === 'GENERIC_PENDING_MATCH' ? { linkedUserId: resolution.linkedUserId } : {},
+    update: isSelf
+      ? { ownerUserId: user.id, linkedUserId: user.id }
+      : (resolution.kind === 'GENERIC_PENDING_MATCH' ? { linkedUserId: resolution.linkedUserId } : {}),
     select: { id: true },
   })
 
@@ -201,15 +220,17 @@ export async function POST(req: NextRequest) {
         whatsapp,
         serviceArea,
         notes,
-        source: 'COMMUNITY_ADDED',
-        verification: pendingMatch ? 'PENDING_OWNER_CONFIRMATION' : 'UNVERIFIED',
-        // Matched-user contacts are NOT public until the owner confirms.
+        source: isSelf ? 'OWNER_SUBMITTED' : 'COMMUNITY_ADDED',
+        // Self-add: VERIFIED if the owner is an active/verified provider, else
+        // CLAIMED (owned). Matched-user (not self) contacts stay non-public
+        // until the owner confirms.
+        verification: isSelf ? (isProvider ? 'VERIFIED' : 'CLAIMED') : (pendingMatch ? 'PENDING_OWNER_CONFIRMATION' : 'UNVERIFIED'),
         status: pendingMatch ? 'PENDING_REVIEW' : 'ACTIVE',
         createdByUserId: user.id,
         sourcePostId,
         sourceCommentId,
       },
-      include: { serviceIdentity: { select: { phoneEnc: true } } },
+      include: { serviceIdentity: { select: { phoneEnc: true, ownerUserId: true } } },
     })
 
     // Prompt the matched user privately to claim/confirm. Best-effort;

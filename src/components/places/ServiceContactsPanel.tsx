@@ -26,6 +26,8 @@ export default function ServiceContactsPanel({
   const [q, setQ] = useState('')
   const [category, setCategory] = useState<ServiceCategory | null>(null)
   const [contacts, setContacts] = useState<PublicServiceContact[]>([])
+  const [viewerId, setViewerId] = useState<string | null>(null)
+  const [canModerate, setCanModerate] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -37,7 +39,12 @@ export default function ServiceContactsPanel({
     if (isReadOnly && browseNeighborhoodId) params.set('neighborhood', browseNeighborhoodId)
     fetch(`/api/directory/service-contacts?${params.toString()}`)
       .then((r) => r.json())
-      .then((d) => { if (!aborted) setContacts(Array.isArray(d.contacts) ? d.contacts : []) })
+      .then((d) => {
+        if (aborted) return
+        setContacts(Array.isArray(d.contacts) ? d.contacts : [])
+        setViewerId(d.viewerId ?? null)
+        setCanModerate(!!d.canModerate)
+      })
       .catch(() => {})
       .finally(() => { if (!aborted) setLoading(false) })
     return () => { aborted = true }
@@ -100,7 +107,16 @@ export default function ServiceContactsPanel({
         </div>
       ) : (
         <div className="space-y-2.5" style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 2rem)' }}>
-          {contacts.map((c) => <ServiceContactCard key={c.id} contact={c} />)}
+          {contacts.map((c) => (
+            <ServiceContactCard
+              key={c.id}
+              contact={c}
+              currentUserId={viewerId}
+              canModerate={canModerate}
+              onRemoved={(id) => setContacts((prev) => prev.filter((x) => x.id !== id))}
+              onUpdated={(u) => setContacts((prev) => prev.map((x) => (x.id === u.id ? u : x)))}
+            />
+          ))}
         </div>
       )}
     </div>

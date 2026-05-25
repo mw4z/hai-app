@@ -1,11 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiPhone, FiFlag, FiStar } from 'react-icons/fi'
+import { FiPhone, FiFlag, FiStar, FiMessageCircle, FiEdit2, FiTrash2 } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useConfirm } from '@/components/ConfirmProvider'
 import { callPhone, openWhatsApp } from '@/lib/openExternal'
-import { getServiceCategoryMeta } from '@/lib/services/serviceCategories'
+import { getServiceCategoryMeta, SERVICE_CATEGORIES } from '@/lib/services/serviceCategories'
 import { SERVICE_REPORT_REASONS } from '@/lib/services/serviceContactSafety'
 import type { PublicServiceContact } from '@/lib/services/serializeServiceContact'
 
@@ -23,15 +25,38 @@ const TRUST: Record<PublicServiceContact['trust'], { ar: string; en: string; cls
   COMMUNITY_UNVERIFIED:{ ar: 'مضاف من السكان · غير موثق', en: 'Community · unverified', cls: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300' },
 }
 
-export default function ServiceContactCard({ contact }: { contact: PublicServiceContact }) {
+export default function ServiceContactCard({
+  contact,
+  currentUserId = null,
+  canModerate = false,
+  onRemoved,
+  onUpdated,
+}: {
+  contact: PublicServiceContact
+  currentUserId?: string | null
+  canModerate?: boolean
+  onRemoved?: (id: string) => void
+  onUpdated?: (c: PublicServiceContact) => void
+}) {
   const { lang } = useLanguage()
+  const router = useRouter()
+  const confirmDialog = useConfirm()
   const tr = (en: string, ar: string, ur: string) => (lang === 'en' ? en : lang === 'ur' ? ur : ar)
   const [reporting, setReporting] = useState(false)
   const [reported, setReported] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [busy, setBusy] = useState(false)
+  // Edit-form fields
+  const [fName, setFName] = useState(contact.displayName)
+  const [fDesc, setFDesc] = useState(contact.description || '')
+  const [fArea, setFArea] = useState(contact.serviceArea || '')
+  const [fCat, setFCat] = useState(contact.category)
+  const [fWa, setFWa] = useState(contact.whatsapp)
 
   const cat = getServiceCategoryMeta(contact.category as any)
   const catLabel = lang === 'en' ? cat.labelEn : lang === 'ur' ? cat.labelUr : cat.labelAr
   const trust = TRUST[contact.trust]
+  const canDM = !!contact.messageableUserId && contact.messageableUserId !== currentUserId
 
   async function report(reason: string) {
     setReporting(false)
@@ -44,6 +69,57 @@ export default function ServiceContactCard({ contact }: { contact: PublicService
       if (res.ok) { setReported(true); toast.success(tr('Reported — thanks', 'تم الإبلاغ، شكراً', 'رپورٹ ہو گئی')) }
       else { const d = await res.json().catch(() => ({})); toast.error(d?.error || tr('Failed', 'فشل', 'ناکام')) }
     } catch { toast.error(tr('Connection error', 'خطأ بالاتصال', 'کنکشن خرابی')) }
+  }
+
+  async function startDM() {
+    if (!contact.messageableUserId) return
+    try {
+      const res = await fetch('/api/threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: contact.messageableUserId }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.threadId) { router.push(`/threads/${d.threadId}`); return }
+      toast.error(d.message || d.error || tr('Could not start chat', 'تعذّر بدء المحادثة', 'چیٹ شروع نہیں ہو سکی'))
+    } catch { toast.error(tr('Connection error', 'خطأ بالاتصال', 'کنکشن خرابی')) }
+  }
+
+  async function saveEdit() {
+    if (fName.trim().length < 2) { toast.error(tr('Name required', 'الاسم مطلوب', 'نام درکار')); return }
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/directory/service-contacts/${contact.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: fName.trim(), description: fDesc.trim(), serviceArea: fArea.trim(), category: fCat, whatsapp: fWa }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.contact) {
+        onUpdated?.(d.contact)
+        setEditing(false)
+        toast.success(tr('Saved', 'تم الحفظ', 'محفوظ ہو گیا'))
+      } else {
+        toast.error(d.error || tr('Failed', 'فشل', 'ناکام'))
+      }
+    } catch { toast.error(tr('Connection error', 'خطأ بالاتصال', 'کنکشن خرابی')) }
+    finally { setBusy(false) }
+  }
+
+  async function remove() {
+    const ok = await confirmDialog({
+      message: tr('Remove this listing?', 'إزالة هذا الإدراج؟', 'یہ فہرست ہٹائیں؟'),
+      variant: 'danger',
+      confirmText: tr('Remove', 'إزالة', 'ہٹائیں'),
+    })
+    if (!ok) return
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/directory/service-contacts/${contact.id}`, { method: 'DELETE' })
+      if (res.ok) { onRemoved?.(contact.id); toast.success(tr('Removed', 'تمت الإزالة', 'ہٹا دیا')) }
+      else { toast.error(tr('Failed', 'فشل', 'ناکام')) }
+    } catch { toast.error(tr('Connection error', 'خطأ بالاتصال', 'کنکشن خرابی')) }
+    finally { setBusy(false) }
   }
 
   return (
@@ -83,7 +159,18 @@ export default function ServiceContactCard({ contact }: { contact: PublicService
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 mt-3">
+      {/* In-app DM — only when the number's owner is a registered user (and not you) */}
+      {canDM && (
+        <button
+          type="button"
+          onClick={startDM}
+          className="w-full mt-3 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 text-[13px] font-bold active:scale-[0.97] transition-transform"
+        >
+          <FiMessageCircle className="w-4 h-4" /> {tr('Message in app', 'مراسلة داخل التطبيق', 'ایپ میں پیغام')}
+        </button>
+      )}
+
+      <div className="grid grid-cols-2 gap-2 mt-2">
         <button
           type="button"
           onClick={() => callPhone(contact.phone)}
@@ -103,6 +190,50 @@ export default function ServiceContactCard({ contact }: { contact: PublicService
           <span className="flex items-center justify-center py-2 rounded-xl bg-gray-50 dark:bg-gray-900/40 text-gray-400 text-[12px]" dir="ltr">{contact.phone}</span>
         )}
       </div>
+
+      {/* Mod/admin controls */}
+      {canModerate && !editing && (
+        <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700/60">
+          <button type="button" onClick={() => setEditing(true)} disabled={busy} className="flex items-center gap-1 text-[12px] font-medium text-gray-500 dark:text-gray-400 active:opacity-70">
+            <FiEdit2 className="w-3.5 h-3.5" /> {tr('Edit', 'تعديل', 'ترمیم')}
+          </button>
+          <button type="button" onClick={remove} disabled={busy} className="flex items-center gap-1 text-[12px] font-medium text-red-500 active:opacity-70">
+            <FiTrash2 className="w-3.5 h-3.5" /> {tr('Remove', 'إزالة', 'ہٹائیں')}
+          </button>
+        </div>
+      )}
+
+      {/* Inline edit form (mod/admin) */}
+      {editing && (
+        <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700/60 space-y-2">
+          <input value={fName} onChange={(e) => setFName(e.target.value)} maxLength={80}
+            placeholder={tr('Name', 'الاسم', 'نام')}
+            className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 text-sm" />
+          <select value={fCat} onChange={(e) => setFCat(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 text-sm">
+            {SERVICE_CATEGORIES.map((c) => (
+              <option key={c.key} value={c.key}>{c.emoji} {lang === 'en' ? c.labelEn : lang === 'ur' ? c.labelUr : c.labelAr}</option>
+            ))}
+          </select>
+          <input value={fArea} onChange={(e) => setFArea(e.target.value)} maxLength={120}
+            placeholder={tr('Service area (optional)', 'نطاق الخدمة (اختياري)', 'علاقہ (اختیاری)')}
+            className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 text-sm" />
+          <textarea value={fDesc} onChange={(e) => setFDesc(e.target.value)} maxLength={280} rows={2}
+            placeholder={tr('Description (optional)', 'الوصف (اختياري)', 'تفصیل (اختیاری)')}
+            className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 text-sm resize-none" />
+          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 px-1">
+            <input type="checkbox" checked={fWa} onChange={(e) => setFWa(e.target.checked)} /> {tr('WhatsApp available', 'متاح على واتساب', 'واٹس ایپ دستیاب')}
+          </label>
+          <div className="flex gap-2">
+            <button type="button" onClick={saveEdit} disabled={busy} className="flex-1 py-2 rounded-xl bg-primary-600 text-white text-[13px] font-bold active:scale-95 disabled:opacity-50">
+              {tr('Save', 'حفظ', 'محفوظ')}
+            </button>
+            <button type="button" onClick={() => setEditing(false)} disabled={busy} className="flex-1 py-2 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-[13px] font-bold active:scale-95">
+              {tr('Cancel', 'إلغاء', 'منسوخ')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {reporting && !reported && (
         <div className="mt-2 rounded-xl border border-gray-200 dark:border-gray-700 p-2 space-y-1">
