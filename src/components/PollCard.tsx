@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useConfirm } from './ConfirmProvider'
 import { hapticLight, hapticMedium, hapticSuccess } from '@/lib/haptic'
-import { FiMessageCircle, FiSend, FiTrash2, FiX, FiEye, FiBell, FiHeart, FiCornerDownRight, FiSmile, FiImage } from 'react-icons/fi'
+import { FiMessageCircle, FiSend, FiTrash2, FiX, FiEye, FiBell, FiHeart, FiCornerDownRight, FiSmile, FiImage, FiEdit2, FiPlus } from 'react-icons/fi'
 import { fullName } from '@/lib/displayName'
 import SmartTextWithPlacePreviews from './SmartTextWithPlacePreviews'
 import UserBadgeDisplay from './UserBadge'
@@ -57,6 +57,13 @@ export default function PollCard({ poll, currentUserId, isSuperAdmin = false, is
   const { t, lang } = useLanguage()
   const confirmDialog = useConfirm()
   const [repushing, setRepushing] = useState(false)
+  // Editable question/options (author/super-admin can modify the poll).
+  const [pollQuestion, setPollQuestion] = useState(poll.question)
+  const [pollOptions, setPollOptions] = useState<string[]>(poll.options)
+  const [editingPoll, setEditingPoll] = useState(false)
+  const [editQ, setEditQ] = useState('')
+  const [editOpts, setEditOpts] = useState<string[]>([])
+  const [savingPoll, setSavingPoll] = useState(false)
   const voteSignature = JSON.stringify(poll.votes.map(v => `${v.userId}:${v.optionIndex}`).sort())
   const [votes, setVotes] = useState(poll.votes)
   const [totalVotes, setTotalVotes] = useState(poll._count.votes)
@@ -148,7 +155,8 @@ export default function PollCard({ poll, currentUserId, isSuperAdmin = false, is
   const hasVoted = !!myVote
   const isClosed = poll.status === 'closed' || !!(poll.expiresAt && new Date(poll.expiresAt) < new Date())
   const isAuthor = poll.authorId === currentUserId
-  const voteCounts = poll.options.map((_, i) => votes.filter(v => v.optionIndex === i).length)
+  const voteCounts = pollOptions.map((_, i) => votes.filter(v => v.optionIndex === i).length)
+  const canEditPoll = isAuthor || isSuperAdmin
 
   async function vote(i: number) {
     if (voting || isClosed) return
@@ -353,6 +361,40 @@ export default function PollCard({ poll, currentUserId, isSuperAdmin = false, is
     if (res.ok) { toast.success(lang === 'en' ? 'Deleted' : lang === 'ur' ? 'حذف ہو گیا' : 'تم الحذف'); onDelete?.() }
   }
 
+  function openPollEdit() {
+    setEditQ(pollQuestion)
+    setEditOpts([...pollOptions])
+    setEditingPoll(true)
+  }
+
+  async function savePoll() {
+    const q = editQ.trim()
+    const opts = editOpts.map((o) => o.trim()).filter(Boolean)
+    if (q.length < 5) { toast.error(lang === 'en' ? 'Question too short' : 'السؤال قصير جداً'); return }
+    if (opts.length < 2) { toast.error(lang === 'en' ? 'Need at least 2 options' : 'خياران على الأقل'); return }
+    setSavingPoll(true)
+    try {
+      const res = await fetch(`/api/polls/${poll.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q, options: opts }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.poll) {
+        setPollQuestion(d.poll.question)
+        setPollOptions(d.poll.options)
+        setEditingPoll(false)
+        toast.success(lang === 'en' ? 'Saved' : 'تم الحفظ')
+      } else {
+        toast.error(d.error || (lang === 'en' ? 'Failed' : 'تعذّر الحفظ'))
+      }
+    } catch {
+      toast.error(lang === 'en' ? 'Connection error' : 'خطأ في الاتصال')
+    } finally {
+      setSavingPoll(false)
+    }
+  }
+
   async function repush() {
     if (repushing) return
     const ok = await confirmDialog({
@@ -533,39 +575,88 @@ export default function PollCard({ poll, currentUserId, isSuperAdmin = false, is
             <FiBell className="w-3.5 h-3.5" />
           </button>
         )}
+        {canEditPoll && !editingPoll && (
+          <button onClick={openPollEdit} title={lang === 'en' ? 'Edit poll' : 'تعديل التصويت'} className="text-gray-300 hover:text-primary-500 p-1">
+            <FiEdit2 className="w-3.5 h-3.5" />
+          </button>
+        )}
         {isAuthor && (
           <button onClick={deletePoll} className="text-gray-300 hover:text-red-400 p-1"><FiTrash2 className="w-3.5 h-3.5" /></button>
         )}
       </div>
 
-      {/* Question */}
-      <h3 className="font-bold text-gray-900 dark:text-white text-sm mb-3">{poll.question}</h3>
-
-      {/* Options with animated bars */}
-      <div className="space-y-2">
-        {poll.options.map((option, i) => {
-          const count = voteCounts[i]
-          const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0
-          const isMyVote = myVote?.optionIndex === i
-          const showResults = hasVoted || isClosed
-          return (
-            <button key={i} onClick={() => !isClosed && vote(i)} disabled={voting || isClosed}
-              className={`w-full text-start rounded-xl overflow-hidden relative active:scale-[0.99] ${isMyVote ? 'border-2 border-primary-500' : 'border border-gray-200 dark:border-gray-600'}`}>
-              {showResults && (
-                <div className={`absolute inset-y-0 rounded-lg ${isMyVote ? 'bg-green-500/30' : 'bg-blue-500/25'}`}
-                  style={{ width: animated ? `${pct}%` : '0%', transition: 'width 0.8s cubic-bezier(0.25, 1, 0.5, 1)', right: 0 }} />
+      {editingPoll ? (
+        /* Edit form (author / super-admin) */
+        <div className="space-y-2 mb-2">
+          <input
+            value={editQ}
+            onChange={(e) => setEditQ(e.target.value)}
+            maxLength={200}
+            placeholder={lang === 'en' ? 'Question' : 'السؤال'}
+            className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 text-sm font-bold"
+          />
+          {editOpts.map((opt, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                value={opt}
+                onChange={(e) => setEditOpts((prev) => prev.map((o, j) => (j === i ? e.target.value : o)))}
+                maxLength={80}
+                placeholder={`${lang === 'en' ? 'Option' : 'خيار'} ${i + 1}`}
+                className="flex-1 px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 text-sm"
+              />
+              {totalVotes === 0 && editOpts.length > 2 && (
+                <button type="button" onClick={() => setEditOpts((prev) => prev.filter((_, j) => j !== i))} className="text-red-400 p-1 flex-shrink-0">
+                  <FiX className="w-4 h-4" />
+                </button>
               )}
-              <div className="relative flex items-center justify-between px-3 py-2.5">
-                <div className="flex items-center gap-2">
-                  {isMyVote && <span className="text-primary-600 text-xs font-bold">✓</span>}
-                  <span className={`text-sm ${isMyVote ? 'font-bold text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300'}`}>{option}</span>
-                </div>
-                {showResults && <span className={`text-xs font-semibold ${isMyVote ? 'text-primary-600' : 'text-gray-400'}`}>{pct}%</span>}
-              </div>
+            </div>
+          ))}
+          {totalVotes === 0 && editOpts.length < 6 && (
+            <button type="button" onClick={() => setEditOpts((prev) => [...prev, ''])} className="text-xs text-primary-600 dark:text-primary-400 font-medium flex items-center gap-1">
+              <FiPlus className="w-3.5 h-3.5" /> {lang === 'en' ? 'Add option' : 'إضافة خيار'}
             </button>
-          )
-        })}
-      </div>
+          )}
+          {totalVotes > 0 && (
+            <p className="text-[10px] text-gray-400">{lang === 'en' ? 'Voting started — you can edit option text only.' : 'بدأ التصويت — يمكنك تعديل نص الخيارات فقط.'}</p>
+          )}
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={savePoll} disabled={savingPoll} className="flex-1 py-2 rounded-xl bg-primary-600 text-white text-sm font-bold active:scale-95 disabled:opacity-50">
+              {lang === 'en' ? 'Save' : 'حفظ'}
+            </button>
+            <button type="button" onClick={() => setEditingPoll(false)} className="flex-1 py-2 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-bold active:scale-95">
+              {lang === 'en' ? 'Cancel' : 'إلغاء'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Question */}
+          <h3 className="font-bold text-gray-900 dark:text-white text-sm mb-3">{pollQuestion}</h3>
+
+          {/* Options with animated bars — results visible to everyone */}
+          <div className="space-y-2">
+            {pollOptions.map((option, i) => {
+              const count = voteCounts[i]
+              const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0
+              const isMyVote = myVote?.optionIndex === i
+              return (
+                <button key={i} onClick={() => !isClosed && vote(i)} disabled={voting || isClosed}
+                  className={`w-full text-start rounded-xl overflow-hidden relative active:scale-[0.99] ${isMyVote ? 'border-2 border-primary-500' : 'border border-gray-200 dark:border-gray-600'}`}>
+                  <div className={`absolute inset-y-0 rounded-lg ${isMyVote ? 'bg-green-500/30' : 'bg-blue-500/25'}`}
+                    style={{ width: animated ? `${pct}%` : '0%', transition: 'width 0.8s cubic-bezier(0.25, 1, 0.5, 1)', right: 0 }} />
+                  <div className="relative flex items-center justify-between px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      {isMyVote && <span className="text-primary-600 text-xs font-bold">✓</span>}
+                      <span className={`text-sm ${isMyVote ? 'font-bold text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300'}`}>{option}</span>
+                    </div>
+                    <span className={`text-xs font-semibold ${isMyVote ? 'text-primary-600' : 'text-gray-400'}`}>{pct}%</span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
 
       {/* Footer: vote count + view count + expiry */}
       <div className="flex items-center justify-between mt-3 mb-2">
