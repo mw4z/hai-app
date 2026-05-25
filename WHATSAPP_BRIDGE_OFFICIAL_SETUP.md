@@ -45,6 +45,31 @@ model + statuses already exist on prod).
 7. For the test number, add the recipient numbers you'll test with to the
    allowed list in API Setup (Meta requires this until the number is live).
 
+### 1b. Coexistence — using an existing WhatsApp Business *app* number
+
+If the bot number is already running in the **WhatsApp Business app** (e.g. the
+real +966 number) and you want to keep using that app, use **Coexistence** —
+the number runs in the app AND on the Cloud API at the same time. Only the
+*number attachment* differs from above; the token/app-secret/webhook/envs are
+identical.
+
+1. Prereqs: you're an **admin** of that number in the WhatsApp Business app, the
+   app is **updated to the latest version**, and you have a **Meta Business
+   Portfolio**.
+2. developers.facebook.com → your Meta app → add the **WhatsApp** product.
+3. **WhatsApp Manager** (business.facebook.com/wa/manage) → **Phone numbers →
+   Add phone number** → choose **connect a number already on the WhatsApp
+   Business app**.
+4. It shows a **QR code** → on the phone, **WhatsApp Business app → Settings →
+   scan the Coexistence QR** to authorize. This links the number to the API
+   **without** removing it from the app (recent chats sync over).
+5. Then continue exactly as in steps 3–6 above (Phone Number ID, permanent
+   token, App Secret, webhook + verify token, subscribe to `messages`).
+
+> Meta's menu labels shift; if something looks different, follow Meta's
+> **"Coexistence"** doc under the WhatsApp Cloud API getting-started guide. The
+> concept is always: connect existing Business-app number → scan QR in the app.
+
 ---
 
 ## 2. Vercel environment variables
