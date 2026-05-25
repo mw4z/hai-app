@@ -88,6 +88,7 @@ model User {
   neighborhoodId   String?
   posts            Post[]
   postViews        PostView[]
+  pollComments     PollComment[]
   reports          Report[]      @relation("reporter")
   reportedPosts    Report[]      @relation("reportedUser")
   userReportsSent     UserReport[] @relation("userReporter")
@@ -1049,14 +1050,33 @@ model PollVote {
 }
 
 model PollComment {
-  id        String   @id @default(cuid())
+  id        String            @id @default(cuid())
   pollId    String
-  poll      Poll     @relation(fields: [pollId], references: [id])
+  poll      Poll              @relation(fields: [pollId], references: [id])
   authorId  String
+  author    User              @relation(fields: [authorId], references: [id])
   body      String
-  createdAt DateTime @default(now())
+  imageUrl  String?           // image URL OR sticker ref (sticker:<id>)
+  parent    PollComment?      @relation("PollCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  parentId  String?
+  replies   PollComment[]     @relation("PollCommentReplies")
+  likes     PollCommentLike[]
+  createdAt DateTime          @default(now())
+  editedAt  DateTime?
 
   @@index([pollId, createdAt])
+  @@index([parentId])
+}
+
+model PollCommentLike {
+  id            String      @id @default(cuid())
+  comment       PollComment @relation(fields: [pollCommentId], references: [id], onDelete: Cascade)
+  pollCommentId String
+  userId        String
+  createdAt     DateTime    @default(now())
+
+  @@unique([pollCommentId, userId])
+  @@index([pollCommentId])
 }
 
 model PollReaction {
