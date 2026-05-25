@@ -1007,6 +1007,10 @@ model Poll {
   votes           PollVote[]
   comments        PollComment[]
   reactions       PollReaction[]
+  views           PollView[]
+  // Distinct-viewer count — bumped once per user on first view (one PollView
+  // row per user); re-views don't increment. Mirrors Post.viewCount.
+  viewCount       Int            @default(0)
   authorId        String
   author          User           @relation(fields: [authorId], references: [id])
   neighborhoodId  String
@@ -1016,6 +1020,20 @@ model Poll {
 
   @@index([neighborhoodId, status, createdAt])
   @@index([authorId])
+}
+
+// One row per (poll, user) who has viewed the poll — the dedup key for the
+// distinct-viewer count. Mirrors PostView. userId is a plain string (no User
+// relation), matching PollVote / PollReaction.
+model PollView {
+  id        String   @id @default(cuid())
+  pollId    String
+  poll      Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([pollId, userId])
+  @@index([pollId])
 }
 
 model PollVote {

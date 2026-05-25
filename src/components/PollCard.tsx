@@ -1,11 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useConfirm } from './ConfirmProvider'
 import { hapticLight, hapticMedium, hapticSuccess } from '@/lib/haptic'
-import { FiMessageCircle, FiSend, FiTrash2, FiX } from 'react-icons/fi'
+import { FiMessageCircle, FiSend, FiTrash2, FiX, FiEye } from 'react-icons/fi'
+
+// Per-session dedup of recorded views (the server also dedups across
+// sessions via the unique PollView row). Mirrors PostCard's reportedViews.
+const reportedPollViews = new Set<string>()
 import { fullName } from '@/lib/displayName'
 import SmartText from './SmartText'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
@@ -25,6 +29,7 @@ interface Props {
     author: { id: string; name: string; lastName?: string | null; avatarUrl: string | null; role: string }
     votes: { userId: string; optionIndex: number }[]
     reactions: { userId: string; emoji: string }[]
+    viewCount?: number
     _count: { votes: number; comments: number }
   }
   currentUserId: string
@@ -46,9 +51,51 @@ export default function PollCard({ poll, currentUserId, onDelete }: Props) {
   const [comments, setComments] = useState<any[]>([])
   const [newComment, setNewComment] = useState('')
   const [animated, setAnimated] = useState(false)
+  // Distinct-viewer count — seeded from the server, bumped after we record
+  // this user's view, then polled live while on screen. Mirrors PostCard.
+  const [viewCount, setViewCount] = useState<number>(poll.viewCount ?? 0)
+  const [cardVisible, setCardVisible] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { setVotes(poll.votes); setTotalVotes(poll._count.votes); setReactions(poll.reactions); setCommentCount(poll._count.comments) }, [voteSignature, poll._count.comments])
   useEffect(() => { setTimeout(() => setAnimated(true), 100) }, [])
+
+  // Record this user's view ONCE the first time the card is ≥50% visible.
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        const isVis = entries.some((e) => e.isIntersecting)
+        setCardVisible(isVis)
+        if (isVis && !reportedPollViews.has(poll.id)) {
+          reportedPollViews.add(poll.id)
+          fetch(`/api/polls/${poll.id}/view`, { method: 'POST' })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => { if (d && typeof d.viewCount === 'number') setViewCount(d.viewCount) })
+            .catch(() => {})
+        }
+      },
+      { threshold: 0.5 },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [poll.id])
+
+  // Live-ish count: re-fetch every 25s while on screen + tab visible.
+  useEffect(() => {
+    if (!cardVisible) return
+    let cancelled = false
+    const tick = () => {
+      if (typeof document !== 'undefined' && document.hidden) return
+      fetch(`/api/polls/${poll.id}/view`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => { if (!cancelled && d && typeof d.viewCount === 'number') setViewCount(d.viewCount) })
+        .catch(() => {})
+    }
+    const id = setInterval(tick, 25_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [cardVisible, poll.id])
 
   // Drag-to-dismiss + scroll lock + back-press parity with the post
   // comments sheet. Same hooks, same hai-sheet class skeleton — keeps
@@ -158,7 +205,7 @@ export default function PollCard({ poll, currentUserId, onDelete }: Props) {
   function timeAgo(d: string) { const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000); if (m < 1) return lang === 'en' ? 'now' : lang === 'ur' ? 'ابھی' : 'الآن'; if (m < 60) return `${m}${lang !== 'en' ? ' د' : 'm'}`; const h = Math.floor(m / 60); if (h < 24) return `${h}${lang !== 'en' ? ' س' : 'h'}`; return `${Math.floor(h / 24)}${lang !== 'en' ? ' ي' : 'd'}` }
 
   return (
-    <div className="card animate-fade-in-up">
+    <div ref={cardRef} className="card animate-fade-in-up">
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
         <div className="w-8 h-8 rounded-full bg-primary-100 overflow-hidden flex-shrink-0">
@@ -207,9 +254,17 @@ export default function PollCard({ poll, currentUserId, onDelete }: Props) {
         })}
       </div>
 
-      {/* Footer: vote count + expiry */}
+      {/* Footer: vote count + view count + expiry */}
       <div className="flex items-center justify-between mt-3 mb-2">
-        <span className="text-[11px] text-gray-400">{totalVotes} {t('poll_votes')}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] text-gray-400">{totalVotes} {t('poll_votes')}</span>
+          <span
+            className="flex items-center gap-1 text-[11px] text-gray-400"
+            title={lang === 'en' ? `${viewCount} views` : `${viewCount} مشاهدة`}
+          >
+            <FiEye className="w-3.5 h-3.5" />{viewCount}
+          </span>
+        </div>
         {isClosed && <span className="text-[10px] text-red-400 font-medium">{t('poll_closed')}</span>}
       </div>
 
