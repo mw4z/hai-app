@@ -2227,6 +2227,10 @@ enum ServiceCategory {
   CAR_SERVICE      // خدمة سيارات متنقلة
   TECH_REPAIR      // صيانة أجهزة
   HEALTH_HOME      // خدمات صحية منزلية
+  COURIER          // مندوب
+  RESTAURANT       // مطعم
+  REAL_ESTATE      // عقار
+  MISC_SUPPLIES    // مستلزمات متنوعة
   OTHER            // أخرى
 }
 

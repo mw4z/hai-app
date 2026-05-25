@@ -44,6 +44,7 @@ export default function ServiceContactCard({
   const tr = (en: string, ar: string, ur: string) => (lang === 'en' ? en : lang === 'ur' ? ur : ar)
   const [reporting, setReporting] = useState(false)
   const [reported, setReported] = useState(false)
+  const [descExpanded, setDescExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   // Edit-form fields
@@ -142,7 +143,20 @@ export default function ServiceContactCard({
             {contact.serviceArea ? <span> · {contact.serviceArea}</span> : null}
           </p>
           {contact.description ? (
-            <p className="text-[13px] text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">{contact.description}</p>
+            <>
+              <p className={`text-[13px] text-gray-600 dark:text-gray-300 mt-1 ${descExpanded ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>
+                {contact.description}
+              </p>
+              {contact.description.length > 90 && (
+                <button
+                  type="button"
+                  onClick={() => setDescExpanded((v) => !v)}
+                  className="text-[11px] text-primary-600 dark:text-primary-400 font-medium mt-0.5 active:opacity-70"
+                >
+                  {descExpanded ? tr('Show less', 'عرض أقل', 'کم دکھائیں') : tr('Show more', 'عرض المزيد', 'مزید دیکھیں')}
+                </button>
+              )}
+            </>
           ) : null}
           {contact.ratingCount > 0 ? (
             <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">

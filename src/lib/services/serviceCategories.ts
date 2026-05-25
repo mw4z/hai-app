@@ -24,6 +24,10 @@ export const SERVICE_CATEGORIES: ServiceCategoryMeta[] = [
   { key: 'CAR_SERVICE',  emoji: '🚗', labelAr: 'خدمة سيارات',      labelEn: 'Car service',    labelUr: 'گاڑی سروس' },
   { key: 'TECH_REPAIR',  emoji: '🛠️', labelAr: 'صيانة أجهزة',      labelEn: 'Device repair',  labelUr: 'آلات مرمت' },
   { key: 'HEALTH_HOME',  emoji: '🩺', labelAr: 'خدمات صحية منزلية', labelEn: 'Home health',   labelUr: 'گھریلو صحت' },
+  { key: 'COURIER',      emoji: '🛵', labelAr: 'مندوب',            labelEn: 'Courier',        labelUr: 'ڈلیوری' },
+  { key: 'RESTAURANT',   emoji: '🍽️', labelAr: 'مطعم',             labelEn: 'Restaurant',     labelUr: 'ریستوران' },
+  { key: 'REAL_ESTATE',  emoji: '🏢', labelAr: 'عقار',             labelEn: 'Real estate',    labelUr: 'پراپرٹی' },
+  { key: 'MISC_SUPPLIES',emoji: '🛒', labelAr: 'مستلزمات متنوعة',   labelEn: 'Misc supplies',  labelUr: 'متفرق سامان' },
   { key: 'OTHER',        emoji: '🔖', labelAr: 'أخرى',             labelEn: 'Other',          labelUr: 'دیگر' },
 ]
 

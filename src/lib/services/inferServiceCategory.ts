@@ -20,6 +20,10 @@ const KEYWORDS: Array<{ cat: ServiceCategory; words: string[] }> = [
   { cat: 'CAR_SERVICE', words: ['سيارات', 'سيارة', 'ميكانيكي', 'بنشر', 'كراج', 'ورشة سيار', 'car service', 'auto'] },
   { cat: 'TECH_REPAIR', words: ['صيانة', 'جوال', 'جوالات', 'كمبيوتر', 'أجهزة', 'شاشات', 'repair'] },
   { cat: 'HEALTH_HOME', words: ['تمريض', 'ممرض', 'علاج طبيعي', 'فيزيو', 'خدمات صحية', 'home health', 'nurse'] },
+  { cat: 'RESTAURANT',  words: ['مطعم', 'مطاعم', 'بوفيه', 'كافيه', 'مقهى', 'restaurant', 'cafe'] },
+  { cat: 'COURIER',     words: ['مندوب', 'توصيل', 'توصيلات', 'دليفري', 'مشاوير', 'delivery', 'courier'] },
+  { cat: 'REAL_ESTATE', words: ['عقار', 'عقارات', 'عقاري', 'مكتب عقاري', 'إيجار', 'للإيجار', 'real estate'] },
+  { cat: 'MISC_SUPPLIES', words: ['مستلزمات', 'تموينات', 'بقالة', 'مواد', 'supplies'] },
 ]
 
 export function inferServiceCategory(...texts: Array<string | null | undefined>): ServiceCategory {
