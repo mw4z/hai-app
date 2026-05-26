@@ -1853,9 +1853,10 @@ export default function PostCard({
                   } catch { /* ignore */ }
                 }}
                 className="hai-action-btn"
+                aria-label={t('thread_contact')}
+                title={t('thread_contact')}
               >
                 <FiMail className="hai-icon-md hai-action-btn__icon" />
-                <span className="hai-action-btn__label">{t('thread_contact')}</span>
               </button>
             )
           )}
