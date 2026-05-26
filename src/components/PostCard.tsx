@@ -1769,11 +1769,13 @@ export default function PostCard({
           {showReactionPicker && typeof document !== 'undefined' && createPortal(
             <>
               {/* Ghost backdrop — a full-screen transparent layer so a tap
-                  ANYWHERE dismisses the reaction picker. More reliable than
-                  document touchstart/mousedown listeners inside the WKWebView. */}
+                  ANYWHERE dismisses the reaction picker. Explicit edges (not
+                  `inset`, which older WKWebView ignores → zero-size backdrop)
+                  + onPointerDown/onClick so a touch reliably closes it. */}
               <div
                 onPointerDown={() => setShowReactionPicker(false)}
-                style={{ position: 'fixed', inset: 0, zIndex: 'var(--hai-z-sheet)', background: 'transparent' }}
+                onClick={() => setShowReactionPicker(false)}
+                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', zIndex: 49, background: 'transparent' }}
               />
               <div
               ref={pickerRef}
