@@ -40,6 +40,8 @@ const PING_URL = '/api/ping'
 const PING_TIMEOUT_MS = 3500
 const PING_INTERVAL_MS = 90_000          // periodic background check (was 25s — too aggressive)
 const PING_FOCUS_DEBOUNCE_MS = 30_000    // ignore focus/visibility probes when one already ran recently
+const COLD_START_GRACE_MS = 6000         // launch (esp. from a notification) radio warm-up
+const COLD_START_RETRY_MS = 1000         // quick retry cadence while warming up
 
 async function probe(): Promise<boolean> {
   if (typeof window === 'undefined') return true
@@ -73,6 +75,11 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
   // events that can fire many times per minute on mobile and were
   // hammering /api/ping enough to slow page navigation.
   const lastProbeAtRef = useRef(0)
+  // On cold start (especially from a tapped notification) the network
+  // stack isn't ready for the first couple seconds; until this timestamp
+  // a failed probe stays optimistic + retries instead of flashing the
+  // offline banner + a false "back online" toast.
+  const coldStartUntilRef = useRef(Date.now() + COLD_START_GRACE_MS)
 
   const updateStatus = useCallback((next: NetStatus) => {
     setStatus((prev) => {
@@ -95,6 +102,14 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
       updateStatus('online')
       return true
     }
+    // Cold-start grace: during the warm-up window a failed probe doesn't
+    // mean we're offline — the radio just isn't ready. Stay optimistic and
+    // retry quickly instead of flipping to offline/unstable (which would
+    // flash "no internet" then a false "back online" toast on launch).
+    if (Date.now() < coldStartUntilRef.current) {
+      setTimeout(() => { void runProbe() }, COLD_START_RETRY_MS)
+      return false
+    }
     failuresRef.current += 1
     // One failure → unstable (soft warning). Two consecutive → offline.
     updateStatus(failuresRef.current >= 2 ? 'offline' : 'unstable')
@@ -116,15 +131,12 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     // `offline` browser event triggers a probe instead of an instant
     // status flip, so we only believe we're offline when an actual
     // network call fails.
-    const mountedAt = Date.now()
-    const COLD_START_GRACE_MS = 3000
-
     const onOnline = () => { void runProbe() }
     const onOffline = () => {
-      if (Date.now() - mountedAt < COLD_START_GRACE_MS) {
-        // Don't trust the navigator yet; verify with a real probe.
-        // If the radio actually IS down, the probe will fail and the
-        // failure counter logic below promotes us to offline normally.
+      if (Date.now() < coldStartUntilRef.current) {
+        // Cold start: don't trust the navigator's offline event yet —
+        // verify with a probe (which retries during the grace window
+        // rather than flipping us offline).
         void runProbe()
         return
       }
