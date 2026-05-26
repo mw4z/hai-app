@@ -51,7 +51,7 @@ interface Props {
   onDelete?: () => void
 }
 
-const QUICK_EMOJIS = ['👍', '❤️', '😂', '🙏']
+const QUICK_EMOJIS = ['👍', '👎', '❤️', '😂', '🙏']
 
 export default function PollCard({ poll, currentUserId, isSuperAdmin = false, isAdmin = false, onDelete }: Props) {
   const { t, lang } = useLanguage()

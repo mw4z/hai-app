@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-const QUICK_EMOJIS = ['❤️', '😂', '👍', '😮', '😢', '🙏']
+const QUICK_EMOJIS = ['❤️', '😂', '👍', '👎', '😮', '😢', '🙏']
 
 const CATEGORIES: { label: string; labelEn: string; emojis: string[] }[] = [
   {
