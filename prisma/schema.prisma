@@ -2309,6 +2309,7 @@ enum ServiceCategory {
   REAL_ESTATE      // عقار
   BEAUTY           // تجميل / كوافير / مكياج
   WATER            // مياه (تنكرات / وايت / محطات تحلية)
+  FURNITURE        // أثاث وديكور (مفروشات / ستائر / كنب / تنجيد)
   MISC_SUPPLIES    // مستلزمات متنوعة
   OTHER            // أخرى
 }
