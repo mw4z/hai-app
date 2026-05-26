@@ -1767,7 +1767,15 @@ export default function PostCard({
               the picker sits right above the post's reaction button,
               with horizontal clamp so it never escapes the viewport. */}
           {showReactionPicker && typeof document !== 'undefined' && createPortal(
-            <div
+            <>
+              {/* Ghost backdrop — a full-screen transparent layer so a tap
+                  ANYWHERE dismisses the reaction picker. More reliable than
+                  document touchstart/mousedown listeners inside the WKWebView. */}
+              <div
+                onPointerDown={() => setShowReactionPicker(false)}
+                style={{ position: 'fixed', inset: 0, zIndex: 'var(--hai-z-sheet)', background: 'transparent' }}
+              />
+              <div
               ref={pickerRef}
               className="hai-reaction-popover reaction-picker-enter"
               style={(() => {
@@ -1788,7 +1796,8 @@ export default function PostCard({
               })()}
             >
               <EmojiPicker onSelect={(emoji) => { handleReact(emoji); setShowReactionPicker(false) }} />
-            </div>,
+            </div>
+            </>,
             document.body,
           )}
 
