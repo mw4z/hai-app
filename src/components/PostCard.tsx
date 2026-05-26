@@ -510,6 +510,9 @@ export default function PostCard({
   const pickerRef = useRef<HTMLDivElement>(null)
   const reactionTriggerRef = useRef<HTMLButtonElement>(null)
   const reactionBackdropRef = useRef<HTMLDivElement>(null)
+  // TEMP DIAGNOSTIC: counts taps that reach the dismiss backdrop. Shown in
+  // the picker hint. Lets us see if events reach it at all (vs being eaten).
+  const [dbgReactTaps, setDbgReactTaps] = useState(0)
 
   useEffect(() => {
     if (!showReactionPicker) return
@@ -534,16 +537,18 @@ export default function PostCard({
     if (!showReactionPicker) return
     const el = reactionBackdropRef.current
     if (!el) return
-    const close = () => setShowReactionPicker(false)
-    el.addEventListener('pointerdown', close)
-    el.addEventListener('touchstart', close, { passive: true })
-    el.addEventListener('mousedown', close)
-    el.addEventListener('click', close)
+    // DIAGNOSTIC: count instead of close, so we can see whether taps reach
+    // the backdrop at all (the hint shows the count).
+    const onTap = () => setDbgReactTaps((c) => c + 1)
+    el.addEventListener('pointerdown', onTap)
+    el.addEventListener('touchstart', onTap, { passive: true })
+    el.addEventListener('mousedown', onTap)
+    el.addEventListener('click', onTap)
     return () => {
-      el.removeEventListener('pointerdown', close)
-      el.removeEventListener('touchstart', close)
-      el.removeEventListener('mousedown', close)
-      el.removeEventListener('click', close)
+      el.removeEventListener('pointerdown', onTap)
+      el.removeEventListener('touchstart', onTap)
+      el.removeEventListener('mousedown', onTap)
+      el.removeEventListener('click', onTap)
     }
   }, [showReactionPicker])
   useEffect(() => {
@@ -1796,9 +1801,9 @@ export default function PostCard({
                   + onPointerDown/onClick so a touch reliably closes it. */}
               <div
                 ref={reactionBackdropRef}
-                onPointerDown={() => setShowReactionPicker(false)}
-                onClick={() => setShowReactionPicker(false)}
-                onTouchStart={() => setShowReactionPicker(false)}
+                onPointerDown={() => setDbgReactTaps((c) => c + 1)}
+                onClick={() => setDbgReactTaps((c) => c + 1)}
+                onTouchStart={() => setDbgReactTaps((c) => c + 1)}
                 style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', zIndex: 2147483646, background: 'rgba(0,0,0,0.25)' }}
               />
               <div
@@ -1830,7 +1835,7 @@ export default function PostCard({
               <div
                 style={{ position: 'fixed', top: 28, left: 0, right: 0, textAlign: 'center', zIndex: 2147483647, pointerEvents: 'none', color: '#fff', fontSize: 13, fontWeight: 700, textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}
               >
-                {lang === 'en' ? 'Tap anywhere to close' : 'اضغط في أي مكان للإغلاق'}
+                {(lang === 'en' ? 'Tap anywhere to close' : 'اضغط في أي مكان للإغلاق') + ` · taps: ${dbgReactTaps}`}
               </div>
             </>,
             document.body,
