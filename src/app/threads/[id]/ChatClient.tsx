@@ -1323,7 +1323,7 @@ export default function ChatClient({
     setEditingMsg(null); setEditText('')
   }
 
-  const QUICK_EMOJIS = ['❤️', '😂', '👍', '😮', '😢', '🤲']
+  const QUICK_EMOJIS = ['❤️', '😂', '👍', '👎', '😮', '😢', '🤲']
   const MORE_EMOJIS = [
     '🔥', '💯', '🙏', '😍', '🥰', '😘', '🤣', '😅',
     '😭', '😡', '🤔', '🫡', '💪', '👏', '🎉', '❤️‍🔥',
