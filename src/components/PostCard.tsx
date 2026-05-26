@@ -510,9 +510,6 @@ export default function PostCard({
   const pickerRef = useRef<HTMLDivElement>(null)
   const reactionTriggerRef = useRef<HTMLButtonElement>(null)
   const reactionBackdropRef = useRef<HTMLDivElement>(null)
-  // TEMP DIAGNOSTIC: counts taps that reach the dismiss backdrop. Shown in
-  // the picker hint. Lets us see if events reach it at all (vs being eaten).
-  const [dbgReactTaps, setDbgReactTaps] = useState(0)
 
   useEffect(() => {
     if (!showReactionPicker) return
@@ -537,18 +534,16 @@ export default function PostCard({
     if (!showReactionPicker) return
     const el = reactionBackdropRef.current
     if (!el) return
-    // DIAGNOSTIC: count instead of close, so we can see whether taps reach
-    // the backdrop at all (the hint shows the count).
-    const onTap = () => setDbgReactTaps((c) => c + 1)
-    el.addEventListener('pointerdown', onTap)
-    el.addEventListener('touchstart', onTap, { passive: true })
-    el.addEventListener('mousedown', onTap)
-    el.addEventListener('click', onTap)
+    // Close on pointerdown/touchstart, and consumeNextClick() swallows the
+    // trailing click so it can't tap through to the reaction trigger
+    // underneath and immediately reopen the picker (the bug: it WAS closing,
+    // then the trailing click reopened it).
+    const close = () => { setShowReactionPicker(false); consumeNextClick() }
+    el.addEventListener('pointerdown', close)
+    el.addEventListener('touchstart', close, { passive: true })
     return () => {
-      el.removeEventListener('pointerdown', onTap)
-      el.removeEventListener('touchstart', onTap)
-      el.removeEventListener('mousedown', onTap)
-      el.removeEventListener('click', onTap)
+      el.removeEventListener('pointerdown', close)
+      el.removeEventListener('touchstart', close)
     }
   }, [showReactionPicker])
   useEffect(() => {
@@ -1801,10 +1796,8 @@ export default function PostCard({
                   + onPointerDown/onClick so a touch reliably closes it. */}
               <div
                 ref={reactionBackdropRef}
-                onPointerDown={() => setDbgReactTaps((c) => c + 1)}
-                onClick={() => setDbgReactTaps((c) => c + 1)}
-                onTouchStart={() => setDbgReactTaps((c) => c + 1)}
-                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', zIndex: 2147483646, background: 'rgba(0,0,0,0.25)' }}
+                onPointerDown={() => { setShowReactionPicker(false); consumeNextClick() }}
+                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', zIndex: 2147483646, background: 'rgba(0,0,0,0.18)' }}
               />
               <div
               ref={pickerRef}
@@ -1829,14 +1822,6 @@ export default function PostCard({
             >
               <EmojiPicker onSelect={(emoji) => { handleReact(emoji); setShowReactionPicker(false) }} />
             </div>
-              {/* Build indicator + UX hint. If you can SEE this text when the
-                  picker opens, the latest build is running. pointer-events:none
-                  so taps pass through to the dismiss backdrop below. */}
-              <div
-                style={{ position: 'fixed', top: 28, left: 0, right: 0, textAlign: 'center', zIndex: 2147483647, pointerEvents: 'none', color: '#fff', fontSize: 13, fontWeight: 700, textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}
-              >
-                {(lang === 'en' ? 'Tap anywhere to close' : 'اضغط في أي مكان للإغلاق') + ` · taps: ${dbgReactTaps}`}
-              </div>
             </>,
             document.body,
           )}
