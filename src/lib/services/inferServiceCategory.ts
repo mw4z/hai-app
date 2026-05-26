@@ -23,6 +23,7 @@ const KEYWORDS: Array<{ cat: ServiceCategory; words: string[] }> = [
   { cat: 'RESTAURANT',  words: ['مطعم', 'مطاعم', 'بوفيه', 'كافيه', 'مقهى', 'restaurant', 'cafe'] },
   { cat: 'COURIER',     words: ['مندوب', 'توصيل', 'توصيلات', 'دليفري', 'مشاوير', 'delivery', 'courier'] },
   { cat: 'REAL_ESTATE', words: ['عقار', 'عقارات', 'عقاري', 'مكتب عقاري', 'إيجار', 'للإيجار', 'real estate'] },
+  { cat: 'BEAUTY',      words: ['مكياج', 'ميك اب', 'ميكب', 'كوافير', 'حناء', 'عرايس', 'حمام مغربي', 'مساج', 'أظافر', 'اظافر', 'تشقير', 'رموش', 'تسريحة', 'باديكير', 'مناكير', 'تجميل', 'makeup', 'salon', 'spa'] },
   { cat: 'MISC_SUPPLIES', words: ['مستلزمات', 'تموينات', 'بقالة', 'مواد', 'supplies'] },
 ]
 

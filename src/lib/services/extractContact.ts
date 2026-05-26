@@ -52,6 +52,7 @@ const CATEGORY_KEYWORDS: { cat: ServiceCategory; words: string[] }[] = [
   { cat: 'CAR_SERVICE', words: ['بنشر', 'ميكانيكي', 'سطحة', 'كهرباء سيارات', 'غسيل سيارات'] },
   { cat: 'TECH_REPAIR', words: ['صيانة', 'تصليح', 'جوال', 'كمبيوتر', 'لابتوب', 'repair'] },
   { cat: 'HEALTH_HOME', words: ['تمريض', 'ممرض', 'ممرضة', 'علاج طبيعي', 'فيزيو'] },
+  { cat: 'BEAUTY',      words: ['مكياج', 'ميك اب', 'كوافير', 'حناء', 'عرايس', 'حمام مغربي', 'مساج', 'تشقير', 'رموش', 'تسريحة', 'مناكير', 'تجميل', 'makeup', 'salon'] },
 ]
 
 /** Infer a service category from text, or null when uncertain. */

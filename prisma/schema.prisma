@@ -2307,6 +2307,7 @@ enum ServiceCategory {
   COURIER          // مندوب
   RESTAURANT       // مطعم
   REAL_ESTATE      // عقار
+  BEAUTY           // تجميل / كوافير / مكياج
   MISC_SUPPLIES    // مستلزمات متنوعة
   OTHER            // أخرى
 }
