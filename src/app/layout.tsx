@@ -8,6 +8,7 @@ import RouteTransition from '@/components/RouteTransition'
 import BottomNav from '@/components/BottomNav'
 import ArrivalAlert from '@/components/ArrivalAlert'
 import CapacitorBridge from '@/components/CapacitorBridge'
+import SwUpdateReload from '@/components/SwUpdateReload'
 import DebugOverlay from '@/components/DebugOverlay'
 import PushRegistration from '@/components/PushRegistration'
 import NotificationPermissionNudge from '@/components/NotificationPermissionNudge'
@@ -185,6 +186,7 @@ export default function RootLayout({
           })();
         `}} />
         <AppSplash />
+        <SwUpdateReload />
         <CapacitorBridge />
         <DebugOverlay />
         <PushRegistration />
