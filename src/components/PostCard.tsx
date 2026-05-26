@@ -509,6 +509,7 @@ export default function PostCard({
   }, [displayBody, bodyExpanded])
   const pickerRef = useRef<HTMLDivElement>(null)
   const reactionTriggerRef = useRef<HTMLButtonElement>(null)
+  const reactionBackdropRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!showReactionPicker) return
@@ -522,6 +523,27 @@ export default function PostCard({
     return () => {
       document.removeEventListener('mousedown', handleOutside)
       document.removeEventListener('touchstart', handleOutside)
+    }
+  }, [showReactionPicker])
+
+  // Native listeners on the dismiss backdrop. React's onClick/onPointerDown
+  // don't reliably fire on a createPortal(<body>) node (the native event
+  // doesn't bubble through React's event-delegation root), so we bind the
+  // close directly to the DOM node — guaranteed to fire on tap.
+  useEffect(() => {
+    if (!showReactionPicker) return
+    const el = reactionBackdropRef.current
+    if (!el) return
+    const close = () => setShowReactionPicker(false)
+    el.addEventListener('pointerdown', close)
+    el.addEventListener('touchstart', close, { passive: true })
+    el.addEventListener('mousedown', close)
+    el.addEventListener('click', close)
+    return () => {
+      el.removeEventListener('pointerdown', close)
+      el.removeEventListener('touchstart', close)
+      el.removeEventListener('mousedown', close)
+      el.removeEventListener('click', close)
     }
   }, [showReactionPicker])
   useEffect(() => {
@@ -1773,6 +1795,7 @@ export default function PostCard({
                   `inset`, which older WKWebView ignores → zero-size backdrop)
                   + onPointerDown/onClick so a touch reliably closes it. */}
               <div
+                ref={reactionBackdropRef}
                 onPointerDown={() => setShowReactionPicker(false)}
                 onClick={() => setShowReactionPicker(false)}
                 onTouchStart={() => setShowReactionPicker(false)}
