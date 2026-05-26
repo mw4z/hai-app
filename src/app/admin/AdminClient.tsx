@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiShield, FiUsers, FiFileText, FiMapPin, FiActivity, FiStar, FiMessageCircle, FiUser } from 'react-icons/fi'
+import { FiShield, FiUsers, FiFileText, FiMapPin, FiActivity, FiStar, FiMessageCircle, FiUser, FiBell } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import HaiLoader, { HaiSpinner } from '@/components/HaiLoader'
 import { useConfirm, usePrompt } from '@/components/ConfirmProvider'
@@ -41,7 +41,7 @@ const ACTION_LABELS: Record<string, { ar: string; en: string }> = {
   CONFLICT_BLOCKED: { ar: 'تم حظر الإجراء (تعارض)', en: 'Action blocked (conflict)' },
 }
 
-type Tab = 'overview' | 'posts' | 'reports' | 'requests' | 'verify' | 'mod_requests' | 'users' | 'nbhd_reports' | 'support' | 'logs' | 'seeds'
+type Tab = 'overview' | 'posts' | 'reports' | 'requests' | 'verify' | 'mod_requests' | 'users' | 'nbhd_reports' | 'support' | 'logs' | 'seeds' | 'broadcast'
 
 export default function AdminClient({
   role,
@@ -84,6 +84,11 @@ export default function AdminClient({
   const [seedCommentsPerPost, setSeedCommentsPerPost] = useState(2)
   const [seedActionOn, setSeedActionOn] = useState<string | null>(null)
   const [seedSearch, setSeedSearch] = useState('')
+  // Broadcast (super-admin custom push to all users)
+  const [broadcasts, setBroadcasts] = useState<any[]>([])
+  const [bcTitle, setBcTitle] = useState('')
+  const [bcBody, setBcBody] = useState('')
+  const [bcSending, setBcSending] = useState(false)
 
   const isSuper = role === 'SUPER_ADMIN'
 
@@ -129,6 +134,7 @@ export default function AdminClient({
     if (tab === 'support') fetchList('support_tickets', setSupportTickets)
     if (tab === 'users') fetchUsers()
     if (tab === 'seeds') fetchSeedStats()
+    if (tab === 'broadcast') fetchBroadcasts()
   }, [tab, postStatusFilter])
 
   async function fetchSeedStats() {
@@ -138,6 +144,49 @@ export default function AdminClient({
       if (res.ok) setSeedStats(await res.json())
     } catch {}
     finally { setSeedLoading(false) }
+  }
+
+  async function fetchBroadcasts() {
+    try {
+      const res = await fetch('/api/admin/broadcast')
+      if (res.ok) setBroadcasts(await res.json())
+    } catch {}
+  }
+
+  async function sendBroadcast() {
+    const title = bcTitle.trim()
+    const body = bcBody.trim()
+    if (title.length < 2 || body.length < 2) {
+      toast.error(lang === 'en' ? 'Enter a subject and body' : 'أدخل العنوان والنص')
+      return
+    }
+    const ok = await confirmDialog({
+      message: lang === 'en'
+        ? 'Send this notification to ALL users?'
+        : 'إرسال هذا الإشعار لجميع المستخدمين؟',
+      confirmText: lang === 'en' ? 'Send' : 'إرسال',
+    })
+    if (!ok) return
+    setBcSending(true)
+    try {
+      const res = await fetch('/api/admin/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, body }),
+      })
+      if (res.ok) {
+        toast.success(lang === 'en' ? 'Broadcast queued ✓' : 'تم إرسال الإشعار ✓')
+        setBcTitle(''); setBcBody('')
+        fetchBroadcasts()
+      } else {
+        const d = await res.json().catch(() => ({}))
+        toast.error(d.error || (lang === 'en' ? 'Failed' : 'تعذّر الإرسال'))
+      }
+    } catch {
+      toast.error(lang === 'en' ? 'Failed' : 'تعذّر الإرسال')
+    } finally {
+      setBcSending(false)
+    }
   }
 
   async function seedGenerate(scope: 'one' | 'all', neighborhoodId?: string) {
@@ -295,6 +344,7 @@ export default function AdminClient({
     { key: 'users' as Tab, label: 'admin_users' as TranslationKey, icon: <FiUsers className="w-4 h-4" /> },
     { key: 'logs' as Tab, label: 'admin_logs' as TranslationKey, icon: <FiShield className="w-4 h-4" /> },
     ...(isSuper ? [{ key: 'seeds' as Tab, label: 'admin_seeds' as TranslationKey, icon: <FiActivity className="w-4 h-4" /> }] : []),
+    ...(isSuper ? [{ key: 'broadcast' as Tab, label: 'admin_broadcast' as TranslationKey, icon: <FiBell className="w-4 h-4" /> }] : []),
   ]
 
   const STATUS_FILTERS: { key: string; label: TranslationKey }[] = [
@@ -1044,6 +1094,62 @@ export default function AdminClient({
             ) : (
               <p className="text-center text-gray-400 py-8">{lang === 'en' ? 'Failed to load' : 'فشل التحميل'}</p>
             )}
+          </div>
+        )}
+
+        {/* ─── Broadcast: super-admin custom push to all users ─── */}
+        {tab === 'broadcast' && isSuper && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
+              <h2 className="font-bold text-gray-800">{lang === 'en' ? 'Send a notification to all users' : 'إرسال إشعار لجميع المستخدمين'}</h2>
+              <input
+                value={bcTitle}
+                onChange={e => setBcTitle(e.target.value)}
+                maxLength={120}
+                placeholder={lang === 'en' ? 'Subject' : 'العنوان'}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              />
+              <textarea
+                value={bcBody}
+                onChange={e => setBcBody(e.target.value)}
+                maxLength={1000}
+                rows={4}
+                placeholder={lang === 'en' ? 'Message body' : 'نص الإشعار'}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none"
+              />
+              <button
+                onClick={sendBroadcast}
+                disabled={bcSending}
+                className="w-full bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-bold rounded-lg py-2.5 text-sm"
+              >
+                {bcSending ? (lang === 'en' ? 'Sending…' : 'جارٍ الإرسال…') : (lang === 'en' ? '📣 Send to everyone' : '📣 إرسال للجميع')}
+              </button>
+              <p className="text-[11px] text-gray-400">{lang === 'en' ? 'Sends a push notification to every user who has the app.' : 'يُرسل إشعاراً لكل مستخدم لديه التطبيق.'}</p>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="font-bold text-gray-700 text-sm">{lang === 'en' ? 'Sent broadcasts' : 'الإشعارات المُرسلة'}</h3>
+              {broadcasts.length === 0 ? (
+                <p className="text-center text-gray-400 py-6 text-sm">{lang === 'en' ? 'None yet' : 'لا يوجد بعد'}</p>
+              ) : broadcasts.map(b => (
+                <div key={b.id} className="bg-white rounded-xl border border-gray-100 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-800 text-sm truncate">{b.title}</p>
+                      <p className="text-xs text-gray-500 line-clamp-2">{b.body}</p>
+                    </div>
+                    <span className="text-[10px] text-gray-400 whitespace-nowrap">{new Date(b.createdAt).toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-SA')}</span>
+                  </div>
+                  <div className="flex items-center gap-4 mt-2 text-xs">
+                    <span className="text-gray-600">👁 {b.reachedUsers} {lang === 'en' ? 'reached' : 'وصل'}</span>
+                    <span className="text-primary-600 font-semibold">✋ {b.opens} {lang === 'en' ? 'opened' : 'فتح'}</span>
+                    {b.reachedUsers > 0 && (
+                      <span className="text-gray-400">{Math.round((b.opens / b.reachedUsers) * 100)}%</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

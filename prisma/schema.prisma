@@ -1636,6 +1636,31 @@ model NotifJob {
   @@index([dedupKey, createdAt])
 }
 
+// Super-admin broadcast push: one custom notification sent to all users,
+// with reach + open (click) analytics.
+model Broadcast {
+  id           String           @id @default(cuid())
+  title        String
+  body         String
+  createdById  String
+  createdAt    DateTime         @default(now())
+  reachedUsers Int              @default(0) // distinct users the push was sent to
+  sentTokens   Int              @default(0) // device tokens pushed
+  clicks       BroadcastClick[]
+}
+
+// One row per user who tapped a broadcast (deduped) → open analytics.
+model BroadcastClick {
+  id          String    @id @default(cuid())
+  broadcastId String
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  userId      String
+  createdAt   DateTime  @default(now())
+
+  @@unique([broadcastId, userId])
+  @@index([broadcastId])
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // WEEKLY DIGEST
 // ═══════════════════════════════════════════════════════════════════════════════

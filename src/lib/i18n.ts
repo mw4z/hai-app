@@ -397,6 +397,7 @@ export const translations = {
   admin_users:           { ar: 'المستخدمين',           en: 'Users'                 , ur: 'صارفین' },
   admin_logs:            { ar: 'السجل',               en: 'Logs'                  , ur: 'لاگ' },
   admin_seeds:           { ar: 'البذور',              en: 'Seeds'                 , ur: 'بیج' },
+  admin_broadcast:       { ar: 'إشعار عام',          en: 'Broadcast'             , ur: 'براڈکاسٹ' },
   admin_active_posts:    { ar: 'منشورات نشطة',        en: 'Active Posts'          , ur: 'فعال پوسٹیں' },
   admin_users_count:     { ar: 'مستخدمين',             en: 'Users'                 , ur: 'صارفین' },
   admin_pending_reports: { ar: 'بلاغات معلّقة',       en: 'Pending Reports'       , ur: 'زیر التوا رپورٹیں' },

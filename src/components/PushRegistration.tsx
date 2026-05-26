@@ -45,6 +45,12 @@ export default function PushRegistration() {
             const data = (action?.notification?.data || {}) as Record<string, string>
             console.log('[PUSH] tap → resolving deeplink:', data?.type, data?.deeplink)
 
+            // Broadcast open tracking (super-admin broadcast analytics) —
+            // fire-and-forget, deduped per user server-side.
+            if (data?.type === 'broadcast' && data?.broadcastId) {
+              fetch(`/api/broadcast/${data.broadcastId}/click`, { method: 'POST', credentials: 'include' }).catch(() => {})
+            }
+
             // Clear the tapped notification AND any siblings of the
             // same type from the system tray. Without this, an
             // already-read notification keeps sitting in the shade,

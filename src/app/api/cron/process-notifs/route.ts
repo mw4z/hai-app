@@ -382,6 +382,69 @@ async function resolveUserTokens(
   return { tokens: user.deviceTokens.map((dt) => ({ token: dt.token, platform: dt.platform || "android" })), userExists: true }
 }
 
+/** All non-banned users' device tokens — for super-admin broadcasts. */
+async function resolveAllTokens(): Promise<ResolvedTokens> {
+  const users = await db.user.findMany({
+    where: { status: { notIn: ['BANNED_TEMP', 'BANNED_PERM'] } },
+    select: { id: true, deviceTokens: { select: { token: true, platform: true } } },
+  })
+  const tokens: TokenWithPlatform[] = []
+  let recipientUserCount = 0
+  for (const u of users) {
+    if (!u.deviceTokens.length) continue
+    recipientUserCount++
+    for (const dt of u.deviceTokens) tokens.push({ token: dt.token, platform: dt.platform || 'android' })
+  }
+  return { tokens, recipientUserCount }
+}
+
+/** Super-admin custom broadcast → push to every user; records reach + opens. */
+async function processBroadcast(job: JobRow): Promise<JobOutcome> {
+  const p = (job.payload || {}) as { broadcastId?: string }
+  const broadcastId = p.broadcastId || job.targetRef
+  if (!broadcastId) return 'dropped'
+
+  const bc = await db.broadcast.findUnique({
+    where: { id: broadcastId },
+    select: { id: true, title: true, body: true },
+  })
+  if (!bc) return 'dropped'
+
+  const { tokens, recipientUserCount } = await resolveAllTokens()
+  if (tokens.length === 0) {
+    await db.broadcast.update({ where: { id: bc.id }, data: { reachedUsers: 0, sentTokens: 0 } }).catch(() => {})
+    return 'done'
+  }
+
+  const result = await sendPushBatch(tokens, {
+    title: bc.title.slice(0, 120),
+    body: bc.body.slice(0, 300),
+    priority: 'high',
+    data: {
+      type: 'broadcast',
+      broadcastId: bc.id,
+      deeplink: 'hai://feed',
+    },
+  })
+
+  await cleanupInvalidTokens(result.invalidTokens, job.id, job.type)
+
+  await db.broadcast.update({
+    where: { id: bc.id },
+    data: { reachedUsers: recipientUserCount, sentTokens: result.success },
+  }).catch(() => {})
+
+  console.log('[NOTIF_CRON] broadcast delivered', {
+    jobId: job.id, broadcastId: bc.id, recipients: recipientUserCount,
+    tokensSent: tokens.length, success: result.success, failed: result.failed,
+  })
+
+  if (result.success === 0 && result.failed > 0) {
+    throw new Error(result.firstError || 'all FCM sends failed')
+  }
+  return 'done'
+}
+
 async function resolveEmergencyTokens(
   neighborhoodId: string,
 ): Promise<ResolvedTokens> {
@@ -1885,6 +1948,9 @@ async function handle(req: NextRequest) {
           break
         case 'emergency_alert':
           outcome = await processEmergencyAlert(job)
+          break
+        case 'broadcast':
+          outcome = await processBroadcast(job)
           break
         case 'user_report':
           outcome = await processUserReport(job)
