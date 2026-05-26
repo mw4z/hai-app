@@ -1824,6 +1824,14 @@ export default function PostCard({
             >
               <EmojiPicker onSelect={(emoji) => { handleReact(emoji); setShowReactionPicker(false) }} />
             </div>
+              {/* Build indicator + UX hint. If you can SEE this text when the
+                  picker opens, the latest build is running. pointer-events:none
+                  so taps pass through to the dismiss backdrop below. */}
+              <div
+                style={{ position: 'fixed', top: 28, left: 0, right: 0, textAlign: 'center', zIndex: 2147483647, pointerEvents: 'none', color: '#fff', fontSize: 13, fontWeight: 700, textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}
+              >
+                {lang === 'en' ? 'Tap anywhere to close' : 'اضغط في أي مكان للإغلاق'}
+              </div>
             </>,
             document.body,
           )}
