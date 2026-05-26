@@ -124,6 +124,16 @@ export default function AdminClient({
     }
   }, [tab])
 
+  // Live broadcast analytics — re-fetch every 8s while the tab is open so
+  // reach/opens climb in real time as the push goes out and people tap it.
+  useEffect(() => {
+    if (tab !== 'broadcast') return
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchBroadcasts()
+    }, 8_000)
+    return () => clearInterval(interval)
+  }, [tab])
+
   useEffect(() => {
     if (tab === 'reports') fetchList('reported_posts', setReports)
     if (tab === 'posts') fetchPosts()

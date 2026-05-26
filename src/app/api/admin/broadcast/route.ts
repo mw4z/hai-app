@@ -22,8 +22,10 @@ export async function POST(req: NextRequest) {
   if (!gate.ok) return gate.res
 
   const body = await req.json().catch(() => ({}))
-  const title = String(body?.title ?? '').trim()
-  const text = String(body?.body ?? '').trim()
+  // Collapse newlines + runs of whitespace to single spaces so the push and
+  // the in-app preview flow naturally and don't waste a line on one word.
+  const title = String(body?.title ?? '').replace(/\s+/g, ' ').trim()
+  const text = String(body?.body ?? '').replace(/\s+/g, ' ').trim()
   if (title.length < 2 || title.length > 120) {
     return NextResponse.json({ error: 'العنوان يجب أن يكون بين 2 و 120 حرفاً' }, { status: 400 })
   }
