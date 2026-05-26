@@ -1775,7 +1775,8 @@ export default function PostCard({
               <div
                 onPointerDown={() => setShowReactionPicker(false)}
                 onClick={() => setShowReactionPicker(false)}
-                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', zIndex: 49, background: 'transparent' }}
+                onTouchStart={() => setShowReactionPicker(false)}
+                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh', zIndex: 2147483646, background: 'transparent' }}
               />
               <div
               ref={pickerRef}
@@ -1794,6 +1795,7 @@ export default function PostCard({
                   left: `${left}px`,
                   top: `${rect.top - 8}px`,
                   transform: 'translateY(-100%)',
+                  zIndex: 2147483647, // above the dismiss backdrop
                 }
               })()}
             >
