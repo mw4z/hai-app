@@ -613,6 +613,13 @@ export default function PostCard({
   // REQUEST intent gets a small secondary marker on the card.
   const isRequest = post.intent === 'REQUEST'
   const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + b, 0)
+  // The distinct emojis actually used, most-used first (top 3) — so the
+  // control shows WHICH emojis people picked, not a generic face.
+  const topReactionEmojis = Object.entries(reactionCounts)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([e]) => e)
+    .slice(0, 3)
   const serverCommentCount = post._count?.comments || 0
   // Before the full thread is loaded, the SSR `_count` is the truth —
   // using it avoids the card saying "1 comment" (the preview) when the
@@ -1797,7 +1804,15 @@ export default function PostCard({
             aria-label={lang === 'en' ? 'React' : 'تفاعل'}
           >
             <span className={`hai-reaction-item__icon ${myReaction ? 'hai-reaction-emoji-lg' : ''} ${bouncingReaction && myReaction ? 'reaction-bounce' : ''}`}>
-              {myReaction ?? <FiSmile className="hai-icon-lg" />}
+              {totalReactions > 0 ? (
+                // Show the actual emojis people reacted with (top 3), so you
+                // can see exactly what was chosen — not a generic smiley.
+                <span className="inline-flex items-center gap-0.5">
+                  {topReactionEmojis.map((e, i) => <span key={i}>{e}</span>)}
+                </span>
+              ) : (
+                myReaction ?? <FiSmile className="hai-icon-lg" />
+              )}
             </span>
             {totalReactions > 0 && <span className="hai-reaction-item__count">{totalReactions}</span>}
           </button>
