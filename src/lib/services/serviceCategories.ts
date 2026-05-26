@@ -28,6 +28,7 @@ export const SERVICE_CATEGORIES: ServiceCategoryMeta[] = [
   { key: 'RESTAURANT',   emoji: '🍽️', labelAr: 'مطعم',             labelEn: 'Restaurant',     labelUr: 'ریستوران' },
   { key: 'REAL_ESTATE',  emoji: '🏢', labelAr: 'عقار',             labelEn: 'Real estate',    labelUr: 'پراپرٹی' },
   { key: 'BEAUTY',       emoji: '💄', labelAr: 'تجميل وكوافير',     labelEn: 'Beauty & salon', labelUr: 'بیوٹی' },
+  { key: 'WATER',        emoji: '💧', labelAr: 'مياه',              labelEn: 'Water',          labelUr: 'پانی' },
   { key: 'MISC_SUPPLIES',emoji: '🛒', labelAr: 'مستلزمات متنوعة',   labelEn: 'Misc supplies',  labelUr: 'متفرق سامان' },
   { key: 'OTHER',        emoji: '🔖', labelAr: 'أخرى',             labelEn: 'Other',          labelUr: 'دیگر' },
 ]

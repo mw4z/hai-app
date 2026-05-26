@@ -2308,6 +2308,7 @@ enum ServiceCategory {
   RESTAURANT       // مطعم
   REAL_ESTATE      // عقار
   BEAUTY           // تجميل / كوافير / مكياج
+  WATER            // مياه (تنكرات / وايت / محطات تحلية)
   MISC_SUPPLIES    // مستلزمات متنوعة
   OTHER            // أخرى
 }
