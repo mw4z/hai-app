@@ -400,10 +400,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!bypass) {
-      // Cooldown: 60 seconds between posts
+      // Cooldown: 60 seconds between posts. Deleted/hidden posts DON'T count —
+      // a user who posted, noticed a mistake, deleted it, and is recreating
+      // the corrected version shouldn't be blocked by the 60s wait. The daily
+      // limit below (counts every status) still caps total posting, so this
+      // isn't a spam loophole.
       const cooldownAgo = new Date(Date.now() - POST_COOLDOWN_SECONDS * 1000)
       const recentPost = await db.post.findFirst({
-        where: { authorId: user.id, createdAt: { gte: cooldownAgo } },
+        where: { authorId: user.id, createdAt: { gte: cooldownAgo }, status: { notIn: ['REMOVED', 'HIDDEN'] } },
         select: { id: true },
       })
       if (recentPost) {
