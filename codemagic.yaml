@@ -42,6 +42,9 @@ workflows:
           echo "[p8] key_id=$APP_STORE_CONNECT_KEY_IDENTIFIER bytes=$(wc -c < "$KEY_FILE" | tr -d ' ') lines=$(wc -l < "$KEY_FILE" | tr -d ' ')"
           echo "[p8] first_line=$(head -n 1 "$KEY_FILE")"
           echo "[p8] last_line=$(tail -n 1 "$KEY_FILE")"
+          # Fail HERE (not later in the build step) if the key isn't a valid
+          # PEM, so the [p8] diagnostics are in the failing step you copy.
+          head -n 1 "$KEY_FILE" | grep -q "BEGIN" || { echo "[p8] FATAL: key is not a valid PEM (empty or wrong format) — see [p8] lines above"; exit 1; }
       - name: Build iOS app
         script: |
           set -e
