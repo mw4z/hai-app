@@ -130,7 +130,7 @@ export default function NeighborhoodReportsClient({ initialReports }: { initialR
                     <div key={i} className="relative flex-shrink-0">
                       <img src={img.preview} alt="" className="w-16 h-16 object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
                       <button onClick={() => setImages(prev => prev.filter((_, j) => j !== i))}
-                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center">✕</button>
+                        className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full shadow ring-2 ring-white text-[11px] flex items-center justify-center">✕</button>
                     </div>
                   ))}
                 </div>

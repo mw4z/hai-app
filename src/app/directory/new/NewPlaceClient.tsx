@@ -427,7 +427,7 @@ export default function NewPlaceClient() {
                       type="button"
                       onClick={() => removeImage(i)}
                       aria-label={tr('Remove photo', 'إزالة الصورة', 'تصویر ہٹائیں')}
-                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                      className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full shadow ring-2 ring-white flex items-center justify-center"
                     >
                       <FiX className="w-3 h-3" />
                     </button>

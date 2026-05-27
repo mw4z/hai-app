@@ -207,7 +207,7 @@ export default function EditPhotosSheet({
                   type="button"
                   onClick={() => removeExisting(i)}
                   aria-label={tr('Remove photo', 'إزالة الصورة', 'تصویر ہٹائیں')}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center"
+                  className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full shadow ring-2 ring-white flex items-center justify-center"
                 >
                   <FiX className="w-3 h-3" />
                 </button>
@@ -220,7 +220,7 @@ export default function EditPhotosSheet({
                   type="button"
                   onClick={() => removePending(i)}
                   aria-label={tr('Remove photo', 'إزالة الصورة', 'تصویر ہٹائیں')}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center"
+                  className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full shadow ring-2 ring-white flex items-center justify-center"
                 >
                   <FiX className="w-3 h-3" />
                 </button>

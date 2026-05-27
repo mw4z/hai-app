@@ -149,7 +149,7 @@ export default function SupportClient({ initialTickets }: { initialTickets: any[
                     <div key={i} className="relative flex-shrink-0">
                       <img src={img.preview} alt="" className="w-20 h-20 object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
                       <button type="button" onClick={() => setImages(prev => prev.filter((_, j) => j !== i))}
-                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center">✕</button>
+                        className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full shadow ring-2 ring-white text-xs flex items-center justify-center">✕</button>
                     </div>
                   ))}
                 </div>
