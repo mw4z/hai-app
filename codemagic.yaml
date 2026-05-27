@@ -35,17 +35,13 @@ workflows:
           keychain initialize
           mkdir -p "$HOME/private_keys"
           printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$HOME/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_IDENTIFIER.p8"
-          # Export options for automatic App Store signing. build-ipa needs
-          # this explicitly now that we don't run `use-profiles` (which used to
-          # generate it). printf (not a heredoc) avoids YAML indentation traps.
-          printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>method</key><string>app-store-connect</string><key>signingStyle</key><string>automatic</string><key>teamID</key><string>XD95FL293Z</string><key>destination</key><string>export</string></dict></plist>\n' > "$HOME/export_options.plist"
       - name: Build iOS app
         script: |
           AUTH="-allowProvisioningUpdates -authenticationKeyPath $HOME/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_IDENTIFIER.p8 -authenticationKeyID $APP_STORE_CONNECT_KEY_IDENTIFIER -authenticationKeyIssuerID $APP_STORE_CONNECT_ISSUER_ID"
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME" \
-            --export-options-plist "$HOME/export_options.plist" \
+            --export-options-plist ios/ExportOptions.plist \
             --archive-xcargs "$AUTH CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=XD95FL293Z" \
             --export-xcargs "$AUTH"
     artifacts:
