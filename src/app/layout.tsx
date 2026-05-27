@@ -25,6 +25,7 @@ import OfflineBanner from '@/components/OfflineBanner'
 import { checkEnvironment } from '@/lib/env-check'
 import type { Lang } from '@/lib/i18n'
 import './globals.css'
+import 'react-image-crop/dist/ReactCrop.css'
 
 // Run environment safety check once on server startup
 checkEnvironment()
