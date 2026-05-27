@@ -23,28 +23,9 @@ workflows:
       - name: Sync Capacitor
         script: |
           npx cap sync ios
-      - name: Set up App Store Connect API key
+      - name: Set up keychain
         script: |
-          # Xcode-managed (automatic) signing. The old flow used
-          # `fetch-signing-files --create` with a fresh cert every build,
-          # which filled Apple's cert limit and produced BARE profiles
-          # missing the app's capabilities (Push) — so the archive failed on
-          # essentially every build. Automatic signing + the ASC API key lets
-          # `-allowProvisioningUpdates` create/refresh a profile that always
-          # includes the app's enabled capabilities, with no manual churn.
           keychain initialize
-          mkdir -p "$HOME/private_keys"
-          KEY_FILE="$HOME/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_IDENTIFIER.p8"
-          printf '%b' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$KEY_FILE"
-          # Non-secret diagnostics: prints ONLY the BEGIN/END header lines and
-          # sizes (never the key body) so we can see the PEM's actual shape and
-          # pinpoint why CryptoKit rejects it.
-          echo "[p8] key_id=$APP_STORE_CONNECT_KEY_IDENTIFIER bytes=$(wc -c < "$KEY_FILE" | tr -d ' ') lines=$(wc -l < "$KEY_FILE" | tr -d ' ')"
-          echo "[p8] first_line=$(head -n 1 "$KEY_FILE")"
-          echo "[p8] last_line=$(tail -n 1 "$KEY_FILE")"
-          # Fail HERE (not later in the build step) if the key isn't a valid
-          # PEM, so the [p8] diagnostics are in the failing step you copy.
-          head -n 1 "$KEY_FILE" | grep -q "BEGIN" || { echo "[p8] FATAL: key is not a valid PEM (empty or wrong format) — see [p8] lines above"; exit 1; }
       - name: Build iOS app
         script: |
           set -e
@@ -52,7 +33,10 @@ workflows:
           # CODE_SIGN_STYLE=Manual (overriding Automatic) and can't do
           # Xcode-managed signing. Archive + export with automatic signing +
           # the ASC API key so a capability-complete profile is created.
-          KEY="$HOME/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_IDENTIFIER.p8"
+          # Codemagic's app_store_connect integration already wrote the API key
+          # to disk; $APP_STORE_CONNECT_PRIVATE_KEY holds an "@file:<path>"
+          # pointer to it (NOT the key body). Strip the prefix to get the path.
+          KEY="${APP_STORE_CONNECT_PRIVATE_KEY#@file:}"
           xcodebuild -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" \
             -archivePath build/App.xcarchive \
             -allowProvisioningUpdates \
