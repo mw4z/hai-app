@@ -23,38 +23,25 @@ workflows:
       - name: Sync Capacitor
         script: |
           npx cap sync ios
-      - name: Set up keychain
-        script: |
-          keychain initialize
-      - name: Build iOS app
+      - name: Set up code signing
         script: |
           set -e
-          # Raw xcodebuild — NOT `xcode-project build-ipa`, which force-appends
-          # CODE_SIGN_STYLE=Manual (overriding Automatic) and can't do
-          # Xcode-managed signing. Archive + export with automatic signing +
-          # the ASC API key so a capability-complete profile is created.
-          # Codemagic's app_store_connect integration already wrote the API key
-          # to disk; $APP_STORE_CONNECT_PRIVATE_KEY holds an "@file:<path>"
-          # pointer to it (NOT the key body). Strip the prefix to get the path.
-          KEY="${APP_STORE_CONNECT_PRIVATE_KEY#@file:}"
-          xcodebuild -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" \
-            -archivePath build/App.xcarchive \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$KEY" \
-            -authenticationKeyID "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=XD95FL293Z \
-            archive
-          mkdir -p build/ios/ipa
-          xcodebuild -exportArchive \
-            -archivePath build/App.xcarchive \
-            -exportPath build/ios/ipa \
-            -exportOptionsPlist ios/ExportOptions.plist \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$KEY" \
-            -authenticationKeyID "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
+          keychain initialize
+          # Fetch (or create) a DISTRIBUTION (App Store) profile + certificate
+          # via the App Store Connect API integration. IOS_APP_STORE is a
+          # distribution profile, so — unlike the development profile automatic
+          # signing tried to mint — it needs NO registered devices. --create
+          # builds it from the App ID's capabilities, so it includes Push and
+          # matches the app's entitlements (no capability-mismatch archive fail).
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+          # Add the fetched signing certificate(s) to the build keychain.
+          keychain add-certificates
+          # Point the Xcode project at the fetched distribution profile (manual
+          # signing — which is exactly what `build-ipa` expects).
+          xcode-project use-profiles
+      - name: Build iOS app
+        script: |
+          xcode-project build-ipa --project "$XCODE_PROJECT" --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
