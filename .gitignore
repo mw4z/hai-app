@@ -62,3 +62,14 @@ tsconfig.tsbuildinfo
 .env*.local
 stickers-preview.html
 membership-preview.html
+
+_extract_numbers.cjs
+_service_numbers.csv
+_extracted.json
+_vcards/
+_extract_vcards.cjs
+_card_numbers.csv
+_cards.json
+
+.env.prod.tmp
+_import_cards.cjs
