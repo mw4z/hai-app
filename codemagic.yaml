@@ -38,15 +38,7 @@ workflows:
           # Export options for automatic App Store signing. build-ipa needs
           # this explicitly now that we don't run `use-profiles` (which used to
           # generate it). printf (not a heredoc) avoids YAML indentation traps.
-          printf '%s\n' \
-            '<?xml version="1.0" encoding="UTF-8"?>' \
-            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
-            '<plist version="1.0"><dict>' \
-            '<key>method</key><string>app-store-connect</string>' \
-            '<key>signingStyle</key><string>automatic</string>' \
-            '<key>teamID</key><string>XD95FL293Z</string>' \
-            '<key>destination</key><string>export</string>' \
-            '</dict></plist>' > "$HOME/export_options.plist"
+          printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>method</key><string>app-store-connect</string><key>signingStyle</key><string>automatic</string><key>teamID</key><string>XD95FL293Z</string><key>destination</key><string>export</string></dict></plist>\n' > "$HOME/export_options.plist"
       - name: Build iOS app
         script: |
           AUTH="-allowProvisioningUpdates -authenticationKeyPath $HOME/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_IDENTIFIER.p8 -authenticationKeyID $APP_STORE_CONNECT_KEY_IDENTIFIER -authenticationKeyIssuerID $APP_STORE_CONNECT_ISSUER_ID"
