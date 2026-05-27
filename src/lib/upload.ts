@@ -88,48 +88,56 @@ export async function uploadFiles(
   files: File[],
   opts?: { onProgress?: (percent: number) => void },
 ): Promise<string[]> {
-  // Compress all images in parallel
-  const compressed = await Promise.all(files.map(f => compressImage(f)))
+  // Compress all images in parallel (1200px max, JPEG q0.75 → ~100-300KB).
+  const compressed = await Promise.all(files.map((f) => compressImage(f)))
 
-  const formData = new FormData()
-  for (const file of compressed) formData.append('images', file)
+  // Client-direct to Vercel Blob, mirroring the PDF path. The old /api/upload
+  // route streamed the whole multipart body THROUGH the Next.js function and
+  // put() to Blob inside it — on mobile that hit the function timeout (seen in
+  // Vercel logs) and Vercel's 4.5MB body cap, surfacing as the generic
+  // "فشل رفع الصور". Minting a token + PUTting straight to Blob avoids both.
+  // Dynamic import so the blob-client bundle isn't pulled into first paint.
+  const { upload } = await import('@vercel/blob/client')
 
-  return new Promise<string[]>((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.open('POST', '/api/upload')
-    // Progress tick while the body uploads.
-    xhr.upload.onprogress = (ev) => {
-      if (!opts?.onProgress) return
-      if (!ev.lengthComputable) return
-      const pct = Math.max(0, Math.min(100, Math.round((ev.loaded / ev.total) * 100)))
-      try { opts.onProgress(pct) } catch {}
-    }
-    xhr.onload = () => {
-      if (xhr.status < 200 || xhr.status >= 300) {
-        let msg = 'فشل رفع الصور'
-        try {
-          const d = JSON.parse(xhr.responseText || '{}')
-          if (d?.error) msg = d.error
-        } catch {}
-        reject(new Error(msg))
-        return
-      }
-      try {
-        const data = JSON.parse(xhr.responseText || '{}')
-        // Snap the bar to 100% once the server has fully replied —
-        // upload.onprogress only ticks while bytes are flowing, so
-        // the user might see it stall at 95% for a moment while the
-        // server finishes writing to Blob. Push it home explicitly.
-        try { opts?.onProgress?.(100) } catch {}
-        resolve(data?.urls || [])
-      } catch (err) {
-        reject(err instanceof Error ? err : new Error('فشل رفع الصور'))
-      }
-    }
-    xhr.onerror = () => reject(new Error('فشل رفع الصور'))
-    xhr.onabort = () => reject(new Error('تم إلغاء الرفع'))
-    xhr.send(formData)
+  const n = compressed.length
+  const pct = new Array<number>(n).fill(0)
+  const emit = () => {
+    if (!opts?.onProgress) return
+    const avg = pct.reduce((a, b) => a + b, 0) / n
+    try { opts.onProgress(Math.max(0, Math.min(100, Math.round(avg)))) } catch {}
+  }
+
+  // Hard deadline so a hung connection surfaces as a toast, not a stuck
+  // spinner. One controller aborts every in-flight PUT.
+  const ctrl = new AbortController()
+  let timedOut = false
+  const deadline = new Promise<never>((_, reject) => {
+    setTimeout(() => { timedOut = true; ctrl.abort(); reject(new Error('انتهت مهلة رفع الصور — تحقّق من الإنترنت')) }, 120_000)
   })
+
+  const work = Promise.all(
+    compressed.map(async (file, i) => {
+      const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
+      const key = `uploads/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}-${i}.${ext}`
+      const blob = await upload(key, file, {
+        access: 'public',
+        handleUploadUrl: '/api/upload-image',
+        contentType: file.type || 'image/jpeg',
+        abortSignal: ctrl.signal,
+        onUploadProgress: (ev) => { pct[i] = ev.percentage ?? 0; emit() },
+      })
+      return blob.url
+    }),
+  )
+
+  try {
+    const urls = await Promise.race([work, deadline])
+    try { opts?.onProgress?.(100) } catch {}
+    return urls
+  } catch (err) {
+    if (timedOut) throw err
+    throw new Error(err instanceof Error && err.message ? err.message : 'فشل رفع الصور')
+  }
 }
 
 /**
