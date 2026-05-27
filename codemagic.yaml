@@ -35,10 +35,13 @@ workflows:
           keychain initialize
           mkdir -p "$HOME/private_keys"
           KEY_FILE="$HOME/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_IDENTIFIER.p8"
-          # %b decodes escaped \n in the env var into real newlines — a common
-          # CI cause of "invalidPEMDocument". Harmless if already real newlines.
           printf '%b' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$KEY_FILE"
-          if head -1 "$KEY_FILE" | grep -q "BEGIN"; then echo "p8 header OK"; else echo "p8 header MISSING/MALFORMED"; fi
+          # Non-secret diagnostics: prints ONLY the BEGIN/END header lines and
+          # sizes (never the key body) so we can see the PEM's actual shape and
+          # pinpoint why CryptoKit rejects it.
+          echo "[p8] key_id=$APP_STORE_CONNECT_KEY_IDENTIFIER bytes=$(wc -c < "$KEY_FILE" | tr -d ' ') lines=$(wc -l < "$KEY_FILE" | tr -d ' ')"
+          echo "[p8] first_line=$(head -n 1 "$KEY_FILE")"
+          echo "[p8] last_line=$(tail -n 1 "$KEY_FILE")"
       - name: Build iOS app
         script: |
           set -e
