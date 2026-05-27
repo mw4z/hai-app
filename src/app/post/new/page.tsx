@@ -18,7 +18,7 @@ import { isTitleRequired } from '@/lib/posts/titleRequired'
 import type { PostCategory, PostIntent, MarketplaceType } from '@prisma/client'
 import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { playSuccess, playError } from '@/lib/sound'
-import { FiX } from 'react-icons/fi'
+import { FiX, FiScissors } from 'react-icons/fi'
 import ContextualGuide from '@/components/ContextualGuide'
 import PlacePickerSheet from '@/components/places/PlacePickerSheet'
 import { formatContactSnippet } from '@/lib/contactPicker'
@@ -1389,21 +1389,24 @@ export default function NewPostPage() {
                           </div>
                         </>
                       )}
+                      {/* Controls sit INSIDE the thumbnail corners — the row is
+                          overflow-x-auto, so negative offsets get clipped into a
+                          teardrop. White ring keeps them clear over any photo. */}
                       {imageUploadProgress === null && (
-                        <button
-                          type="button"
-                          onClick={() => removeImage(i)}
-                          className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
-                        >✕</button>
-                      )}
-                      {/* Optional crop — opt-in, so adding a photo stays one tap. */}
-                      {imageUploadProgress === null && (
-                        <button
-                          type="button"
-                          onClick={() => cropExistingImage(i)}
-                          aria-label={lang === 'en' ? 'Crop' : 'قص الصورة'}
-                          className="absolute bottom-1 start-1 w-6 h-6 bg-black/60 text-white rounded-full text-[11px] flex items-center justify-center active:scale-95"
-                        >✂️</button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => removeImage(i)}
+                            aria-label={lang === 'en' ? 'Remove' : 'حذف'}
+                            className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full shadow-md ring-2 ring-white flex items-center justify-center active:scale-95"
+                          ><FiX className="w-3.5 h-3.5" /></button>
+                          <button
+                            type="button"
+                            onClick={() => cropExistingImage(i)}
+                            aria-label={lang === 'en' ? 'Crop' : 'قص الصورة'}
+                            className="absolute bottom-1 left-1 w-6 h-6 bg-black/55 text-white rounded-full shadow ring-1 ring-white/50 flex items-center justify-center active:scale-95"
+                          ><FiScissors className="w-3.5 h-3.5" /></button>
+                        </>
                       )}
                     </div>
                   ))}
