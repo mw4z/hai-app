@@ -34,6 +34,12 @@ public class MainActivity extends BridgeActivity {
     // offline page. Prevents the WebViewClient from looping if the
     // offline page itself somehow fails to load.
     private boolean showingOfflineFallback = false;
+    // Cold launch (especially from a tapped notification) often fails the
+    // FIRST load because the radio isn't up yet. Retry the remote URL a
+    // couple of times before falling back to the offline page, so that
+    // screen doesn't flash for a second or two on every cold start.
+    private int loadRetries = 0;
+    private static final int MAX_LOAD_RETRIES = 2;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,12 +98,29 @@ public class MainActivity extends BridgeActivity {
                     // ignore subresource (image, script) failures and
                     // failures of the offline page itself.
                     if (req == null || !req.isForMainFrame()) return;
-                    String failed = req.getUrl() == null ? "" : req.getUrl().toString();
+                    final String failed = req.getUrl() == null ? "" : req.getUrl().toString();
                     if (showingOfflineFallback) return;
                     if (!failed.startsWith(REMOTE_URL)) return;
+                    // Cold-start grace: the radio is usually up within ~1-2s.
+                    // Retry the load before showing the offline page so it
+                    // doesn't flash on every launch-from-notification.
+                    if (loadRetries < MAX_LOAD_RETRIES) {
+                        loadRetries++;
+                        view.stopLoading();
+                        view.postDelayed(() -> {
+                            try { view.loadUrl(failed); } catch (Exception ignored) {}
+                        }, loadRetries * 700L);
+                        return;
+                    }
                     showingOfflineFallback = true;
                     view.stopLoading();
                     view.loadUrl(OFFLINE_URL);
+                }
+
+                @Override
+                public void onPageFinished(WebView view, String url) {
+                    // A successful remote load resets the retry budget.
+                    if (url != null && url.startsWith(REMOTE_URL)) loadRetries = 0;
                 }
 
                 @Override

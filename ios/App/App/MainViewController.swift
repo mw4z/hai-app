@@ -33,6 +33,13 @@ class MainViewController: CAPBridgeViewController {
     /// Prevents a recursion if the offline page itself ever fails.
     private var showingOfflineFallback = false
 
+    /// Cold launch (especially from a tapped notification) often fails the
+    /// FIRST load because the radio isn't up yet. Retry the remote URL a
+    /// couple of times before falling back to the offline page, so that
+    /// screen doesn't flash for a second or two on every cold start.
+    private var loadRetries = 0
+    private static let maxLoadRetries = 2
+
     /// `nil` until viewDidLoad runs — created lazily so we don't pay
     /// for the path monitor when the app is fully online.
     private var pathMonitor: NWPathMonitor?
@@ -196,6 +203,17 @@ class MainViewController: CAPBridgeViewController {
         ].contains(nsErr.code)
 
         if offlineCode {
+            // Cold-start grace: the radio is usually up within ~1-2s. Retry
+            // the failed load before showing the offline page so it doesn't
+            // flash on every launch-from-notification.
+            if loadRetries < MainViewController.maxLoadRetries {
+                loadRetries += 1
+                let delay = Double(loadRetries) * 0.7
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    self?.webView?.load(URLRequest(url: url))
+                }
+                return
+            }
             loadBundledOfflinePage()
         }
     }
@@ -233,6 +251,10 @@ extension MainViewController: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // A successful remote load resets the retry budget.
+        if let url = webView.url, url.absoluteString.hasPrefix(MainViewController.remoteURLString) {
+            loadRetries = 0
+        }
         capacitorDelegate?.webView?(webView, didFinish: navigation)
     }
 
