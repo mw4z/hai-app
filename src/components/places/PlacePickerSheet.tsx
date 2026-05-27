@@ -5,8 +5,9 @@ import { createPortal } from 'react-dom'
 import { FiX, FiSearch, FiPhone } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
-import { getCategoryMeta } from '@/lib/places/categories'
-import { getServiceCategoryMeta } from '@/lib/services/serviceCategories'
+import { useDragToDismiss } from '@/hooks/useDragToDismiss'
+import { getCategoryMeta, PLACE_CATEGORIES } from '@/lib/places/categories'
+import { getServiceCategoryMeta, SERVICE_CATEGORIES } from '@/lib/services/serviceCategories'
 import PlaceStatusBadge from '@/components/places/PlaceStatusBadge'
 import HaiLoader from '@/components/HaiLoader'
 
@@ -63,58 +64,84 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
   const [places, setPlaces] = useState<PickerPlace[] | null>(null)
   const [services, setServices] = useState<PickerService[] | null>(null)
   const [loading, setLoading] = useState(false)
+  const [category, setCategory] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useBodyScrollLock(open)
+  const { sheetRef, handleRef, bodyRef } = useDragToDismiss<HTMLDivElement, HTMLDivElement, HTMLDivElement>({ open, onDismiss: onClose })
 
-  // Debounced fetch for the active tab. Empty query loads the
-  // neighborhood's most recent entries.
+  const mapServices = (data: any): PickerService[] =>
+    (Array.isArray(data?.contacts) ? data.contacts : []).map((c: any) => ({
+      id: c.id, displayName: c.displayName, category: c.category,
+      serviceArea: c.serviceArea ?? null, phone: c.phone, whatsapp: !!c.whatsapp,
+    }))
+  const mapPlaces = (data: any): PickerPlace[] =>
+    (Array.isArray(data?.places) ? data.places : []).map((p: any) => ({
+      id: p.id, name: p.name, category: p.category,
+      status: p.status, addressText: p.addressText ?? null,
+    }))
+  const buildUrl = (offset: number) => {
+    const params = new URLSearchParams()
+    if (q.trim()) params.set('q', q.trim())
+    if (category) params.set('category', category)
+    if (offset > 0) params.set('offset', String(offset))
+    const base = tab === 'services' ? '/api/directory/service-contacts' : '/api/directory'
+    return `${base}?${params.toString()}`
+  }
+
+  // Debounced first-page fetch for the active tab + category. Empty query
+  // loads the neighborhood's most recent entries.
   useEffect(() => {
     if (!open) return
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
       try {
-        const params = new URLSearchParams()
-        if (q.trim()) params.set('q', q.trim())
-        const url = tab === 'services'
-          ? `/api/directory/service-contacts?${params.toString()}`
-          : `/api/directory?${params.toString()}`
-        const res = await fetch(url, { credentials: 'include', cache: 'no-store' })
-        if (!res.ok) {
-          if (tab === 'services') setServices([]); else setPlaces([])
-          return
-        }
+        const res = await fetch(buildUrl(0), { credentials: 'include', cache: 'no-store' })
+        if (!res.ok) { if (tab === 'services') setServices([]); else setPlaces([]); setHasMore(false); return }
         const data = await res.json()
-        if (tab === 'services') {
-          const arr = Array.isArray(data?.contacts) ? data.contacts : []
-          setServices(arr.map((c: any) => ({
-            id: c.id, displayName: c.displayName, category: c.category,
-            serviceArea: c.serviceArea ?? null, phone: c.phone, whatsapp: !!c.whatsapp,
-          })))
-        } else {
-          const arr = Array.isArray(data?.places) ? data.places : []
-          setPlaces(arr.map((p: any) => ({
-            id: p.id, name: p.name, category: p.category,
-            status: p.status, addressText: p.addressText ?? null,
-          })))
-        }
+        setHasMore(!!data.hasMore)
+        if (tab === 'services') setServices(mapServices(data)); else setPlaces(mapPlaces(data))
       } catch {
-        if (tab === 'services') setServices([]); else setPlaces([])
+        if (tab === 'services') setServices([]); else setPlaces([]); setHasMore(false)
       } finally {
         setLoading(false)
       }
     }, q ? SEARCH_DEBOUNCE_MS : 0)
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [open, q, tab, category])
+
+  // Append the next page (offset = current count). De-dupes by id.
+  async function loadMore() {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const offset = (tab === 'services' ? services?.length : places?.length) || 0
+      const res = await fetch(buildUrl(offset), { credentials: 'include', cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      setHasMore(!!data.hasMore)
+      if (tab === 'services') {
+        const more = mapServices(data)
+        setServices((prev) => { const seen = new Set((prev ?? []).map((x) => x.id)); return [...(prev ?? []), ...more.filter((x) => !seen.has(x.id))] })
+      } else {
+        const more = mapPlaces(data)
+        setPlaces((prev) => { const seen = new Set((prev ?? []).map((x) => x.id)); return [...(prev ?? []), ...more.filter((x) => !seen.has(x.id))] })
+      }
+    } catch { /* keep what we have */ } finally {
+      setLoadingMore(false)
     }
-  }, [open, q, tab])
+  }
 
   // Reset on open.
   useEffect(() => {
     if (open) {
       setTab('places')
       setQ('')
+      setCategory(null)
+      setHasMore(false)
       setPlaces(null)
       setServices(null)
     }
@@ -143,10 +170,12 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
   }
 
   const results = tab === 'services' ? services : places
+  const chipCls = (active: boolean) =>
+    `flex-shrink-0 px-3 py-1.5 rounded-full text-[11.5px] font-semibold whitespace-nowrap ${active ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'}`
   const tabBtn = (t: Tab, label: string) => (
     <button
       type="button"
-      onClick={() => { setTab(t); setQ('') }}
+      onClick={() => { setTab(t); setQ(''); setCategory(null); setHasMore(false) }}
       className={`flex-1 py-2 rounded-xl text-[13px] font-bold transition-colors ${tab === t ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
     >
       {label}
@@ -162,11 +191,12 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
       aria-labelledby="hai-place-picker-title"
     >
       <div
+        ref={sheetRef}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-[520px] max-h-[80vh] flex flex-col bg-white dark:bg-gray-900 rounded-t-3xl"
         style={{ paddingBottom: 'var(--hai-safe-bottom, 0px)' }}
       >
-        <div className="px-4 pt-3 pb-2 flex-shrink-0 border-b border-gray-100 dark:border-gray-800">
+        <div ref={handleRef} className="px-4 pt-3 pb-2 flex-shrink-0 border-b border-gray-100 dark:border-gray-800">
           <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-2" />
           <div className="flex items-center justify-between mb-2">
             <h2 id="hai-place-picker-title" className="text-sm font-bold text-gray-900 dark:text-white">
@@ -200,9 +230,22 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
               autoFocus
             />
           </div>
+
+          {/* Category filter — PlaceCategory on the Places tab,
+              ServiceCategory on the Services tab. */}
+          <div className="flex gap-1.5 mt-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
+            <button type="button" onClick={() => setCategory(null)} className={chipCls(category === null)}>
+              {tr('All', 'الكل', 'سب')}
+            </button>
+            {(tab === 'services' ? SERVICE_CATEGORIES : PLACE_CATEGORIES).map((c) => (
+              <button key={c.key} type="button" onClick={() => setCategory((cur) => (cur === c.key ? null : c.key))} className={chipCls(category === c.key)}>
+                {c.emoji} {lang === 'en' ? c.labelEn : lang === 'ur' ? c.labelUr : c.labelAr}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div ref={bodyRef} className="flex-1 overflow-y-auto px-4 py-3">
           {loading && results === null && (
             <div className="py-8"><HaiLoader size="md" /></div>
           )}
@@ -268,6 +311,17 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
                 )
               })}
             </ul>
+          )}
+
+          {hasMore && (
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="w-full mt-2 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-[13px] font-semibold active:scale-[0.98] transition-transform disabled:opacity-60"
+            >
+              {loadingMore ? tr('Loading…', 'جاري التحميل…', 'لوڈ ہو رہا ہے…') : tr('Show more', 'عرض المزيد', 'مزید دکھائیں')}
+            </button>
           )}
         </div>
       </div>

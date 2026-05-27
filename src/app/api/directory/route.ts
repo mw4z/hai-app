@@ -70,6 +70,7 @@ export async function GET(req: NextRequest) {
       : undefined
 
   const q = (url.searchParams.get('q') || '').trim().slice(0, 80)
+  const offset = Math.min(100_000, Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0))
 
   // Pro-filter knobs: minRating, openNow, verifiedOnly, hasPhotos,
   // sort. All optional; defaults preserve legacy behaviour
@@ -101,6 +102,7 @@ export async function GET(req: NextRequest) {
     where,
     orderBy: buildDirectoryOrderBy(filters),
     take: dbTake,
+    ...(needsPostFilter ? {} : { skip: offset }),
     include: {
       claimedByUser: {
         select: { id: true, name: true, avatarUrl: true, providerStatus: true },
@@ -115,9 +117,13 @@ export async function GET(req: NextRequest) {
       (p) => matchesArabic(p.name, q) || matchesArabic(p.addressText, q),
     )
   }
-  working = applyOpenNowFilter(working, filters).slice(0, PAGE_SIZE)
+  working = applyOpenNowFilter(working, filters)
+  // Browse (no post-filter) is offset-paginated; the q/openNow path stays a
+  // single overfetched window. hasMore lets clients show "Show more".
+  const hasMore = needsPostFilter ? working.length > PAGE_SIZE : rows.length === PAGE_SIZE
+  working = working.slice(0, PAGE_SIZE)
 
-  return NextResponse.json({ places: working.map(toPublicPlace) })
+  return NextResponse.json({ places: working.map(toPublicPlace), hasMore })
 }
 
 /**
