@@ -38,7 +38,7 @@ class MainViewController: CAPBridgeViewController {
     /// couple of times before falling back to the offline page, so that
     /// screen doesn't flash for a second or two on every cold start.
     private var loadRetries = 0
-    private static let maxLoadRetries = 2
+    private static let maxLoadRetries = 8
 
     /// `nil` until viewDidLoad runs — created lazily so we don't pay
     /// for the path monitor when the app is fully online.
@@ -203,12 +203,14 @@ class MainViewController: CAPBridgeViewController {
         ].contains(nsErr.code)
 
         if offlineCode {
-            // Cold-start grace: the radio is usually up within ~1-2s. Retry
-            // the failed load before showing the offline page so it doesn't
-            // flash on every launch-from-notification.
+            // Cold-start grace: launching from a notification, the radio can
+            // take several seconds to come up. Retry the load patiently (~8s,
+            // every 1s) before EVER showing the offline page — otherwise it
+            // flashes the offline page AND the web app never runs, so the
+            // notification's deep-link is lost. Splash stays up meanwhile.
             if loadRetries < MainViewController.maxLoadRetries {
                 loadRetries += 1
-                let delay = Double(loadRetries) * 0.7
+                let delay = 1.0
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                     self?.webView?.load(URLRequest(url: url))
                 }

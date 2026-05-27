@@ -38,7 +38,7 @@ public class MainActivity extends BridgeActivity {
     // couple of times before falling back to the offline page, so that
     // screen doesn't flash for a second or two on every cold start.
     private int loadRetries = 0;
-    private static final int MAX_LOAD_RETRIES = 2;
+    private static final int MAX_LOAD_RETRIES = 8;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -114,9 +114,14 @@ public class MainActivity extends BridgeActivity {
                     if (loadRetries < MAX_LOAD_RETRIES) {
                         loadRetries++;
                         view.stopLoading();
+                        // Retry patiently (~8s, every 1s) before EVER showing
+                        // the offline page — on a notification cold-start the
+                        // radio can take several seconds, and the offline page
+                        // also stops the web app from running, which loses the
+                        // notification's deep-link.
                         view.postDelayed(() -> {
                             try { view.loadUrl(failed); } catch (Exception ignored) {}
-                        }, loadRetries * 700L);
+                        }, 1000L);
                         return;
                     }
                     showingOfflineFallback = true;
