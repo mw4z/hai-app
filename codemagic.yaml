@@ -23,20 +23,26 @@ workflows:
       - name: Sync Capacitor
         script: |
           npx cap sync ios
-      - name: Set up code signing
+      - name: Set up App Store Connect API key
         script: |
+          # Xcode-managed (automatic) signing. The old flow used
+          # `fetch-signing-files --create` with a fresh cert every build,
+          # which filled Apple's cert limit and produced BARE profiles
+          # missing the app's capabilities (Push) — so the archive failed on
+          # essentially every build. Automatic signing + the ASC API key lets
+          # `-allowProvisioningUpdates` create/refresh a profile that always
+          # includes the app's enabled capabilities, with no manual churn.
           keychain initialize
-          export CERTIFICATE_PRIVATE_KEY=$(openssl genrsa 2048 2>/dev/null)
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create
-          keychain add-certificates
-          xcode-project use-profiles --project "$XCODE_PROJECT"
+          mkdir -p "$HOME/private_keys"
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$HOME/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_IDENTIFIER.p8"
       - name: Build iOS app
         script: |
+          AUTH="-allowProvisioningUpdates -authenticationKeyPath $HOME/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_IDENTIFIER.p8 -authenticationKeyID $APP_STORE_CONNECT_KEY_IDENTIFIER -authenticationKeyIssuerID $APP_STORE_CONNECT_ISSUER_ID"
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME" \
+            --archive-xcargs "$AUTH CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=XD95FL293Z" \
+            --export-xcargs "$AUTH"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
