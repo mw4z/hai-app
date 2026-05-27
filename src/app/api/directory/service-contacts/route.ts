@@ -55,6 +55,9 @@ export async function GET(req: NextRequest) {
 
   const categoryParam = url.searchParams.get('category')
   const q = (url.searchParams.get('q') || '').trim()
+  // Browse is offset-paginated so a big neighborhood (hundreds of contacts)
+  // isn't capped at one page. Search is a single wider window filtered in JS.
+  const offset = q ? 0 : Math.min(100_000, Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0))
 
   const rows = await db.directoryServiceContact.findMany({
     where: {
@@ -63,18 +66,21 @@ export async function GET(req: NextRequest) {
       ...(categoryParam && isValidServiceCategory(categoryParam) ? { category: categoryParam } : {}),
     },
     orderBy: [{ verification: 'desc' }, { ratingAvg: 'desc' }, { createdAt: 'desc' }],
-    take: q ? PAGE_SIZE * 6 : PAGE_SIZE,
+    ...(q ? { take: PAGE_SIZE * 6 } : { take: PAGE_SIZE, skip: offset }),
     include: { serviceIdentity: { select: { phoneEnc: true, ownerUserId: true } } },
   })
 
   let working = rows
-  if (q) working = working.filter((c) => matchesArabic(c.displayName, q) || matchesArabic(c.serviceArea, q))
+  let hasMore = false
+  if (q) working = working.filter((c) => matchesArabic(c.displayName, q) || matchesArabic(c.serviceArea, q)).slice(0, PAGE_SIZE)
+  else hasMore = rows.length === PAGE_SIZE  // a full page came back → more may follow
   // canModerate mirrors the [id] route gate: any directory moderator, but a
   // NEIGHBORHOOD_MOD only in their own hood (not while browsing another).
   const canModerate = isDirectoryModerator(user.role) &&
     (user.role !== 'NEIGHBORHOOD_MOD' || targetNeighborhoodId === user.neighborhoodId)
   return NextResponse.json({
-    contacts: working.slice(0, PAGE_SIZE).map(toPublicServiceContact),
+    contacts: working.map(toPublicServiceContact),
+    hasMore,
     viewerId: session.userId,
     canModerate,
   })

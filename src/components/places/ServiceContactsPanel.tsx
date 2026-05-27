@@ -29,19 +29,29 @@ export default function ServiceContactsPanel({
   const [viewerId, setViewerId] = useState<string | null>(null)
   const [canModerate, setCanModerate] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
 
-  useEffect(() => {
-    let aborted = false
-    setLoading(true)
+  // Shared query string for the current filter (offset added per call).
+  const buildParams = (offset: number) => {
     const params = new URLSearchParams()
     if (q) params.set('q', q)
     if (category) params.set('category', category)
     if (isReadOnly && browseNeighborhoodId) params.set('neighborhood', browseNeighborhoodId)
-    fetch(`/api/directory/service-contacts?${params.toString()}`)
+    if (offset > 0) params.set('offset', String(offset))
+    return params
+  }
+
+  // First page — re-runs whenever the filter changes (replaces the list).
+  useEffect(() => {
+    let aborted = false
+    setLoading(true)
+    fetch(`/api/directory/service-contacts?${buildParams(0).toString()}`)
       .then((r) => r.json())
       .then((d) => {
         if (aborted) return
         setContacts(Array.isArray(d.contacts) ? d.contacts : [])
+        setHasMore(!!d.hasMore)
         setViewerId(d.viewerId ?? null)
         setCanModerate(!!d.canModerate)
       })
@@ -49,6 +59,25 @@ export default function ServiceContactsPanel({
       .finally(() => { if (!aborted) setLoading(false) })
     return () => { aborted = true }
   }, [q, category, isReadOnly, browseNeighborhoodId])
+
+  // "Show more" — append the next page (browse only; search is single-page).
+  const loadMore = () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    fetch(`/api/directory/service-contacts?${buildParams(contacts.length).toString()}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const more: PublicServiceContact[] = Array.isArray(d.contacts) ? d.contacts : []
+        // Guard against duplicates if rows shifted between pages.
+        setContacts((prev) => {
+          const seen = new Set(prev.map((x) => x.id))
+          return [...prev, ...more.filter((x) => !seen.has(x.id))]
+        })
+        setHasMore(!!d.hasMore)
+      })
+      .catch(() => {})
+      .finally(() => setLoadingMore(false))
+  }
 
   return (
     <div className="space-y-3">
@@ -117,6 +146,17 @@ export default function ServiceContactsPanel({
               onUpdated={(u) => setContacts((prev) => prev.map((x) => (x.id === u.id ? u : x)))}
             />
           ))}
+
+          {hasMore && (
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="w-full py-3 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-semibold active:scale-[0.98] transition-transform disabled:opacity-60"
+            >
+              {loadingMore ? tr('Loading…', 'جاري التحميل…', 'لوڈ ہو رہا ہے…') : tr('Show more', 'عرض المزيد', 'مزید دکھائیں')}
+            </button>
+          )}
         </div>
       )}
     </div>
