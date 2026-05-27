@@ -9,6 +9,8 @@ workflows:
       node: 22
       xcode: latest
       cocoapods: default
+      groups:
+        - ios_signing
       vars:
         BUNDLE_ID: "net.hai-app.hai"
         XCODE_PROJECT: "ios/App/App.xcodeproj"
