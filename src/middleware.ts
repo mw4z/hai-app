@@ -15,6 +15,6 @@ export const config = {
   // links, and public share pages (/s/...) so shared links render a preview
   // instead of bouncing browser visitors to the marketing site.
   matcher: [
-    '/((?!api|_next|favicon|icons|images|manifest|sw|workbox|privacy|contact|child-safety|i/|s/|.*\\.).*)',
+    '/((?!api|_next|favicon|icons|images|manifest|sw|workbox|privacy|contact|child-safety|i/|s/|\\.well-known|.*\\.).*)',
   ],
 }

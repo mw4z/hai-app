@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "XD95FL293Z.net.hai-app.hai",
+        "paths": [
+          "/s/*",
+          "/i/*",
+          "/threads/*",
+          "/directory/*"
+        ]
+      }
+    ]
+  }
+}

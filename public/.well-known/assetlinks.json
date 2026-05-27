@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.hai.app",
+      "sha256_cert_fingerprints": [
+        "01:52:0C:DD:1D:2D:29:D5:24:33:C5:46:43:65:4D:4D:69:A3:55:25:D6:16:ED:3B:9B:83:3F:3D:CE:22:8D:A8"
+      ]
+    }
+  }
+]

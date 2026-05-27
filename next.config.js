@@ -105,6 +105,9 @@ const nextConfig = {
       { source: '/icon-foreground-:size.svg', headers: brandIconHeaders },
       { source: '/favicon.ico', headers: brandIconHeaders },
       { source: '/favicon.svg', headers: brandIconHeaders },
+      // Apple fetches the AASA (no file extension) and is happiest with an
+      // explicit JSON content-type. assetlinks.json already gets it via .json.
+      { source: '/.well-known/apple-app-site-association', headers: [{ key: 'Content-Type', value: 'application/json' }] },
       // Security headers apply to everything — last so the brand-icon
       // rules above can layer Cache-Control on top.
       { source: '/(.*)', headers: securityHeaders },

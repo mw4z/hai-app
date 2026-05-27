@@ -163,6 +163,7 @@ export default function CapacitorBridge() {
     // appStateChange and re-evaluating the theme on resume is the
     // canonical fix; it also covers iPhone and Android for free.
     let appListenerHandle: { remove: () => void } | null = null
+    let urlListenerHandle: { remove: () => void } | null = null
     ;(async () => {
       try {
         const { App } = await import('@capacitor/app')
@@ -180,12 +181,32 @@ export default function CapacitorBridge() {
             (th === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
           document.documentElement.classList.toggle('dark', isDarkNow)
         })
+
+        // Universal/App Links: when a shared https://app.hai-app.net/... link
+        // opens the installed app, route it to the right in-app screen. Share
+        // links are /s/post/<id> & /s/poll/<id>; the real content lives at
+        // /feed?post= / /feed?poll= (mirrors the share pages). Other claimed
+        // paths (/i, /threads, /directory) map 1:1.
+        urlListenerHandle = await App.addListener('appUrlOpen', ({ url }: { url: string }) => {
+          try {
+            const u = new URL(url)
+            if (u.host !== 'app.hai-app.net') return
+            const seg = u.pathname.split('/').filter(Boolean)
+            let target: string
+            if (seg[0] === 's' && seg[1] === 'post' && seg[2]) target = '/feed?post=' + encodeURIComponent(seg[2])
+            else if (seg[0] === 's' && seg[1] === 'poll' && seg[2]) target = '/feed?poll=' + encodeURIComponent(seg[2])
+            else target = u.pathname + u.search
+            const cur = window.location.pathname + window.location.search
+            if (target && target !== cur) window.location.assign(target)
+          } catch { /* malformed url — ignore */ }
+        })
       } catch { /* @capacitor/app not available — no-op on web */ }
     })()
 
     return () => {
       observer.disconnect()
       try { appListenerHandle?.remove() } catch {}
+      try { urlListenerHandle?.remove() } catch {}
     }
   }, [])
 

@@ -24,6 +24,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- App Links: open https://app.hai-app.net/{s,i,threads,directory}/*
+                 directly in the app (verified via /.well-known/assetlinks.json). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="app.hai-app.net" android:pathPrefix="/s/" />
+                <data android:scheme="https" android:host="app.hai-app.net" android:pathPrefix="/i/" />
+                <data android:scheme="https" android:host="app.hai-app.net" android:pathPrefix="/threads/" />
+                <data android:scheme="https" android:host="app.hai-app.net" android:pathPrefix="/directory/" />
+            </intent-filter>
+
         </activity>
 
         <provider
