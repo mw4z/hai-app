@@ -30,7 +30,9 @@ const ASPECTS: { key: string; ar: string; en: string; ratio: number | null | und
   { key: 'l169', ar: '16:9', en: '16:9', ratio: 16 / 9 },
 ]
 
-const FULL: Crop = { unit: '%', x: 0, y: 0, width: 100, height: 100 }
+// Start slightly inset (not the full frame) so the corner handles sit ON the
+// image — at 100% they'd straddle the very edge and get half-clipped/hidden.
+const INITIAL: Crop = { unit: '%', x: 2.5, y: 2.5, width: 95, height: 95 }
 const MAX_OUTPUT_EDGE = 1600
 const OUTPUT_QUALITY = 0.9
 
@@ -46,7 +48,7 @@ export default function PhotoCropEditor({ image, fileName, index, total, onDone,
 
   const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     imgRef.current = e.currentTarget
-    setCrop(FULL) // start with the whole image selected (free)
+    setCrop(INITIAL) // start with the whole image selected (free)
   }, [])
 
   function chooseAspect(key: string, ratio: number | null | undefined) {
@@ -54,7 +56,7 @@ export default function PhotoCropEditor({ image, fileName, index, total, onDone,
     const img = imgRef.current
     if (ratio === undefined) {            // free — release the lock
       setAspect(undefined)
-      setCrop(FULL)
+      setCrop(INITIAL)
       return
     }
     const r = ratio === null ? (img ? img.naturalWidth / img.naturalHeight : 1) : ratio
@@ -93,6 +95,14 @@ export default function PhotoCropEditor({ image, fileName, index, total, onDone,
 
   return (
     <div className="fixed inset-0 z-[9999] bg-black flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      {/* react-image-crop's default handles are a faint translucent-dark
+          square — almost invisible over a photo. Make them solid white,
+          bordered, and bigger (incl. a large touch target on mobile). */}
+      <style>{`
+        :root { --rc-drag-handle-size: 14px; --rc-drag-handle-mobile-size: 30px; --rc-drag-handle-bg-colour: #ffffff; }
+        .ReactCrop__drag-handle { border: 2px solid rgba(0,0,0,0.55); border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.65); }
+        @media (pointer: coarse) { .ReactCrop__drag-handle::after { content: ''; position: absolute; inset: -10px; } }
+      `}</style>
       <div className="flex items-center justify-between px-4 py-3">
         <button onClick={onCancel} className="text-white/80 text-2xl leading-none w-9 h-9 flex items-center justify-center" aria-label={tr('Cancel', 'إلغاء', 'منسوخ')}>✕</button>
         <span className="text-white/70 text-sm font-medium">
@@ -109,6 +119,7 @@ export default function PhotoCropEditor({ image, fileName, index, total, onDone,
           minWidth={16}
           minHeight={16}
           keepSelection
+          ruleOfThirds
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={image} alt="" onLoad={onImageLoad} style={{ maxHeight: '70vh', maxWidth: '100%', display: 'block' }} />
