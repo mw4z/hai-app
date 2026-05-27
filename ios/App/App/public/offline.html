@@ -175,7 +175,7 @@
       function probe() {
         return new Promise(function (resolve) {
           var ctrl = new AbortController()
-          var to = setTimeout(function () { ctrl.abort() }, 4000)
+          var to = setTimeout(function () { ctrl.abort() }, 2000)
           fetch(REMOTE_URL + '/api/ping?_=' + Date.now(), {
             method: 'GET',
             cache: 'no-store',
@@ -231,8 +231,17 @@
       // means we don't flip the button into the busy state, so the
       // user can still tap it freely.
       window.addEventListener('online', function () { attemptRetry(true) })
-      setInterval(function () { attemptRetry(true) }, 5000)
-      setTimeout(function () { attemptRetry(true) }, 200)
+      // Cold launch (esp. from a notification): the radio is warming up, so
+      // retry fast — every 500ms for the first ~12s — then back off to 4s.
+      // Combined with the 2s probe timeout, the page navigates to the app the
+      // instant connectivity returns, so this screen is a blink, not seconds.
+      var _tries = 0
+      function _retryLoop () {
+        attemptRetry(true)
+        _tries++
+        setTimeout(_retryLoop, _tries < 24 ? 500 : 4000)
+      }
+      setTimeout(_retryLoop, 120)
     })()
   </script>
 </body>
