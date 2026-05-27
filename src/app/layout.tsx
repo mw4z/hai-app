@@ -9,6 +9,7 @@ import BottomNav from '@/components/BottomNav'
 import ArrivalAlert from '@/components/ArrivalAlert'
 import CapacitorBridge from '@/components/CapacitorBridge'
 import SwUpdateReload from '@/components/SwUpdateReload'
+import CropHost from '@/components/CropHost'
 import DebugOverlay from '@/components/DebugOverlay'
 import PushRegistration from '@/components/PushRegistration'
 import NotificationPermissionNudge from '@/components/NotificationPermissionNudge'
@@ -229,6 +230,9 @@ export default function RootLayout({
           {/* Offline banner — mounted last so its z-index sits above
               the rest of the chrome but below sheets/modals. */}
           <OfflineBanner />
+          {/* Global crop-before-upload editor — renders over everything when
+              a picked image is awaiting crop (see lib/cropBridge). */}
+          <CropHost />
           </ConfirmProvider>
           </NetworkProvider>
         </LangProvider>

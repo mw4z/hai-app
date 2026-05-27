@@ -10,6 +10,7 @@ import { useNetworkStatus } from '@/lib/network'
 import { translateApiError } from '@/lib/apiError'
 import RiyalIcon from '@/components/RiyalIcon'
 import { uploadFiles, uploadPdf, uploadStageLabel, type UploadStage } from '@/lib/upload'
+import { cropFiles } from '@/lib/cropBridge'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
 import PdfTile from '@/components/PdfTile'
@@ -642,9 +643,10 @@ export default function NewPostPage() {
   }
   const [showImageSheet, setShowImageSheet] = useState(false)
 
-  function applyPostImages(files: File[]) {
+  async function applyPostImages(files: File[]) {
     const remaining = 5 - images.length
-    const toAdd = files.slice(0, remaining)
+    // Crop-before-upload: each picked image goes through the global editor.
+    const toAdd = await cropFiles(files.slice(0, remaining))
     for (const file of toAdd) {
       if (file.size > 10 * 1024 * 1024) { toast.error('حجم الصورة كبير (أقصى 10 ميقا)'); continue }
       if (!file.type.startsWith('image/')) { toast.error('نوع غير مدعوم'); continue }

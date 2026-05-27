@@ -10,6 +10,7 @@ import PlacePickerSheet from './places/PlacePickerSheet'
 import { canAttachDirectoryPlace } from '@/lib/places/canAttachPlace'
 import SubtypeChip from './posts/SubtypeChip'
 import { uploadFiles, uploadPdf, uploadStageLabel, type UploadStage } from '@/lib/upload'
+import { cropFile, cropFiles } from '@/lib/cropBridge'
 import { playSend, playReaction, playDelete } from '@/lib/sound'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
 import EmojiPicker from './EmojiPickerWrapper'
@@ -958,8 +959,11 @@ export default function PostCard({
     }
   }
 
-  function applyPickedImage(file: File, target: 'comment' | 'reply') {
-    if (!file.type.startsWith('image/')) { toast.error(lang === 'en' ? 'Images only' : 'صور فقط'); return }
+  async function applyPickedImage(rawFile: File, target: 'comment' | 'reply') {
+    if (!rawFile.type.startsWith('image/')) { toast.error(lang === 'en' ? 'Images only' : 'صور فقط'); return }
+    // Crop-before-upload: run the picked image through the global editor.
+    const file = await cropFile(rawFile)
+    if (!file) return
     if (file.size > 10 * 1024 * 1024) { toast.error(lang === 'en' ? 'Max 10MB' : 'الحد الأقصى 10 ميقا'); return }
     const preview = URL.createObjectURL(file)
     if (target === 'comment') {
@@ -1457,7 +1461,7 @@ export default function PostCard({
               multiple
               className="hai-hidden"
               onChange={async (e) => {
-                const files = Array.from(e.target.files || [])
+                const files = await cropFiles(Array.from(e.target.files || []))
                 if (!files.length) return
                 setEditImageUploading(true)
                 try {
@@ -1478,7 +1482,7 @@ export default function PostCard({
               capture="environment"
               className="hai-hidden"
               onChange={async (e) => {
-                const files = Array.from(e.target.files || [])
+                const files = await cropFiles(Array.from(e.target.files || []))
                 if (!files.length) return
                 setEditImageUploading(true)
                 try {
@@ -3149,9 +3153,11 @@ export default function PostCard({
           if (isNative) {
             try {
               const file = await pickImageFromCamera()
+              const cropped = await cropFile(file)
+              if (!cropped) return
               setEditImageUploading(true)
               try {
-                const urls = await uploadFiles([file])
+                const urls = await uploadFiles([cropped])
                 setEditImages((prev) => [...prev, ...urls].slice(0, 5))
               } catch {
                 toast.error(lang === 'en' ? 'Upload failed' : lang === 'ur' ? 'اپ لوڈ ناکام' : 'فشل رفع الصورة')
@@ -3170,9 +3176,11 @@ export default function PostCard({
         onGallery={async () => {
           const file = await pickImageOrFallback(lang as any, editImageInputRef)
           if (!file) return
+          const cropped = await cropFile(file)
+          if (!cropped) return
           setEditImageUploading(true)
           try {
-            const urls = await uploadFiles([file])
+            const urls = await uploadFiles([cropped])
             setEditImages((prev) => [...prev, ...urls].slice(0, 5))
           } catch {
             toast.error(lang === 'en' ? 'Upload failed' : lang === 'ur' ? 'اپ لوڈ ناکام' : 'فشل رفع الصورة')

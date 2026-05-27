@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import { uploadFiles } from '@/lib/upload'
 import { pickImagesOrFallback } from '@/lib/imagePicker'
+import { cropFiles } from '@/lib/cropBridge'
 import BackButton from '@/components/BackButton'
 import { HaiSpinner } from '@/components/HaiLoader'
 import { hapticSuccess } from '@/lib/haptic'
@@ -34,8 +35,8 @@ export default function NeighborhoodReportsClient({ initialReports }: { initialR
   const [loading, setLoading] = useState(false)
   const imageInputRef = useRef<HTMLInputElement>(null)
 
-  function applyReportImages(files: File[]) {
-    const limited = files.slice(0, 3 - images.length)
+  async function applyReportImages(files: File[]) {
+    const limited = await cropFiles(files.slice(0, 3 - images.length))
     const newImages = limited.map(f => ({ file: f, preview: URL.createObjectURL(f) }))
     setImages(prev => [...prev, ...newImages])
   }

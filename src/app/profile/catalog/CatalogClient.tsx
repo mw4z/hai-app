@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { uploadFiles } from '@/lib/upload'
 import { pickImageOrFallback } from '@/lib/imagePicker'
+import { cropFile } from '@/lib/cropBridge'
 import { useLanguage } from '@/hooks/useLanguage'
 import { FiArrowRight, FiArrowLeft, FiPlus, FiTrash2, FiCamera } from 'react-icons/fi'
 import { HaiSpinner } from '@/components/HaiLoader'
@@ -51,9 +52,11 @@ export default function CatalogClient({ initialItems, claimedPlace }: Props) {
 
   async function uploadImage(file: File) {
     if (uploading) return
+    const cropped = await cropFile(file)
+    if (!cropped) return
     setUploading(true)
     try {
-      const urls = await uploadFiles([file])
+      const urls = await uploadFiles([cropped])
       if (urls[0]) setImageUrl(urls[0])
     } catch { toast.error(dn('فشل رفع الصورة', 'Upload failed')) }
     finally { setUploading(false) }
