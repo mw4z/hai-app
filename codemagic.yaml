@@ -31,9 +31,17 @@ workflows:
           # via the App Store Connect API integration. IOS_APP_STORE is a
           # distribution profile, so — unlike the development profile automatic
           # signing tried to mint — it needs NO registered devices. --create
-          # builds it from the App ID's capabilities, so it includes Push and
-          # matches the app's entitlements (no capability-mismatch archive fail).
-          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+          # builds it from the App ID's capabilities, so it includes Push.
+          #
+          # --certificate-key pins signing to OUR persistent private key (stored
+          # as the CERT_KEY env var in Codemagic). Codemagic VMs are ephemeral,
+          # so without a stored key every build either churns a new cert or hits
+          # orphaned certs it has no key for ("Cannot save ... without private
+          # key"). With the pinned key the same cert is reused every build.
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --certificate-key "@env:CERT_KEY" \
+            --create
           # Add the fetched signing certificate(s) to the build keychain.
           keychain add-certificates
           # Point the Xcode project at the fetched distribution profile (manual

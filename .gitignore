@@ -74,3 +74,6 @@ _cards.json
 .env.prod.tmp
 _import_cards.cjs
 _enable_wa.cjs
+
+# iOS distribution signing private key (NEVER commit)
+_dist_cert_key.pem
