@@ -30,6 +30,7 @@ export const SERVICE_CATEGORIES: ServiceCategoryMeta[] = [
   { key: 'BEAUTY',       emoji: '💄', labelAr: 'تجميل وكوافير',     labelEn: 'Beauty & salon', labelUr: 'بیوٹی' },
   { key: 'WATER',        emoji: '💧', labelAr: 'مياه',              labelEn: 'Water',          labelUr: 'پانی' },
   { key: 'FURNITURE',    emoji: '🛋️', labelAr: 'أثاث وديكور',        labelEn: 'Furniture & decor', labelUr: 'فرنیچر' },
+  { key: 'SPORTS',       emoji: '🏋️', labelAr: 'رياضة ولياقة',       labelEn: 'Sports & fitness', labelUr: 'کھیل و فٹنس' },
   { key: 'MISC_SUPPLIES',emoji: '🛒', labelAr: 'مستلزمات متنوعة',   labelEn: 'Misc supplies',  labelUr: 'متفرق سامان' },
   { key: 'OTHER',        emoji: '🔖', labelAr: 'أخرى',             labelEn: 'Other',          labelUr: 'دیگر' },
 ]

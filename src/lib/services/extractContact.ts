@@ -55,6 +55,7 @@ const CATEGORY_KEYWORDS: { cat: ServiceCategory; words: string[] }[] = [
   { cat: 'BEAUTY',      words: ['مكياج', 'ميك اب', 'كوافير', 'حناء', 'عرايس', 'حمام مغربي', 'مساج', 'تشقير', 'رموش', 'تسريحة', 'مناكير', 'تجميل', 'makeup', 'salon'] },
   { cat: 'WATER',       words: ['مياه', 'مياة', 'وايت ماء', 'تنكر ماء', 'وايت', 'تنكر', 'محطة مياه', 'تحلية', 'ارتواء', 'water'] },
   { cat: 'FURNITURE',   words: ['أثاث', 'اثاث', 'مفروشات', 'ديكور', 'ستائر', 'ستاير', 'ستارة', 'كنب', 'مجالس', 'تنجيد', 'ركنات', 'ورق جدران', 'furniture', 'decor'] },
+  { cat: 'SPORTS',      words: ['نادي ', 'جيم', 'لياقة', 'فتنس', 'جمنازيوم', 'بادل', 'gym', 'fitness'] },
 ]
 
 /** Infer a service category from text, or null when uncertain. */
