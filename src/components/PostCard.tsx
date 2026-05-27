@@ -984,6 +984,28 @@ export default function PostCard({
     applyPickedImage(file, target)
   }
 
+  // "إضافة الرقم للدليل" for a comment/reply: when the directory is enabled
+  // and the text holds a Saudi number, offer to add it. Pre-fills the add
+  // form (user reviews + confirms; server resolves-or-creates). Mirrors the
+  // post-body action, scoped to the comment via sourceCommentId.
+  function directoryActionFor(body: string | null | undefined, sourceCommentId: string) {
+    if (!directoryUIVisible() || !body) return null
+    const found = extractServiceContact(body)
+    if (found.phones.length === 0) return null
+    const params = new URLSearchParams({ phone: found.phones[0].raw, sourceCommentId })
+    if (found.suggestedName) params.set('name', found.suggestedName)
+    if (found.suggestedCategory) params.set('category', found.suggestedCategory)
+    return (
+      <button
+        type="button"
+        onClick={() => router.push(`/directory/services/new?${params.toString()}`)}
+        className="hai-comment__action"
+      >
+        📇 {lang === 'en' ? 'Add number' : lang === 'ur' ? 'نمبر شامل کریں' : 'إضافة الرقم للدليل'}
+      </button>
+    )
+  }
+
   async function openImagePicker(target: 'comment' | 'reply') {
     const ref = target === 'comment' ? commentImgRef : replyImgRef
     const file = await pickImageOrFallback(lang, ref)
@@ -2346,6 +2368,7 @@ export default function PostCard({
                                   : (lang === 'en' ? 'Translate' : lang === 'ur' ? 'ترجمہ' : 'ترجمة')}
                             </button>
                           )}
+                          {directoryActionFor(c.body, c.id)}
                           {/* Report — only on other people's comments. */}
                           {c.author.id !== currentUserId && (
                             <button
@@ -2459,6 +2482,7 @@ export default function PostCard({
                                         : (lang === 'en' ? 'Translate' : lang === 'ur' ? 'ترجمہ' : 'ترجمة')}
                                   </button>
                                 )}
+                                {directoryActionFor(reply.body, reply.id)}
                                 {reply.author.id !== currentUserId && (
                                   <button
                                     onClick={() => setCommentReportTarget({ id: reply.author.id, name: fullName(reply.author) || reply.author.name, commentId: reply.id })}
