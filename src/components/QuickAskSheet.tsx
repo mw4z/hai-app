@@ -11,7 +11,6 @@ import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
 import { pushBackHandler } from '@/lib/backHandler'
 import { inferAskCategory, type V2Category } from '@/lib/classify/inferAskCategory'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
-import { cropFile } from '@/lib/cropBridge'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
 import { uploadFiles } from '@/lib/upload'
 
@@ -140,13 +139,11 @@ export default function QuickAskSheet({
     }
   }, [image])
 
-  async function applyImage(rawFile: File) {
-    if (!rawFile.type.startsWith('image/')) {
+  function applyImage(file: File) {
+    if (!file.type.startsWith('image/')) {
       toast.error('صور فقط')
       return
     }
-    const file = await cropFile(rawFile)
-    if (!file) return
     if (file.size > 5 * 1024 * 1024) {
       toast.error('الحد الأقصى 5 ميقا')
       return

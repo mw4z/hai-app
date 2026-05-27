@@ -5,7 +5,6 @@ import toast from 'react-hot-toast'
 import { useLanguage } from '@/hooks/useLanguage'
 import { uploadFiles } from '@/lib/upload'
 import { pickImagesOrFallback } from '@/lib/imagePicker'
-import { cropFiles } from '@/lib/cropBridge'
 import BackButton from '@/components/BackButton'
 import { HaiSpinner } from '@/components/HaiLoader'
 import { hapticSuccess } from '@/lib/haptic'
@@ -36,8 +35,8 @@ export default function SupportClient({ initialTickets }: { initialTickets: any[
 
   const imageInputRef = useRef<HTMLInputElement>(null)
 
-  async function applySupportImages(files: File[]) {
-    const limited = await cropFiles(files.slice(0, 3 - images.length))
+  function applySupportImages(files: File[]) {
+    const limited = files.slice(0, 3 - images.length)
     const newImages = limited.map(file => ({ file, preview: URL.createObjectURL(file) }))
     setImages(prev => [...prev, ...newImages])
   }

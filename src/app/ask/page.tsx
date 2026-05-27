@@ -25,7 +25,6 @@ import { playSuccess, playError } from '@/lib/sound'
 import { t as translate } from '@/lib/i18n'
 import { inferAskCategory } from '@/lib/classify/inferAskCategory'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
-import { cropFile } from '@/lib/cropBridge'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
 import { uploadFiles } from '@/lib/upload'
 import DirectoryEntryCard from '@/components/places/DirectoryEntryCard'
@@ -331,13 +330,11 @@ export default function AskNeighborsPage() {
     }
   }, [image])
 
-  async function applyImage(rawFile: File) {
-    if (!rawFile.type.startsWith('image/')) {
+  function applyImage(file: File) {
+    if (!file.type.startsWith('image/')) {
       toast.error(lang === 'en' ? 'Images only' : lang === 'ur' ? 'صرف تصاویر' : 'صور فقط')
       return
     }
-    const file = await cropFile(rawFile)
-    if (!file) return
     if (file.size > 5 * 1024 * 1024) {
       toast.error(lang === 'en' ? 'Max 5MB' : lang === 'ur' ? 'زیادہ سے زیادہ 5MB' : 'الحد الأقصى 5 ميقا')
       return

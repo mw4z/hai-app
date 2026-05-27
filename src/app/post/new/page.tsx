@@ -10,7 +10,7 @@ import { useNetworkStatus } from '@/lib/network'
 import { translateApiError } from '@/lib/apiError'
 import RiyalIcon from '@/components/RiyalIcon'
 import { uploadFiles, uploadPdf, uploadStageLabel, type UploadStage } from '@/lib/upload'
-import { cropFiles } from '@/lib/cropBridge'
+import { cropFile } from '@/lib/cropBridge'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
 import PdfTile from '@/components/PdfTile'
@@ -643,16 +643,28 @@ export default function NewPostPage() {
   }
   const [showImageSheet, setShowImageSheet] = useState(false)
 
-  async function applyPostImages(files: File[]) {
+  function applyPostImages(files: File[]) {
     const remaining = 5 - images.length
-    // Crop-before-upload: each picked image goes through the global editor.
-    const toAdd = await cropFiles(files.slice(0, remaining))
+    const toAdd = files.slice(0, remaining)
     for (const file of toAdd) {
       if (file.size > 10 * 1024 * 1024) { toast.error('حجم الصورة كبير (أقصى 10 ميقا)'); continue }
       if (!file.type.startsWith('image/')) { toast.error('نوع غير مدعوم'); continue }
       const preview = URL.createObjectURL(file)
       setImages(prev => [...prev, { file, preview }])
     }
+  }
+
+  // Optional crop — opens the editor for ONE already-added image and swaps in
+  // the result. Crop is opt-in (the ✂️ button on each thumbnail), not forced
+  // on every pick, so the common "just post the photo" path stays one tap.
+  async function cropExistingImage(index: number) {
+    const img = images[index]
+    if (!img) return
+    const cropped = await cropFile(img.file)
+    if (!cropped) return
+    try { URL.revokeObjectURL(img.preview) } catch { /* ignore */ }
+    const preview = URL.createObjectURL(cropped)
+    setImages(prev => prev.map((it, i) => (i === index ? { file: cropped, preview } : it)))
   }
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1380,6 +1392,15 @@ export default function NewPostPage() {
                           onClick={() => removeImage(i)}
                           className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
                         >✕</button>
+                      )}
+                      {/* Optional crop — opt-in, so adding a photo stays one tap. */}
+                      {imageUploadProgress === null && (
+                        <button
+                          type="button"
+                          onClick={() => cropExistingImage(i)}
+                          aria-label={lang === 'en' ? 'Crop' : 'قص الصورة'}
+                          className="absolute bottom-1 start-1 w-6 h-6 bg-black/60 text-white rounded-full text-[11px] flex items-center justify-center active:scale-95"
+                        >✂️</button>
                       )}
                     </div>
                   ))}

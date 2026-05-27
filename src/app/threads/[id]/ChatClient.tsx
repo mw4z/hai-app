@@ -16,7 +16,6 @@ import PdfTile from '@/components/PdfTile'
 import VoicePlayer from '@/components/chat/VoicePlayer'
 import VoiceComposer from '@/components/chat/VoiceComposer'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
-import { cropFiles } from '@/lib/cropBridge'
 import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import { useAttachContact } from '@/hooks/useAttachContact'
@@ -1146,13 +1145,10 @@ export default function ChatClient({
   // message (matches how the thread model and reply/lightbox features
   // expect one imageUrl per message). The reply target, if any, is
   // attached only to the first image — subsequent ones are plain.
-  async function sendImages(rawFiles: File[]) {
-    if (sendImagesLockRef.current || rawFiles.length === 0) return
+  async function sendImages(files: File[]) {
+    if (sendImagesLockRef.current || files.length === 0) return
     if (!(await gateOutsideDm())) return
     sendImagesLockRef.current = true
-    // Crop-before-send: run each picked image through the global editor.
-    const files = await cropFiles(rawFiles)
-    if (files.length === 0) { sendImagesLockRef.current = false; return }
     const valid = files.filter((f) => {
       if (!f.type.startsWith('image/')) return false
       if (f.size > 5 * 1024 * 1024) return false

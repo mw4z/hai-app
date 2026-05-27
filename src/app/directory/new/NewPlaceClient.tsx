@@ -12,7 +12,6 @@ import OpeningHoursPicker from '@/components/places/OpeningHoursPicker'
 import PlaceAutocomplete, { type SelectedPlace } from '@/components/places/PlaceAutocomplete'
 import { openMapPicker } from '@/components/rides/openMapPicker'
 import { uploadFiles } from '@/lib/upload'
-import { cropFiles } from '@/lib/cropBridge'
 
 // Riyadh fallback center for the map picker when no coords are set yet.
 const FALLBACK_CENTER = { lat: 24.7136, lng: 46.6753 }
@@ -120,12 +119,11 @@ export default function NewPlaceClient() {
     }
   }
 
-  async function pickImages(e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = Array.from(e.target.files || [])
+  function pickImages(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
     e.target.value = ''
     const remaining = MAX_IMAGES - images.length
-    const files = await cropFiles(raw.slice(0, remaining))
-    for (const file of files) {
+    for (const file of files.slice(0, remaining)) {
       if (file.size > 10 * 1024 * 1024) { toast.error(tr('Image too large', 'حجم الصورة كبير', 'تصویر بہت بڑی')); continue }
       if (!file.type.startsWith('image/')) { toast.error(tr('Image only', 'صور فقط', 'صرف تصاویر')); continue }
       const preview = URL.createObjectURL(file)
