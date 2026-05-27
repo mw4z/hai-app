@@ -5,7 +5,7 @@ import type { PostCategory, PostIntent, MarketplaceType } from '@prisma/client'
  *
  * Title is REQUIRED for commercial / structured posts where the
  * headline is part of the listing's value:
- *   - MARKETPLACE (SELL / BUY / JOB) — the title IS the listing
+ *   - MARKETPLACE JOB — shown in listing rails + relied on by anti-spam
  *   - HOME_BUSINESSES with intent OFFER — menu / product name
  *   - SERVICES with intent OFFER — service headline
  *   - REAL_ESTATE with intent OFFER — apartment headline
@@ -15,6 +15,7 @@ import type { PostCategory, PostIntent, MarketplaceType } from '@prisma/client'
  * Title is OPTIONAL for lightweight / conversational posts where
  * the body already speaks for itself:
  *   - GENERAL ("معلومة لأهل الحي")
+ *   - MARKETPLACE SELL / BUY — body + photo carry the listing
  *   - NEIGHBORHOOD_REPORTS — "الشارع عند الصيدلية خطر" doesn't need a separate headline
  *   - LOST_FOUND — "ضاع كلبي البودل عند المسجد" stands alone
  *   - SERVICES with intent REQUEST — same as the Ask flow today
@@ -35,10 +36,11 @@ export function isTitleRequired(
 ): boolean {
   switch (category) {
     case 'MARKETPLACE':
-      // SELL / BUY / JOB — all three need a headline. JOB has the
-      // strictest anti-spam guards already, and "phone number" titles
-      // get blocked there separately.
-      return true
+      // Buy/Sell listings: الموضوع (subject) is OPTIONAL — the body + photo
+      // carry the listing (per request). JOB still needs a headline: it's
+      // shown in listing rails/notifications and its anti-spam guards rely
+      // on a real title ("phone number" titles get blocked separately).
+      return marketplaceType === 'JOB'
     case 'HOME_BUSINESSES':
       // الأسر المنتجة — الموضوع (subject) is OPTIONAL for all intents. The
       // body + photo carry the listing; we don't force a headline.

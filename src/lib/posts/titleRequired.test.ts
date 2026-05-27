@@ -12,17 +12,8 @@ import { isTitleRequired } from './titleRequired'
 
 // ── Required for commercial / structured posts ──────────────────────────────
 
-test('MARKETPLACE/SELL requires a title', () => {
-  assert.equal(isTitleRequired('MARKETPLACE', 'NORMAL', 'SELL'), true)
-})
-test('MARKETPLACE/BUY requires a title', () => {
-  assert.equal(isTitleRequired('MARKETPLACE', 'REQUEST', 'BUY'), true)
-})
 test('MARKETPLACE/JOB requires a title', () => {
   assert.equal(isTitleRequired('MARKETPLACE', 'OFFER', 'JOB'), true)
-})
-test('HOME_BUSINESSES OFFER requires a title', () => {
-  assert.equal(isTitleRequired('HOME_BUSINESSES', 'OFFER', null), true)
 })
 test('SERVICES OFFER requires a title', () => {
   assert.equal(isTitleRequired('SERVICES', 'OFFER', null), true)
@@ -42,6 +33,12 @@ test('COMPETITIONS requires a title', () => {
 test('GENERAL allows body-only', () => {
   assert.equal(isTitleRequired('GENERAL', 'NORMAL', null), false)
 })
+test('MARKETPLACE/SELL allows body-only (subject optional)', () => {
+  assert.equal(isTitleRequired('MARKETPLACE', 'NORMAL', 'SELL'), false)
+})
+test('MARKETPLACE/BUY allows body-only (subject optional)', () => {
+  assert.equal(isTitleRequired('MARKETPLACE', 'REQUEST', 'BUY'), false)
+})
 test('NEIGHBORHOOD_REPORTS allows body-only', () => {
   assert.equal(isTitleRequired('NEIGHBORHOOD_REPORTS', 'NORMAL', null), false)
 })
@@ -54,8 +51,9 @@ test('SERVICES REQUEST allows body-only ("Ask for plumber")', () => {
 test('REAL_ESTATE REQUEST allows body-only ("Looking for apartment")', () => {
   assert.equal(isTitleRequired('REAL_ESTATE', 'REQUEST', null), false)
 })
-test('HOME_BUSINESSES REQUEST allows body-only', () => {
+test('HOME_BUSINESSES allows body-only for all intents (الأسر المنتجة)', () => {
   assert.equal(isTitleRequired('HOME_BUSINESSES', 'REQUEST', null), false)
+  assert.equal(isTitleRequired('HOME_BUSINESSES', 'OFFER', null), false)
 })
 test('RIDES allows body-only (handled by /rides/new anyway)', () => {
   assert.equal(isTitleRequired('RIDES', 'REQUEST', null), false)
