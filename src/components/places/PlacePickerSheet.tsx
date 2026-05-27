@@ -70,7 +70,9 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useBodyScrollLock(open)
-  const { sheetRef, handleRef, bodyRef } = useDragToDismiss<HTMLDivElement, HTMLDivElement, HTMLDivElement>({ open, onDismiss: onClose })
+  // Drag-to-dismiss is scoped to the grab bar ONLY (handleRef) — no bodyRef,
+  // so swiping the tabs / search / chips / list never closes the sheet.
+  const { sheetRef, handleRef } = useDragToDismiss<HTMLDivElement, HTMLDivElement>({ open, onDismiss: onClose })
 
   const mapServices = (data: any): PickerService[] =>
     (Array.isArray(data?.contacts) ? data.contacts : []).map((c: any) => ({
@@ -196,8 +198,12 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
         className="w-full max-w-[520px] max-h-[80vh] flex flex-col bg-white dark:bg-gray-900 rounded-t-3xl"
         style={{ paddingBottom: 'var(--hai-safe-bottom, 0px)' }}
       >
-        <div ref={handleRef} className="px-4 pt-3 pb-2 flex-shrink-0 border-b border-gray-100 dark:border-gray-800">
-          <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-2" />
+        <div className="px-4 pt-3 pb-2 flex-shrink-0 border-b border-gray-100 dark:border-gray-800">
+          {/* Grab bar — the ONLY drag-to-dismiss surface. Padded wrapper so
+              the 4px bar has a real touch target. */}
+          <div ref={handleRef} className="flex justify-center pt-0.5 pb-2 -mt-1 touch-none cursor-grab" aria-hidden>
+            <div className="w-10 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full" />
+          </div>
           <div className="flex items-center justify-between mb-2">
             <h2 id="hai-place-picker-title" className="text-sm font-bold text-gray-900 dark:text-white">
               {tr('Attach from directory', 'إرفاق من دليل الحي', 'ڈائریکٹری سے منسلک کریں')}
@@ -245,7 +251,7 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
           </div>
         </div>
 
-        <div ref={bodyRef} className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="flex-1 overflow-y-auto px-4 py-3">
           {loading && results === null && (
             <div className="py-8"><HaiLoader size="md" /></div>
           )}
