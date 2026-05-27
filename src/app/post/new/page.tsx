@@ -464,6 +464,9 @@ export default function NewPostPage() {
   const { isOffline } = useNetworkStatus()
   const [location, setLocation] = useState<{ lat: number; lng: number; name: string } | null>(null)
   const [detectingLocation, setDetectingLocation] = useState(false)
+  // Extra attachments (place · PDF · location) are collapsed by default so the
+  // composer stays simple (text → photo → نشر). Opt-in via one toggle.
+  const [showMoreAttach, setShowMoreAttach] = useState(false)
 
   // Draft state
   const [draftAvailable, setDraftAvailable] = useState<PostDraft | null>(null)
@@ -1422,6 +1425,11 @@ export default function NewPostPage() {
               )}
             </div>
 
+            {/* Optional attachments (place · PDF · location) — collapsed
+                behind one toggle so the default composer stays simple
+                (text → photo → نشر). Auto-opens if something's attached. */}
+            {(showMoreAttach || !!pdf || !!location) ? (
+            <>
             {/* Directory place attach — inserts a relative
                 /directory/<id> link into the body. The published
                 PostCard renders SmartTextWithPlacePreviews which
@@ -1599,6 +1607,16 @@ export default function NewPostPage() {
                 </div>
               )}
             </div>
+            </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowMoreAttach(true)}
+                className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl py-3 text-sm text-gray-500 dark:text-gray-400 hover:border-primary-300 transition-colors"
+              >
+                ➕ {lang === 'en' ? 'More: place · file · location' : lang === 'ur' ? 'مزید: جگہ · فائل · مقام' : 'إضافة: مكان · ملف · موقع'}
+              </button>
+            )}
 
             {/* Issue tip */}
             {category === 'NEIGHBORHOOD_REPORTS' && (
