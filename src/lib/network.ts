@@ -94,6 +94,16 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  // Re-arm the cold-start grace window. Called on EVERY resume (visibility,
+  // focus, online, Capacitor appStateChange) — not just the initial mount —
+  // because tapping a notification usually RESUMES the existing WebView
+  // (NetworkProvider never re-mounts) and the radio warms up again. We
+  // deliberately do NOT reset failuresRef here, so a genuine ongoing outage
+  // stays 'offline' across a resume instead of flickering through 'unstable'.
+  const beginGrace = useCallback(() => {
+    coldStartUntilRef.current = Date.now() + COLD_START_GRACE_MS
+  }, [])
+
   const runProbe = useCallback(async () => {
     lastProbeAtRef.current = Date.now()
     const ok = await probe()
@@ -102,17 +112,25 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
       updateStatus('online')
       return true
     }
-    // Cold-start grace: during the warm-up window a failed probe doesn't
-    // mean we're offline — the radio just isn't ready. Stay optimistic and
-    // retry quickly instead of flipping to offline/unstable (which would
-    // flash "no internet" then a false "back online" toast on launch).
+    // Cold-start / resume grace: during the warm-up window a failed probe
+    // doesn't mean we're offline — the radio just isn't ready. Stay optimistic
+    // and retry quickly instead of flashing "no internet" + a false "back
+    // online" toast on launch/resume.
     if (Date.now() < coldStartUntilRef.current) {
       setTimeout(() => { void runProbe() }, COLD_START_RETRY_MS)
       return false
     }
     failuresRef.current += 1
-    // One failure → unstable (soft warning). Two consecutive → offline.
-    updateStatus(failuresRef.current >= 2 ? 'offline' : 'unstable')
+    if (failuresRef.current >= 2) {
+      updateStatus('offline')
+    } else {
+      // First failure outside the grace window → soft warning, and probe once
+      // more shortly to CONFIRM a real outage (→ offline) vs. a one-off blip
+      // (→ back online). This is what lets genuine offline resolve in ~1s
+      // without ever trusting navigator.onLine's flaky launch/resume value.
+      updateStatus('unstable')
+      setTimeout(() => { void runProbe() }, COLD_START_RETRY_MS)
+    }
     return false
   }, [updateStatus])
 
@@ -122,44 +140,50 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
   }, [runProbe])
 
   useEffect(() => {
-    // Cold-start grace period. On iOS especially when the app is
-    // launched from a tapped notification, the radio is still spinning
-    // up and `navigator.onLine` briefly reports false — which fires
-    // the `offline` event, flips status to 'offline', and shows the
-    // banner for ~2 seconds before the next probe corrects it. The
-    // grace window short-circuits that: for the first 3 seconds, an
-    // `offline` browser event triggers a probe instead of an instant
-    // status flip, so we only believe we're offline when an actual
-    // network call fails.
-    const onOnline = () => { void runProbe() }
-    const onOffline = () => {
-      if (Date.now() < coldStartUntilRef.current) {
-        // Cold start: don't trust the navigator's offline event yet —
-        // verify with a probe (which retries during the grace window
-        // rather than flipping us offline).
-        void runProbe()
-        return
-      }
-      failuresRef.current = 2
-      updateStatus('offline')
-    }
+    // navigator.onLine is a flaky HINT (see the module docstring), and on
+    // launch/resume it briefly reports false while the radio spins up — which
+    // used to fire the `offline` event and flash the banner for ~2s before a
+    // probe corrected it. So we NEVER flip to offline straight off the browser
+    // `offline` event: we verify with a real probe (which honours the grace
+    // window + the confirm-probe in runProbe). `online` re-arms a short grace
+    // because a freshly-restored connection can still drop its first request.
+    const onOnline = () => { beginGrace(); void runProbe() }
+    const onOffline = () => { void runProbe() }
     window.addEventListener('online', onOnline)
     window.addEventListener('offline', onOffline)
 
-    // Re-probe on focus/visibilitychange, but ONLY if we haven't
-    // probed recently. Without the debounce, every navigation +
-    // every WebView resume hit /api/ping, and on Vercel cold-start
-    // those probes piled up enough latency to slow real page
-    // navigation. 30s debounce window — plenty for real connectivity
-    // changes, cheap for normal use.
-    const onVisibility = () => {
+    // Resume signals (background→foreground). Re-arm the grace window FIRST so
+    // any `offline` event racing in during warm-up is treated optimistically,
+    // then re-check. The probe stays debounced (30s) to avoid hammering
+    // /api/ping on rapid focus/visibility churn (e.g. keyboard open/close).
+    const onResume = () => {
       if (document.visibilityState !== 'visible') return
+      beginGrace()
       runProbeIfStale()
     }
-    document.addEventListener('visibilitychange', onVisibility)
-    window.addEventListener('focus', onVisibility)
+    document.addEventListener('visibilitychange', onResume)
+    window.addEventListener('focus', onResume)
 
-    // Initial check + slow background poll. Bumped from 25s → 90s.
+    // Capacitor: the most reliable foreground signal on native — fires when a
+    // tapped notification resumes the app. This is the case the web events
+    // miss, because the WebView is restored (NetworkProvider doesn't remount)
+    // so the original grace window is long expired. An explicit probe here
+    // bypasses the focus debounce since this is a genuine resume.
+    let appListener: { remove: () => void } | null = null
+    const isNative = typeof window !== 'undefined' &&
+      !!(window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()
+    if (isNative) {
+      import('@capacitor/app')
+        .then(({ App }) => App.addListener('appStateChange', ({ isActive }: { isActive: boolean }) => {
+          if (!isActive) return
+          beginGrace()
+          void runProbe()
+        }))
+        .then((h) => { appListener = h })
+        .catch(() => {})
+    }
+
+    // Initial check + slow background poll (90s).
     void runProbe()
     const id = setInterval(() => {
       if (document.visibilityState !== 'visible') return
@@ -169,11 +193,12 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener('online', onOnline)
       window.removeEventListener('offline', onOffline)
-      document.removeEventListener('visibilitychange', onVisibility)
-      window.removeEventListener('focus', onVisibility)
+      document.removeEventListener('visibilitychange', onResume)
+      window.removeEventListener('focus', onResume)
+      appListener?.remove()
       clearInterval(id)
     }
-  }, [runProbe, runProbeIfStale, updateStatus])
+  }, [runProbe, runProbeIfStale, beginGrace])
 
   const value = useMemo<NetworkContextValue>(() => ({
     status,
