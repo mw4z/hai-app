@@ -25,7 +25,6 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
-    private static final int DARK_COLOR = Color.parseColor("#0f172a");
     private static final int LIGHT_COLOR = Color.WHITE;
     private static final String OFFLINE_URL = "file:///android_asset/public/offline.html";
     private static final String REMOTE_URL = "https://app.hai-app.net";
@@ -45,6 +44,14 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         applyBars();
+
+        // Lock phones to portrait in CODE rather than the manifest: Android 16
+        // ignores manifest orientation locks on large screens and Play flags
+        // them, but the UI is phone-first portrait. Tablets / foldables
+        // (>=600dp smallest width) are left free to rotate.
+        if (getResources().getConfiguration().smallestScreenWidthDp < 600) {
+            setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        }
 
         try {
             WebView wv = getBridge().getWebView();
@@ -188,11 +195,12 @@ public class MainActivity extends BridgeActivity {
     private void applyBars() {
         Window window = getWindow();
         boolean dark = isDarkMode();
-        int barColor = dark ? DARK_COLOR : LIGHT_COLOR;
 
-        // Top: system handles status bar. Bottom: app draws behind nav bar.
-        window.setStatusBarColor(barColor);
-        window.setNavigationBarColor(Color.TRANSPARENT);
+        // Edge-to-edge: the WebView draws behind the system bars, so the
+        // deprecated setStatusBarColor / setNavigationBarColor (deprecated in
+        // Android 15) are unnecessary — the content paints over the bar
+        // background anyway. Bar ICON contrast is still set below via the
+        // modern WindowInsetsControllerCompat API.
         WindowCompat.setDecorFitsSystemWindows(window, false);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
