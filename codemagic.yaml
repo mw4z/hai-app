@@ -34,7 +34,11 @@ workflows:
           # includes the app's enabled capabilities, with no manual churn.
           keychain initialize
           mkdir -p "$HOME/private_keys"
-          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$HOME/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_IDENTIFIER.p8"
+          KEY_FILE="$HOME/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_IDENTIFIER.p8"
+          # %b decodes escaped \n in the env var into real newlines — a common
+          # CI cause of "invalidPEMDocument". Harmless if already real newlines.
+          printf '%b' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$KEY_FILE"
+          if head -1 "$KEY_FILE" | grep -q "BEGIN"; then echo "p8 header OK"; else echo "p8 header MISSING/MALFORMED"; fi
       - name: Build iOS app
         script: |
           set -e
