@@ -133,6 +133,11 @@ interface Props {
   /** When arriving from a notification (/feed?post=<id>), scroll to and
    *  flash that post so the user sees exactly which one it's about. */
   highlightPostId?: string
+  /** ISO timestamp of the user's most recent post (any category /
+   *  intent), or null if they've never posted. Used to auto-hide the
+   *  Quick Ask card once the user has demonstrably figured out how to
+   *  post — and to re-surface it after a 7-day quiet streak. */
+  lastUserPostAt?: string | null
 }
 
 export default function FeedClient({
@@ -154,6 +159,7 @@ export default function FeedClient({
   initialRides = [],
   initialPolls = [],
   highlightPostId,
+  lastUserPostAt = null,
 }: Props) {
   const router = useRouter()
   const { t, lang } = useLanguage()
@@ -218,6 +224,20 @@ export default function FeedClient({
   /** When true, the bottom-sheet category picker is mounted — the
    *  discoverable replacement for the prior swipe-only chip strip. */
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false)
+
+  /** "Show the Quick Ask prompt?" — true for users who've never
+   *  posted, OR who haven't posted in the last 7 days. Hides the
+   *  card once they've figured out posting, re-surfaces it after a
+   *  quiet week to nudge them back. SSR-seeded; the comparison
+   *  runs on a stable timestamp captured at mount so we don't trip
+   *  a hydration mismatch. */
+  const quickAskActive = useMemo(() => {
+    if (!lastUserPostAt) return true
+    const last = Date.parse(lastUserPostAt)
+    if (!Number.isFinite(last)) return true
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+    return Date.now() - last >= SEVEN_DAYS_MS
+  }, [lastUserPostAt])
   // Poll-creation state (showPollForm / pollQuestion / pollOptions /
   // pollLoading) was removed when the admin poll form moved to its
   // own /polls/new page. Surface is now reachable via the BottomNav
@@ -835,8 +855,9 @@ export default function FeedClient({
         </div>
       )}
 
-      {/* Quick Ask bar — only in own neighborhood */}
-      {!isReadOnly && (
+      {/* Quick Ask bar — own neighborhood AND the user hasn't posted
+          anything in the last 7 days (see quickAskActive memo). */}
+      {!isReadOnly && quickAskActive && (
         <div className="px-4 pt-4">
           {/* Plain button — NOT a real input. The previous <input
               readOnly> trigger caused the browser to auto-scroll the
@@ -956,7 +977,7 @@ export default function FeedClient({
                     rises synchronously on tap. Gated on the boost
                     flag so the CTA disappears alongside ranking +
                     badge when the experiment is off. */}
-                {idx === 3 && selectedCategory === 'ALL' && !isReadOnly && requestBoostOn && (
+                {idx === 3 && selectedCategory === 'ALL' && !isReadOnly && requestBoostOn && quickAskActive && (
                   <button
                     type="button"
                     onClick={() => {

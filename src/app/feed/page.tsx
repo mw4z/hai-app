@@ -94,7 +94,7 @@ export default async function FeedPage({
   // to run sequentially after the batch and added a full DB roundtrip
   // (~150ms) to every feed render.
   const ridesNow = new Date()
-  const [posts, unreadNotifCount, browseNeighborhood, bookmarkedIds, followedIds, highlightsBundle, openRidesRaw, pollsRaw] = await Promise.all([
+  const [posts, unreadNotifCount, browseNeighborhood, bookmarkedIds, followedIds, highlightsBundle, openRidesRaw, pollsRaw, latestUserPost] = await Promise.all([
     // Posts — cache 60s per neighborhood+category combo (was 30s).
     // Doubling the TTL halves the per-feed DB load with no user-visible
     // change in freshness for posts (PostCard's poll catches edits).
@@ -229,6 +229,16 @@ export default async function FeedPage({
       orderBy: { createdAt: 'desc' },
       take: 10,
     }).catch(() => []),
+    // Most recent post by this user — drives the Quick Ask auto-hide
+    // logic in FeedClient. Hidden after any post; re-surfaces after a
+    // 7-day quiet streak. Counts every post (any category / intent)
+    // so existing active users see it hidden immediately on first
+    // page load (no localStorage bootstrap needed).
+    db.post.findFirst({
+      where: { authorId: session.userId },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }).catch(() => null),
   ])
 
   const initialOpenRides = (openRidesRaw as any[]).map(r => {
@@ -478,6 +488,7 @@ export default async function FeedPage({
       initialRides={JSON.parse(JSON.stringify(initialOpenRides))}
       initialPolls={JSON.parse(JSON.stringify(pollsRaw))}
       highlightPostId={typeof searchParams.post === 'string' ? searchParams.post : undefined}
+      lastUserPostAt={latestUserPost?.createdAt ? latestUserPost.createdAt.toISOString() : null}
     />
   )
 }
