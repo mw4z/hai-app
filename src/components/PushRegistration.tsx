@@ -98,20 +98,37 @@ export default function PushRegistration() {
               // and retry once on the next tick if the URL didn't move.
               // assign() is more reliable than href= on Capacitor (forces
               // a navigation even when the WebView is mid-load).
+              // Cold-start race fix v2: WKWebView silently drops the
+              // initial assign() AND can drop the first ~1-2s of retries
+              // while it finishes hydrating React + applying Capacitor
+              // bridge setup. The previous "1 retry @ 400ms" left the
+              // user on /feed when the iOS WebView swallowed both
+              // attempts — the symptom is "DM push opens but lands on
+              // feed not the conversation."
+              //
+              // Now: assign() immediately, then keep verifying every
+              // 250ms for up to ~4s, re-firing assign() any time the
+              // URL hasn't moved. Idempotent — once we're on the
+              // target, the loop short-circuits. Bails after 16 tries
+              // so we don't fight a router that legitimately put the
+              // user somewhere else (e.g. /login interstitial).
               const navigate = () => {
-                try {
-                  window.location.assign(target)
-                  // Retry once if the navigation got swallowed (rare iOS
-                  // cold-start race). Same target, idempotent.
-                  setTimeout(() => {
-                    const cur = window.location.pathname + window.location.search
-                    if (cur !== target) {
-                      try { window.location.assign(target) } catch {}
-                    }
-                  }, 400)
-                } catch (err) {
-                  console.error('[PUSH] navigation failed:', err)
+                let attempts = 0
+                const MAX_ATTEMPTS = 16
+                const tick = () => {
+                  const cur = window.location.pathname + window.location.search
+                  if (cur === target) return
+                  try { window.location.assign(target) } catch (err) {
+                    console.error('[PUSH] assign failed:', err)
+                  }
+                  attempts++
+                  if (attempts < MAX_ATTEMPTS) {
+                    setTimeout(tick, 250)
+                  } else {
+                    console.warn('[PUSH] navigation exhausted retries; on', cur, 'wanted', target)
+                  }
                 }
+                tick()
               }
               if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', navigate, { once: true })
