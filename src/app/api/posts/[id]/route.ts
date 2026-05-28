@@ -90,6 +90,20 @@ export async function PATCH(
     }
   }
 
+  // originalPrice — the "was" price on offer posts. Same validation
+  // shape as price. Clearing via null is allowed.
+  if (body.originalPrice !== undefined) {
+    if (body.originalPrice === null) {
+      updates.originalPrice = null
+    } else {
+      const n = typeof body.originalPrice === 'number' ? body.originalPrice : parseFloat(String(body.originalPrice))
+      if (!Number.isFinite(n) || n <= 0 || n > 1_000_000) {
+        return NextResponse.json({ error: 'السعر السابق غير صالح' }, { status: 400 })
+      }
+      updates.originalPrice = n
+    }
+  }
+
   // Image edit — the author can add/remove/reorder photos on an
   // already-published post. Validate the array the same way the
   // create route does (max 5, https:// or /uploads/ prefix, total
@@ -114,7 +128,7 @@ export async function PATCH(
   const updated = await db.post.update({
     where: { id: params.id },
     data: updates as any,
-    select: { id: true, title: true, body: true, price: true, editedAt: true, imageUrls: true },
+    select: { id: true, title: true, body: true, price: true, originalPrice: true, editedAt: true, imageUrls: true },
   })
 
   return NextResponse.json(updated)

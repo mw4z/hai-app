@@ -12,6 +12,7 @@ import SubtypeChip from './posts/SubtypeChip'
 import { uploadFiles, uploadPdf, uploadStageLabel, type UploadStage } from '@/lib/upload'
 import { playSend, playReaction, playDelete } from '@/lib/sound'
 import { hapticLight, hapticMedium } from '@/lib/haptic'
+import { openExternal } from '@/lib/openExternal'
 import EmojiPicker from './EmojiPickerWrapper'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useNetworkStatus, isOfflineError, OfflineError } from '@/lib/network'
@@ -412,11 +413,17 @@ export default function PostCard({
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(post.title)
   const [editBody, setEditBody] = useState(post.body)
-  // Edit-mode price draft. Stored as a string so the empty / partial
+  // Edit-mode price drafts. Stored as strings so the empty / partial
   // typing states ("", "1.") don't fight a numeric controlled input.
-  // Empty on save → sends `price: null` (clears the price).
+  // Empty on save → sends null (clears the field).
+  //   editPrice         → current price (always editable)
+  //   editOriginalPrice → the "was" price on offer posts; UI only
+  //                       surfaces it when post.isOffer is true
   const [editPrice, setEditPrice] = useState<string>(
     post.price != null ? String(post.price) : '',
+  )
+  const [editOriginalPrice, setEditOriginalPrice] = useState<string>(
+    post.originalPrice != null ? String(post.originalPrice) : '',
   )
   // Separate edit-mode image list so the user can add/remove/reorder
   // without touching the original post.imageUrls until they hit Save.
@@ -432,7 +439,15 @@ export default function PostCard({
     editedAt: Date | string | null
     imageUrls: string[]
     price: number | null
-  }>({ title: post.title, body: post.body, editedAt: post.editedAt ?? null, imageUrls: post.imageUrls || [], price: post.price ?? null })
+    originalPrice: number | null
+  }>({
+    title: post.title,
+    body: post.body,
+    editedAt: post.editedAt ?? null,
+    imageUrls: post.imageUrls || [],
+    price: post.price ?? null,
+    originalPrice: post.originalPrice ?? null,
+  })
   // Auto-translation. Detected language comes from the raw title+body;
   // the translate button only surfaces if it differs from the user's
   // UI language. Cached per-card in state so toggling off/on is free.
@@ -1480,7 +1495,9 @@ export default function PostCard({
           />
           {/* Price edit. Empty clears it (sends price: null). Numeric
               keyboard hint via inputMode="decimal" so iOS shows the
-              comma/period pad. Capped at 1,000,000 server-side. */}
+              comma/period pad. Capped at 1,000,000 server-side.
+              On offer posts: also expose the "was" price so the
+              author can adjust both sides of the discount. */}
           <input
             type="text"
             inputMode="decimal"
@@ -1489,10 +1506,28 @@ export default function PostCard({
               const v = e.target.value.replace(/[^\d.]/g, '')
               setEditPrice(v)
             }}
-            placeholder={lang === 'en' ? 'Price (optional, SAR)' : 'السعر (اختياري، ر.س)'}
+            placeholder={
+              post.isOffer
+                ? (lang === 'en' ? 'New price (after offer, SAR)' : 'السعر بعد العرض (ر.س)')
+                : (lang === 'en' ? 'Price (optional, SAR)' : 'السعر (اختياري، ر.س)')
+            }
             className="hai-input"
             aria-label={lang === 'en' ? 'Price' : 'السعر'}
           />
+          {post.isOffer && (
+            <input
+              type="text"
+              inputMode="decimal"
+              value={editOriginalPrice}
+              onChange={(e) => {
+                const v = e.target.value.replace(/[^\d.]/g, '')
+                setEditOriginalPrice(v)
+              }}
+              placeholder={lang === 'en' ? 'Old price (before offer, SAR)' : 'السعر قبل العرض (ر.س)'}
+              className="hai-input"
+              aria-label={lang === 'en' ? 'Original price' : 'السعر السابق'}
+            />
+          )}
 
           {/* Image editor — thumbnail strip of current photos + add
               button. Tapping the X on a thumbnail drops it from the
@@ -1620,19 +1655,30 @@ export default function PostCard({
                 // expected shape: empty = null (clear price), valid
                 // number = number, anything else = skip the field
                 // entirely so we don't silently null on a typo.
-                const trimmedPrice = editPrice.trim()
-                let priceUpdate: number | null | undefined
-                if (trimmedPrice === '') {
-                  priceUpdate = null
-                } else {
-                  const parsed = parseFloat(trimmedPrice)
-                  if (Number.isFinite(parsed) && parsed > 0) {
-                    priceUpdate = parsed
-                  } else {
-                    toast.error(lang === 'en' ? 'Invalid price' : 'السعر غير صالح')
-                    setEditLoading(false)
-                    return
-                  }
+                // Translate price + originalPrice inputs into the API
+                // shape. Empty string → null (clear); valid positive
+                // number → that value; anything else → abort with a
+                // localized error so a typo doesn't silently null.
+                const parseOptionalPrice = (raw: string, label: string): number | null | 'INVALID' => {
+                  const trimmed = raw.trim()
+                  if (trimmed === '') return null
+                  const parsed = parseFloat(trimmed)
+                  if (Number.isFinite(parsed) && parsed > 0) return parsed
+                  toast.error(
+                    lang === 'en' ? `Invalid ${label}` : `${label} غير صالح`,
+                  )
+                  return 'INVALID'
+                }
+                const priceUpdate = parseOptionalPrice(editPrice, lang === 'en' ? 'price' : 'السعر')
+                if (priceUpdate === 'INVALID') { setEditLoading(false); return }
+                let originalPriceUpdate: number | null | undefined = undefined
+                if (post.isOffer) {
+                  const result = parseOptionalPrice(
+                    editOriginalPrice,
+                    lang === 'en' ? 'original price' : 'السعر السابق',
+                  )
+                  if (result === 'INVALID') { setEditLoading(false); return }
+                  originalPriceUpdate = result
                 }
                 const res = await fetch(`/api/posts/${post.id}`, {
                   method: 'PATCH',
@@ -1642,17 +1688,23 @@ export default function PostCard({
                     body: editBody.trim(),
                     imageUrls: editImages,
                     price: priceUpdate,
+                    // Only include originalPrice in the body when it
+                    // could actually be edited (offer post) — non-offer
+                    // posts don't surface the input, so omit the field
+                    // so the API doesn't accidentally clear it on save.
+                    ...(originalPriceUpdate !== undefined ? { originalPrice: originalPriceUpdate } : {}),
                   }),
                 })
                 if (res.ok) {
                   const d = await res.json()
-                  setPostData({
+                  setPostData((prev) => ({
                     title: d.title,
                     body: d.body,
                     editedAt: d.editedAt,
                     imageUrls: Array.isArray(d.imageUrls) ? d.imageUrls : editImages,
                     price: d.price ?? null,
-                  })
+                    originalPrice: d.originalPrice ?? prev.originalPrice,
+                  }))
                   setEditing(false)
                   toast.success(lang === 'en' ? 'Updated' : lang === 'ur' ? 'ترمیم شدہ' : 'تم التعديل')
                 } else {
@@ -1672,6 +1724,7 @@ export default function PostCard({
                 setEditBody(postData.body)
                 setEditImages(postData.imageUrls || [])
                 setEditPrice(postData.price != null ? String(postData.price) : '')
+                setEditOriginalPrice(postData.originalPrice != null ? String(postData.originalPrice) : '')
               }}
               className="hai-btn-ghost hai-btn-sm"
             >
@@ -1747,7 +1800,7 @@ export default function PostCard({
           away without a feed refresh. isOffer + originalPrice still
           come from the prop because the inline editor doesn't touch
           them yet. */}
-      {(postData.price != null || (post.isOffer && post.originalPrice)) && (
+      {(postData.price != null || (post.isOffer && postData.originalPrice)) && (
         <div className="hai-mt-2 flex items-center flex-wrap gap-2">
           {post.isOffer && (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-[11px] font-bold px-2 py-0.5">
@@ -1757,15 +1810,16 @@ export default function PostCard({
           {postData.price != null && (
             <span className="hai-price">{postData.price.toLocaleString('ar-SA')} <RiyalIcon /></span>
           )}
-          {/* "Was" price struck-through + discount %, only a genuine drop */}
-          {post.isOffer && post.originalPrice != null && post.originalPrice > (postData.price ?? 0) && (
+          {/* "Was" price struck-through + discount %, only a genuine drop.
+              Pulls from postData.originalPrice so edits show immediately. */}
+          {post.isOffer && postData.originalPrice != null && postData.originalPrice > (postData.price ?? 0) && (
             <>
               <span className="text-sm text-gray-400 line-through decoration-rose-400">
-                {post.originalPrice.toLocaleString('ar-SA')} <RiyalIcon />
+                {postData.originalPrice.toLocaleString('ar-SA')} <RiyalIcon />
               </span>
               {postData.price != null && postData.price > 0 && (
                 <span className="rounded-md bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 text-[11px] font-bold px-1.5 py-0.5 tabular-nums">
-                  -{Math.round((1 - postData.price / post.originalPrice) * 100)}%
+                  -{Math.round((1 - postData.price / postData.originalPrice) * 100)}%
                 </span>
               )}
             </>
@@ -1773,19 +1827,28 @@ export default function PostCard({
         </div>
       )}
 
-      {post.locationLat && post.locationLng && (
-        <a
-          href={`https://www.google.com/maps?q=${post.locationLat},${post.locationLng}`}
-          target="_blank" rel="noopener noreferrer"
-          className="hai-callout hai-callout--info hai-row-2 hai-mt-2"
-        >
-          <FiMapPin className="hai-icon-md hai-shrink-0" />
-          <span className="hai-truncate hai-flex-1">
-            {post.locationName || `${post.locationLat.toFixed(4)}, ${post.locationLng.toFixed(4)}`}
-          </span>
-          <span className="hai-meta hai-shrink-0">{lang === 'en' ? 'Open map' : lang === 'ur' ? 'نقشہ کھولیں' : 'فتح الخريطة'}</span>
-        </a>
-      )}
+      {post.locationLat && post.locationLng && (() => {
+        const mapUrl = `https://www.google.com/maps?q=${post.locationLat},${post.locationLng}`
+        return (
+          <a
+            href={mapUrl}
+            // target="_blank" alone routes through the Android WebView's
+            // window-creation handler and shows "page not available".
+            // openExternal() takes over: native opens via Capacitor's
+            // Custom Tab (which Android then hands off to Google Maps
+            // via App Links); web does plain window.open.
+            onClick={(e) => { e.preventDefault(); openExternal(mapUrl) }}
+            target="_blank" rel="noopener noreferrer"
+            className="hai-callout hai-callout--info hai-row-2 hai-mt-2"
+          >
+            <FiMapPin className="hai-icon-md hai-shrink-0" />
+            <span className="hai-truncate hai-flex-1">
+              {post.locationName || `${post.locationLat.toFixed(4)}, ${post.locationLng.toFixed(4)}`}
+            </span>
+            <span className="hai-meta hai-shrink-0">{lang === 'en' ? 'Open map' : lang === 'ur' ? 'نقشہ کھولیں' : 'فتح الخريطة'}</span>
+          </a>
+        )
+      })()}
 
       {/* PDF attachment — rendered between location and the civic
           disclaimer footer so it sits with the post's other meta
@@ -2937,7 +3000,11 @@ export default function PostCard({
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-100 dark:bg-primary-900/30 px-2.5 py-1 rounded-lg flex items-center gap-1 flex-shrink-0"
-                                onClick={e => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  e.preventDefault()
+                                  openExternal(`https://maps.google.com/?q=${post.author!.serviceLat},${post.author!.serviceLng}`)
+                                }}
                               >
                                 <FiMapPin className="w-3 h-3" />
                                 {lang !== 'en' ? 'الخريطة' : 'Map'}

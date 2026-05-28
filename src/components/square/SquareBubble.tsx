@@ -5,6 +5,7 @@ import { FiBell, FiCheck, FiEdit3, FiMapPin } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { fullName } from '@/lib/displayName'
 import SmartTextWithPlacePreviews from '@/components/SmartTextWithPlacePreviews'
+import { openExternal } from '@/lib/openExternal'
 import VoicePlayer from '@/components/chat/VoicePlayer'
 import PdfTile from '@/components/PdfTile'
 import Sticker from '@/components/Sticker'
@@ -310,7 +311,16 @@ export default function SquareBubble({
                   href={`https://maps.google.com/?q=${message.lat},${message.lng}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    // Don't let the Android WebView try to "navigate"
+                    // to maps.google.com (shows "page not available").
+                    // openExternal() hands off to a Custom Tab, which
+                    // Android resolves to the Google Maps app via
+                    // App Links.
+                    e.stopPropagation()
+                    e.preventDefault()
+                    openExternal(`https://maps.google.com/?q=${message.lat},${message.lng}`)
+                  }}
                   className={`block rounded-xl overflow-hidden mb-1 p-2.5 text-center ${
                     isMe ? 'bg-primary-700/50' : 'bg-gray-100 dark:bg-gray-700'
                   }`}
