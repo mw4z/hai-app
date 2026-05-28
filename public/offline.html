@@ -8,20 +8,6 @@
   <meta name="theme-color" content="#006d57" />
   <title>حي | Hai</title>
   <style>
-    :root {
-      --bg-light: radial-gradient(ellipse at 50% 35%, #e8f5e9 0%, #e0f7f2 45%, #ffffff 100%);
-      --bg-dark:  radial-gradient(ellipse at 50% 35%, #1c2832 0%, #1a262c 45%, #19232a 100%);
-      --primary: #006d57;
-      --primary-soft: #00a884;
-      --text-light: #1a1a1a;
-      --text-muted-light: #5b6770;
-      --text-dark: #e9edef;
-      --text-muted-dark: #8696a0;
-      --card-light: rgba(255,255,255,0.62);
-      --card-dark:  rgba(255,255,255,0.04);
-      --card-border-light: rgba(0, 109, 87, 0.12);
-      --card-border-dark:  rgba(0, 168, 132, 0.16);
-    }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body {
       margin: 0;
@@ -29,15 +15,26 @@
       height: 100%;
       width: 100%;
       font-family: "IBM Plex Sans Arabic", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
-      background: var(--bg-light);
-      color: var(--text-light);
+      background: radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #e0f7f2 40%, #fff 100%);
+      color: #1a1a1a;
       overflow: hidden;
       user-select: none;
       -webkit-user-select: none;
     }
     @media (prefers-color-scheme: dark) {
-      html, body { background: var(--bg-dark); color: var(--text-dark); }
+      html, body {
+        background: radial-gradient(ellipse at 50% 42%, #1c2832 0%, #1a262c 40%, #19232a 100%);
+        color: #e9edef;
+      }
     }
+
+    /* This whole screen is meant to be visually INDISTINGUISHABLE
+       from the AppSplash component (src/components/AppSplash.tsx) —
+       so when the native shell shows this on a cold-start network
+       failure, the user just sees "the app is still loading", not
+       "the app is broken". Logo + ring + wave dots, same colors,
+       same easing. Auto-reloads when the radio is back; renders
+       nothing else (no text, no buttons, no error messaging). */
 
     .wrap {
       position: fixed;
@@ -45,229 +42,146 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: space-between;
-      padding: 32px 24px;
-      padding-top: calc(56px + env(safe-area-inset-top, 0px));
-      padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
-      text-align: center;
+      justify-content: center;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
     }
-
-    /* ── Hero block: logo + tagline ─────────────────────── */
-    .hero {
+    .stage {
+      position: relative;
+      width: 220px;
+      height: 220px;
       display: flex;
-      flex-direction: column;
       align-items: center;
-      gap: 14px;
-      width: 100%;
+      justify-content: center;
     }
-    .logo {
-      width: 84px;
-      height: 84px;
-      border-radius: 22px;
-      box-shadow: 0 10px 32px rgba(0, 109, 87, 0.22);
-      animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-    }
-    @keyframes rise {
-      from { opacity: 0; transform: translateY(10px) scale(0.92); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
-    }
-    .name {
-      font-size: 30px;
-      font-weight: 800;
-      color: var(--primary);
-      letter-spacing: -0.5px;
-      line-height: 1;
-      margin: 0;
-      animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
-    }
-    @media (prefers-color-scheme: dark) {
-      .name { color: var(--primary-soft); }
-    }
-    .name-en {
-      font-size: 11px;
-      font-weight: 600;
-      color: #98a2b3;
-      letter-spacing: 4px;
-      margin-top: 2px;
-    }
-    .tagline-ar {
-      font-size: 15px;
-      color: var(--text-muted-light);
-      max-width: 300px;
-      line-height: 1.65;
-      margin: 4px 0 0;
-      animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
-    }
-    @media (prefers-color-scheme: dark) {
-      .tagline-ar { color: var(--text-muted-dark); }
-    }
-
-    /* ── Feature cards ──────────────────────────────────── */
-    .features {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      width: 100%;
-      max-width: 360px;
-      margin-top: 28px;
-      animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) 260ms both;
-    }
-    .feature {
-      background: var(--card-light);
-      border: 1px solid var(--card-border-light);
-      border-radius: 16px;
-      padding: 14px 12px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-    }
-    @media (prefers-color-scheme: dark) {
-      .feature { background: var(--card-dark); border-color: var(--card-border-dark); }
-    }
-    .feature-icon { font-size: 22px; line-height: 1; }
-    .feature-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-light);
-      line-height: 1.35;
-    }
-    @media (prefers-color-scheme: dark) {
-      .feature-label { color: var(--text-dark); }
-    }
-
-    /* ── Footer connecting strip ────────────────────────── */
-    .footer {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      width: 100%;
-      max-width: 320px;
-    }
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 9px 16px;
-      background: rgba(0, 109, 87, 0.08);
-      border: 1px solid rgba(0, 109, 87, 0.15);
-      border-radius: 999px;
-      color: var(--primary);
-      font-size: 12px;
-      font-weight: 600;
-    }
-    @media (prefers-color-scheme: dark) {
-      .pill {
-        background: rgba(0, 168, 132, 0.10);
-        border-color: rgba(0, 168, 132, 0.20);
-        color: var(--primary-soft);
-      }
-    }
-    .spinner {
-      width: 12px;
-      height: 12px;
-      border: 2px solid rgba(0, 109, 87, 0.25);
-      border-top-color: var(--primary);
+    .ring {
+      position: absolute;
       border-radius: 50%;
-      animation: spin 0.9s linear infinite;
+      border: 1px solid #00a884;
+      opacity: 0;
+      animation: rp 1.8s ease-out infinite;
     }
-    @media (prefers-color-scheme: dark) {
-      .spinner { border-color: rgba(0, 168, 132, 0.25); border-top-color: var(--primary-soft); }
+    .r1 { width: 100px; height: 100px; animation-delay: 0.4s; }
+    .r2 { width: 180px; height: 180px; animation-delay: 0.7s; }
+    @keyframes rp {
+      0%   { transform: scale(0.5); opacity: 0.35; }
+      100% { transform: scale(1.2); opacity: 0; }
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
 
-    .retry-btn {
-      font: inherit;
-      font-weight: 700;
-      font-size: 14px;
-      padding: 12px 22px;
-      border-radius: 14px;
-      border: 0;
-      background: var(--primary);
-      color: #fff;
-      cursor: pointer;
-      transition: transform 80ms ease, opacity 80ms ease;
-      width: 100%;
-      box-shadow: 0 6px 18px rgba(0, 109, 87, 0.28);
+    .logo {
+      position: relative;
+      z-index: 2;
+      width: 68px;
+      height: 68px;
+      border-radius: 15px;
+      overflow: hidden;
+      box-shadow: 0 6px 24px rgba(0, 168, 132, 0.32);
+      animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
     }
-    .retry-btn:active { transform: scale(0.97); opacity: 0.92; }
-    .retry-btn[disabled] { opacity: 0.6; cursor: default; transform: none; }
-    .retry-btn .spinner {
-      width: 14px;
-      height: 14px;
-      border-color: rgba(255,255,255,0.35);
-      border-top-color: #fff;
-      margin-inline-end: 8px;
-      display: inline-block;
-      vertical-align: middle;
+    .logo svg { display: block; width: 100%; height: 100%; }
+    @keyframes rise {
+      from { opacity: 0; transform: scale(0.75); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 14px;
+      animation: fadeUp 0.5s ease-out 0.9s both;
+    }
+    .ar {
+      font-size: 26px;
+      font-weight: 700;
+      color: #006d57;
+      line-height: 1.6;
+    }
+    @media (prefers-color-scheme: dark) { .ar { color: #00a884; } }
+    .en {
+      font-size: 10px;
+      font-weight: 600;
+      color: #9ca3af;
+      letter-spacing: 3px;
+      margin-top: 4px;
+    }
+    @media (prefers-color-scheme: dark) { .en { color: #6b7280; } }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .loader {
+      position: absolute;
+      bottom: max(env(safe-area-inset-bottom, 20px), 44px);
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 5px;
+      animation: ldIn 0.3s ease-out 1.0s both;
+    }
+    .loader i {
+      display: block;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #00a884;
+      animation: wave 1s ease-in-out infinite;
+    }
+    .loader i:nth-child(1) { animation-delay: 0s; }
+    .loader i:nth-child(2) { animation-delay: 0.12s; }
+    .loader i:nth-child(3) { animation-delay: 0.24s; }
+    @keyframes wave {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
+      40%            { transform: translateY(-6px); opacity: 1; }
+    }
+    @keyframes ldIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .ring, .loader i { animation: none !important; }
+      .ring { opacity: 0.08; transform: scale(1); }
+      .loader i { opacity: 0.5; }
+      .logo, .brand { animation-duration: 0.01s !important; animation-delay: 0s !important; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
-
-    <!-- ── Hero ─────────────────────────────────────────── -->
-    <div class="hero">
-      <img class="logo" src="/icon-192.png" alt="Hai" onerror="this.style.display='none'" />
-      <div>
-        <h1 class="name">حَيّ</h1>
-        <div class="name-en">HAI</div>
-      </div>
-      <p class="tagline-ar">منصّتك للتعرّف على جيرانك،<br/>وكل ما يخص حَيّك من خدمات ومنشورات.</p>
-    </div>
-
-    <!-- ── Feature cards ────────────────────────────────── -->
-    <div class="features">
-      <div class="feature">
-        <div class="feature-icon">🏘️</div>
-        <div class="feature-label">حيّك في يدك</div>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">💬</div>
-        <div class="feature-label">تواصل مع جيرانك</div>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">🛒</div>
-        <div class="feature-label">سوق محلي</div>
-      </div>
-      <div class="feature">
-        <div class="feature-icon">📒</div>
-        <div class="feature-label">دليل خدمات الحي</div>
+    <div class="stage">
+      <div class="ring r1"></div>
+      <div class="ring r2"></div>
+      <div class="logo">
+        <svg viewBox="0 0 192 192" width="68" height="68" xmlns="http://www.w3.org/2000/svg">
+          <rect width="192" height="192" rx="42" fill="#006d57"/>
+          <circle cx="96" cy="106" r="17" fill="#fff"/>
+          <circle cx="96" cy="51"  r="11" fill="#fff"/>
+          <circle cx="144" cy="134" r="11" fill="#fff"/>
+          <circle cx="48"  cy="134" r="11" fill="#fff"/>
+        </svg>
       </div>
     </div>
-
-    <!-- ── Connecting strip ─────────────────────────────── -->
-    <div class="footer">
-      <div class="pill" id="status-pill">
-        <span class="spinner" aria-hidden="true"></span>
-        <span id="status">جاري التحضير…</span>
-      </div>
-      <button class="retry-btn" id="retry" type="button" style="display:none;">
-        <span id="retry-label">ابدأ · Start</span>
-      </button>
+    <div class="brand">
+      <span class="ar">حَيّ</span>
+      <span class="en">HAI</span>
     </div>
-
+    <div class="loader" aria-hidden="true">
+      <i></i><i></i><i></i>
+    </div>
   </div>
 
   <script>
+    // Silent auto-reload. No buttons, no error text — the user just
+    // sees a longer splash. Probe /api/ping every 400ms for the
+    // first ~12s (covers radio warmup), then every 3s as a safety
+    // net. Navigate the moment we get a 2xx. Also fires on the
+    // browser `online` event for cases where the OS knows
+    // connectivity is back before our probe does.
     (function () {
       var REMOTE_URL = 'https://app.hai-app.net'
-      var btn = document.getElementById('retry')
-      var label = document.getElementById('retry-label')
-      var status = document.getElementById('status')
-      var statusPill = document.getElementById('status-pill')
-      var attempting = false
-      var showedRetry = false
-
-      function setStatus(text) { if (status) status.textContent = text }
-      function showRetryButton() {
-        if (showedRetry) return
-        showedRetry = true
-        if (btn) btn.style.display = ''
-      }
+      var navigating = false
 
       function probe() {
         return new Promise(function (resolve) {
@@ -279,65 +193,31 @@
             credentials: 'omit',
             signal: ctrl.signal,
           }).then(function (r) {
-            clearTimeout(to)
-            resolve(!!(r && r.ok))
+            clearTimeout(to); resolve(!!(r && r.ok))
           }).catch(function () {
-            clearTimeout(to)
-            resolve(false)
+            clearTimeout(to); resolve(false)
           })
         })
       }
 
-      function attemptRetry(silent) {
-        if (attempting) return
-        if (!silent) {
-          attempting = true
-          if (btn) btn.disabled = true
-          setStatus('جاري التحضير…')
-        }
+      function tryReload() {
+        if (navigating) return
         probe().then(function (ok) {
-          attempting = false
-          if (btn) btn.disabled = false
-          if (ok) {
-            setStatus('تم — جاري التحميل…')
-            try { window.location.href = REMOTE_URL } catch (_) {}
-          }
+          if (!ok || navigating) return
+          navigating = true
+          try { window.location.href = REMOTE_URL } catch (_) {}
         })
       }
 
-      function manualStart() {
-        if (attempting) return
-        attempting = true
-        if (btn) btn.disabled = true
-        if (label) label.innerHTML = '<span class="spinner"></span>جاري التحميل…'
-        try { window.location.href = REMOTE_URL } catch (_) {}
-        setTimeout(function () {
-          attempting = false
-          if (btn) btn.disabled = false
-          if (label) label.textContent = 'ابدأ · Start'
-        }, 4000)
+      window.addEventListener('online', tryReload)
+
+      var tries = 0
+      function loop() {
+        tryReload()
+        tries++
+        setTimeout(loop, tries < 30 ? 400 : 3000)
       }
-
-      if (btn) btn.addEventListener('click', manualStart)
-
-      // Auto-retry on `online` event AND on a fast poll. Combined with
-      // the 2s probe timeout, the page navigates to the app the instant
-      // connectivity returns — so this screen reads as a brief intro,
-      // not as an error.
-      window.addEventListener('online', function () { attemptRetry(true) })
-
-      var _tries = 0
-      function _retryLoop () {
-        attemptRetry(true)
-        _tries++
-        // After ~8s of failed probes, surface a manual "Start" button
-        // so the user has agency. Up to that point we just show the
-        // intro + the "preparing…" pill, which feels like a launch
-        // screen rather than an error.
-        if (_tries === 16) showRetryButton()
-        setTimeout(_retryLoop, _tries < 24 ? 500 : 4000)
-      }
-      setTimeout(_retryLoop, 120)
+      setTimeout(loop, 80)
     })()
   </script>
 </body>
