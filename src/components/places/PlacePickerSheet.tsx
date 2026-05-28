@@ -225,6 +225,9 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
 
           <div className="relative">
             <FiSearch className="absolute top-1/2 -translate-y-1/2 start-3 w-4 h-4 text-gray-400 pointer-events-none" aria-hidden />
+            {/* No autoFocus — opening the picker should NOT force the
+                soft keyboard up. The user can browse categories /
+                results first, and tap the field if they want to type. */}
             <input
               type="search"
               value={q}
@@ -233,7 +236,6 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
                 ? tr('Search services & numbers', 'ابحث عن خدمة أو رقم', 'خدمات تلاش کریں')
                 : tr('Search the neighborhood directory', 'ابحث عن مكان في دليل الحي', 'محلے کی ڈائرکٹری تلاش کریں')}
               className="w-full ps-9 pe-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              autoFocus
             />
           </div>
 
