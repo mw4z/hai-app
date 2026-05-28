@@ -2525,6 +2525,9 @@ enum SquareMessageType {
   PDF
   VOICE
   STICKER
+  // "Delete for everyone" tombstone — author cleared the message
+  // body/media; renderer shows a "this message was deleted" pill.
+  DELETED
 }
 
 model SquareMessage {
@@ -2592,6 +2595,15 @@ model SquareMessage {
   // ([{emoji, userId}, ...]). One reaction per user per message
   // (enforced at the API; the toggle replaces or removes).
   reactions Json @default("[]")
+
+  // "Delete for me" — userIds who hid this message from their own
+  // view. The list query filters out rows where the current user
+  // is in this array. Independent from type=DELETED (which is the
+  // global "delete for everyone" tombstone). Field is `hiddenFor`
+  // in code; mapped to the DB column `hiddenBy` (the original
+  // migration name) — collision with the existing `hiddenBy`
+  // moderator relation forces the rename in Prisma only.
+  hiddenFor String[] @default([]) @map("hiddenBy")
 
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt

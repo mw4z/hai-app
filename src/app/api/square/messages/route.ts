@@ -79,6 +79,10 @@ export async function GET(req: NextRequest) {
       where: {
         neighborhoodId: me.neighborhoodId,
         status: 'ACTIVE',
+        // "Delete for me" — filter out rows where this viewer is in
+        // the hiddenFor array. Tombstones (type=DELETED) are kept
+        // visible so other viewers see the placeholder.
+        NOT: { hiddenFor: { has: me.id } },
         ...(beforeValid ? { createdAt: { lt: beforeValid } } : {}),
       },
       orderBy: { createdAt: 'desc' },

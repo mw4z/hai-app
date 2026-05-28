@@ -60,6 +60,8 @@ export default function SquareReplyQuote({
     preview = '📍'
   } else if (reply.type === 'STICKER') {
     preview = lang === 'en' ? '🖼️ Sticker' : '🖼️ ملصق'
+  } else if (reply.type === 'DELETED') {
+    preview = lang === 'en' ? '🚫 Deleted' : '🚫 رسالة محذوفة'
   } else {
     preview = (reply.body || '').slice(0, 80)
   }

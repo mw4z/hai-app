@@ -20,11 +20,11 @@ export interface PublicSquareReplyTo {
   authorName: string | null
   authorLastName: string | null
   body: string | null
-  type: 'TEXT' | 'LOCATION' | 'PDF' | 'VOICE' | 'STICKER'
+  type: 'TEXT' | 'LOCATION' | 'PDF' | 'VOICE' | 'STICKER' | 'DELETED'
   status: 'ACTIVE' | 'HIDDEN'
 }
 
-export type SquareMessageType = 'TEXT' | 'LOCATION' | 'PDF' | 'VOICE' | 'STICKER'
+export type SquareMessageType = 'TEXT' | 'LOCATION' | 'PDF' | 'VOICE' | 'STICKER' | 'DELETED'
 
 export interface SquareReaction {
   emoji: string

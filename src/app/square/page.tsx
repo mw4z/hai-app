@@ -46,6 +46,7 @@ export default async function SquarePage() {
     where: {
       neighborhoodId: user.neighborhoodId!,
       status: 'ACTIVE' as const,
+      NOT: { hiddenFor: { has: user.id } },
     },
     orderBy: { createdAt: 'desc' as const },
     take: PAGE_SIZE + 1,

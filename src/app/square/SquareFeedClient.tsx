@@ -12,7 +12,9 @@ import {
   FiCornerUpLeft,
   FiCornerUpRight,
   FiEdit3,
+  FiEyeOff,
   FiFlag,
+  FiTrash2,
   FiX,
 } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
@@ -244,6 +246,73 @@ export default function SquareFeedClient({
   function handleAvatarTap(userId: string) {
     if (userId && userId !== currentUserId) setProfileUserId(userId)
   }
+  async function handleDeleteForMe() {
+    if (!selectedMsg) return
+    const target = selectedMsg
+    setSelectedMsg(null)
+    // Optimistic — remove from local list immediately.
+    setMessages((prev) => prev.filter((m) => m.id !== target.id))
+    try {
+      const res = await fetch(`/api/square/messages/${target.id}?scope=me`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        toast.error(lang === 'en' ? 'Could not hide' : 'تعذر إخفاء الرسالة')
+        // Put it back on failure.
+        setMessages((prev) => [...prev, target].sort((a, b) =>
+          Date.parse(a.createdAt) - Date.parse(b.createdAt),
+        ))
+      }
+    } catch {
+      setMessages((prev) => [...prev, target].sort((a, b) =>
+        Date.parse(a.createdAt) - Date.parse(b.createdAt),
+      ))
+    }
+  }
+  async function handleDeleteForAll() {
+    if (!selectedMsg) return
+    const target = selectedMsg
+    setSelectedMsg(null)
+    try {
+      const res = await fetch(`/api/square/messages/${target.id}?scope=all`, {
+        method: 'DELETE',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(
+          typeof data.error === 'string'
+            ? data.error
+            : data.error?.message || (lang === 'en' ? 'Could not delete' : 'تعذر الحذف'),
+        )
+        return
+      }
+      // Tombstone locally — flip the rendered message to DELETED so
+      // the bubble shows "🚫 حذفت هذه الرسالة" immediately. The next
+      // refresh from the server agrees.
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === target.id
+            ? {
+                ...m,
+                type: 'DELETED',
+                body: null,
+                lat: null,
+                lng: null,
+                pdfUrl: null,
+                pdfName: null,
+                audioUrl: null,
+                audioDurationMs: null,
+                audioMimeType: null,
+                imageUrl: null,
+                reactions: [],
+              }
+            : m,
+        ),
+      )
+    } catch {
+      toast.error(lang === 'en' ? 'Could not delete' : 'تعذر الحذف')
+    }
+  }
   async function handleNotifyNeighbors() {
     if (!selectedMsg) return
     const target = selectedMsg
@@ -418,6 +487,16 @@ export default function SquareFeedClient({
       {selectedMsg && (
         <SquareActionSheet
           isOwn={selectedMsg.author.id === currentUserId}
+          isTombstone={selectedMsg.type === 'DELETED'}
+          /** Own + non-tombstone + within the 60-min cutoff. The
+           *  server re-checks; this just hides the row when it
+           *  wouldn't work anyway. */
+          canDeleteForAll={(() => {
+            if (selectedMsg.author.id !== currentUserId) return false
+            if (selectedMsg.type === 'DELETED') return false
+            const age = Date.now() - Date.parse(selectedMsg.createdAt)
+            return age < 60 * 60 * 1000
+          })()}
           myReactionEmoji={
             selectedMsg.reactions.find((r) => r.userId === currentUserId)?.emoji ?? null
           }
@@ -449,6 +528,8 @@ export default function SquareFeedClient({
           onConvertToPost={handleConvertToPost}
           onNotifyNeighbors={handleNotifyNeighbors}
           onReport={handleReport}
+          onDeleteForMe={handleDeleteForMe}
+          onDeleteForAll={handleDeleteForAll}
           onClose={() => setSelectedMsg(null)}
         />
       )}
@@ -476,15 +557,19 @@ export default function SquareFeedClient({
 
 interface ActionSheetProps {
   isOwn: boolean
-  myReactionEmoji: string | null
+  isTombstone: boolean
   canConvertToPost: boolean
   canNotifyNeighbors: boolean
+  canDeleteForAll: boolean
+  myReactionEmoji: string | null
   onReact: (emoji: string) => void
   onReply: () => void
   onCopy: () => void
   onConvertToPost: () => void
   onNotifyNeighbors: () => void
   onReport: () => void
+  onDeleteForMe: () => void
+  onDeleteForAll: () => void
   onClose: () => void
 }
 
@@ -495,15 +580,19 @@ interface ActionSheetProps {
  */
 function SquareActionSheet({
   isOwn,
+  isTombstone,
   myReactionEmoji,
   canConvertToPost,
   canNotifyNeighbors,
+  canDeleteForAll,
   onReact,
   onReply,
   onCopy,
   onConvertToPost,
   onNotifyNeighbors,
   onReport,
+  onDeleteForMe,
+  onDeleteForAll,
   onClose,
 }: ActionSheetProps) {
   const { lang } = useLanguage()
@@ -519,56 +608,65 @@ function SquareActionSheet({
       >
         <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto my-2.5" />
         {/* Quick reactions — tap to add / replace / toggle off the
-            current user's reaction (server enforces one per user). */}
-        <div className="px-4 pt-1 pb-2 flex items-center justify-around">
-          {QUICK_EMOJIS.map((emoji) => {
-            const mine = myReactionEmoji === emoji
-            return (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => onReact(emoji)}
-                className={`text-[24px] leading-none w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
-                  mine ? 'bg-primary-100 dark:bg-primary-900/40' : ''
-                }`}
-                aria-label={emoji}
-              >
-                {emoji}
-              </button>
-            )
-          })}
-        </div>
-        <div className="h-px bg-gray-100 dark:bg-gray-800 mx-4 mb-1" />
-        <button
-          type="button"
-          onClick={onReply}
-          className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-gray-50 dark:active:bg-gray-800/60 text-start"
-        >
-          {lang === 'en' ? (
-            <FiCornerUpLeft className="w-5 h-5 text-primary-600" />
-          ) : (
-            <FiCornerUpRight className="w-5 h-5 text-primary-600" />
-          )}
-          <span className="text-[15px] font-semibold text-gray-900 dark:text-white">
-            {lang === 'en' ? 'Reply' : 'رد'}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={onCopy}
-          className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-gray-50 dark:active:bg-gray-800/60 text-start"
-        >
-          <FiCopy className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-          <span className="text-[15px] font-semibold text-gray-900 dark:text-white">
-            {lang === 'en' ? 'Copy text' : 'نسخ النص'}
-          </span>
-        </button>
+            current user's reaction (server enforces one per user).
+            Hidden on tombstones — you can't react to a deleted msg. */}
+        {!isTombstone && (
+          <>
+            <div className="px-4 pt-1 pb-2 flex items-center justify-around">
+              {QUICK_EMOJIS.map((emoji) => {
+                const mine = myReactionEmoji === emoji
+                return (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => onReact(emoji)}
+                    className={`text-[24px] leading-none w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
+                      mine ? 'bg-primary-100 dark:bg-primary-900/40' : ''
+                    }`}
+                    aria-label={emoji}
+                  >
+                    {emoji}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="h-px bg-gray-100 dark:bg-gray-800 mx-4 mb-1" />
+          </>
+        )}
+        {!isTombstone && (
+          <button
+            type="button"
+            onClick={onReply}
+            className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-gray-50 dark:active:bg-gray-800/60 text-start"
+          >
+            {lang === 'en' ? (
+              <FiCornerUpLeft className="w-5 h-5 text-primary-600" />
+            ) : (
+              <FiCornerUpRight className="w-5 h-5 text-primary-600" />
+            )}
+            <span className="text-[15px] font-semibold text-gray-900 dark:text-white">
+              {lang === 'en' ? 'Reply' : 'رد'}
+            </span>
+          </button>
+        )}
+        {!isTombstone && (
+          <button
+            type="button"
+            onClick={onCopy}
+            className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-gray-50 dark:active:bg-gray-800/60 text-start"
+          >
+            <FiCopy className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+            <span className="text-[15px] font-semibold text-gray-900 dark:text-white">
+              {lang === 'en' ? 'Copy text' : 'نسخ النص'}
+            </span>
+          </button>
+        )}
         {/* Promoted action pills — convert-to-post + notify-neighbors
             sit at the top of the row stack as prominent primary /
             amber tiles, NOT regular menu rows. Matches the "post"
             and "broadcast" affordance language elsewhere in the
             app so the eye lands on them immediately. */}
-        {(canConvertToPost || canNotifyNeighbors) && (
+        {!isTombstone && (canConvertToPost || canNotifyNeighbors) && (
           <div className="px-4 pt-2 pb-1 flex gap-2">
             {canConvertToPost && (
               <button
@@ -599,7 +697,7 @@ function SquareActionSheet({
               : 'التنبيه: مرة لكل رسالة · مرة كل 24 ساعة'}
           </p>
         )}
-        {!isOwn && (
+        {!isOwn && !isTombstone && (
           <button
             type="button"
             onClick={onReport}
@@ -608,6 +706,46 @@ function SquareActionSheet({
             <FiFlag className="w-5 h-5 text-rose-600" />
             <span className="text-[15px] font-semibold text-rose-600">
               {lang === 'en' ? 'Report' : 'إبلاغ'}
+            </span>
+          </button>
+        )}
+        {/* Delete-for-me — always available, hides from MY view only.
+            Idempotent on the server; works on tombstones too (the
+            row disappears from my list). */}
+        <button
+          type="button"
+          onClick={onDeleteForMe}
+          className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-gray-50 dark:active:bg-gray-800/60 text-start border-t border-gray-100 dark:border-gray-800"
+        >
+          <FiEyeOff className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+          <span className="flex-1">
+            <span className="block text-[15px] font-semibold text-gray-900 dark:text-white">
+              {lang === 'en' ? 'Delete for me' : 'حذف من عندي'}
+            </span>
+            <span className="block text-[11.5px] text-gray-500 dark:text-gray-400 mt-0.5">
+              {lang === 'en' ? 'Only you stop seeing this message' : 'تختفي عندك فقط'}
+            </span>
+          </span>
+        </button>
+        {/* Delete-for-everyone — own + within the 60-min window only.
+            Destructive; sets tombstone server-side. Red label so the
+            consequence is obvious. */}
+        {canDeleteForAll && (
+          <button
+            type="button"
+            onClick={onDeleteForAll}
+            className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-rose-50 dark:active:bg-rose-900/20 text-start"
+          >
+            <FiTrash2 className="w-5 h-5 text-rose-600" />
+            <span className="flex-1">
+              <span className="block text-[15px] font-semibold text-rose-600">
+                {lang === 'en' ? 'Delete for everyone' : 'حذف للجميع'}
+              </span>
+              <span className="block text-[11.5px] text-gray-500 dark:text-gray-400 mt-0.5">
+                {lang === 'en'
+                  ? 'Available for ~1 hour after sending'
+                  : 'متاح لمدة ساعة بعد الإرسال'}
+              </span>
             </span>
           </button>
         )}

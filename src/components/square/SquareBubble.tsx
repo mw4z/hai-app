@@ -190,7 +190,31 @@ export default function SquareBubble({
               />
             )}
 
-            {message.type === 'STICKER' ? (() => {
+            {message.type === 'DELETED' ? (
+              <div
+                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 border border-dashed ${
+                  isMe
+                    ? `bg-primary-600/30 border-primary-400/40 ${
+                        isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
+                      }`
+                    : `bg-white/30 dark:bg-[#242625]/60 border-gray-300/40 dark:border-gray-600/30 ${
+                        isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''
+                      }`
+                }`}
+              >
+                <p
+                  className={`text-[13px] italic ${
+                    isMe
+                      ? 'text-primary-100'
+                      : 'text-gray-600 dark:text-gray-400'
+                  }`}
+                >
+                  🚫 {isMe
+                    ? (lang === 'en' ? 'You deleted this message' : 'حذفت هذه الرسالة')
+                    : (lang === 'en' ? 'This message was deleted' : 'تم حذف هذه الرسالة')}
+                </p>
+              </div>
+            ) : message.type === 'STICKER' ? (() => {
               const stickerId = parseStickerRef(message.imageUrl || '')
               if (!stickerId) return null
               return <Sticker id={stickerId} size={120} />
