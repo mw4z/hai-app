@@ -59,31 +59,43 @@ export default function PushRegistration() {
     // (router.push first, fall back to window.location.assign with
     // retries). Kept inline so the launch handler AND the mount-time
     // resume effect both call the same code.
-    // Slimmer navigateToTarget — kicks the watchdog, fires
-    // router.push, and trusts the watchdog to drag the URL back if
-    // anything bounces it. CRUCIALLY: does NOT clear PENDING_KEY on
-    // any momentary landing. If we cleared on the brief DM render
-    // before the bouncer wins, then on the subsequent full-page nav
-    // remount there'd be nothing in sessionStorage to resume from,
-    // and the user lands permanently on /feed (the symptom in the
-    // user's screenshot). Only the watchdog clears PENDING_KEY,
-    // after its 15-second guard window expires.
+    // navigateToTarget v4 — use window.location.assign instead of
+    // router.push for the deeplink hop.
+    //
+    // Earlier rounds used router.push because it's a cheap
+    // history.pushState navigation, but the real-device logs showed
+    // the bouncer winning ~180ms later: the user saw DM → /feed →
+    // DM with the watchdog yanking it back. The cause is Next.js's
+    // client-side router rolling back on the cold-start React #419
+    // (server Suspense boundary fails to stream) — push lands the
+    // URL, the streaming RSC fetch errors, the router pops back to
+    // /feed, the watchdog catches it.
+    //
+    // assign() is a HARD navigation: the browser drops all
+    // client-side router state and does a fresh full-page load of
+    // /threads/<id>. The Suspense boundary renders cleanly because
+    // it's a top-level navigation, not a streamed transition. No
+    // bounce, no flash — the user sees the AppSplash bridge a
+    // single cleanly-rendered transition into the conversation.
+    //
+    // Watchdog still runs to catch any residual drift; PENDING_KEY
+    // still owned exclusively by the watchdog (cleared on its 15s
+    // expiry only).
     const navigateToTarget = (target: string) => {
       try {
         const cur0 = window.location.pathname + window.location.search
-        // Kick the watchdog FIRST, regardless of current URL.
         try {
           window.dispatchEvent(new CustomEvent('hai:deeplink-landed', { detail: target }))
         } catch {}
-        // Always refresh the landed-at timestamp so SwUpdateReload's
-        // guard window keeps extending while we're chasing the target.
         try { sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now())) } catch {}
         if (cur0 === target) return
-        console.log('[PUSH] navigateToTarget →', target, 'from', cur0)
+        console.log('[PUSH] navigateToTarget →', target, 'from', cur0, '(hard assign)')
         try {
-          routerRef.current.push(target)
+          window.location.assign(target)
         } catch (err) {
-          console.error('[PUSH] router.push threw:', err)
+          console.error('[PUSH] assign threw:', err)
+          // Last-ditch fallback to router.push if assign somehow throws.
+          try { routerRef.current.push(target) } catch {}
         }
       } catch (err) {
         console.error('[PUSH] navigateToTarget failed:', err)
