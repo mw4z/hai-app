@@ -566,7 +566,6 @@ async function processSquareReply(job: JobRow): Promise<JobOutcome> {
     title: `↩️ ${cleanActor} رد على رسالتك`,
     body: safePreview,
     priority: 'normal',
-    refs: { contentType: 'squareMessage', contentId: messageId },
     collapseId: `square-reply:${messageId}`,
     data: {
       type: 'square_reply',
@@ -623,7 +622,6 @@ async function processSquareReaction(job: JobRow): Promise<JobOutcome> {
     title: `${emoji} ${cleanActor} تفاعل مع رسالتك`,
     body: safePreview || 'تفاعل جديد على رسالتك في الساحة',
     priority: 'normal',
-    refs: { contentType: 'squareMessage', contentId: messageId },
     // Collapse all reactions on the same message into one banner so
     // the recipient isn't spammed with one push per emoji.
     collapseId: `square-react:${messageId}`,
