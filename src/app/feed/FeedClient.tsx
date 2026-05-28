@@ -22,6 +22,7 @@ import { fullName } from '@/lib/displayName'
 import HighlightsSection, { type HighlightItemPayload } from '@/components/HighlightsSection'
 import HomeActionCard from '@/components/feed/HomeActionCard'
 import FirstRunGuide from '@/components/FirstRunGuide'
+import CategoryPickerSheet, { type CategoryOption } from '@/components/CategoryPickerSheet'
 
 // v2 filter chips — REQUESTS is a special intent-based chip (not a
 // PostCategory value) elevated to position 2 to surface request
@@ -214,6 +215,9 @@ export default function FeedClient({
   const [openRides, setOpenRides] = useState<any[]>(initialRides)
   const [polls, setPolls] = useState<any[]>(initialPolls)
   const [showFilter, setShowFilter] = useState(false)
+  /** When true, the bottom-sheet category picker is mounted — the
+   *  discoverable replacement for the prior swipe-only chip strip. */
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false)
   // Poll-creation state (showPollForm / pollQuestion / pollOptions /
   // pollLoading) was removed when the admin poll form moved to its
   // own /polls/new page. Surface is now reachable via the BottomNav
@@ -554,9 +558,13 @@ export default function FeedClient({
           </Link>
         </div>
 
-        {/* Category Tabs */}
-        <div data-tour="categories" className="hai-row-2 hai-pb-2 hai-ps-4">
-          {/* Filter icon — always visible */}
+        {/* Category picker. Filter (sort + hidden categories) icon at
+            the leading edge · one dropdown button (replaces the prior
+            scrollable chip row that hid options behind a swipe) ·
+            optional rides-dashboard shortcut when RIDES is the active
+            filter (the only chip that used to ship with an attached
+            "open dashboard" affordance). */}
+        <div data-tour="categories" className="hai-row-2 hai-pb-2 hai-ps-4 hai-pe-4">
           <button
             onClick={() => setShowFilter(!showFilter)}
             data-active={showFilter || hiddenCategories.size > 0 || sortMode !== 'recommended' ? 'true' : 'false'}
@@ -567,53 +575,56 @@ export default function FeedClient({
               <span className="hai-count-badge">{hiddenCategories.size}</span>
             )}
           </button>
-          {/* Category tabs */}
-          <div className="hai-row-2 hai-overflow-x-auto hai-flex-1 hai-pe-4 hai-tabs-mask">
-            {categories.map((cat) => {
-              // Presence dot — NOT a count. Reads as "there's recent
-              // activity in this filter" rather than "X unread", so
-              // we don't promise an unread inbox we can't deliver.
-              const showDot = cat.key === 'REQUESTS' && requestBoostOn && requestsRecentDot
-              const isRides = cat.key === 'RIDES'
-              return (
-                <span
-                  key={cat.key}
-                  className="hai-shrink-0 inline-flex items-stretch relative"
-                >
-                  <button
-                    onClick={() => handleCategoryChange(cat.key)}
-                    data-active={selectedCategory === cat.key ? 'true' : 'false'}
-                    className={`hai-chip relative ${isRides ? 'rounded-e-none border-e-0' : ''}`}
-                  >
-                    <span>{cat.icon}</span>
-                    <span>{t(cat.tKey)}</span>
-                    {showDot && (
-                      <span
-                        className="absolute top-0.5 end-1 w-2 h-2 rounded-full bg-sky-500 ring-2 ring-white dark:ring-gray-900"
-                        aria-label="recent activity"
-                      />
-                    )}
-                  </button>
-                  {/* RIDES chip ships with an attached dashboard
-                      shortcut so users can reach /rides without
-                      hunting for the entry point. The chip itself
-                      keeps filtering posts; this side-button opens
-                      the rides dashboard (all rides + my requests +
-                      my offers + delivery toggle CTA). */}
-                  {isRides && (
-                    <button
-                      onClick={() => { hapticLight(); router.push('/rides') }}
-                      className="hai-chip rounded-s-none px-2"
-                      aria-label={lang === 'en' ? 'Open rides dashboard' : 'فتح لوحة المشاوير'}
-                      title={lang === 'en' ? 'Rides dashboard' : 'لوحة المشاوير'}
-                    >
-                      <span>↗</span>
-                    </button>
+          {(() => {
+            const currentCat = categories.find((c) => c.key === selectedCategory) ?? categories[0]
+            const isFiltered = selectedCategory !== 'ALL'
+            const currentEmoji = currentCat.icon
+            const currentLabel = selectedCategory === 'ALL'
+              ? t('categories_browse_all')
+              : t(currentCat.tKey)
+            const showRequestsDot =
+              selectedCategory === 'ALL' && requestBoostOn && requestsRecentDot
+            return (
+              <button
+                type="button"
+                onClick={() => { hapticLight(); setCategoryPickerOpen(true) }}
+                aria-haspopup="dialog"
+                aria-expanded={categoryPickerOpen}
+                className={`flex-1 inline-flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors active:scale-[0.98] ${
+                  isFiltered
+                    ? 'bg-primary-50 dark:bg-primary-900/25 border border-primary-300 dark:border-primary-700 text-primary-800 dark:text-primary-200'
+                    : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white'
+                }`}
+              >
+                <span className="inline-flex items-center gap-2 min-w-0">
+                  <span className="text-base flex-shrink-0" aria-hidden>{currentEmoji}</span>
+                  <span className="truncate">{currentLabel}</span>
+                  {showRequestsDot && (
+                    <span
+                      className="w-2 h-2 rounded-full bg-sky-500 ring-2 ring-white dark:ring-gray-900 flex-shrink-0"
+                      aria-label="recent activity"
+                    />
                   )}
                 </span>
-              )
-            })}
-          </div>
+                <FiChevronDown
+                  className={`w-4 h-4 flex-shrink-0 transition-transform ${
+                    isFiltered ? 'text-primary-600 dark:text-primary-300' : 'text-gray-400 dark:text-gray-500'
+                  } ${categoryPickerOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+            )
+          })()}
+          {selectedCategory === 'RIDES' && (
+            <button
+              type="button"
+              onClick={() => { hapticLight(); router.push('/rides') }}
+              className="hai-shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 active:scale-95 transition-transform"
+              aria-label={lang === 'en' ? 'Open rides dashboard' : 'فتح لوحة المشاوير'}
+              title={lang === 'en' ? 'Rides dashboard' : 'لوحة المشاوير'}
+            >
+              <span>↗</span>
+            </button>
+          )}
         </div>
         {/* Filter panel (expands below tabs) */}
         {showFilter && (
@@ -1015,6 +1026,21 @@ export default function FeedClient({
         allNeighborhoods={lazyNeighborhoods.length > 0 ? lazyNeighborhoods : allNeighborhoods}
         loading={loadingNeighborhoods && lazyNeighborhoods.length === 0}
         isReadOnly={isReadOnly}
+      />
+
+      {/* Bottom-sheet replacement for the prior horizontally-scrolling
+          chip row. Vertical list, large rows, one-tap commit. */}
+      <CategoryPickerSheet
+        open={categoryPickerOpen}
+        onClose={() => setCategoryPickerOpen(false)}
+        selected={selectedCategory === 'ALL' ? null : selectedCategory}
+        onSelect={(v) => { hapticLight(); handleCategoryChange(v ?? 'ALL') }}
+        title={t('categories_pick_feed')}
+        options={categories.map<CategoryOption>((c) => ({
+          value: c.key === 'ALL' ? null : c.key,
+          emoji: c.icon,
+          label: c.key === 'ALL' ? t('categories_browse_all') : t(c.tKey),
+        }))}
       />
     </div>
   )
