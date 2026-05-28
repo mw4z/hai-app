@@ -9,7 +9,18 @@ import type { TranslationKey } from '@/lib/i18n'
 import { useNetworkStatus } from '@/lib/network'
 import { translateApiError } from '@/lib/apiError'
 import RiyalIcon from '@/components/RiyalIcon'
-import { uploadFiles, uploadPdf, uploadStageLabel, type UploadStage } from '@/lib/upload'
+import { uploadFiles, uploadOneImage, uploadPdf, uploadStageLabel, type UploadStage } from '@/lib/upload'
+
+/** Stable per-image id used to track the upload back to its row when
+ *  the user reorders / crops / removes other images while uploads are
+ *  in flight. crypto.randomUUID isn't guaranteed on every iOS WebView
+ *  version we support, so fall back to a date+random string. */
+function makeImageId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    try { return (crypto as Crypto).randomUUID() } catch { /* ignore */ }
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
 import { cropFile } from '@/lib/cropBridge'
 import { pickImagesOrFallback, pickImageFromCamera } from '@/lib/imagePicker'
 import ImageSourceSheet from '@/components/ImageSourceSheet'
@@ -431,12 +442,29 @@ export default function NewPostPage() {
   // deal on the card.
   const [isOffer, setIsOffer] = useState(false)
   const [originalPrice, setOriginalPrice] = useState('')
-  const [images, setImages] = useState<{ file: File; preview: string; url?: string }[]>([])
-  const [uploading, setUploading] = useState(false)
+  // Each image now carries its own upload state so picks kick off
+  // uploads in the background (matches the PDF flow). By the time the
+  // user taps Publish, urls are usually already populated — Submit
+  // just collects them. id lets the upload completion find the right
+  // row even after the user reorders / crops / removes around it.
+  const [images, setImages] = useState<{
+    id: string
+    file: File
+    preview: string
+    url?: string
+    uploading?: boolean
+    percent?: number
+    error?: boolean
+  }[]>([])
+  /** Derived: at least one image is still uploading. Disables Publish
+   *  and the in-flight checks in uploadImages. Replaces the old
+   *  singular `uploading` flag that paired with the all-at-once batch
+   *  upload — per-image uploads now own their own `uploading` field
+   *  on the image row itself. */
+  const uploading = images.some(img => img.uploading)
   // 0..100 while the image upload is in flight. Drives the per-
   // thumbnail progress overlay so users on slow networks see the
   // upload is still working and don't bail prematurely.
-  const [imageUploadProgress, setImageUploadProgress] = useState<number | null>(null)
   // Directory place attach. Residents see it only when the
   // directory is publicly enabled; mods/admin always see it for
   // testing (isAdminLike).
@@ -502,6 +530,7 @@ export default function NewPostPage() {
     setLocation(d.location || null)
     setImages(
       (d.imageUrls || []).map((url) => ({
+        id: makeImageId(),
         file: new File([], 'restored'),
         preview: url,
         url,
@@ -659,8 +688,46 @@ export default function NewPostPage() {
       if (file.size > 10 * 1024 * 1024) { toast.error('حجم الصورة كبير (أقصى 10 ميقا)'); continue }
       if (!file.type.startsWith('image/')) { toast.error('نوع غير مدعوم'); continue }
       const preview = URL.createObjectURL(file)
-      setImages(prev => [...prev, { file, preview }])
+      const id = makeImageId()
+      setImages(prev => [...prev, { id, file, preview, uploading: true, percent: 0 }])
+      // Kick off the upload IMMEDIATELY — the user gets a head start
+      // while they fill out title/body. By Submit time the url is
+      // usually already on the row.
+      startImageUpload(id, file)
     }
+  }
+
+  /** Start (or retry) the background upload for one image row. */
+  function startImageUpload(id: string, file: File) {
+    void uploadOneImage(file, (pct) => {
+      setImages(prev => prev.map(img => img.id === id ? { ...img, percent: pct } : img))
+    })
+      .then((url) => {
+        // Row may have been removed while uploading — silently no-op
+        // by checking inside the updater.
+        setImages(prev => prev.map(img =>
+          img.id === id
+            ? { ...img, url, uploading: false, percent: 100, error: false }
+            : img,
+        ))
+      })
+      .catch(() => {
+        setImages(prev => prev.map(img =>
+          img.id === id
+            ? { ...img, uploading: false, percent: 0, error: true }
+            : img,
+        ))
+      })
+  }
+  /** Tap a failed thumbnail's retry control → re-run the upload for
+   *  that specific row (others unaffected). */
+  function retryImageUpload(id: string) {
+    const target = images.find(img => img.id === id)
+    if (!target) return
+    setImages(prev => prev.map(img =>
+      img.id === id ? { ...img, uploading: true, percent: 0, error: false, url: undefined } : img,
+    ))
+    startImageUpload(id, target.file)
   }
 
   // Optional crop — opens the editor for ONE already-added image and swaps in
@@ -673,7 +740,14 @@ export default function NewPostPage() {
     if (!cropped) return
     try { URL.revokeObjectURL(img.preview) } catch { /* ignore */ }
     const preview = URL.createObjectURL(cropped)
-    setImages(prev => prev.map((it, i) => (i === index ? { file: cropped, preview } : it)))
+    setImages(prev => prev.map((it, i) =>
+      i === index
+        ? { id: it.id, file: cropped, preview, uploading: true, percent: 0, error: false, url: undefined }
+        : it,
+    ))
+    // Re-upload the cropped result — the previous upload's URL would
+    // point at the un-cropped image.
+    startImageUpload(img.id, cropped)
   }
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -717,22 +791,33 @@ export default function NewPostPage() {
     setImages(prev => { URL.revokeObjectURL(prev[index].preview); return prev.filter((_, i) => i !== index) })
   }
 
+  /**
+   * Background-uploads have been running since the user picked each
+   * image. By Submit time, this is a check-and-collect: confirm
+   * every row has a url, surface a meaningful error if any are still
+   * in flight or failed, then return the urls array.
+   */
   async function uploadImages(): Promise<string[] | null> {
     if (images.length === 0) return []
-    setUploading(true)
-    setImageUploadProgress(0)
-    try {
-      return await uploadFiles(
-        images.map(img => img.file),
-        { onProgress: (pct) => setImageUploadProgress(pct) },
+    const stillUploading = images.some(img => img.uploading)
+    if (stillUploading) {
+      toast.error(
+        lang === 'en'
+          ? 'Images still uploading — give it a moment'
+          : 'الصور لا تزال قيد الرفع — انتظر قليلًا',
       )
-    } catch (err: any) {
-      toast.error(err?.message || 'فشل رفع الصور')
       return null
-    } finally {
-      setUploading(false)
-      setImageUploadProgress(null)
     }
+    const failed = images.find(img => img.error || !img.url)
+    if (failed) {
+      toast.error(
+        lang === 'en'
+          ? 'Some images failed to upload — retry or remove them'
+          : 'بعض الصور فشل رفعها — أعد المحاولة أو احذفها',
+      )
+      return null
+    }
+    return images.map(img => img.url!).filter(Boolean)
   }
 
   async function handleSubmit() {
@@ -1377,28 +1462,39 @@ export default function NewPostPage() {
               {images.length > 0 && (
                 <div className="flex gap-2 mb-2 overflow-x-auto">
                   {images.map((img, i) => (
-                    <div key={i} className="relative flex-shrink-0">
+                    <div key={img.id} className="relative flex-shrink-0">
                       <img src={img.preview} alt="" className="w-20 h-20 object-cover rounded-xl border border-gray-200 dark:border-gray-700" />
-                      {/* Upload-progress overlay — shared overall
-                          percent across thumbnails since the upload
-                          is a single multipart POST. */}
-                      {imageUploadProgress !== null && (
+                      {/* Per-image upload state. Each picked image
+                          uploads in the background starting from the
+                          moment of pick (mirrors PDF flow), so the
+                          percent shown is THIS image's actual progress
+                          — not a shared average across all rows. */}
+                      {img.uploading && (
                         <>
                           <div className="absolute inset-0 rounded-xl bg-black/55 flex items-center justify-center text-[11px] font-bold text-white">
-                            {imageUploadProgress}%
+                            {img.percent ?? 0}%
                           </div>
                           <div className="absolute bottom-0 inset-x-0 h-1 bg-black/30 rounded-b-xl overflow-hidden">
                             <div
                               className="h-full bg-emerald-400 transition-[width] duration-150"
-                              style={{ width: `${imageUploadProgress}%` }}
+                              style={{ width: `${img.percent ?? 0}%` }}
                             />
                           </div>
                         </>
                       )}
-                      {/* Controls sit INSIDE the thumbnail corners — the row is
-                          overflow-x-auto, so negative offsets get clipped into a
-                          teardrop. White ring keeps them clear over any photo. */}
-                      {imageUploadProgress === null && (
+                      {img.error && (
+                        <div className="absolute inset-0 rounded-xl bg-rose-600/85 flex flex-col items-center justify-center gap-1 text-[10px] font-bold text-white px-1">
+                          <span>{lang === 'en' ? 'Upload failed' : 'فشل الرفع'}</span>
+                          <button
+                            type="button"
+                            onClick={() => retryImageUpload(img.id)}
+                            className="px-2 py-0.5 rounded-full bg-white/90 text-rose-700"
+                          >
+                            {lang === 'en' ? 'Retry' : 'إعادة'}
+                          </button>
+                        </div>
+                      )}
+                      {!img.uploading && !img.error && (
                         <>
                           <button
                             type="button"
@@ -1413,6 +1509,16 @@ export default function NewPostPage() {
                             className="absolute bottom-1 left-1 w-6 h-6 bg-black/55 text-white rounded-full shadow ring-1 ring-white/50 flex items-center justify-center active:scale-95"
                           ><FiScissors className="w-3.5 h-3.5" /></button>
                         </>
+                      )}
+                      {/* X button is always available for in-flight /
+                          failed uploads so a stuck row can be removed. */}
+                      {(img.uploading || img.error) && (
+                        <button
+                          type="button"
+                          onClick={() => removeImage(i)}
+                          aria-label={lang === 'en' ? 'Remove' : 'حذف'}
+                          className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full shadow-md ring-2 ring-white flex items-center justify-center active:scale-95"
+                        ><FiX className="w-3.5 h-3.5" /></button>
                       )}
                     </div>
                   ))}

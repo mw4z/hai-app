@@ -141,6 +141,23 @@ export async function uploadFiles(
 }
 
 /**
+ * Single-image background upload. Wraps uploadFiles for one file so
+ * the post composer (and any other surface that wants
+ * upload-on-pick) can fire one upload per image as soon as the user
+ * chooses it — no waiting until "Send post" to start the network
+ * work. Errors isolated per file: if image 3 of 5 hangs, the other
+ * 4 complete normally and the failed one can be retried or removed.
+ */
+export async function uploadOneImage(
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<string> {
+  const urls = await uploadFiles([file], { onProgress })
+  if (!urls[0]) throw new Error('فشل رفع الصورة')
+  return urls[0]
+}
+
+/**
  * Upload a single PDF up to 25MB. Goes via the client-direct path
  * (the file streams from the browser straight to Vercel Blob; the
  * Next.js function only issues an auth token) because 25MB blows past
