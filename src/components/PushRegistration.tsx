@@ -62,18 +62,21 @@ export default function PushRegistration() {
     const navigateToTarget = (target: string) => {
       try {
         const cur0 = window.location.pathname + window.location.search
+        // ALWAYS kick the stickiness watchdog the moment we're asked
+        // to navigate. The previous design only started it AFTER a
+        // successful 500ms-check landing — but the cold-start
+        // bouncer (server-redirect of `/` → /feed, plus the React
+        // #419 hydration error breaking router.push) wins that race
+        // and the watchdog never starts. With the watchdog kicked
+        // at entry, it polls every 250ms for 10s and re-asserts the
+        // target no matter what else is yanking the URL.
+        try {
+          window.dispatchEvent(new CustomEvent('hai:deeplink-landed', { detail: target }))
+        } catch {}
         if (cur0 === target) {
           try {
             sessionStorage.removeItem(PENDING_KEY)
-            // Mark that a deeplink just landed so SwUpdateReload
-            // skips its auto-reload — see SwUpdateReload.tsx for why.
             sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))
-          } catch {}
-          // Activate the stickiness watchdog on this target — if any
-          // other code re-navigates to /feed within 10s, we'll catch
-          // it and force a return here.
-          try {
-            window.dispatchEvent(new CustomEvent('hai:deeplink-landed', { detail: target }))
           } catch {}
           return
         }
@@ -159,10 +162,13 @@ export default function PushRegistration() {
     let watchdogInterval: ReturnType<typeof setInterval> | null = null
     let watchdogTarget: string | null = null
     let watchdogDeadline = 0
-    const STICKINESS_MS = 10_000
+    let watchdogDriftCount = 0
+    const STICKINESS_MS = 15_000
     const startStickinessWatchdog = (target: string) => {
+      if (watchdogTarget === target && watchdogInterval) return // idempotent
       watchdogTarget = target
       watchdogDeadline = Date.now() + STICKINESS_MS
+      watchdogDriftCount = 0
       if (watchdogInterval) clearInterval(watchdogInterval)
       console.log('[PUSH] watchdog → guarding', target, 'for', STICKINESS_MS, 'ms')
       watchdogInterval = setInterval(() => {
@@ -171,19 +177,37 @@ export default function PushRegistration() {
           if (watchdogInterval) clearInterval(watchdogInterval)
           watchdogInterval = null
           watchdogTarget = null
+          // Now safe to clear the pending key — we held the URL as
+          // long as we reasonably can.
+          try { sessionStorage.removeItem(PENDING_KEY) } catch {}
           return
         }
         if (!watchdogTarget) return
         const cur = window.location.pathname + window.location.search
         if (cur === watchdogTarget) return
-        console.warn('[PUSH] watchdog → URL drifted to', cur, '— forcing back to', watchdogTarget)
-        try {
-          routerRef.current.push(watchdogTarget)
-        } catch (err) {
-          console.error('[PUSH] watchdog router.push failed:', err)
-          try { window.location.assign(watchdogTarget) } catch {}
+        watchdogDriftCount++
+        console.warn('[PUSH] watchdog → drift #' + watchdogDriftCount + ' to', cur, '— forcing back to', watchdogTarget)
+        // First two drifts: try router.push (cheap, client-side).
+        // After that: escalate to window.location.assign which is a
+        // full navigation that the server can't redirect away from
+        // (Next.js root-page redirect only applies to bare `/`, not
+        // /threads/<id>). assign also clears any pending router
+        // transition that the bouncer might have hijacked.
+        if (watchdogDriftCount <= 2) {
+          try {
+            routerRef.current.push(watchdogTarget)
+          } catch (err) {
+            console.error('[PUSH] watchdog router.push threw:', err)
+          }
+        } else {
+          try {
+            console.log('[PUSH] watchdog → escalating to assign()')
+            window.location.assign(watchdogTarget)
+          } catch (err) {
+            console.error('[PUSH] watchdog assign threw:', err)
+          }
         }
-      }, 250)
+      }, 200)
     }
     // Hook the watchdog into the landing branch of navigateToTarget
     // by listening on a custom event the helper dispatches when it
