@@ -66,11 +66,12 @@ export default function PushDebugOverlay() {
   // the push chain shows up here instead of dying silently.
   useEffect(() => {
     const onErr = (e: ErrorEvent) => {
-      setEntries((prev) => [...prev, {
+      const entry: Entry = {
         t: Date.now(),
         level: 'error',
         text: `[ERR] ${e.message} @ ${e.filename}:${e.lineno}`,
-      }].slice(-20))
+      }
+      setEntries((prev) => [...prev, entry].slice(-20))
     }
     window.addEventListener('error', onErr)
     return () => window.removeEventListener('error', onErr)
