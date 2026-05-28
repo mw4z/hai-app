@@ -133,6 +133,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
       data: { notificationFiredAt: new Date() },
     })
     if (recipients.length > 0) {
+      // In-app bell entries for each recipient.
       await tx.notification.createMany({
         data: recipients.map((u) => ({
           type: 'SYSTEM' as const,
@@ -145,11 +146,37 @@ export async function POST(_req: NextRequest, { params }: Params) {
           bodyEn,
         })),
       })
+      // ALSO enqueue ONE NotifJob so the push cron actually fans out
+      // OS notifications. Previously the route only created bell
+      // rows + kicked the cron — but the cron only processes NotifJob
+      // rows, so no push ever fired. The handler lives in
+      // /api/cron/process-notifs (case 'square_notify') and
+      // resolves recipients itself (admin users in the neighborhood,
+      // minus the actor) before calling sendPushBatch.
+      await tx.notifJob.create({
+        data: {
+          type: 'square_notify',
+          priority: 'high',
+          targetType: 'nbhd_topic',
+          // me.neighborhoodId is non-null at this point (we gated on
+          // it at the top of the handler) — assert for the type
+          // narrower since Prisma's transaction client doesn't carry
+          // the narrowing through.
+          targetRef: me.neighborhoodId!,
+          dedupKey: `square_notify:${msg.id}`,
+          payload: {
+            messageId: msg.id,
+            actorId: me.id,
+            actorName,
+            preview,
+          },
+        },
+      })
     }
   })
 
-  // Wake the push cron so OS notifications fan out without waiting
-  // for the next scheduled tick.
+  // Wake the push cron so OS notifications fan out within ~1-2s,
+  // not on the next minute-mark.
   try { kickNotifCron() } catch { /* fire-and-forget */ }
 
   return NextResponse.json({

@@ -22,6 +22,10 @@ interface Props {
   dateLabel: string
   onLongPress: () => void
   onJumpToReply: (id: string) => void
+  /** True when this is the first message after the user's last-seen
+   *  boundary — renders a "رسائل جديدة" divider above the bubble,
+   *  same look as DM's unread separator. */
+  showUnreadDivider?: boolean
   /** Tap an author's avatar/name → open their profile sheet. */
   onAvatarTap: (userId: string) => void
   /** Tap an existing reactions chip → toggle the current user's
@@ -52,6 +56,7 @@ export default function SquareBubble({
   isFirstInGroup,
   isLastInGroup,
   showDate,
+  showUnreadDivider = false,
   dateLabel,
   onLongPress,
   onJumpToReply,
@@ -105,6 +110,19 @@ export default function SquareBubble({
         </div>
       )}
 
+      {/* Unread divider — same shape DM uses. Rendered above the
+          first message authored AFTER the viewer's last-seen
+          boundary captured on mount. */}
+      {showUnreadDivider && (
+        <div className="flex items-center gap-3 my-4">
+          <div className="flex-1 h-px bg-primary-400/50" />
+          <span className="text-[11px] text-primary-600 dark:text-primary-400 font-semibold px-2">
+            {lang === 'en' ? 'New messages' : 'رسائل جديدة'}
+          </span>
+          <div className="flex-1 h-px bg-primary-400/50" />
+        </div>
+      )}
+
       {/* Outermost wrapper PLACES the chat-row on the correct screen
           side via justify-content — direction-aware so own goes RIGHT
           in both LTR and RTL, other goes LEFT in both. The inner row
@@ -140,12 +158,13 @@ export default function SquareBubble({
             />
           )}
 
-          {/* Bubble column. Content-sized (no flex-1), so the inner
-              row clusters tightly at the justified screen edge.
+          {/* Bubble column. Content-sized (no flex-1, no min-w-0 —
+              min-w-0 was letting break-words shred single Arabic
+              words like "تجربة" into one-char-per-line slivers).
               Children align to the bubble's anchor side using the
               same DM ltr:/rtl: pattern. */}
           <div
-            className={`flex flex-col min-w-0 ${
+            className={`flex flex-col ${
               isMe
                 ? 'ltr:items-end rtl:items-start'
                 : 'ltr:items-start rtl:items-end'

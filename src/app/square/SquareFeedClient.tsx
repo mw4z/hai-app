@@ -44,6 +44,8 @@ interface Props {
   currentUserId: string
 }
 
+const LAST_SEEN_KEY_PREFIX = 'square-last-seen-'
+
 /**
  * Square — one shared neighborhood message space. Adopts the DM
  * ChatClient layout patterns (bubble alignment, group rhythm, date
@@ -79,6 +81,13 @@ export default function SquareFeedClient({
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const endAnchorRef = useRef<HTMLDivElement | null>(null)
+  /** Per-user "last seen" boundary captured ONCE on mount. Any
+   *  message whose createdAt is strictly newer than this is below
+   *  the "رسائل جديدة" / "New messages" divider. Drives the
+   *  WhatsApp-style unread separator without a schema column —
+   *  for MVP this is good enough since Square is admin-only and
+   *  sessions are short. */
+  const lastSeenBoundaryRef = useRef<number | null>(null)
   /** Captured before a "load older" prepend so we can restore scrollTop
    *  to keep the user's anchor row in view after the DOM grows upward. */
   const preserveScrollFromHeight = useRef<number | null>(null)
@@ -87,7 +96,23 @@ export default function SquareFeedClient({
   const nearBottomRef = useRef<boolean>(true)
 
   // First paint: snap to the bottom so the newest message is in view.
+  // ALSO capture the "last seen" boundary from localStorage BEFORE
+  // updating it. Any message newer than the boundary gets the
+  // unread divider above it. We don't want the boundary to shift
+  // while the user is on the page, so it's stored in a ref captured
+  // exactly once.
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const key = LAST_SEEN_KEY_PREFIX + (window.location.pathname || '')
+      try {
+        const raw = localStorage.getItem(key)
+        const prev = raw ? parseInt(raw, 10) : null
+        lastSeenBoundaryRef.current = prev && Number.isFinite(prev) ? prev : null
+        localStorage.setItem(key, String(Date.now()))
+      } catch {
+        // localStorage blocked / quota — divider just doesn't render.
+      }
+    }
     endAnchorRef.current?.scrollIntoView({ block: 'end', behavior: 'auto' })
   }, [])
 
@@ -368,6 +393,20 @@ export default function SquareFeedClient({
   // their later message (hours apart) starts a new one with its own
   // sender label + timestamp + avatar.
   const decorated = useMemo(() => {
+    const boundary = lastSeenBoundaryRef.current
+    // First message strictly newer than the captured boundary AND
+    // NOT authored by the viewer (the user shouldn't see "new
+    // messages" pointing at their own sent ones). Only one bubble
+    // gets the divider — the first unread row.
+    let firstUnreadId: string | null = null
+    if (boundary != null) {
+      for (const m of messages) {
+        if (Date.parse(m.createdAt) > boundary && m.author.id !== currentUserId) {
+          firstUnreadId = m.id
+          break
+        }
+      }
+    }
     let lastDay = ''
     return messages.map((msg, idx) => {
       const day = dayKey(msg.createdAt)
@@ -385,9 +424,10 @@ export default function SquareFeedClient({
         next && (Date.parse(next.createdAt) - Date.parse(msg.createdAt)) < GROUP_TIME_GAP_MS
       const isFirstInGroup = showDate || !sameSenderAsPrev || !closeToPrev
       const isLastInGroup = !sameSenderAsNext || !closeToNext
-      return { msg, isFirstInGroup, isLastInGroup, showDate, dateLabel: dateLabelFor(msg.createdAt, lang) }
+      const showUnreadDivider = msg.id === firstUnreadId
+      return { msg, isFirstInGroup, isLastInGroup, showDate, showUnreadDivider, dateLabel: dateLabelFor(msg.createdAt, lang) }
     })
-  }, [messages, lang])
+  }, [messages, lang, currentUserId])
 
   return (
     <div
@@ -467,7 +507,7 @@ export default function SquareFeedClient({
               </p>
             </div>
           ) : (
-            decorated.map(({ msg, isFirstInGroup, isLastInGroup, showDate, dateLabel }) => (
+            decorated.map(({ msg, isFirstInGroup, isLastInGroup, showDate, showUnreadDivider, dateLabel }) => (
               <SquareBubble
                 key={msg.id}
                 message={msg}
@@ -475,6 +515,7 @@ export default function SquareFeedClient({
                 isFirstInGroup={isFirstInGroup}
                 isLastInGroup={isLastInGroup}
                 showDate={showDate}
+                showUnreadDivider={showUnreadDivider}
                 dateLabel={dateLabel}
                 selected={selectedMsg?.id === msg.id}
                 onLongPress={() => { hapticLight(); setSelectedMsg(msg) }}

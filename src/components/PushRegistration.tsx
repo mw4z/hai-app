@@ -595,6 +595,13 @@ function resolveDeeplink(data: Record<string, string>): string {
     case 'emergency_alert':
       return '/feed'
 
+    case 'square_notify':
+      // Defensive fallback — normally the `deeplink: 'hai://square'`
+      // field on the payload takes precedence and lands the user on
+      // /square via the generic hai:// → / mapping above. This case
+      // catches the rare path where `deeplink` is dropped en-route.
+      return '/square'
+
     case 'weekly_digest':
     default:
       return '/feed'

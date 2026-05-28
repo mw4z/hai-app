@@ -445,6 +445,92 @@ async function processBroadcast(job: JobRow): Promise<JobOutcome> {
   return 'done'
 }
 
+/** Square admin "notify neighbors" — author-fired on their own
+ *  Square message. Fans out a push to every OTHER admin user in
+ *  the same neighborhood (admin = NEIGHBORHOOD_MOD / PLATFORM_MOD /
+ *  SUPER_ADMIN) since Square is admin-only in MVP. When Square
+ *  opens to all residents the role filter widens; the rest of the
+ *  flow stays the same. */
+async function processSquareNotify(job: JobRow): Promise<JobOutcome> {
+  const p = (job.payload || {}) as {
+    messageId?: string
+    actorId?: string
+    actorName?: string
+    preview?: string
+    titleAr?: string
+    titleEn?: string
+  }
+  const { messageId, actorId, actorName, preview } = p
+  if (!messageId || !actorId) {
+    console.log('[NOTIF_CRON] drop: invalid square_notify payload', { jobId: job.id })
+    return 'dropped'
+  }
+
+  // Re-verify the message still exists, is ACTIVE, and lives in the
+  // target neighborhood (job.targetRef). Guards against the case
+  // where the author hides / deletes-for-all between firing and the
+  // cron pick-up.
+  const msg = await db.squareMessage.findUnique({
+    where: { id: messageId },
+    select: { neighborhoodId: true, status: true, type: true },
+  })
+  if (!msg) return 'dropped'
+  if (msg.neighborhoodId !== job.targetRef) return 'dropped'
+  if (msg.status !== 'ACTIVE' || msg.type === 'DELETED') return 'dropped'
+
+  // Recipients = other admin users in the same neighborhood. Pull
+  // their device tokens directly; we don't need the existing
+  // resolveNewPostTokens helper because Square has its own audience
+  // scope (admin-only) and its own pref-bypass (the action is
+  // explicitly user-initiated, so it ignores per-category mutes).
+  const admins = await db.user.findMany({
+    where: {
+      neighborhoodId: job.targetRef,
+      id: { not: actorId },
+      role: { in: ['NEIGHBORHOOD_MOD', 'PLATFORM_MOD', 'SUPER_ADMIN'] },
+      status: 'ACTIVE',
+    },
+    select: { id: true, deviceTokens: { select: { token: true, platform: true } } },
+  })
+  const tokens: Array<{ token: string; platform: string }> = []
+  let recipientUserCount = 0
+  for (const u of admins) {
+    if (u.deviceTokens.length === 0) continue
+    recipientUserCount++
+    for (const dt of u.deviceTokens) tokens.push({ token: dt.token, platform: dt.platform || 'android' })
+  }
+  if (tokens.length === 0) {
+    console.log('[NOTIF_CRON] drop: no recipients (square_notify)', { jobId: job.id })
+    return 'dropped'
+  }
+
+  const cleanActor = (actorName || '').trim() || 'جار'
+  const safePreview = (preview || '').trim().slice(0, 180) || 'تنبيه من الساحة'
+  const result = await sendPushBatch(tokens, {
+    title: '🔔 تنبيه في الساحة',
+    body: `${cleanActor}: ${safePreview}`,
+    priority: 'high',
+    collapseId: `square-notify:${messageId}`,
+    data: {
+      type: 'square_notify',
+      messageId,
+      deeplink: 'hai://square',
+    },
+  })
+
+  await cleanupInvalidTokens(result.invalidTokens, job.id, job.type)
+
+  console.log('[NOTIF_CRON] square_notify delivered', {
+    jobId: job.id, messageId, recipients: recipientUserCount,
+    tokensSent: tokens.length, success: result.success, failed: result.failed,
+  })
+
+  if (result.success === 0 && result.failed > 0) {
+    throw new Error(result.firstError || 'all FCM sends failed')
+  }
+  return 'done'
+}
+
 async function resolveEmergencyTokens(
   neighborhoodId: string,
 ): Promise<ResolvedTokens> {
@@ -1951,6 +2037,9 @@ async function handle(req: NextRequest) {
           break
         case 'broadcast':
           outcome = await processBroadcast(job)
+          break
+        case 'square_notify':
+          outcome = await processSquareNotify(job)
           break
         case 'user_report':
           outcome = await processUserReport(job)
