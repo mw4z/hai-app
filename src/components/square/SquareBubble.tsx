@@ -515,7 +515,7 @@ export default function SquareBubble({
                 </span>
               )}
               <span>{timeStr}</span>
-              {isMe && message.type !== 'DELETED' && viewCount > 0 && (
+              {isMe && message.type !== 'DELETED' && (
                 <span
                   className="inline-flex items-center gap-0.5 opacity-70"
                   aria-label={lang === 'en' ? `${viewCount} views` : `${viewCount} مشاهدة`}
