@@ -69,6 +69,12 @@ export default function PushRegistration() {
             // skips its auto-reload — see SwUpdateReload.tsx for why.
             sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))
           } catch {}
+          // Activate the stickiness watchdog on this target — if any
+          // other code re-navigates to /feed within 10s, we'll catch
+          // it and force a return here.
+          try {
+            window.dispatchEvent(new CustomEvent('hai:deeplink-landed', { detail: target }))
+          } catch {}
           return
         }
         console.log('[PUSH] navigateToTarget →', target, 'from', cur0)
@@ -86,6 +92,12 @@ export default function PushRegistration() {
             // skips its auto-reload — see SwUpdateReload.tsx for why.
             sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))
           } catch {}
+          // Activate the stickiness watchdog on this target — if any
+          // other code re-navigates to /feed within 10s, we'll catch
+          // it and force a return here.
+          try {
+            window.dispatchEvent(new CustomEvent('hai:deeplink-landed', { detail: target }))
+          } catch {}
             return
           }
           // Fallback: full assign with retries
@@ -99,6 +111,12 @@ export default function PushRegistration() {
             // Mark that a deeplink just landed so SwUpdateReload
             // skips its auto-reload — see SwUpdateReload.tsx for why.
             sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))
+          } catch {}
+          // Activate the stickiness watchdog on this target — if any
+          // other code re-navigates to /feed within 10s, we'll catch
+          // it and force a return here.
+          try {
+            window.dispatchEvent(new CustomEvent('hai:deeplink-landed', { detail: target }))
           } catch {}
               return
             }
@@ -127,6 +145,54 @@ export default function PushRegistration() {
         setTimeout(() => navigateToTarget(pending), 50)
       }
     } catch {}
+
+    // ── Deeplink stickiness watchdog ────────────────────────────────
+    // Even after a successful navigation, something has been bouncing
+    // the user back to /feed ~1s after the DM renders. Rather than
+    // chase every possible culprit (server redirects, layout effects,
+    // service-worker race), we install a brute-force watchdog: for 10
+    // seconds after a deeplink lands, every 250ms we check the URL.
+    // If it drifted off the target, we re-navigate. Cleared once the
+    // window elapses or the user explicitly navigates somewhere we
+    // recognise as intentional (back / forward / a different deep
+    // path).
+    let watchdogInterval: ReturnType<typeof setInterval> | null = null
+    let watchdogTarget: string | null = null
+    let watchdogDeadline = 0
+    const STICKINESS_MS = 10_000
+    const startStickinessWatchdog = (target: string) => {
+      watchdogTarget = target
+      watchdogDeadline = Date.now() + STICKINESS_MS
+      if (watchdogInterval) clearInterval(watchdogInterval)
+      console.log('[PUSH] watchdog → guarding', target, 'for', STICKINESS_MS, 'ms')
+      watchdogInterval = setInterval(() => {
+        if (Date.now() > watchdogDeadline) {
+          console.log('[PUSH] watchdog → window elapsed, releasing')
+          if (watchdogInterval) clearInterval(watchdogInterval)
+          watchdogInterval = null
+          watchdogTarget = null
+          return
+        }
+        if (!watchdogTarget) return
+        const cur = window.location.pathname + window.location.search
+        if (cur === watchdogTarget) return
+        console.warn('[PUSH] watchdog → URL drifted to', cur, '— forcing back to', watchdogTarget)
+        try {
+          routerRef.current.push(watchdogTarget)
+        } catch (err) {
+          console.error('[PUSH] watchdog router.push failed:', err)
+          try { window.location.assign(watchdogTarget) } catch {}
+        }
+      }, 250)
+    }
+    // Hook the watchdog into the landing branch of navigateToTarget
+    // by listening on a custom event the helper dispatches when it
+    // confirms a successful land.
+    const onDeeplinkLanded = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail
+      if (typeof detail === 'string') startStickinessWatchdog(detail)
+    }
+    window.addEventListener('hai:deeplink-landed', onDeeplinkLanded)
 
     const installDeeplinkListener = async () => {
       if (deeplinkReadyRef.current) return
@@ -193,6 +259,12 @@ export default function PushRegistration() {
             // Mark that a deeplink just landed so SwUpdateReload
             // skips its auto-reload — see SwUpdateReload.tsx for why.
             sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))
+          } catch {}
+          // Activate the stickiness watchdog on this target — if any
+          // other code re-navigates to /feed within 10s, we'll catch
+          // it and force a return here.
+          try {
+            window.dispatchEvent(new CustomEvent('hai:deeplink-landed', { detail: target }))
           } catch {}
                 return
               }
@@ -427,6 +499,11 @@ export default function PushRegistration() {
     const cleanupAppListener = () => {
       try { appListenerHandle?.remove() } catch {}
       window.removeEventListener('hai:content-deleted', onContentDeleted)
+      window.removeEventListener('hai:deeplink-landed', onDeeplinkLanded)
+      if (watchdogInterval) {
+        clearInterval(watchdogInterval)
+        watchdogInterval = null
+      }
     }
 
     // The hai_token cookie is HttpOnly, so we can't see it from JS.
