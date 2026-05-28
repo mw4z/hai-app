@@ -70,22 +70,23 @@ async function flushBatch() {
   batchTimer = null
   if (!batch || batch.phones.size === 0) return
   const phones = Array.from(batch.phones).join(',')
+  const resolvers = Array.from(batch.resolvers.entries())
   try {
     const res = await fetch(
       `/api/directory/service-contacts/lookup?phones=${encodeURIComponent(phones)}`,
       { credentials: 'include', cache: 'no-store' },
     )
     if (!res.ok) {
-      for (const [, resolve] of batch.resolvers) resolve({ kind: 'no-match' })
+      for (const [, resolve] of resolvers) resolve({ kind: 'no-match' })
       return
     }
     const data = await res.json() as { matches: Record<string, Match | null> }
-    for (const [e164, resolve] of batch.resolvers) {
+    for (const [e164, resolve] of resolvers) {
       const m = data.matches?.[e164]
       resolve(m ? { kind: 'match', data: m } : { kind: 'no-match' })
     }
   } catch {
-    for (const [, resolve] of batch.resolvers) resolve({ kind: 'no-match' })
+    for (const [, resolve] of resolvers) resolve({ kind: 'no-match' })
   }
 }
 
