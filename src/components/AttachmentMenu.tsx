@@ -9,12 +9,15 @@ import { pushBackHandler } from '@/lib/backHandler'
 interface Props {
   open: boolean
   onClose: () => void
-  onPickImage: () => void
-  onPickContact: () => void
-  onPickLocation: () => void
-  /** Optional — when provided, a "Document" (PDF) row is rendered as
-   *  the fourth menu option. Surfaces that don't yet handle PDFs
-   *  (legacy callers) omit this prop and the row simply doesn't render. */
+  /** All three of the original options are now individually optional
+   *  so the menu can be cut down per-surface. Square in particular
+   *  omits Image (text-first policy) but keeps Contact/Location/PDF/Place. */
+  onPickImage?: () => void
+  onPickContact?: () => void
+  onPickLocation?: () => void
+  /** Optional — when provided, a "Document" (PDF) row is rendered.
+   *  Surfaces that don't yet handle PDFs (legacy callers) omit this
+   *  prop and the row simply doesn't render. */
   onPickDocument?: () => void
   /** Optional — when provided, a "Directory place" row is rendered.
    *  Callers gate visibility themselves via canAttachDirectoryPlace()
@@ -94,30 +97,36 @@ export default function AttachmentMenu({
   }
 
   const options = [
-    {
-      key: 'image',
-      onClick: wrap(onPickImage),
-      icon: '🖼️',
-      title: tr('Photo', 'صورة', 'تصویر'),
-      subtitle: tr('From gallery or camera', 'من المعرض أو الكاميرا', 'گیلری یا کیمرہ سے'),
-      tint: 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300',
-    },
-    {
-      key: 'contact',
-      onClick: wrap(onPickContact),
-      icon: '📱',
-      title: tr('Contact', 'جهة اتصال', 'رابطہ'),
-      subtitle: tr('Pick a phone contact', 'اختر من جهات اتصالك', 'فون رابطہ منتخب کریں'),
-      tint: 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300',
-    },
-    {
-      key: 'location',
-      onClick: wrap(onPickLocation),
-      icon: '📍',
-      title: tr('Location', 'موقع', 'مقام'),
-      subtitle: tr('Pick a point on the map', 'اختر من الخريطة', 'نقشے سے منتخب کریں'),
-      tint: 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300',
-    },
+    ...(onPickImage
+      ? [{
+          key: 'image',
+          onClick: wrap(onPickImage),
+          icon: '🖼️',
+          title: tr('Photo', 'صورة', 'تصویر'),
+          subtitle: tr('From gallery or camera', 'من المعرض أو الكاميرا', 'گیلری یا کیمرہ سے'),
+          tint: 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300',
+        }]
+      : []),
+    ...(onPickContact
+      ? [{
+          key: 'contact',
+          onClick: wrap(onPickContact),
+          icon: '📱',
+          title: tr('Contact', 'جهة اتصال', 'رابطہ'),
+          subtitle: tr('Pick a phone contact', 'اختر من جهات اتصالك', 'فون رابطہ منتخب کریں'),
+          tint: 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300',
+        }]
+      : []),
+    ...(onPickLocation
+      ? [{
+          key: 'location',
+          onClick: wrap(onPickLocation),
+          icon: '📍',
+          title: tr('Location', 'موقع', 'مقام'),
+          subtitle: tr('Pick a point on the map', 'اختر من الخريطة', 'نقشے سے منتخب کریں'),
+          tint: 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300',
+        }]
+      : []),
     // Document row only renders when the caller wired up a handler.
     // Surfaces that don't yet support PDF (or never will, e.g. ride
     // messages) omit onPickDocument and the row disappears.

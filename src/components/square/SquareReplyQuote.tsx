@@ -46,9 +46,23 @@ export default function SquareReplyQuote({
       reply.authorName ||
       (lang === 'en' ? 'Neighbor' : 'جار')
 
-  const preview = unavailable || reply.status === 'HIDDEN'
-    ? (lang === 'en' ? 'Message unavailable' : 'رسالة غير متاحة')
-    : (reply.body || '').slice(0, 80)
+  // Per-type preview — mirrors DM's reply quote ("🎤" / "📄 PDF" /
+  // "📍" / "🖼️ ملصق") so the user sees what shape of content they're
+  // replying to even when the parent has no text body.
+  let preview: string
+  if (unavailable || reply.status === 'HIDDEN') {
+    preview = lang === 'en' ? 'Message unavailable' : 'رسالة غير متاحة'
+  } else if (reply.type === 'VOICE') {
+    preview = '🎤'
+  } else if (reply.type === 'PDF') {
+    preview = '📄 PDF'
+  } else if (reply.type === 'LOCATION') {
+    preview = '📍'
+  } else if (reply.type === 'STICKER') {
+    preview = lang === 'en' ? '🖼️ Sticker' : '🖼️ ملصق'
+  } else {
+    preview = (reply.body || '').slice(0, 80)
+  }
 
   const Tag = onClick ? 'button' : 'div'
   const tagProps = onClick

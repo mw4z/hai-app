@@ -2514,13 +2514,56 @@ enum SquareStatus {
   HIDDEN
 }
 
+// Square's per-message content type discriminator. Mirrors DM
+// MessageType but DOES NOT include IMAGE — Square deliberately
+// blocks arbitrary image uploads. Stickers ride on imageUrl with
+// a "sticker:<id>" sentinel (same pattern DM uses) so we don't
+// need a separate stickerId column.
+enum SquareMessageType {
+  TEXT
+  LOCATION
+  PDF
+  VOICE
+  STICKER
+}
+
 model SquareMessage {
-  id                String         @id @default(cuid())
+  id                String            @id @default(cuid())
   neighborhoodId    String
   authorId          String
-  body              String
-  kind              SquareKind     @default(GENERAL)
-  status            SquareStatus   @default(ACTIVE)
+  // Body is the text payload for TEXT messages, but nullable because
+  // VOICE / PDF / LOCATION / STICKER messages have no body (their
+  // content rides on the per-type columns below). Contact + place
+  // attachments are still encoded INTO `body` as text snippets (DM
+  // does the same — formatContactSnippet output / "/directory/<id>"
+  // links), so those stay as type=TEXT with a non-null body.
+  body              String?
+  kind              SquareKind        @default(GENERAL)
+  type              SquareMessageType @default(TEXT)
+  status            SquareStatus      @default(ACTIVE)
+
+  // Location (type=LOCATION) — Float pair, same shape as DM Message.
+  lat               Float?
+  lng               Float?
+
+  // PDF (type=PDF) — Vercel Blob URL + display name. Same shape as
+  // DM Message; uploads go through the existing /lib/upload helper.
+  pdfUrl            String?
+  pdfName           String?
+
+  // Voice (type=VOICE) — m4a/AAC on native, webm on web fallback.
+  // Same shape as DM Message. audioSizeBytes lets us reject obvious
+  // abuse server-side; audioDurationMs drives the player UI.
+  audioUrl          String?
+  audioDurationMs   Int?
+  audioMimeType     String?
+  audioSizeBytes    Int?
+
+  // Sticker (type=STICKER) — sentinel "sticker:<id>" string only.
+  // ARBITRARY IMAGE URLs ARE REJECTED at the API layer: Square has
+  // no image upload. Same field name as DM Message so the renderer
+  // logic stays uniform.
+  imageUrl          String?
 
   // Optional self-reference for a future "reply to specific message"
   // affordance. NO UI in MVP — the column exists so we can add the

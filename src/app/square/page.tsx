@@ -58,7 +58,7 @@ export default async function SquarePage() {
       },
       replyTo: {
         select: {
-          id: true, authorId: true, body: true, status: true,
+          id: true, authorId: true, body: true, type: true, status: true,
           author: { select: { name: true, lastName: true } },
         },
       },

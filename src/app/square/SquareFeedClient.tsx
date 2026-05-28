@@ -153,6 +153,7 @@ export default function SquareFeedClient({
       authorName: selectedMsg.author.name,
       authorLastName: selectedMsg.author.lastName,
       body: selectedMsg.body,
+      type: selectedMsg.type,
       status: selectedMsg.status,
     })
     setSelectedMsg(null)
@@ -160,7 +161,7 @@ export default function SquareFeedClient({
   async function handleCopy() {
     if (!selectedMsg) return
     try {
-      await navigator.clipboard.writeText(selectedMsg.body)
+      await navigator.clipboard.writeText(selectedMsg.body || '')
       toast.success(lang === 'en' ? 'Copied' : 'تم النسخ')
     } catch {
       toast.error(lang === 'en' ? 'Copy failed' : 'فشل النسخ')

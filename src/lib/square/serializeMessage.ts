@@ -1,7 +1,7 @@
 /**
- * DB row → wire/UI shape for Square messages. One model, one
- * serializer — the pivot away from threads collapses the thread+reply
- * pair to a single SquareMessage row.
+ * DB row → wire/UI shape for Square messages. Mirrors the DM Message
+ * shape one-for-one MINUS image uploads (stickers use the
+ * "sticker:<id>" sentinel in imageUrl, same as DM).
  */
 
 export interface PublicSquareAuthor {
@@ -14,22 +14,22 @@ export interface PublicSquareAuthor {
   role: string
 }
 
-/** Nested shape included with each message so a reply quote can render
- *  inline without a second fetch. Mirrors the DM ChatClient `replyTo`
- *  field; status is exposed so the bubble can show "رسالة غير متاحة"
- *  when the parent was hidden by a moderator. */
 export interface PublicSquareReplyTo {
   id: string
   authorId: string
   authorName: string | null
   authorLastName: string | null
-  body: string
+  body: string | null
+  type: 'TEXT' | 'LOCATION' | 'PDF' | 'VOICE' | 'STICKER'
   status: 'ACTIVE' | 'HIDDEN'
 }
 
+export type SquareMessageType = 'TEXT' | 'LOCATION' | 'PDF' | 'VOICE' | 'STICKER'
+
 export interface PublicSquareMessage {
   id: string
-  body: string
+  type: SquareMessageType
+  body: string | null
   kind: 'GENERAL' | 'QUESTION' | 'NOTE' | 'LIGHT_ALERT'
   status: 'ACTIVE' | 'HIDDEN'
   isPinned: boolean
@@ -38,9 +38,20 @@ export interface PublicSquareMessage {
   replyTo: PublicSquareReplyTo | null
   createdAt: string
   author: PublicSquareAuthor
-  /** True if the viewer is the author — Phase 2 author-side affordances
-   *  (edit/delete) can branch on this without an extra lookup. */
   isAuthor: boolean
+
+  // Type-specific payload — exactly one of these surfaces in the UI
+  // depending on `type`. All null on a TEXT message.
+  lat: number | null
+  lng: number | null
+  pdfUrl: string | null
+  pdfName: string | null
+  audioUrl: string | null
+  audioDurationMs: number | null
+  audioMimeType: string | null
+  /** Stickers only. "sticker:<id>" sentinel (Square forbids arbitrary
+   *  image URLs at the API layer). */
+  imageUrl: string | null
 }
 
 interface RawAuthor {
@@ -55,7 +66,8 @@ interface RawAuthor {
 
 interface RawMessage {
   id: string
-  body: string
+  type: string
+  body: string | null
   kind: string
   status: string
   isPinned: boolean
@@ -64,13 +76,20 @@ interface RawMessage {
   createdAt: Date
   authorId: string
   author: RawAuthor
-  /** Loaded via Prisma `include: { replyTo: { include: { author: ... } } }`.
-   *  Optional — list endpoints that don't need quotes can skip the
-   *  include (the renderer simply won't show a quote). */
+  lat: number | null
+  lng: number | null
+  pdfUrl: string | null
+  pdfName: string | null
+  audioUrl: string | null
+  audioDurationMs: number | null
+  audioMimeType: string | null
+  audioSizeBytes: number | null
+  imageUrl: string | null
   replyTo?: {
     id: string
     authorId: string
-    body: string
+    body: string | null
+    type: string
     status: string
     author: Pick<RawAuthor, 'name' | 'lastName'>
   } | null
@@ -82,6 +101,7 @@ export function serializeSquareMessage(
 ): PublicSquareMessage {
   return {
     id: row.id,
+    type: row.type as SquareMessageType,
     body: row.body,
     kind: row.kind as PublicSquareMessage['kind'],
     status: row.status as PublicSquareMessage['status'],
@@ -95,11 +115,20 @@ export function serializeSquareMessage(
           authorName: row.replyTo.author.name,
           authorLastName: row.replyTo.author.lastName,
           body: row.replyTo.body,
+          type: row.replyTo.type as PublicSquareReplyTo['type'],
           status: row.replyTo.status as PublicSquareReplyTo['status'],
         }
       : null,
     createdAt: row.createdAt.toISOString(),
     author: row.author,
     isAuthor: row.authorId === ctx.viewerId,
+    lat: row.lat,
+    lng: row.lng,
+    pdfUrl: row.pdfUrl,
+    pdfName: row.pdfName,
+    audioUrl: row.audioUrl,
+    audioDurationMs: row.audioDurationMs,
+    audioMimeType: row.audioMimeType,
+    imageUrl: row.imageUrl,
   }
 }

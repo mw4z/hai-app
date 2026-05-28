@@ -11,11 +11,14 @@ import {
   serializeSquareMessage,
   type PublicSquareMessage,
 } from '@/lib/square/serializeMessage'
-import { SquareKind } from '@prisma/client'
+import { SquareKind, SquareMessageType } from '@prisma/client'
 
 const PAGE_SIZE = 30
 const BODY_MIN = 2
 const BODY_MAX = 800
+const PDF_NAME_MAX = 200
+const VOICE_MAX_MS = 5 * 60 * 1000
+const VOICE_MAX_BYTES = 6 * 1024 * 1024
 
 const VALID_KINDS = new Set<SquareKind>([
   SquareKind.GENERAL,
@@ -24,13 +27,34 @@ const VALID_KINDS = new Set<SquareKind>([
   SquareKind.LIGHT_ALERT,
 ])
 
+const VALID_TYPES = new Set<SquareMessageType>([
+  SquareMessageType.TEXT,
+  SquareMessageType.LOCATION,
+  SquareMessageType.PDF,
+  SquareMessageType.VOICE,
+  SquareMessageType.STICKER,
+])
+
+/** Reusable Prisma include for messages, with one-level reply quote. */
+const messageInclude = {
+  author: {
+    select: {
+      id: true, name: true, lastName: true, avatarUrl: true,
+      reputation: true, membership: true, role: true,
+    },
+  },
+  replyTo: {
+    select: {
+      id: true, authorId: true, body: true, type: true, status: true,
+      author: { select: { name: true, lastName: true } },
+    },
+  },
+} as const
+
 /**
  * GET /api/square/messages — paginated list of messages in the viewer's
- * neighborhood, returned in chronological ascending order (oldest first
- * within each page). Cursor-based: `?before=<ISO>` returns the page of
- * messages older than the cursor; omit it for the most-recent page.
- *
- * MVP gate: admin-only. Non-admin → 404 (no advertising the feature).
+ * neighborhood, returned in chronological ascending order. Cursor-based
+ * via ?before=<ISO>; omit for the most-recent page.
  */
 export async function GET(req: NextRequest) {
   const session = await getSession()
@@ -51,10 +75,6 @@ export async function GET(req: NextRequest) {
   const beforeValid = before && !Number.isNaN(before.getTime()) ? before : null
 
   try {
-    // Pull `take + 1` newest-first so we can answer hasMore in one
-    // query; then reverse the slice for ascending-order rendering.
-    // replyTo is included one level deep (author name only) so each
-    // bubble can render its quote inline without a second roundtrip.
     const rows = await db.squareMessage.findMany({
       where: {
         neighborhoodId: me.neighborhoodId,
@@ -63,39 +83,16 @@ export async function GET(req: NextRequest) {
       },
       orderBy: { createdAt: 'desc' },
       take: PAGE_SIZE + 1,
-      include: {
-        author: {
-          select: {
-            id: true, name: true, lastName: true, avatarUrl: true,
-            reputation: true, membership: true, role: true,
-          },
-        },
-        replyTo: {
-          select: {
-            id: true, authorId: true, body: true, status: true,
-            author: { select: { name: true, lastName: true } },
-          },
-        },
-      },
+      include: messageInclude,
     })
     const hasMore = rows.length > PAGE_SIZE
     const slice = hasMore ? rows.slice(0, PAGE_SIZE) : rows
-    // Reverse → ascending (oldest first), so the client can append at
-    // the bottom and prepend at the top without shuffling.
     const ascending = [...slice].reverse()
     const messages: PublicSquareMessage[] = ascending.map((row) =>
       serializeSquareMessage(row, { viewerId: me.id }),
     )
     return NextResponse.json({ messages, hasMore })
   } catch (err) {
-    // Two-track error handling:
-    //   - The narrow "table missing yet" case (deploy → migration
-    //     window) responds with an empty list — the UI renders the
-    //     normal empty state. Server logs a WARN, not an ERROR,
-    //     because this is expected during the brief gap.
-    //   - Any OTHER Prisma / DB / runtime error is a real fault.
-    //     Log and respond 500 so the client surfaces a real error
-    //     instead of pretending the Square is empty.
     if (isSquareTableMissingError(err)) {
       console.warn('[square] table missing — empty list (apply migration)', err)
       return NextResponse.json({ messages: [], hasMore: false })
@@ -106,13 +103,21 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST /api/square/messages — create a message.
+ * POST /api/square/messages — create a message of one of five types:
  *
- * Body: { body: string, kind?: SquareKind, replyToMessageId?: string }
+ *   - TEXT     (default): body required. detectIntent runs.
+ *   - LOCATION: lat + lng required, body is an optional caption.
+ *   - PDF     : pdfUrl + pdfName required.
+ *   - VOICE   : audioUrl + audioDurationMs required.
+ *   - STICKER : imageUrl required, must start with "sticker:" — any
+ *               other value (incl. a real https:// image URL) is
+ *               rejected. Square does not accept arbitrary image
+ *               uploads even when they smell like stickers.
  *
- * Text-only — no media fields are read. Hard nudges (group-invite URL,
- * repeated phone promo) reject; soft nudges are advisory only and the
- * composer banner already showed them.
+ * Contact + place attachments don't need a separate type — they're
+ * encoded into `body` as text snippets (formatContactSnippet output /
+ * "/directory/<id>" links), and the bubble's SmartTextWithPlacePreviews
+ * + SmartText handle the rendering.
  */
 export async function POST(req: NextRequest) {
   const session = await getSession()
@@ -138,33 +143,105 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(apiError('Bad request', 400), { status: 400 })
   }
 
-  const text = typeof body.body === 'string' ? body.body.trim() : ''
+  // ── Resolve discriminator + shared fields ────────────────────────
+  const rawType = typeof body.type === 'string' ? body.type : 'TEXT'
+  const type: SquareMessageType = VALID_TYPES.has(rawType as SquareMessageType)
+    ? (rawType as SquareMessageType)
+    : SquareMessageType.TEXT
+
   const rawKind = typeof body.kind === 'string' ? body.kind : 'GENERAL'
   const kind: SquareKind = VALID_KINDS.has(rawKind as SquareKind)
     ? (rawKind as SquareKind)
     : SquareKind.GENERAL
+
   const replyToRaw =
     typeof body.replyToMessageId === 'string' ? body.replyToMessageId.trim() : ''
   const replyToMessageId = replyToRaw ? replyToRaw : null
 
-  if (!text) {
-    return NextResponse.json(apiError('اكتب رسالتك أولًا.', 400, 'BODY_REQUIRED'), { status: 400 })
-  }
-  if (text.length < BODY_MIN) {
-    return NextResponse.json(apiError('الرسالة قصيرة جدًا.', 400, 'BODY_TOO_SHORT'), { status: 400 })
-  }
-  if (text.length > BODY_MAX) {
-    return NextResponse.json(apiError('الرسالة طويلة جدًا.', 400, 'BODY_TOO_LONG'), { status: 400 })
+  const text = typeof body.body === 'string' ? body.body.trim() : ''
+
+  // ── Per-type payload + validation ────────────────────────────────
+  const data: {
+    body: string | null
+    type: SquareMessageType
+    lat?: number | null
+    lng?: number | null
+    pdfUrl?: string | null
+    pdfName?: string | null
+    audioUrl?: string | null
+    audioDurationMs?: number | null
+    audioMimeType?: string | null
+    audioSizeBytes?: number | null
+    imageUrl?: string | null
+  } = { body: null, type }
+
+  if (type === SquareMessageType.TEXT) {
+    if (!text) {
+      return NextResponse.json(apiError('اكتب رسالتك أولًا.', 400, 'BODY_REQUIRED'), { status: 400 })
+    }
+    if (text.length < BODY_MIN) {
+      return NextResponse.json(apiError('الرسالة قصيرة جدًا.', 400, 'BODY_TOO_SHORT'), { status: 400 })
+    }
+    if (text.length > BODY_MAX) {
+      return NextResponse.json(apiError('الرسالة طويلة جدًا.', 400, 'BODY_TOO_LONG'), { status: 400 })
+    }
+    const intent = detectSquareIntent(text)
+    if (intent?.hard) {
+      return NextResponse.json(
+        apiError(intent.messageAr, 400, `INTENT_${intent.code.toUpperCase()}`),
+        { status: 400 },
+      )
+    }
+    data.body = text
+  } else if (type === SquareMessageType.LOCATION) {
+    const lat = typeof body.lat === 'number' ? body.lat : NaN
+    const lng = typeof body.lng === 'number' ? body.lng : NaN
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return NextResponse.json(apiError('موقع غير صالح.', 400, 'LOCATION_INVALID'), { status: 400 })
+    }
+    data.lat = lat
+    data.lng = lng
+    data.body = text || null
+  } else if (type === SquareMessageType.PDF) {
+    const pdfUrl = typeof body.pdfUrl === 'string' ? body.pdfUrl.trim() : ''
+    const pdfName = typeof body.pdfName === 'string' ? body.pdfName.trim() : ''
+    if (!pdfUrl.startsWith('https://') || pdfUrl.length > 500) {
+      return NextResponse.json(apiError('ملف PDF غير صالح.', 400, 'PDF_INVALID'), { status: 400 })
+    }
+    data.pdfUrl = pdfUrl
+    data.pdfName = (pdfName || 'document.pdf').slice(0, PDF_NAME_MAX)
+    data.body = text || null
+  } else if (type === SquareMessageType.VOICE) {
+    const audioUrl = typeof body.audioUrl === 'string' ? body.audioUrl.trim() : ''
+    const audioDurationMs = Number.isFinite(body.audioDurationMs) ? Math.floor(body.audioDurationMs) : 0
+    const audioMimeType = typeof body.audioMimeType === 'string' ? body.audioMimeType.trim().slice(0, 80) : null
+    const audioSizeBytes = Number.isFinite(body.audioSizeBytes) ? Math.floor(body.audioSizeBytes) : null
+    if (!audioUrl.startsWith('https://') || audioUrl.length > 500) {
+      return NextResponse.json(apiError('ملف صوتي غير صالح.', 400, 'VOICE_INVALID'), { status: 400 })
+    }
+    if (audioDurationMs <= 0 || audioDurationMs > VOICE_MAX_MS) {
+      return NextResponse.json(apiError('الرسالة الصوتية طويلة جدًا.', 400, 'VOICE_TOO_LONG'), { status: 400 })
+    }
+    if (audioSizeBytes != null && audioSizeBytes > VOICE_MAX_BYTES) {
+      return NextResponse.json(apiError('حجم الملف الصوتي كبير جدًا.', 400, 'VOICE_TOO_LARGE'), { status: 400 })
+    }
+    data.audioUrl = audioUrl
+    data.audioDurationMs = audioDurationMs
+    data.audioMimeType = audioMimeType
+    data.audioSizeBytes = audioSizeBytes
+  } else if (type === SquareMessageType.STICKER) {
+    const imageUrl = typeof body.imageUrl === 'string' ? body.imageUrl.trim() : ''
+    // HARD POLICY: stickers ride on a "sticker:<id>" sentinel ONLY.
+    // Reject any value that even looks like a URL — Square has no
+    // image uploads, and we don't want a sneaky "send arbitrary
+    // image as a sticker" bypass.
+    if (!/^sticker:[a-z0-9_-]{1,80}$/i.test(imageUrl)) {
+      return NextResponse.json(apiError('ملصق غير صالح.', 400, 'STICKER_INVALID'), { status: 400 })
+    }
+    data.imageUrl = imageUrl
   }
 
-  const intent = detectSquareIntent(text)
-  if (intent?.hard) {
-    return NextResponse.json(
-      apiError(intent.messageAr, 400, `INTENT_${intent.code.toUpperCase()}`),
-      { status: 400 },
-    )
-  }
-
+  // ── Shared rate-limit (SUPER_ADMIN bypasses) ─────────────────────
   if (!isSuperAdminRole(me.role)) {
     const limit = await checkSquareMessageRateLimit({
       id: me.id,
@@ -179,7 +256,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Validate replyToMessageId — same-neighborhood, ACTIVE, exists.
+  // ── Reply target validation — same scope as v1 ───────────────────
   if (replyToMessageId) {
     const parent = await db.squareMessage.findUnique({
       where: { id: replyToMessageId },
@@ -199,24 +276,11 @@ export async function POST(req: NextRequest) {
     data: {
       neighborhoodId: me.neighborhoodId,
       authorId: me.id,
-      body: text,
       kind,
       replyToMessageId,
+      ...data,
     },
-    include: {
-      author: {
-        select: {
-          id: true, name: true, lastName: true, avatarUrl: true,
-          reputation: true, membership: true, role: true,
-        },
-      },
-      replyTo: {
-        select: {
-          id: true, authorId: true, body: true, status: true,
-          author: { select: { name: true, lastName: true } },
-        },
-      },
-    },
+    include: messageInclude,
   })
 
   return NextResponse.json({

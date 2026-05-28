@@ -2,13 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-import { FiAlertCircle, FiPaperclip, FiSend, FiX } from 'react-icons/fi'
+import { FiAlertCircle, FiPaperclip, FiSend, FiSmile, FiX } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { hapticLight } from '@/lib/haptic'
 import { detectSquareIntent } from '@/lib/square/detectIntent'
 import { fullName } from '@/lib/displayName'
+import AttachmentMenu from '@/components/AttachmentMenu'
 import PlacePickerSheet from '@/components/places/PlacePickerSheet'
+import StickerPicker from '@/components/StickerPicker'
+import VoiceComposer from '@/components/chat/VoiceComposer'
 import { formatContactSnippet } from '@/lib/contactPicker'
+import { useAttachContact } from '@/hooks/useAttachContact'
+import { uploadPdf } from '@/lib/upload'
+import { getCurrentPositionSafe } from '@/lib/location/getCurrentPositionSafe'
+import { toStickerRef } from '@/lib/stickers/catalog'
 import type {
   PublicSquareMessage,
   PublicSquareReplyTo,
@@ -16,29 +23,31 @@ import type {
 
 interface Props {
   currentUserId: string
-  /** Fires after a successful send so the parent can append + auto-scroll. */
   onSent: (message: PublicSquareMessage) => void
-  /** Reply target (staging) — when non-null, a preview bar appears
-   *  above the input. Send POSTS with replyToMessageId set; on
-   *  success the parent clears this. */
   replyingTo: PublicSquareReplyTo | null
   setReplyingTo: (r: PublicSquareReplyTo | null) => void
 }
 
 /**
- * Square composer — adopts the DM `glass-bottom` composer exactly:
- * normal flex child of the chat container (NOT fixed), reply preview
- * bar above the input, single-line input + circular send. Because the
- * Square page now uses the same `position: fixed; top: safe-area-top;
- * bottom: 0` shell as DM AND the BottomNav is hidden on /square, the
- * composer rides up with the visual viewport when the iOS keyboard
- * opens — no extra positioning logic, no body-class hack, no nav to
- * fight. Identical to WhatsApp/DM keyboard handling.
+ * Square composer — mirrors the DM composer (ChatClient) with one
+ * deliberate omission: NO image picker. The Square policy is text-
+ * first and admin-only in MVP; arbitrary image uploads are blocked
+ * at the API. Stickers ride on the "sticker:<id>" sentinel, same
+ * pattern DM uses, so the imageUrl column NEVER carries a real
+ * https:// URL.
  *
- * Square-specific restrictions: text only, no stickers/voice/image,
- * single attach button → opens PlacePickerSheet directly. Picked
- * places land in the body as "/directory/<id>"; the bubble renders
- * them via SmartTextWithPlacePreviews.
+ * Wired DM components:
+ *   - AttachmentMenu (Contact, Location, PDF, Place)
+ *   - StickerPicker
+ *   - VoiceComposer
+ *   - PlacePickerSheet
+ *   - useAttachContact
+ *   - uploadPdf, getCurrentPositionSafe
+ *
+ * Each picker funnels into a small `postMessage(type, payload)` helper
+ * that POSTs to /api/square/messages and appends to the parent list on
+ * success — keeps the per-attachment plumbing one-liners instead of
+ * the 100-line sendX functions the DM ChatClient grew over time.
  */
 export default function SquareComposer({
   currentUserId,
@@ -49,30 +58,33 @@ export default function SquareComposer({
   const { t, lang } = useLanguage()
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
-  const [placePickerOpen, setPlacePickerOpen] = useState(false)
-  const inputRef = useRef<HTMLInputElement | null>(null)
 
+  const [showAttachMenu, setShowAttachMenu] = useState(false)
+  const [placePickerOpen, setPlacePickerOpen] = useState(false)
+  const [showStickers, setShowStickers] = useState(false)
+  const pdfInputRef = useRef<HTMLInputElement | null>(null)
+
+  const inputRef = useRef<HTMLInputElement | null>(null)
   const intent = useMemo(() => detectSquareIntent(body), [body])
 
-  // Refocus the input when the parent stages a reply so the user can
-  // type immediately. Mirrors DM behaviour.
+  // Refocus input when a reply is staged (mirrors DM).
   useEffect(() => {
     if (replyingTo) {
       try { inputRef.current?.focus() } catch { /* ignore */ }
     }
   }, [replyingTo])
 
-  async function send(e?: React.FormEvent) {
-    e?.preventDefault()
-    const trimmed = body.trim()
-    if (!trimmed || sending) return
+  /** Generic POST → /api/square/messages. Returns the created message
+   *  shape so the caller can append + clear reply state on success. */
+  async function postMessage(payload: Record<string, unknown>): Promise<boolean> {
+    if (sending) return false
     setSending(true)
     try {
       const res = await fetch('/api/square/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          body: trimmed,
+          ...payload,
           ...(replyingTo ? { replyToMessageId: replyingTo.id } : {}),
         }),
       })
@@ -83,18 +95,103 @@ export default function SquareComposer({
             ? data.error
             : data.error?.message || t('square_send_failed'),
         )
-        return
+        return false
       }
       if (data?.message) {
         onSent(data.message as PublicSquareMessage)
-        setBody('')
         setReplyingTo(null)
       }
+      return true
     } catch {
       toast.error(t('square_send_failed'))
+      return false
     } finally {
       setSending(false)
     }
+  }
+
+  async function sendText(e?: React.FormEvent) {
+    e?.preventDefault()
+    const trimmed = body.trim()
+    if (!trimmed) return
+    const ok = await postMessage({ type: 'TEXT', body: trimmed })
+    if (ok) setBody('')
+  }
+
+  // ── Attachment helpers ───────────────────────────────────────────
+  // Contact picker — returns a formatted snippet string; we wrap it
+  // into a TEXT message (same as DM).
+  const getContactSnippet = useAttachContact()
+  async function attachContact() {
+    try {
+      const snippet = await getContactSnippet()
+      if (!snippet) return
+      await postMessage({ type: 'TEXT', body: snippet })
+    } catch {
+      // useAttachContact handles its own user-facing errors.
+    }
+  }
+
+  async function pickLocation() {
+    try {
+      const pos = await getCurrentPositionSafe()
+      await postMessage({
+        type: 'LOCATION',
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+      })
+    } catch {
+      toast.error(lang === 'en' ? 'Location unavailable' : 'تعذر الحصول على الموقع')
+    }
+  }
+
+  async function handlePdfFile(file: File) {
+    if (sending) return
+    setSending(true)
+    try {
+      const url = await uploadPdf(file)
+      if (!url) {
+        toast.error(lang === 'en' ? 'Upload failed' : 'فشل الرفع')
+        return
+      }
+      await postMessage({ type: 'PDF', pdfUrl: url, pdfName: file.name })
+    } catch {
+      toast.error(lang === 'en' ? 'Upload failed' : 'فشل الرفع')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  async function sendVoice(blob: Blob, mimeType: string, durationMs: number, sizeBytes: number) {
+    if (sending) return
+    setSending(true)
+    try {
+      const form = new FormData()
+      form.append('file', blob, `voice.${(mimeType.split('/')[1] || 'webm').split(';')[0]}`)
+      const up = await fetch('/api/upload', { method: 'POST', body: form })
+      const upJson = await up.json().catch(() => ({}))
+      const url = Array.isArray(upJson?.urls) ? upJson.urls[0] : upJson?.url
+      if (!up.ok || !url) {
+        toast.error(lang === 'en' ? 'Upload failed' : 'فشل الرفع')
+        return
+      }
+      await postMessage({
+        type: 'VOICE',
+        audioUrl: url,
+        audioDurationMs: durationMs,
+        audioMimeType: mimeType,
+        audioSizeBytes: sizeBytes,
+      })
+    } catch {
+      toast.error(lang === 'en' ? 'Upload failed' : 'فشل الرفع')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  async function sendSticker(stickerId: string) {
+    setShowStickers(false)
+    await postMessage({ type: 'STICKER', imageUrl: toStickerRef(stickerId) })
   }
 
   function handlePickPlace(item: { kind: 'place' | 'service'; id: string; name: string; phone?: string | null }) {
@@ -119,6 +216,13 @@ export default function SquareComposer({
           || (lang === 'en' ? 'Neighbor' : 'جار'))
     : ''
 
+  const replyTypeIcon =
+    replyingTo?.type === 'VOICE' ? '🎤 ' :
+    replyingTo?.type === 'PDF' ? '📄 PDF ' :
+    replyingTo?.type === 'LOCATION' ? '📍 ' :
+    replyingTo?.type === 'STICKER' ? (lang === 'en' ? '🖼️ Sticker ' : '🖼️ ملصق ') :
+    ''
+
   return (
     <>
       <div
@@ -138,7 +242,6 @@ export default function SquareComposer({
           </div>
         )}
 
-        {/* Reply preview bar — same look as DM. */}
         {replyingTo && (
           <div className="flex items-center gap-2 px-1 pt-2 pb-1">
             <div className="flex-1 min-w-0 border-s-2 border-primary-500 ps-2.5 py-0.5">
@@ -146,7 +249,7 @@ export default function SquareComposer({
                 {replyAuthorLabel}
               </p>
               <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-                {(replyingTo.body || '').slice(0, 80)}
+                {replyTypeIcon}{(replyingTo.body || '').slice(0, 80)}
               </p>
             </div>
             <button
@@ -161,16 +264,45 @@ export default function SquareComposer({
         )}
 
         <div className="flex items-center gap-2 py-2.5">
+          {/* Hidden PDF input — the AttachmentMenu's "Document" option
+              triggers a click on this. Same flow DM uses. */}
+          <input
+            ref={pdfInputRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) handlePdfFile(file)
+              if (pdfInputRef.current) pdfInputRef.current.value = ''
+            }}
+          />
+
           <button
             type="button"
-            onClick={() => { hapticLight(); setPlacePickerOpen(true) }}
-            aria-label={lang === 'en' ? 'Attach from directory' : 'إرفاق من الدليل'}
-            className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-primary-400 active:scale-90 transition-all flex-shrink-0"
+            onClick={() => { hapticLight(); setShowAttachMenu(true) }}
+            disabled={sending}
+            aria-label={lang === 'en' ? 'Attach' : 'إرفاق'}
+            className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-primary-400 active:scale-90 transition-all disabled:opacity-50 flex-shrink-0"
           >
             <FiPaperclip className="w-5 h-5" />
           </button>
 
-          <form onSubmit={send} className="flex-1 min-w-0 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => { hapticLight(); setShowStickers(true) }}
+            aria-label={lang === 'en' ? 'Stickers' : 'ملصقات'}
+            className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-primary-400 active:scale-90 transition-all flex-shrink-0"
+          >
+            <FiSmile className="w-5 h-5" />
+          </button>
+
+          {/* Voice recorder — same component DM uses; on send it
+              receives the recorded blob + metadata and posts as a
+              VOICE message. */}
+          <VoiceComposer onSend={sendVoice} disabled={sending} />
+
+          <form onSubmit={sendText} className="flex-1 min-w-0 flex items-center gap-2">
             <input
               ref={inputRef}
               type="text"
@@ -195,10 +327,25 @@ export default function SquareComposer({
         </div>
       </div>
 
+      <AttachmentMenu
+        open={showAttachMenu}
+        onClose={() => setShowAttachMenu(false)}
+        onPickContact={attachContact}
+        onPickLocation={pickLocation}
+        onPickDocument={() => pdfInputRef.current?.click()}
+        onPickPlace={() => setPlacePickerOpen(true)}
+      />
+
       <PlacePickerSheet
         open={placePickerOpen}
         onClose={() => setPlacePickerOpen(false)}
         onSelect={handlePickPlace}
+      />
+
+      <StickerPicker
+        open={showStickers}
+        onClose={() => setShowStickers(false)}
+        onPick={(id) => sendSticker(id)}
       />
     </>
   )

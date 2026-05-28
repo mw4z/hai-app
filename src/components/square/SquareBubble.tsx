@@ -1,10 +1,14 @@
 'use client'
 
 import { useRef } from 'react'
-import { FiCheck } from 'react-icons/fi'
+import { FiCheck, FiMapPin } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { fullName } from '@/lib/displayName'
 import SmartTextWithPlacePreviews from '@/components/SmartTextWithPlacePreviews'
+import VoicePlayer from '@/components/chat/VoicePlayer'
+import PdfTile from '@/components/PdfTile'
+import Sticker from '@/components/Sticker'
+import { parseStickerRef } from '@/lib/stickers/catalog'
 import type { PublicSquareMessage } from '@/lib/square/serializeMessage'
 import { useSquareLongPress } from '@/lib/square/useSquareLongPress'
 import SquareReplyQuote from './SquareReplyQuote'
@@ -130,6 +134,7 @@ export default function SquareBubble({
                   authorName: null,
                   authorLastName: null,
                   body: '',
+                  type: 'TEXT',
                   status: 'HIDDEN',
                 }
               }
@@ -143,24 +148,118 @@ export default function SquareBubble({
               }
             />
           )}
-          <div
-            className={`relative rounded-2xl px-3 py-2 shadow-sm ${
-              isMe
-                ? `bg-primary-600 text-white ${
-                    isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
-                  }`
-                : `bg-white dark:bg-[#242625] text-gray-800 dark:text-gray-100 ${
-                    isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''
-                  }`
-            }`}
-          >
-            <div className="text-[14.5px] leading-relaxed whitespace-pre-wrap break-words">
-              <SmartTextWithPlacePreviews
-                text={message.body}
-                variant={isMe ? 'onGreen' : 'light'}
+
+          {/* Per-type bubble rendering — same shapes DM uses. STICKER
+              renders without a chrome bubble shell (just the sticker
+              floating on the chat background) which matches DM behavior. */}
+          {message.type === 'STICKER' ? (() => {
+            const stickerId = parseStickerRef(message.imageUrl || '')
+            if (!stickerId) return null
+            return <Sticker id={stickerId} size={120} />
+          })() : message.type === 'VOICE' && message.audioUrl ? (
+            <div
+              className={`relative rounded-2xl px-3 py-2.5 shadow-sm ${
+                isMe
+                  ? `bg-primary-600 ${
+                      isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
+                    }`
+                  : `bg-white dark:bg-[#242625] ${
+                      isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''
+                    }`
+              }`}
+            >
+              <VoicePlayer
+                src={message.audioUrl}
+                durationMs={message.audioDurationMs ?? undefined}
+                isMe={isMe}
               />
             </div>
-          </div>
+          ) : message.type === 'PDF' && message.pdfUrl ? (
+            <div
+              className={`relative rounded-2xl px-2.5 py-2 shadow-sm ${
+                isMe
+                  ? `bg-primary-600 ${
+                      isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
+                    }`
+                  : `bg-white dark:bg-[#242625] ${
+                      isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''
+                    }`
+              }`}
+            >
+              <PdfTile
+                url={message.pdfUrl}
+                name={message.pdfName}
+                variant="message"
+                tone={isMe ? 'onPrimary' : 'onSurface'}
+              />
+              {message.body && (
+                <p
+                  className={`mt-1.5 text-[13.5px] leading-relaxed whitespace-pre-wrap break-words ${
+                    isMe ? 'text-white' : 'text-gray-800 dark:text-gray-100'
+                  }`}
+                >
+                  {message.body}
+                </p>
+              )}
+            </div>
+          ) : message.type === 'LOCATION' && message.lat != null && message.lng != null ? (
+            <div
+              className={`relative rounded-2xl px-3.5 py-2.5 shadow-sm ${
+                isMe
+                  ? `bg-primary-600 text-white ${
+                      isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
+                    }`
+                  : `bg-white dark:bg-[#242625] text-gray-800 dark:text-gray-100 ${
+                      isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''
+                    }`
+              }`}
+            >
+              <div className={`flex items-center gap-1.5 mb-1 ${isMe ? 'text-primary-100' : 'text-primary-600 dark:text-primary-400'}`}>
+                <FiMapPin className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium">
+                  {lang === 'en' ? 'Location' : 'موقع'}
+                </span>
+              </div>
+              <a
+                href={`https://maps.google.com/?q=${message.lat},${message.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className={`block rounded-xl overflow-hidden mb-1 p-2.5 text-center ${
+                  isMe ? 'bg-primary-700/50' : 'bg-gray-100 dark:bg-gray-700'
+                }`}
+              >
+                <span className="text-2xl">📍</span>
+                <p className={`text-xs mt-1 font-medium ${isMe ? 'text-primary-100' : 'text-primary-600 dark:text-primary-400'}`}>
+                  {lang === 'en' ? 'Open in Maps ↗' : 'افتح في الخريطة ↗'}
+                </p>
+              </a>
+              {message.body && (
+                <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap break-words mt-1">
+                  {message.body}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div
+              className={`relative rounded-2xl px-3 py-2 shadow-sm ${
+                isMe
+                  ? `bg-primary-600 text-white ${
+                      isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
+                    }`
+                  : `bg-white dark:bg-[#242625] text-gray-800 dark:text-gray-100 ${
+                      isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''
+                    }`
+              }`}
+            >
+              <div className="text-[14.5px] leading-relaxed whitespace-pre-wrap break-words">
+                <SmartTextWithPlacePreviews
+                  text={message.body || ''}
+                  variant={isMe ? 'onGreen' : 'light'}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <p
