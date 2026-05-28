@@ -92,6 +92,7 @@ export default async function SquarePage() {
       hasMoreOlder={hasMoreOlder}
       neighborhoodName={user.neighborhood?.name ?? ''}
       currentUserId={user.id}
+      currentUserRole={user.role}
     />
   )
 }

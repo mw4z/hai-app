@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import {
   FiArrowLeft,
   FiArrowRight,
+  FiTrash2,
   FiBell,
   FiCopy,
   FiCornerUpLeft,
@@ -42,6 +43,9 @@ interface Props {
   hasMoreOlder: boolean
   neighborhoodName: string
   currentUserId: string
+  /** Caller's role — used to gate the destructive "wipe all messages"
+   *  button on the header. SUPER_ADMIN only. */
+  currentUserRole: string
 }
 
 const LAST_SEEN_KEY_PREFIX = 'square-last-seen-'
@@ -58,7 +62,10 @@ export default function SquareFeedClient({
   hasMoreOlder: initialHasMore,
   neighborhoodName,
   currentUserId,
+  currentUserRole,
 }: Props) {
+  const isSuperAdmin = currentUserRole === 'SUPER_ADMIN'
+  const [wipeBusy, setWipeBusy] = useState(false)
   const { t, lang } = useLanguage()
   const router = useRouter()
 
@@ -206,6 +213,45 @@ export default function SquareFeedClient({
       status: selectedMsg.status,
     })
     setSelectedMsg(null)
+  }
+
+  // SUPER_ADMIN-only: wipe every Square message in this neighborhood.
+  // Confirmation dialog uses the browser's native confirm so we don't
+  // pull in extra component scaffolding for a one-off destructive op.
+  async function handleWipeNeighborhood() {
+    if (!isSuperAdmin) return
+    if (wipeBusy) return
+    const ok = window.confirm(
+      lang === 'en'
+        ? 'Delete EVERY Square message in this neighborhood? This cannot be undone.'
+        : 'حذف كل رسائل الساحة في هذا الحي؟ لا يمكن التراجع.',
+    )
+    if (!ok) return
+    setWipeBusy(true)
+    try {
+      const res = await fetch('/api/admin/square/wipe-my-neighborhood', {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '')
+        alert((lang === 'en' ? 'Wipe failed: ' : 'فشل الحذف: ') + (errText || res.status))
+        return
+      }
+      const data = await res.json() as { deleted?: number }
+      // Clear the local message list so the user sees the empty state
+      // immediately — no need to refetch since the server is now empty.
+      setMessages([])
+      alert(
+        lang === 'en'
+          ? `Deleted ${data.deleted ?? 0} message(s).`
+          : `تم حذف ${data.deleted ?? 0} رسالة.`,
+      )
+    } catch (err) {
+      alert((lang === 'en' ? 'Wipe failed: ' : 'فشل الحذف: ') + (err as Error)?.message)
+    } finally {
+      setWipeBusy(false)
+    }
   }
 
   // Quick-reply variant: triggered by the small reply arrow on the
@@ -484,6 +530,21 @@ export default function SquareFeedClient({
             </p>
           )}
         </div>
+        {/* SUPER_ADMIN-only destructive wipe button. Hidden for
+            everyone else. Native confirm() before firing so a stray
+            tap can't nuke the chat. */}
+        {isSuperAdmin && (
+          <button
+            type="button"
+            onClick={handleWipeNeighborhood}
+            disabled={wipeBusy}
+            className="flex-shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800/60 hover:bg-rose-100 dark:hover:bg-rose-900/50 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-default"
+            aria-label={lang === 'en' ? 'Wipe all messages' : 'حذف كل الرسائل'}
+            title={lang === 'en' ? 'Wipe all Square messages (SUPER_ADMIN)' : 'حذف كل رسائل الساحة (مشرف عام)'}
+          >
+            <FiTrash2 className="w-4 h-4" />
+          </button>
+        )}
       </header>
 
       {/* Message list — flex-1, the ONLY scroll surface in the chat
