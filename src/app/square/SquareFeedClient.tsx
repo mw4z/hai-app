@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import toast from 'react-hot-toast'
 import {
   FiArrowLeft,
@@ -45,7 +45,6 @@ export default function SquareFeedClient({
   currentUserId,
 }: Props) {
   const { t, lang } = useLanguage()
-  const router = useRouter()
 
   const [messages, setMessages] = useState<PublicSquareMessage[]>(initialMessages)
   const [hasMoreOlder, setHasMoreOlder] = useState(initialHasMore)
@@ -195,48 +194,55 @@ export default function SquareFeedClient({
   }, [messages, lang])
 
   return (
-    <main className="h-screen h-[100dvh] overflow-hidden bg-gray-50 dark:bg-gray-900 flex flex-col">
-      {/* Cancel the global body padding-top so the header can own the
-          notch zone with its own paddingTop. See migration-history note
-          in earlier commits — this is the bulletproof header-flush fix. */}
-      <style>{`
-        body { padding-top: 0 !important; }
-      `}</style>
-
-      {/* Header */}
-      <div
-        className="sticky top-0 z-20 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700"
-        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
-      >
-        <div className="max-w-[640px] mx-auto px-4 pt-3 pb-3 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 active:bg-gray-100 dark:active:bg-gray-700"
-            aria-label={lang === 'en' ? 'Back' : 'رجوع'}
-          >
-            {lang === 'en' ? <FiArrowLeft className="w-5 h-5" /> : <FiArrowRight className="w-5 h-5" />}
-          </button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-[17px] font-extrabold text-gray-900 dark:text-white truncate">
-              {t('square_page_title')}
-            </h1>
-            {neighborhoodName && (
-              <p className="text-[11.5px] text-gray-500 dark:text-gray-400 truncate">
-                {lang === 'en' ? `In ${neighborhoodName}` : `حي ${neighborhoodName}`}
-              </p>
-            )}
-          </div>
+    <div
+      className="flex flex-col bg-gray-100 dark:bg-gray-950"
+      // EXACT DM container pattern (see ChatClient.tsx ~line 1424). The
+      // chat is anchored to the viewport via position:fixed (top sits
+      // BELOW the iOS safe-area so html::before still paints the notch
+      // with the same colour as .glass; bottom = 0). Removes the page
+      // from the document scroll → iOS WKWebView's rubber-band bounce
+      // can only fire INSIDE the messages list (which has its own
+      // overscroll-y-contain), not on the header/composer chrome.
+      style={{
+        position: 'fixed',
+        top: 'env(safe-area-inset-top, 0px)',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        overscrollBehavior: 'none',
+        touchAction: 'pan-y',
+      }}
+    >
+      {/* Header — `.glass` is the same class the DM chat header uses,
+          which paints the same background as html::before's safe-area
+          cover → no colour seam between notch and title strip. */}
+      <header className="glass px-4 py-2.5 flex items-center gap-3 z-10 shadow-sm flex-shrink-0">
+        <Link href="/feed" className="text-gray-500 dark:text-gray-400 p-1" aria-label={lang === 'en' ? 'Back' : 'رجوع'}>
+          {lang !== 'en' ? <FiArrowRight className="w-5 h-5" /> : <FiArrowLeft className="w-5 h-5" />}
+        </Link>
+        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-base flex-shrink-0 shadow-sm" aria-hidden>
+          🏘️
         </div>
-      </div>
+        <div className="min-w-0 text-start flex-1">
+          <h1 className="text-[15px] font-semibold text-gray-900 dark:text-white truncate">
+            {t('square_page_title')}
+          </h1>
+          {neighborhoodName && (
+            <p className="text-[11px] font-medium text-gray-400 truncate">
+              {lang === 'en' ? `In ${neighborhoodName}` : `حي ${neighborhoodName}`}
+            </p>
+          )}
+        </div>
+      </header>
 
-      {/* Message list */}
+      {/* Message list — flex-1, the ONLY scroll surface in the chat
+          shell. overscroll-contain so iOS rubber-band stops here and
+          doesn't drag the whole chat. */}
       <div
         ref={listRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto"
+        className="flex-1 overflow-y-auto overscroll-y-contain"
         style={{
-          paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 12rem)',
           WebkitOverflowScrolling: 'touch',
         }}
       >
@@ -312,7 +318,7 @@ export default function SquareFeedClient({
         onClose={() => setReportTargetUserId(null)}
         targetUserId={reportTargetUserId ?? ''}
       />
-    </main>
+    </div>
   )
 }
 

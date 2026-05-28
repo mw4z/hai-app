@@ -14,44 +14,31 @@ import type {
   PublicSquareReplyTo,
 } from '@/lib/square/serializeMessage'
 
-/** Body-class flag — present while the composer's input has focus and
- *  the iOS keyboard is up. The matching CSS rule in globals.css hides
- *  the global BottomNav so the composer doesn't fight it for the
- *  same strip of pixels above the keyboard. */
-const KBD_BODY_CLASS = 'square-composer-focused'
-
 interface Props {
-  /** Identity of the viewer — used to render "You" in the reply
-   *  preview when the staged reply targets the user's own message. */
   currentUserId: string
   /** Fires after a successful send so the parent can append + auto-scroll. */
   onSent: (message: PublicSquareMessage) => void
-  /** Reply target ("staging" state) — when non-null, a preview bar
-   *  appears above the input row with an X to cancel. Send POSTS
-   *  with replyToMessageId set; on success the parent clears this. */
+  /** Reply target (staging) — when non-null, a preview bar appears
+   *  above the input. Send POSTS with replyToMessageId set; on
+   *  success the parent clears this. */
   replyingTo: PublicSquareReplyTo | null
   setReplyingTo: (r: PublicSquareReplyTo | null) => void
 }
 
 /**
- * The Square composer — adapted from the DM composer in ChatClient.tsx
- * with Square's stricter rules:
+ * Square composer — adopts the DM `glass-bottom` composer exactly:
+ * normal flex child of the chat container (NOT fixed), reply preview
+ * bar above the input, single-line input + circular send. Because the
+ * Square page now uses the same `position: fixed; top: safe-area-top;
+ * bottom: 0` shell as DM AND the BottomNav is hidden on /square, the
+ * composer rides up with the visual viewport when the iOS keyboard
+ * opens — no extra positioning logic, no body-class hack, no nav to
+ * fight. Identical to WhatsApp/DM keyboard handling.
  *
- *   - Same glass-bottom wrapper + safe-area padding.
- *   - Same reply preview bar above the input.
- *   - Same input + circular send button styling.
- *   - Single attach button (paperclip) that opens PlacePickerSheet
- *     directly — Square's only allowed attachment is a directory
- *     place, so a multi-option menu would be needless friction.
- *     Picked places land in the body as "/directory/<id>"; the bubble
- *     renderer uses SmartTextWithPlacePreviews to surface the card.
- *   - No sticker button, no voice composer, no image upload, no
- *     contact attach, no location attach.
- *
- * Keyboard handling matches DM: on focus, the BottomNav is hidden
- * (body class) and the composer drops to env(safe-area-inset-bottom)
- * so it sits flush above the keyboard rather than 4rem up over the
- * lifted nav.
+ * Square-specific restrictions: text only, no stickers/voice/image,
+ * single attach button → opens PlacePickerSheet directly. Picked
+ * places land in the body as "/directory/<id>"; the bubble renders
+ * them via SmartTextWithPlacePreviews.
  */
 export default function SquareComposer({
   currentUserId,
@@ -62,25 +49,13 @@ export default function SquareComposer({
   const { t, lang } = useLanguage()
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
-  const [focused, setFocused] = useState(false)
   const [placePickerOpen, setPlacePickerOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const intent = useMemo(() => detectSquareIntent(body), [body])
 
-  // Hide the global BottomNav while the input is focused (iOS keyboard
-  // raises both nav and composer with the visual viewport and they
-  // would otherwise share pixels). Cleanup on unmount so a back-press
-  // mid-typing never leaves the nav hidden across other screens.
-  useEffect(() => {
-    if (typeof document === 'undefined') return
-    if (focused) document.body.classList.add(KBD_BODY_CLASS)
-    else document.body.classList.remove(KBD_BODY_CLASS)
-    return () => { document.body.classList.remove(KBD_BODY_CLASS) }
-  }, [focused])
-
-  // When the parent stages a reply, refocus the input so the user
-  // can type immediately without an extra tap. Mirrors DM behavior.
+  // Refocus the input when the parent stages a reply so the user can
+  // type immediately. Mirrors DM behaviour.
   useEffect(() => {
     if (replyingTo) {
       try { inputRef.current?.focus() } catch { /* ignore */ }
@@ -122,9 +97,6 @@ export default function SquareComposer({
     }
   }
 
-  // Place picker handler — inserts /directory/<id> into the body
-  // (same encoding DM uses). The bubble's SmartTextWithPlacePreviews
-  // renders the place card under the text on the receiving end.
   function handlePickPlace(item: { kind: 'place' | 'service'; id: string; name: string; phone?: string | null }) {
     const snippet =
       item.kind === 'service'
@@ -150,21 +122,8 @@ export default function SquareComposer({
   return (
     <>
       <div
-        className="glass-bottom fixed inset-x-0 z-20 px-4 w-full transition-[bottom] duration-200"
-        style={{
-          // Mirrors the keyboard fix from the message-only composer:
-          //  - blurred → 5rem above the BottomNav (clears the FAB
-          //    -translate-y-5 protrusion)
-          //  - focused → flush at the visual-viewport bottom (the
-          //    keyboard sits below); BottomNav is hidden via the
-          //    body class so the two don't share pixels.
-          bottom: focused
-            ? 'env(safe-area-inset-bottom, 0px)'
-            : 'calc(var(--hai-safe-bottom, 0px) + 5rem)',
-          paddingBottom: focused
-            ? '0px'
-            : 'calc(var(--hai-safe-bottom, 0px) + 10px)',
-        }}
+        className="glass-bottom px-4 w-full z-20 flex-shrink-0"
+        style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 10px)' }}
       >
         {intent && (
           <div
@@ -179,8 +138,7 @@ export default function SquareComposer({
           </div>
         )}
 
-        {/* Reply preview bar — same look as DM. Tapping the X cancels
-            the staged reply; the input keeps its content. */}
+        {/* Reply preview bar — same look as DM. */}
         {replyingTo && (
           <div className="flex items-center gap-2 px-1 pt-2 pb-1">
             <div className="flex-1 min-w-0 border-s-2 border-primary-500 ps-2.5 py-0.5">
@@ -218,8 +176,6 @@ export default function SquareComposer({
               type="text"
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
               placeholder={t('square_message_placeholder')}
               maxLength={900}
               className="flex-1 min-w-0 bg-white/10 dark:bg-white/10 rounded-full px-4 py-2.5 text-[15px] text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-400/40 focus:border-primary-400/30 transition-shadow"

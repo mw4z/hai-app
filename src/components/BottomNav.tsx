@@ -68,7 +68,12 @@ const SHOW_BOTTOM_NAV_ON = new Set([
   '/contests',
   '/neighborhood-reports',
   '/support',
-  '/square',
+  // NOTE: /square is intentionally NOT in this list. Once the user
+  // taps الساحة and enters the Square room, the bottom nav hides
+  // (same UX as /threads/[id] — a full-screen chat). The tab still
+  // exists on every OTHER allow-listed page so the user can reach
+  // Square from anywhere; we just don't fight the chat composer for
+  // the same strip of pixels above the keyboard.
 ])
 
 function activeKeyForPath(path: string): string {

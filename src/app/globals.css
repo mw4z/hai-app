@@ -326,17 +326,6 @@ input, textarea, [contenteditable="true"] {
   .glow-directory, .dark .glow-directory { animation: none; }
 }
 
-/* When the Square composer's textarea has focus, the iOS soft keyboard
-   slides up the visual viewport and the global BottomNav rises with
-   it — colliding with the composer that's also rising. Hide the nav
-   while the composer is focused so the composer owns the strip above
-   the keyboard cleanly. SquareComposer.tsx toggles the body class
-   via useEffect; the class is also removed on unmount so the nav is
-   never left hidden if the user navigates away mid-focus. */
-body.square-composer-focused [data-firstrun="bottom-nav"] {
-  display: none;
-}
-
 /* Notification/badge glow */
 .glow-badge {
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.4), 0 0 20px rgba(239, 68, 68, 0.15);
