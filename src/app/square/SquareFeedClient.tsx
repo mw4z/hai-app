@@ -110,6 +110,17 @@ export default function SquareFeedClient({
     // header rides along with the page. The sticky on the header
     // below is belt-and-suspenders for nested scroll contexts.
     <main className="h-screen h-[100dvh] overflow-hidden bg-gray-50 dark:bg-gray-900 flex flex-col">
+      {/* Paint the iOS top safe-area zone (notch / dynamic island /
+          status bar) the SAME colour as the sticky header so they
+          read as one continuous strip. The repo paints that zone via
+          html::before driven by --hai-safe-top-bg; default value is
+          --hai-surface-1 (~#101619 in dark) which is a different
+          shade from this header's bg-gray-800 (#1f2937), producing
+          the visible "black band" between status bar and title. */}
+      <style>{`
+        html { --hai-safe-top-bg: #ffffff !important; }
+        html.dark { --hai-safe-top-bg: #1f2937 !important; }
+      `}</style>
       {/* Header — sticky at the top of the column so it never moves,
           regardless of which container ends up scrolling. */}
       <div className="sticky top-0 z-20 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">

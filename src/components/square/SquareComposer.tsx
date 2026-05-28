@@ -94,13 +94,17 @@ export default function SquareComposer({ onSent }: Props) {
       className="fixed inset-x-0 z-20 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 transition-[bottom] duration-200"
       style={{
         // Two positions:
-        //  - blurred  → sits 4rem above the BottomNav (its usual spot)
+        //  - blurred  → sits above the BottomNav AND clears the FAB's
+        //    -translate-y-5 (20px) protrusion. BN content height is
+        //    ~4rem + safe-bottom; the extra ~1rem on top gives a
+        //    clean visual gap above the FAB instead of flushing into
+        //    the green ring poking up through the nav.
         //  - focused  → drops flush to the viewport bottom (above the
         //    keyboard's visual-viewport inset); the BottomNav is
         //    hidden via the body class so they don't share pixels.
         bottom: focused
           ? 'env(safe-area-inset-bottom, 0px)'
-          : 'calc(var(--hai-safe-bottom, 0px) + 4rem)',
+          : 'calc(var(--hai-safe-bottom, 0px) + 5rem)',
         paddingBottom: focused ? '0px' : 'env(safe-area-inset-bottom, 0px)',
       }}
     >
