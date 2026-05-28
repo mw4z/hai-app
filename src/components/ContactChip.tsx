@@ -159,6 +159,16 @@ const URL_RE = /https?:\/\/[^\s)]+[^\s).,;!?]/g
 // number, year, or coordinate.
 const PHONE_RE = /(?<![\w+])(?:(?:\+|00)966[\s-]?5\d(?:[\s-]?\d){7}|0[\s-]?5\d(?:[\s-]?\d){7}|\+\d{1,3}(?:[\s-]?\d){7,12})(?!\w)/g
 
+/** Translate Arabic-Indic (٠-٩) and Persian/Urdu (۰-۹) digit ranges
+ *  into Western 0-9 in-place. Non-digit characters pass through.
+ *  Used so PHONE_RE (which only matches ASCII digits) can recognise
+ *  numbers a user typed using their native keyboard. */
+function toEnglishDigits(s: string): string {
+  return s
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06F0))
+}
+
 // Recognised maps domains. Includes the short-link redirector domains
 // — even though they don't carry coords in the URL, the user still
 // pasted a "maps link" and deserves a tappable location chip rather
@@ -263,15 +273,30 @@ export function parseMessageSegments(text: string): MessageSegment[] {
   // `contact` segment shape the 📱 snippet pass uses, with no name —
   // ContactChip renders a Call / Copy / WhatsApp card sized to fit
   // the number alone.
-  const pass4: Array<string | AnyParsed> = pass3.flatMap((seg) =>
-    typeof seg === 'string'
-      ? scan(seg, PHONE_RE, (m): AnyParsed => ({
-          kind: 'contact',
-          name: '',
-          phone: m[0].trim(),
-        }))
-      : [seg],
-  )
+  //
+  // Arabic-Indic (٠١٢٣٤٥٦٧٨٩) and Persian/Urdu (۰۱۲۳۴۵۶۷۸۹) digits
+  // are recognised the same as Western 0-9: we scan a digit-
+  // normalised copy of the segment, but emit ORIGINAL non-phone
+  // text so prose like "أنا أملك ٥ منازل" keeps its Arabic numerals.
+  // The phone itself is emitted normalised so ContactChip's
+  // tel: / wa.me URLs work (those strip non-\d which excludes
+  // Arabic-Indic digits, so without normalisation the call URL
+  // would be empty).
+  const pass4: Array<string | AnyParsed> = pass3.flatMap((seg) => {
+    if (typeof seg !== 'string') return [seg]
+    const normalised = toEnglishDigits(seg)
+    const out: Array<string | AnyParsed> = []
+    let last = 0
+    let m: RegExpExecArray | null
+    PHONE_RE.lastIndex = 0
+    while ((m = PHONE_RE.exec(normalised)) !== null) {
+      if (m.index > last) out.push(seg.slice(last, m.index))
+      out.push({ kind: 'contact', name: '', phone: m[0].trim() })
+      last = m.index + m[0].length
+    }
+    if (last < seg.length) out.push(seg.slice(last))
+    return out
+  })
   return pass4.map((seg): MessageSegment =>
     typeof seg === 'string' ? { kind: 'text', text: seg } : seg,
   )
