@@ -35,7 +35,27 @@ function createPrismaClient() {
   // client doesn't actually connect. Any route that runs at request
   // time will have DATABASE_URL set (Vercel injects it), at which
   // point queries succeed normally.
-  const adapter = new PrismaPg({ connectionString: DATABASE_URL })
+  // POOL CONFIG (added after the second EMAXCONN incident):
+  //   - max = 4: each serverless instance keeps at most 4 sockets to
+  //     Postgres. Supabase's pooled tier caps at 200 concurrent
+  //     connections; with Vercel autoscaling across N warm instances,
+  //     a per-instance cap of 4 lets ~50 warm instances coexist
+  //     before saturating the backend (50 × 4 = 200). Previously
+  //     uncapped — each instance could grab as many sockets as the
+  //     pg pool would hand out, and a small traffic burst exhausted
+  //     the whole pool.
+  //   - idleTimeoutMillis = 10s: aggressive recycle so cold
+  //     instances release their pool quickly instead of holding
+  //     sockets nothing is using.
+  //   - connectionTimeoutMillis = 5s: fail fast if the pool is
+  //     genuinely exhausted, instead of queueing requests and
+  //     piling on backend pressure.
+  const adapter = new PrismaPg({
+    connectionString: DATABASE_URL,
+    max: 4,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 5_000,
+  } as any)
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
