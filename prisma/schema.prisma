@@ -2582,6 +2582,12 @@ model SquareMessage {
   hiddenAt          DateTime?
   hiddenById        String?
 
+  // Author-fired "notify neighbors" timestamp. Set the first (and
+  // only) time the author taps the "نبّه الجيران" action on their
+  // own message. Doubles as the per-user rate-limit anchor — the
+  // API blocks a second firing from the same author within 24h.
+  notificationFiredAt DateTime?
+
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
@@ -2596,4 +2602,7 @@ model SquareMessage {
   @@index([neighborhoodId, isPinned])
   @@index([authorId])
   @@index([replyToMessageId])
+  // Per-user rate limit on "notify neighbors" lookups: "did this
+  // author fire on ANY of their messages in the past 24h?"
+  @@index([authorId, notificationFiredAt])
 }

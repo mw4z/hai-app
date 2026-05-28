@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef } from 'react'
-import { FiCheck, FiMapPin } from 'react-icons/fi'
+import { FiBell, FiCheck, FiMapPin } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { fullName } from '@/lib/displayName'
 import SmartTextWithPlacePreviews from '@/components/SmartTextWithPlacePreviews'
@@ -263,11 +263,28 @@ export default function SquareBubble({
         </div>
 
         <p
-          className={`text-[10px] mt-1 px-1 text-gray-400 ${
+          className={`text-[10px] mt-1 px-1 text-gray-400 inline-flex items-center gap-1 ${
             isMe ? 'ltr:text-start rtl:text-end' : 'ltr:text-end rtl:text-start'
           }`}
         >
-          {timeStr}
+          {/* Author-fired "notify neighbors" — tiny bell next to the
+              timestamp once the firing happened. Indicates to the
+              author that the action was completed (and that it can't
+              be re-fired on this message). */}
+          {message.notificationFiredAt && (
+            <span
+              className={`inline-flex items-center justify-center w-3.5 h-3.5 rounded-full ${
+                isMe
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300'
+              }`}
+              aria-label={lang === 'en' ? 'Notified neighbors' : 'تم تنبيه الجيران'}
+              title={lang === 'en' ? 'Notified neighbors' : 'تم تنبيه الجيران'}
+            >
+              <FiBell className="w-2.5 h-2.5" strokeWidth={3} />
+            </span>
+          )}
+          <span>{timeStr}</span>
         </p>
       </div>
     </div>

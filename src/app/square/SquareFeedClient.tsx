@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import {
   FiArrowLeft,
   FiArrowRight,
+  FiBell,
   FiCopy,
   FiCornerUpLeft,
   FiCornerUpRight,
@@ -182,6 +183,35 @@ export default function SquareFeedClient({
     router.push(buildConvertToPostHref({ body: selectedMsg.body }))
     setSelectedMsg(null)
   }
+  async function handleNotifyNeighbors() {
+    if (!selectedMsg) return
+    const target = selectedMsg
+    setSelectedMsg(null)
+    try {
+      const res = await fetch(`/api/square/messages/${target.id}/notify`, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(
+          typeof data.error === 'string'
+            ? data.error
+            : data.error?.message || (lang === 'en' ? 'Could not notify' : 'تعذر إرسال التنبيه'),
+        )
+        return
+      }
+      // Optimistically reflect the new notificationFiredAt on the
+      // local list so the 🔔 indicator + "already fired" guard
+      // surface immediately.
+      const firedAt = (data.notificationFiredAt as string) || new Date().toISOString()
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === target.id ? { ...m, notificationFiredAt: firedAt } : m,
+        ),
+      )
+      toast.success(lang === 'en' ? 'Neighbors notified' : 'تم تنبيه الجيران')
+    } catch {
+      toast.error(lang === 'en' ? 'Could not notify' : 'تعذر إرسال التنبيه')
+    }
+  }
 
   const empty = messages.length === 0
 
@@ -323,9 +353,20 @@ export default function SquareFeedClient({
             selectedMsg.type === 'TEXT' &&
             !!(selectedMsg.body && selectedMsg.body.trim())
           }
+          /** "Notify neighbors" is own-message only, and only once per
+           *  message (the server also enforces a 24h-per-user rate
+           *  limit — we don't surface that here so the user gets a
+           *  meaningful toast on the off chance the timer hasn't
+           *  elapsed). */
+          canNotifyNeighbors={
+            selectedMsg.author.id === currentUserId &&
+            !selectedMsg.notificationFiredAt &&
+            selectedMsg.status === 'ACTIVE'
+          }
           onReply={handleReply}
           onCopy={handleCopy}
           onConvertToPost={handleConvertToPost}
+          onNotifyNeighbors={handleNotifyNeighbors}
           onReport={handleReport}
           onClose={() => setSelectedMsg(null)}
         />
@@ -344,24 +385,28 @@ export default function SquareFeedClient({
 interface ActionSheetProps {
   isOwn: boolean
   canConvertToPost: boolean
+  canNotifyNeighbors: boolean
   onReply: () => void
   onCopy: () => void
   onConvertToPost: () => void
+  onNotifyNeighbors: () => void
   onReport: () => void
   onClose: () => void
 }
 
 /**
  * Bottom action sheet shown when the user long-presses a bubble.
- * Rows (in order): Reply, Copy text, [Convert to post — own TEXT
- * messages only], Report (hidden for own messages).
+ * Rows (in order): Reply, Copy text, [Convert to post], [Notify
+ * neighbors], Report (hidden for own messages).
  */
 function SquareActionSheet({
   isOwn,
   canConvertToPost,
+  canNotifyNeighbors,
   onReply,
   onCopy,
   onConvertToPost,
+  onNotifyNeighbors,
   onReport,
   onClose,
 }: ActionSheetProps) {
@@ -410,6 +455,25 @@ function SquareActionSheet({
             <FiEdit3 className="w-5 h-5 text-primary-600" />
             <span className="text-[15px] font-semibold text-gray-900 dark:text-white">
               {lang === 'en' ? 'Convert to a post' : 'حوّلها إلى منشور'}
+            </span>
+          </button>
+        )}
+        {canNotifyNeighbors && (
+          <button
+            type="button"
+            onClick={onNotifyNeighbors}
+            className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-gray-50 dark:active:bg-gray-800/60 text-start"
+          >
+            <FiBell className="w-5 h-5 text-amber-500" />
+            <span className="flex-1">
+              <span className="block text-[15px] font-semibold text-gray-900 dark:text-white">
+                {lang === 'en' ? 'Notify neighbors' : 'نبّه الجيران'}
+              </span>
+              <span className="block text-[11.5px] text-gray-500 dark:text-gray-400 mt-0.5">
+                {lang === 'en'
+                  ? 'One per message · one per 24 hours'
+                  : 'مرة لكل رسالة · مرة كل 24 ساعة'}
+              </span>
             </span>
           </button>
         )}

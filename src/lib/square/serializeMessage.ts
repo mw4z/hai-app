@@ -34,6 +34,10 @@ export interface PublicSquareMessage {
   status: 'ACTIVE' | 'HIDDEN'
   isPinned: boolean
   pinnedAt: string | null
+  /** Set when the author has fired "notify neighbors" on this
+   *  message. Drives the small 🔔 indicator on the bubble and the
+   *  "already fired" guard in the long-press menu. */
+  notificationFiredAt: string | null
   replyToMessageId: string | null
   replyTo: PublicSquareReplyTo | null
   createdAt: string
@@ -72,6 +76,7 @@ interface RawMessage {
   status: string
   isPinned: boolean
   pinnedAt: Date | null
+  notificationFiredAt: Date | null
   replyToMessageId: string | null
   createdAt: Date
   authorId: string
@@ -107,6 +112,9 @@ export function serializeSquareMessage(
     status: row.status as PublicSquareMessage['status'],
     isPinned: row.isPinned,
     pinnedAt: row.pinnedAt ? row.pinnedAt.toISOString() : null,
+    notificationFiredAt: row.notificationFiredAt
+      ? row.notificationFiredAt.toISOString()
+      : null,
     replyToMessageId: row.replyToMessageId,
     replyTo: row.replyTo
       ? {
