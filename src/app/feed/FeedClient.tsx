@@ -207,9 +207,18 @@ export default function FeedClient({
     const tryScroll = () => {
       const el = document.getElementById(`post-${highlightPostId}`)
       if (el) {
+        // Scroll the post into view, then trigger the triple-pulse
+        // flash. We delay the class toggle by ~350ms so the smooth
+        // scroll settles before the animation starts — otherwise
+        // the first pulse fires while the page is still moving and
+        // reads as a jitter rather than a "look here" cue.
         el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        el.classList.add('hai-highlight-flash')
-        setTimeout(() => el.classList.remove('hai-highlight-flash'), 1800)
+        setTimeout(() => {
+          el.classList.add('hai-highlight-flash')
+          // Keep the class for the full 3s animation + a small
+          // tail so we don't strip it mid-pulse on slow devices.
+          setTimeout(() => el.classList.remove('hai-highlight-flash'), 3200)
+        }, 350)
         return
       }
       if (++tries < 16) timer = setTimeout(tryScroll, 250) // ~4s window

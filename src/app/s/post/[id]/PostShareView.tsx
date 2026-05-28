@@ -45,6 +45,20 @@ export default function PostShareView({ post, postId }: { post: PublicPost; post
     googlePlay: 'Google Play',
   }
 
+  // Android intent:// URL — explicit handoff to the Hai app for the
+  // SAME post URL. Bypasses the App Links verification cache: even
+  // if a device hasn't re-verified our (updated) assetlinks.json,
+  // Chrome will still launch com.hai.app with this intent. If the
+  // app isn't installed, S.browser_fallback_url drops the user on
+  // the Play Store listing automatically.
+  const androidIntentUrl =
+    `intent://app.hai-app.net/s/post/${encodeURIComponent(postId)}` +
+    `#Intent;scheme=https;package=com.hai.app;` +
+    `S.browser_fallback_url=${encodeURIComponent(ANDROID_STORE_URL)};end`
+
+  const openInAppLabel = en ? 'Open in the Hai app' : 'افتح في تطبيق حي'
+  const orInstallLabel = en ? 'Don’t have it? Install Hai' : 'ما عندك التطبيق؟ نزّله'
+
   const storeButtons = (
     <div className="mt-7 w-full space-y-3">
       {platform === 'ios' && (
@@ -53,9 +67,26 @@ export default function PostShareView({ post, postId }: { post: PublicPost; post
         </a>
       )}
       {platform === 'android' && (
-        <a href={ANDROID_STORE_URL} className="block w-full rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-bold py-3.5 text-sm transition-colors">
-          {t.cta} — {t.googlePlay}
-        </a>
+        <>
+          {/* Primary CTA: launch the installed Hai app via intent://.
+              Works even when App Links verification is stale; falls
+              back to Play Store automatically if the app isn't there. */}
+          <a
+            href={androidIntentUrl}
+            className="block w-full rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-bold py-3.5 text-sm transition-colors"
+          >
+            {openInAppLabel}
+          </a>
+          {/* Secondary CTA: explicit Play Store link for users who
+              tapped Open and the app didn't show up (rare — intent
+              fallback should already cover this). */}
+          <a
+            href={ANDROID_STORE_URL}
+            className="block w-full rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-semibold py-3 text-xs text-center transition-colors"
+          >
+            {orInstallLabel}
+          </a>
+        </>
       )}
       {platform === 'other' && (
         <div className="grid grid-cols-2 gap-2.5">

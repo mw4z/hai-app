@@ -1080,13 +1080,28 @@ body.hai-scroll-locked .hai-app-shell__scroll {
    (var(--hai-shadow-sm)) so the shadow is never visibly removed
    during the animation — otherwise it pops back in when the
    animation ends and reads as a small "card movement". */
+/* Triple-pulse so a deep-link landing on /feed?post=<id> reads as
+   "this is the post" even when the viewport already showed several
+   cards. Each pulse expands a soft amber ring + a faint inner glow
+   and a tiny scale pop; pulses 1.05x → 1.0 so the card "breathes"
+   instead of jumping. Total runtime ~3s — long enough that a user
+   who looked away during the scroll still catches the second/third
+   pulse. */
 @keyframes hai-highlight-flash {
-  0%   { box-shadow: var(--hai-shadow-sm), 0 0 0 0 rgba(245, 158, 11, 0); }
-  20%  { box-shadow: var(--hai-shadow-sm), 0 0 0 4px rgba(245, 158, 11, 0.55); }
-  100% { box-shadow: var(--hai-shadow-sm), 0 0 0 0 rgba(245, 158, 11, 0); }
+  0%   { box-shadow: var(--hai-shadow-sm), 0 0 0 0 rgba(245, 158, 11, 0),     0 0 0 0    rgba(245, 158, 11, 0); transform: scale(1); }
+  8%   { box-shadow: var(--hai-shadow-sm), 0 0 0 6px rgba(245, 158, 11, 0.7), 0 0 22px 4px rgba(245, 158, 11, 0.35); transform: scale(1.015); }
+  22%  { box-shadow: var(--hai-shadow-sm), 0 0 0 0 rgba(245, 158, 11, 0),     0 0 0 0    rgba(245, 158, 11, 0); transform: scale(1); }
+  35%  { box-shadow: var(--hai-shadow-sm), 0 0 0 6px rgba(245, 158, 11, 0.7), 0 0 22px 4px rgba(245, 158, 11, 0.35); transform: scale(1.015); }
+  50%  { box-shadow: var(--hai-shadow-sm), 0 0 0 0 rgba(245, 158, 11, 0),     0 0 0 0    rgba(245, 158, 11, 0); transform: scale(1); }
+  63%  { box-shadow: var(--hai-shadow-sm), 0 0 0 6px rgba(245, 158, 11, 0.7), 0 0 22px 4px rgba(245, 158, 11, 0.35); transform: scale(1.015); }
+  100% { box-shadow: var(--hai-shadow-sm), 0 0 0 0 rgba(245, 158, 11, 0),     0 0 0 0    rgba(245, 158, 11, 0); transform: scale(1); }
 }
 .hai-highlight-flash {
-  animation: hai-highlight-flash 1.6s ease-out;
+  animation: hai-highlight-flash 3s ease-out;
+  /* The outer ring sits outside layout; lift the card above sibling
+     cards so the ring isn't clipped by a neighbor's overflow. */
+  position: relative;
+  z-index: 5;
 }
 @media (prefers-reduced-motion: reduce) {
   .hai-highlight-flash { animation: none; }
