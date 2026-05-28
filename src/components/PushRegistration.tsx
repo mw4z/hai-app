@@ -40,6 +40,79 @@ export default function PushRegistration() {
     // auth dependency — it just translates the deeplink and navigates —
     // so it's safe to attach immediately. The auth-gated token
     // registration below still waits for isSignedIn().
+    // ── Pending deeplink survival across reloads ────────────────────
+    // Capacitor's plugin queues the launch action with
+    // retainUntilConsumed:true — meaning it fires once, for the FIRST
+    // listener that attaches, then drops the data. If that first
+    // attach happens but the navigation fails (WKWebView race) OR if
+    // SwUpdateReload triggers a service-worker handoff reload mid-
+    // navigation, the event is consumed and gone. The reload lands
+    // back on /feed with no way to recover the original target.
+    //
+    // Fix: persist the resolved target to sessionStorage the instant
+    // we get the event. A mount-time effect (below) checks the same
+    // key and continues the navigation across reloads. Cleared as
+    // soon as the URL actually lands on the target.
+    const PENDING_KEY = 'hai:pending-deeplink'
+
+    // Helper: navigate to a target with the same two-layer strategy
+    // (router.push first, fall back to window.location.assign with
+    // retries). Kept inline so the launch handler AND the mount-time
+    // resume effect both call the same code.
+    const navigateToTarget = (target: string) => {
+      try {
+        const cur0 = window.location.pathname + window.location.search
+        if (cur0 === target) {
+          try { sessionStorage.removeItem(PENDING_KEY) } catch {}
+          return
+        }
+        console.log('[PUSH] navigateToTarget →', target, 'from', cur0)
+        try {
+          routerRef.current.push(target)
+        } catch (err) {
+          console.error('[PUSH] router.push threw:', err)
+        }
+        setTimeout(() => {
+          const cur1 = window.location.pathname + window.location.search
+          if (cur1 === target) {
+            try { sessionStorage.removeItem(PENDING_KEY) } catch {}
+            return
+          }
+          // Fallback: full assign with retries
+          let attempts = 0
+          const MAX_ATTEMPTS = 16
+          const tick = () => {
+            const cur = window.location.pathname + window.location.search
+            if (cur === target) {
+              try { sessionStorage.removeItem(PENDING_KEY) } catch {}
+              return
+            }
+            try { window.location.assign(target) } catch (err) {
+              console.error('[PUSH] assign failed:', err)
+            }
+            attempts++
+            if (attempts < MAX_ATTEMPTS) setTimeout(tick, 250)
+            else console.warn('[PUSH] nav exhausted; on', cur, 'wanted', target)
+          }
+          tick()
+        }, 500)
+      } catch (err) {
+        console.error('[PUSH] navigateToTarget failed:', err)
+      }
+    }
+
+    // Check sessionStorage on every mount for a deeplink that didn't
+    // finish navigating in a previous session (e.g. SwUpdateReload
+    // killed the navigation). If present, resume immediately.
+    try {
+      const pending = sessionStorage.getItem(PENDING_KEY)
+      if (pending) {
+        console.log('[PUSH] resuming pending deeplink from sessionStorage:', pending)
+        // Small delay so React/Capacitor have a tick to settle.
+        setTimeout(() => navigateToTarget(pending), 50)
+      }
+    } catch {}
+
     const installDeeplinkListener = async () => {
       if (deeplinkReadyRef.current) return
       deeplinkReadyRef.current = true
@@ -89,84 +162,27 @@ export default function PushRegistration() {
 
             const target = resolveDeeplink(data)
             if (!target) return
+            // Persist the target IMMEDIATELY so a SwUpdateReload (or
+            // any other reload that races our navigation) can resume
+            // it on the next mount. Capacitor's plugin only replays
+            // the event to the first listener — once we've received
+            // it, the only place it can live is here in storage.
+            try { sessionStorage.setItem(PENDING_KEY, target) } catch {}
             try {
               // Skip re-nav if we're already on the exact target — avoids
               // an unnecessary reload if the app was already on the page.
               const currentPath = window.location.pathname + window.location.search
-              if (currentPath === target) return
-              // Cold-start path: on iOS, the launch notification can fire
-              // milliseconds after the WebView starts loading, sometimes
-              // before window/document are fully wired. window.location =
-              // ... at that moment is silently dropped by WKWebView, which
-              // is the "tap notification, app opens to /feed instead of
-              // the conversation" symptom users were reporting.
-              //
-              // Fix: defer the navigation until the document is ready,
-              // and retry once on the next tick if the URL didn't move.
-              // assign() is more reliable than href= on Capacitor (forces
-              // a navigation even when the WebView is mid-load).
-              // Cold-start race fix v3: WKWebView silently drops the
-              // initial assign() while React is still hydrating + the
-              // Capacitor bridge is wiring up, which left users on
-              // /feed instead of the DM (symptom: "tap push, opens
-              // app, lands on feed not the conversation").
-              //
-              // Two-layer strategy:
-              //   1. Try Next.js's client-side router first
-              //      (history.pushState — NEVER dropped by WKWebView
-              //      because it doesn't touch the WebView's
-              //      navigation pipeline at all).
-              //   2. If after 500ms we still haven't landed on the
-              //      target (e.g. the route didn't match a Next page
-              //      so the push was a no-op), fall back to
-              //      window.location.assign with a retry loop, same
-              //      shape as before.
-              //
-              // Logs at every step so we can see in the iOS Web
-              // Inspector exactly which path the deep-link took.
-              const navigate = () => {
-                console.log('[PUSH] navigate() → target:', target, 'current:', window.location.pathname + window.location.search)
-                // Layer 1: router.push (client-side, history API).
-                try {
-                  routerRef.current.push(target)
-                  console.log('[PUSH] router.push fired')
-                } catch (err) {
-                  console.error('[PUSH] router.push threw:', err)
-                }
-                // Verify after a beat; if we're not on target, fall
-                // back to a full assign() with retries.
-                setTimeout(() => {
-                  const cur1 = window.location.pathname + window.location.search
-                  if (cur1 === target) {
-                    console.log('[PUSH] router.push landed correctly')
-                    return
-                  }
-                  console.warn('[PUSH] router.push did NOT land (on', cur1, ') — falling back to window.location.assign')
-                  let attempts = 0
-                  const MAX_ATTEMPTS = 16
-                  const tick = () => {
-                    const cur = window.location.pathname + window.location.search
-                    if (cur === target) {
-                      console.log('[PUSH] assign() landed on attempt', attempts)
-                      return
-                    }
-                    try { window.location.assign(target) } catch (err) {
-                      console.error('[PUSH] assign failed:', err)
-                    }
-                    attempts++
-                    if (attempts < MAX_ATTEMPTS) {
-                      setTimeout(tick, 250)
-                    } else {
-                      console.warn('[PUSH] navigation exhausted; stuck on', cur, 'wanted', target)
-                    }
-                  }
-                  tick()
-                }, 500)
+              if (currentPath === target) {
+                try { sessionStorage.removeItem(PENDING_KEY) } catch {}
+                return
               }
+              // Use the shared helper so the event handler AND the
+              // mount-time resume both go through the same two-layer
+              // (router.push → assign with retries) navigation logic.
               if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', navigate, { once: true })
+                document.addEventListener('DOMContentLoaded', () => navigateToTarget(target), { once: true })
               } else {
-                navigate()
+                navigateToTarget(target)
               }
             } catch (err) {
               console.error('[PUSH] navigation failed:', err)
