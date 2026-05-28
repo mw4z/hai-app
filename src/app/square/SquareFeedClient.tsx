@@ -313,10 +313,12 @@ export default function SquareFeedClient({
       toast.error(lang === 'en' ? 'Could not delete' : 'تعذر الحذف')
     }
   }
-  async function handleNotifyNeighbors() {
-    if (!selectedMsg) return
-    const target = selectedMsg
-    setSelectedMsg(null)
+  /** Shared "notify neighbors" handler. Used by both the long-press
+   *  sheet (operates on selectedMsg) and the inline bubble chip
+   *  (operates on the bubble's own message), so the API call,
+   *  optimistic update, and toasts live in one place. */
+  async function notifyMessage(target: PublicSquareMessage) {
+    if (target.notificationFiredAt || target.status !== 'ACTIVE') return
     try {
       const res = await fetch(`/api/square/messages/${target.id}/notify`, { method: 'POST' })
       const data = await res.json().catch(() => ({}))
@@ -328,9 +330,6 @@ export default function SquareFeedClient({
         )
         return
       }
-      // Optimistically reflect the new notificationFiredAt on the
-      // local list so the 🔔 indicator + "already fired" guard
-      // surface immediately.
       const firedAt = (data.notificationFiredAt as string) || new Date().toISOString()
       setMessages((prev) =>
         prev.map((m) =>
@@ -341,6 +340,20 @@ export default function SquareFeedClient({
     } catch {
       toast.error(lang === 'en' ? 'Could not notify' : 'تعذر إرسال التنبيه')
     }
+  }
+  function handleNotifyNeighbors() {
+    if (!selectedMsg) return
+    const target = selectedMsg
+    setSelectedMsg(null)
+    notifyMessage(target)
+  }
+  /** Inline-chip version used by SquareBubble. Same handler, no
+   *  selection state to clear. */
+  function handleMakePostForMessage(message: PublicSquareMessage) {
+    router.push(buildConvertToPostHref({ body: message.body }))
+  }
+  function handleNotifyForMessage(message: PublicSquareMessage) {
+    notifyMessage(message)
   }
 
   const empty = messages.length === 0
@@ -465,6 +478,8 @@ export default function SquareFeedClient({
                 onJumpToReply={handleJumpToReply}
                 onAvatarTap={handleAvatarTap}
                 onToggleReaction={handleToggleReaction}
+                onMakePost={handleMakePostForMessage}
+                onNotify={handleNotifyForMessage}
               />
             ))
           )}

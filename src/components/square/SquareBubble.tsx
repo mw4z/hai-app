@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useRef } from 'react'
-import { FiBell, FiCheck, FiMapPin } from 'react-icons/fi'
+import { FiBell, FiCheck, FiEdit3, FiMapPin } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { fullName } from '@/lib/displayName'
 import SmartTextWithPlacePreviews from '@/components/SmartTextWithPlacePreviews'
@@ -27,6 +27,11 @@ interface Props {
   /** Tap an existing reactions chip → toggle the current user's
    *  reaction with the same emoji (add / remove / replace). */
   onToggleReaction: (messageId: string, emoji: string) => void
+  /** Inline "حوّلها لمنشور" chip — own TEXT messages with a body. */
+  onMakePost: (message: PublicSquareMessage) => void
+  /** Inline "نبّه الحي" chip — own messages that haven't been fired
+   *  on yet. Server still enforces the 24h-per-user rate limit. */
+  onNotify: (message: PublicSquareMessage) => void
   selected: boolean
 }
 
@@ -52,6 +57,8 @@ export default function SquareBubble({
   onJumpToReply,
   onAvatarTap,
   onToggleReaction,
+  onMakePost,
+  onNotify,
   selected,
 }: Props) {
   const { lang } = useLanguage()
@@ -328,6 +335,37 @@ export default function SquareBubble({
               </div>
             )}
           </div>
+
+          {/* Inline quick-action chips — own messages only, last in
+              group, not a tombstone. The same two actions that live
+              in the long-press sheet are surfaced HERE because most
+              users won't discover the long-press gesture. Shown on
+              the trailing edge (next to the message) so they read
+              as "extra things I can do with what I just sent". */}
+          {isMe && isLastInGroup && message.type !== 'DELETED' && (
+            <div className="mt-1 inline-flex items-center gap-1.5 flex-wrap">
+              {message.type === 'TEXT' && message.body && message.body.trim() && (
+                <button
+                  type="button"
+                  onClick={() => onMakePost(message)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11.5px] font-bold bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800/60 active:scale-95 transition-transform"
+                >
+                  <FiEdit3 className="w-3 h-3" />
+                  <span>{lang === 'en' ? 'Make a post' : 'حوّلها لمنشور'}</span>
+                </button>
+              )}
+              {!message.notificationFiredAt && message.status === 'ACTIVE' && (
+                <button
+                  type="button"
+                  onClick={() => onNotify(message)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11.5px] font-bold bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 active:scale-95 transition-transform"
+                >
+                  <FiBell className="w-3 h-3" />
+                  <span>{lang === 'en' ? 'Broadcast' : 'نبّه الحي'}</span>
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Reactions chip — same look as DM's grouped bubble. Tap
               an emoji you've already reacted with to remove it; tap
