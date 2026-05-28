@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { isSquareAdminRole } from '@/lib/square/isSquareAdmin'
+import { isSquareTableMissingError } from '@/lib/square/migrationGate'
 import {
   serializeSquareMessage,
   type PublicSquareMessage,
@@ -35,9 +36,12 @@ export default async function SquarePage() {
   if (!user.neighborhoodId) notFound()
   if (!isSquareAdminRole(user.role)) notFound()
 
-  // Graceful failure: if the migration hasn't been applied yet, render
-  // the empty state instead of bubbling a 500. Lambda wrapper preserves
-  // the include shape for the serializer.
+  // ONLY the "SquareMessage table doesn't exist yet" case is swallowed
+  // into the empty-state render — that's the brief deploy → migration
+  // window where ungated rendering would 500 on every admin tap.
+  // Every OTHER Prisma / DB / runtime error is re-thrown so Next.js's
+  // error boundary handles it (no silent empty Square).
+  // Lambda wrapper preserves the include shape for the serializer.
   const fetchRecent = () => db.squareMessage.findMany({
     where: {
       neighborhoodId: user.neighborhoodId!,
@@ -58,7 +62,12 @@ export default async function SquarePage() {
   try {
     rows = await fetchRecent()
   } catch (err) {
-    console.error('[square] list query failed — migration may not be applied yet', err)
+    if (isSquareTableMissingError(err)) {
+      console.warn('[square] table missing — empty state (apply migration)', err)
+      // rows stays []
+    } else {
+      throw err
+    }
   }
 
   const hasMoreOlder = rows.length > PAGE_SIZE

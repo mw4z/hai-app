@@ -6,6 +6,7 @@ import { isSquareAdminRole } from '@/lib/square/isSquareAdmin'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { detectSquareIntent } from '@/lib/square/detectIntent'
 import { checkSquareMessageRateLimit } from '@/lib/square/rateLimit'
+import { isSquareTableMissingError } from '@/lib/square/migrationGate'
 import {
   serializeSquareMessage,
   type PublicSquareMessage,
@@ -79,11 +80,20 @@ export async function GET(req: NextRequest) {
     )
     return NextResponse.json({ messages, hasMore })
   } catch (err) {
-    // Graceful failure if the migration hasn't been applied yet (the
-    // pivot drops the prior tables, so a half-applied state is the
-    // most likely cause). Empty list instead of a 500.
+    // Two-track error handling:
+    //   - The narrow "table missing yet" case (deploy → migration
+    //     window) responds with an empty list — the UI renders the
+    //     normal empty state. Server logs a WARN, not an ERROR,
+    //     because this is expected during the brief gap.
+    //   - Any OTHER Prisma / DB / runtime error is a real fault.
+    //     Log and respond 500 so the client surfaces a real error
+    //     instead of pretending the Square is empty.
+    if (isSquareTableMissingError(err)) {
+      console.warn('[square] table missing — empty list (apply migration)', err)
+      return NextResponse.json({ messages: [], hasMore: false })
+    }
     console.error('[square] GET /api/square/messages failed', err)
-    return NextResponse.json({ messages: [], hasMore: false })
+    return NextResponse.json(apiError('Server error', 500), { status: 500 })
   }
 }
 
