@@ -2596,6 +2596,12 @@ model SquareMessage {
   // (enforced at the API; the toggle replaces or removes).
   reactions Json @default("[]")
 
+  // Distinct-viewer counter — mirrors Post.viewCount. Incremented
+  // once per (messageId, userId) via SquareMessageView below; the
+  // author's own views are excluded. PostCard's IntersectionObserver
+  // pattern is reused on the bubble side.
+  viewCount Int @default(0)
+
   // "Delete for me" — userIds who hid this message from their own
   // view. The list query filters out rows where the current user
   // is in this array. Independent from type=DELETED (which is the
@@ -2622,4 +2628,24 @@ model SquareMessage {
   // Per-user rate limit on "notify neighbors" lookups: "did this
   // author fire on ANY of their messages in the past 24h?"
   @@index([authorId, notificationFiredAt])
+
+  squareMessageViews SquareMessageView[]
+}
+
+/**
+ * Distinct-viewer dedupe table for Square messages. One row per
+ * (messageId, userId); unique index makes re-viewing a no-op. Mirrors
+ * PostView for the post feed.
+ */
+model SquareMessageView {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  message SquareMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
 }

@@ -1,7 +1,14 @@
 'use client'
 
-import { useMemo, useRef } from 'react'
-import { FiBell, FiCheck, FiEdit3, FiMapPin } from 'react-icons/fi'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { FiBell, FiCheck, FiEdit3, FiEye, FiMapPin } from 'react-icons/fi'
+
+// Shared per-session "already reported" set so navigating away and
+// back doesn't double-POST the same message — mirrors PostCard's
+// reportedViews. SquareMessage view rows are also dedup'd server-side
+// via the unique (messageId, userId) index, so this is just to avoid
+// the unnecessary roundtrip.
+const reportedViews = new Set<string>()
 import { useLanguage } from '@/hooks/useLanguage'
 import { fullName } from '@/lib/displayName'
 import SmartTextWithPlacePreviews from '@/components/SmartTextWithPlacePreviews'
@@ -70,6 +77,59 @@ export default function SquareBubble({
   const { lang } = useLanguage()
   const rowRef = useRef<HTMLDivElement | null>(null)
   const longPress = useSquareLongPress(onLongPress)
+  // Live-updated viewer count. Seeded from the server-sent value, then
+  // bumped to the server's authoritative number on POST and on the
+  // periodic poll while the bubble is on screen.
+  const [viewCount, setViewCount] = useState<number>(message.viewCount)
+  const [bubbleVisible, setBubbleVisible] = useState(false)
+
+  // First-time visibility → POST a view (server dedups). Also flips
+  // `bubbleVisible` so the live-poll effect below knows when to poll
+  // and when to pause. Skipped on own messages + DELETED tombstones
+  // (server would no-op anyway, but saves the roundtrip).
+  useEffect(() => {
+    if (isMe) return
+    if (message.type === 'DELETED') return
+    const el = rowRef.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        const isVis = entries.some((e) => e.isIntersecting)
+        setBubbleVisible(isVis)
+        if (isVis && !reportedViews.has(message.id)) {
+          reportedViews.add(message.id)
+          fetch(`/api/square/messages/${message.id}/view`, { method: 'POST' })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => {
+              if (d && typeof d.viewCount === 'number') setViewCount(d.viewCount)
+            })
+            .catch(() => {})
+        }
+      },
+      { threshold: 0.5 },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [message.id, message.type, isMe])
+
+  // Live count while on-screen: re-fetch every 25s (paused when the
+  // tab is hidden) so the number climbs as other neighbors view.
+  useEffect(() => {
+    if (!bubbleVisible) return
+    if (message.type === 'DELETED') return
+    let cancelled = false
+    const poll = () => {
+      if (typeof document !== 'undefined' && document.hidden) return
+      fetch(`/api/square/messages/${message.id}/view`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!cancelled && d && typeof d.viewCount === 'number') setViewCount(d.viewCount)
+        })
+        .catch(() => {})
+    }
+    const id = setInterval(poll, 25_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [bubbleVisible, message.id, message.type])
 
   const isMe = message.author.id === currentUserId
   const authorName = isMe
@@ -450,6 +510,16 @@ export default function SquareBubble({
                 </span>
               )}
               <span>{timeStr}</span>
+              {message.type !== 'DELETED' && viewCount > 0 && (
+                <span
+                  className="inline-flex items-center gap-0.5 opacity-70"
+                  aria-label={lang === 'en' ? `${viewCount} views` : `${viewCount} مشاهدة`}
+                  title={lang === 'en' ? `${viewCount} views` : `${viewCount} مشاهدة`}
+                >
+                  <FiEye className="w-2.5 h-2.5" />
+                  <span>{viewCount}</span>
+                </span>
+              )}
             </p>
           )}
         </div>

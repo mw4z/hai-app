@@ -22,6 +22,25 @@ workflows:
       - name: Build web app
         script: |
           npx next build
+      - name: Stage native assets for Capacitor sync
+        script: |
+          # next build does NOT populate out/ on this project (no
+          # output: 'export' in next.config.js because we have
+          # server-side API routes). Capacitor's webDir is 'out',
+          # so without this step cap sync has nothing fresh to copy
+          # — and the OLD offline.html previously synced into
+          # ios/App/App/public/ persists in the bundle, even though
+          # public/offline.html on the repo has been updated.
+          #
+          # Mirror the bundled fallback files from public/ into out/
+          # so cap sync picks them up. Only the files the native
+          # shell actually loads from file:// (offline.html, icons,
+          # manifest) need to be present.
+          mkdir -p out
+          cp public/offline.html out/offline.html
+          cp public/manifest.json out/manifest.json || true
+          cp public/icon-192.png out/icon-192.png || true
+          cp public/icon-512.png out/icon-512.png || true
       - name: Sync Capacitor
         script: |
           npx cap sync ios

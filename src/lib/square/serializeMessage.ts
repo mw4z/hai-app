@@ -64,6 +64,10 @@ export interface PublicSquareMessage {
   /** Stickers only. "sticker:<id>" sentinel (Square forbids arbitrary
    *  image URLs at the API layer). */
   imageUrl: string | null
+  /** Distinct-viewer count. Bubble renders this next to the
+   *  timestamp on the last bubble in a group; client patches the
+   *  value after the IntersectionObserver POSTs the viewer's view. */
+  viewCount: number
 }
 
 interface RawAuthor {
@@ -99,6 +103,7 @@ interface RawMessage {
   audioMimeType: string | null
   audioSizeBytes: number | null
   imageUrl: string | null
+  viewCount: number
   replyTo?: {
     id: string
     authorId: string
@@ -152,5 +157,6 @@ export function serializeSquareMessage(
     audioDurationMs: row.audioDurationMs,
     audioMimeType: row.audioMimeType,
     imageUrl: row.imageUrl,
+    viewCount: row.viewCount,
   }
 }
