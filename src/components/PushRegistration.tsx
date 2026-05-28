@@ -59,28 +59,28 @@ export default function PushRegistration() {
     // (router.push first, fall back to window.location.assign with
     // retries). Kept inline so the launch handler AND the mount-time
     // resume effect both call the same code.
-    // navigateToTarget v4 — use window.location.assign instead of
-    // router.push for the deeplink hop.
+    // navigateToTarget v5 — router.push primary + anti-loop counter.
     //
-    // Earlier rounds used router.push because it's a cheap
-    // history.pushState navigation, but the real-device logs showed
-    // the bouncer winning ~180ms later: the user saw DM → /feed →
-    // DM with the watchdog yanking it back. The cause is Next.js's
-    // client-side router rolling back on the cold-start React #419
-    // (server Suspense boundary fails to stream) — push lands the
-    // URL, the streaming RSC fetch errors, the router pops back to
-    // /feed, the watchdog catches it.
+    // v4 used window.location.assign to avoid the React-#419 rollback
+    // flash, but that triggered a different bug: on cold-start when
+    // the radio is still warming up, the assign() target page fails
+    // to load → native fallback to bundled offline.html → offline.html
+    // probes /api/ping → succeeds → reloads to bare REMOTE_URL → server
+    // redirects bare URL to /feed → PushRegistration mounts → reads
+    // PENDING_KEY → calls assign again → INFINITE LOOP through offline
+    // page.
     //
-    // assign() is a HARD navigation: the browser drops all
-    // client-side router state and does a fresh full-page load of
-    // /threads/<id>. The Suspense boundary renders cleanly because
-    // it's a top-level navigation, not a streamed transition. No
-    // bounce, no flash — the user sees the AppSplash bridge a
-    // single cleanly-rendered transition into the conversation.
-    //
-    // Watchdog still runs to catch any residual drift; PENDING_KEY
-    // still owned exclusively by the watchdog (cleared on its 15s
-    // expiry only).
+    // Back to router.push (client-side, no network roundtrip for the
+    // navigation itself, so no offline-page risk). Combined with the
+    // anti-loop counter below: if we've tried more than MAX_NAV_ATTEMPTS
+    // navigations within a cooldown window without holding the target,
+    // give up and let the user stay where they are — better /feed
+    // than a permanently broken loop.
+    const NAV_ATTEMPT_KEY = 'hai:nav-attempts'
+    const NAV_LAST_KEY = 'hai:nav-last-attempt-at'
+    const MAX_NAV_ATTEMPTS = 3
+    const NAV_COOLDOWN_MS = 8000
+
     const navigateToTarget = (target: string) => {
       try {
         const cur0 = window.location.pathname + window.location.search
@@ -89,13 +89,36 @@ export default function PushRegistration() {
         } catch {}
         try { sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now())) } catch {}
         if (cur0 === target) return
-        console.log('[PUSH] navigateToTarget →', target, 'from', cur0, '(hard assign)')
+
+        // Anti-loop: count attempts inside a sliding cooldown window.
+        // If we've burned through MAX_NAV_ATTEMPTS without holding
+        // target, give up — clear PENDING_KEY so the next mount
+        // doesn't re-trigger this code path.
+        let attempts = 0
         try {
-          window.location.assign(target)
+          attempts = Number(sessionStorage.getItem(NAV_ATTEMPT_KEY) || '0')
+          const lastAt = Number(sessionStorage.getItem(NAV_LAST_KEY) || '0')
+          if (Date.now() - lastAt > NAV_COOLDOWN_MS) attempts = 0
+        } catch {}
+        if (attempts >= MAX_NAV_ATTEMPTS) {
+          console.warn('[PUSH] anti-loop tripped — giving up after', attempts, 'attempts')
+          try {
+            sessionStorage.removeItem(PENDING_KEY)
+            sessionStorage.removeItem(NAV_ATTEMPT_KEY)
+            sessionStorage.removeItem(NAV_LAST_KEY)
+          } catch {}
+          return
+        }
+        try {
+          sessionStorage.setItem(NAV_ATTEMPT_KEY, String(attempts + 1))
+          sessionStorage.setItem(NAV_LAST_KEY, String(Date.now()))
+        } catch {}
+
+        console.log('[PUSH] navigateToTarget →', target, 'from', cur0, 'attempt', attempts + 1)
+        try {
+          routerRef.current.push(target)
         } catch (err) {
-          console.error('[PUSH] assign threw:', err)
-          // Last-ditch fallback to router.push if assign somehow throws.
-          try { routerRef.current.push(target) } catch {}
+          console.error('[PUSH] router.push threw:', err)
         }
       } catch (err) {
         console.error('[PUSH] navigateToTarget failed:', err)
@@ -143,8 +166,13 @@ export default function PushRegistration() {
           watchdogInterval = null
           watchdogTarget = null
           // Now safe to clear the pending key — we held the URL as
-          // long as we reasonably can.
-          try { sessionStorage.removeItem(PENDING_KEY) } catch {}
+          // long as we reasonably can. Also clear the anti-loop
+          // counter so a future deeplink starts with a fresh budget.
+          try {
+            sessionStorage.removeItem(PENDING_KEY)
+            sessionStorage.removeItem(NAV_ATTEMPT_KEY)
+            sessionStorage.removeItem(NAV_LAST_KEY)
+          } catch {}
           return
         }
         if (!watchdogTarget) return
