@@ -1,11 +1,17 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { FiAlertCircle, FiSend } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { detectSquareIntent } from '@/lib/square/detectIntent'
 import type { PublicSquareMessage } from '@/lib/square/serializeMessage'
+
+/** Body-class flag that signals "the Square composer is focused, the
+ *  iOS keyboard is open, hide the global BottomNav so it doesn't
+ *  fight the composer for the same strip of pixels". The matching
+ *  CSS rule lives in globals.css. */
+const KBD_BODY_CLASS = 'square-composer-focused'
 
 interface Props {
   /** Called after a successful send so the parent can append to the
@@ -31,6 +37,23 @@ export default function SquareComposer({ onSent }: Props) {
   const { t, lang } = useLanguage()
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
+  /** True while the textarea has focus and the soft keyboard is up.
+   *  Drives both (a) the composer's own `bottom` (drops to 0 when
+   *  focused so it sits flush above the keyboard) and (b) a body
+   *  class that hides the global BottomNav so the two don't overlap
+   *  on the same pixels — iOS WKWebView slides BOTH up with the
+   *  visual viewport and they collide. */
+  const [focused, setFocused] = useState(false)
+
+  // Add/remove the body class in lockstep with focus. Cleanup on
+  // unmount so navigating away (back button, etc.) never leaves the
+  // BottomNav hidden across screens.
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    if (focused) document.body.classList.add(KBD_BODY_CLASS)
+    else document.body.classList.remove(KBD_BODY_CLASS)
+    return () => { document.body.classList.remove(KBD_BODY_CLASS) }
+  }, [focused])
 
   const intent = useMemo(() => detectSquareIntent(body), [body])
 
@@ -68,11 +91,17 @@ export default function SquareComposer({ onSent }: Props) {
   return (
     <form
       onSubmit={send}
-      className="fixed inset-x-0 z-10 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700"
+      className="fixed inset-x-0 z-20 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 transition-[bottom] duration-200"
       style={{
-        // Sits just above the bottom nav (5rem ≈ tab bar height + safe area).
-        bottom: 'calc(var(--hai-safe-bottom, 0px) + 4rem)',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        // Two positions:
+        //  - blurred  → sits 4rem above the BottomNav (its usual spot)
+        //  - focused  → drops flush to the viewport bottom (above the
+        //    keyboard's visual-viewport inset); the BottomNav is
+        //    hidden via the body class so they don't share pixels.
+        bottom: focused
+          ? 'env(safe-area-inset-bottom, 0px)'
+          : 'calc(var(--hai-safe-bottom, 0px) + 4rem)',
+        paddingBottom: focused ? '0px' : 'env(safe-area-inset-bottom, 0px)',
       }}
     >
       <div className="max-w-[640px] mx-auto px-3 py-2 space-y-1.5">
@@ -92,6 +121,8 @@ export default function SquareComposer({ onSent }: Props) {
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             placeholder={t('square_message_placeholder')}
             rows={1}
             maxLength={900}
