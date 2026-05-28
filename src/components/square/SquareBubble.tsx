@@ -173,48 +173,80 @@ export default function SquareBubble({
   // LAST bubble of a group. Both pieces are kept as variables so the
   // five per-type branches below can drop them in without copying
   // the JSX five times.
+  // Role pill — small badge next to the sender name showing whether
+  // the author is a neighborhood moderator, platform mod, or super
+  // admin. Mirrors the moderation badge already shown elsewhere in
+  // the app so users learn the same color language across surfaces.
+  const role = message.author.role
+  const rolePillCfg = (() => {
+    if (role === 'SUPER_ADMIN') return {
+      labelAr: 'مشرف عام', labelEn: 'Admin',
+      cls: 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60',
+    }
+    if (role === 'PLATFORM_MOD') return {
+      labelAr: 'مشرف', labelEn: 'Mod',
+      cls: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800/60',
+    }
+    if (role === 'NEIGHBORHOOD_MOD') return {
+      labelAr: 'مشرف الحي', labelEn: 'Hood Mod',
+      cls: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60',
+    }
+    return null
+  })()
+
   const senderHeader = (!isMe && isFirstInGroup) ? (
-    <button
-      type="button"
-      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAvatarTap(message.author.id) }}
-      className="block mb-1 text-[12.5px] font-bold text-primary-600 dark:text-primary-400 inline-flex items-center gap-1 active:opacity-70 transition-opacity"
-    >
-      <span className="truncate max-w-[200px]">{authorName}</span>
-      {isVerified && (
+    <div className="flex items-center gap-1.5 mb-1">
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAvatarTap(message.author.id) }}
+        className="text-[12.5px] font-bold text-primary-600 dark:text-primary-400 inline-flex items-center gap-1 active:opacity-70 transition-opacity"
+      >
+        <span className="truncate max-w-[180px]">{authorName}</span>
+        {isVerified && (
+          <span
+            className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300"
+            aria-label={lang === 'en' ? 'Verified resident' : 'ساكن مؤكد'}
+            title={lang === 'en' ? 'Verified resident' : 'ساكن مؤكد'}
+          >
+            <FiCheck className="w-2 h-2" strokeWidth={3} />
+          </span>
+        )}
+      </button>
+      {rolePillCfg && (
         <span
-          className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300"
-          aria-label={lang === 'en' ? 'Verified resident' : 'ساكن مؤكد'}
-          title={lang === 'en' ? 'Verified resident' : 'ساكن مؤكد'}
+          className={`inline-flex items-center px-1.5 py-[1px] rounded-full text-[9.5px] font-bold border ${rolePillCfg.cls}`}
         >
-          <FiCheck className="w-2 h-2" strokeWidth={3} />
+          {lang === 'en' ? rolePillCfg.labelEn : rolePillCfg.labelAr}
         </span>
       )}
-    </button>
+    </div>
   ) : null
 
   const footerTone = isMe
     ? 'text-white/65'
     : 'text-gray-500 dark:text-gray-400'
-  const footerArrowTone = isMe
-    ? 'text-white/65 hover:text-white'
-    : 'text-gray-400 hover:text-primary-600 dark:hover:text-primary-400'
+
+  // Standalone reply arrow, rendered OUTSIDE the bubble — beside it
+  // on the side opposite the avatar. Bigger / more obvious than the
+  // tiny chevron we used to tuck into the footer line. Always
+  // visible (except on DELETED tombstones).
+  const replyArrowButton = message.type !== 'DELETED' ? (
+    <button
+      type="button"
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onQuickReply(message) }}
+      aria-label={lang === 'en' ? 'Reply' : 'رد'}
+      title={lang === 'en' ? 'Reply' : 'رد'}
+      className="flex-shrink-0 self-end inline-flex items-center justify-center w-9 h-9 rounded-full bg-white dark:bg-[#242625] border border-gray-200 dark:border-gray-700 text-primary-600 dark:text-primary-400 shadow-sm hover:bg-primary-50 dark:hover:bg-primary-900/30 active:scale-90 transition-all"
+    >
+      <FiCornerUpLeft className="w-4 h-4" strokeWidth={2.5} />
+    </button>
+  ) : null
   const metaFooter = isLastInGroup ? (
     <p
       className={`text-[10.5px] mt-1.5 inline-flex items-center gap-1.5 ${footerTone} ${
         isMe ? 'ltr:justify-start rtl:justify-start' : 'ltr:justify-end rtl:justify-end'
       }`}
     >
-      {message.type !== 'DELETED' && (
-        <button
-          type="button"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onQuickReply(message) }}
-          className={`inline-flex items-center justify-center w-4 h-4 rounded-full active:scale-95 transition-colors ${footerArrowTone}`}
-          aria-label={lang === 'en' ? 'Reply' : 'رد'}
-          title={lang === 'en' ? 'Reply' : 'رد'}
-        >
-          <FiCornerUpLeft className="w-3 h-3" strokeWidth={2.5} />
-        </button>
-      )}
       {message.notificationFiredAt && (
         <span
           className={`inline-flex items-center justify-center w-3.5 h-3.5 rounded-full ${
@@ -303,6 +335,12 @@ export default function SquareBubble({
               lang={lang}
             />
           )}
+          {/* Reply arrow for OWN messages — sits BEFORE the bubble
+              column in the DOM, which places it on the LEFT of the
+              bubble in LTR and (via flex-row-reverse) on the RIGHT
+              in RTL. Either way it lands on the side opposite our
+              avatar (which is the trailing edge). */}
+          {isMe && replyArrowButton}
 
           {/* Bubble column. Content-sized (no flex-1, no min-w-0 —
               min-w-0 was letting break-words shred single Arabic
@@ -576,6 +614,12 @@ export default function SquareBubble({
               per-type bubble above. */}
         </div>
 
+        {/* Reply arrow for OTHER messages — sits AFTER the bubble
+            column. In LTR this lands on the bubble's RIGHT (opposite
+            the avatar on the left); in RTL with flex-row-reverse it
+            visually lands on the LEFT (opposite the avatar on the
+            right). Either way it's on the trailing/outer edge. */}
+        {!isMe && replyArrowButton}
         {/* Own avatar — matches the other-user slot but rendered AFTER
             the bubble column so it lands on the row's outer edge
             (right of own bubble in both LTR and RTL). Same isLastInGroup
