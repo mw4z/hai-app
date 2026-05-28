@@ -1,13 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { FiChevronDown } from 'react-icons/fi'
 import type { ServiceCategory } from '@prisma/client'
 import { useLanguage } from '@/hooks/useLanguage'
+import { hapticLight } from '@/lib/haptic'
 import HaiLoader from '@/components/HaiLoader'
 import ServiceContactCard from '@/components/places/ServiceContactCard'
 import { SERVICE_CATEGORIES } from '@/lib/services/serviceCategories'
 import type { PublicServiceContact } from '@/lib/services/serializeServiceContact'
+import CategoryPickerSheet, { type CategoryOption } from '@/components/CategoryPickerSheet'
 
 /** "خدمات وأرقام" tab of the directory — community service contacts.
  *  Self-contained: own search + category filter + fetch. The "add"
@@ -20,11 +23,35 @@ export default function ServiceContactsPanel({
   isReadOnly?: boolean
   browseNeighborhoodId?: string | null
 }) {
-  const { lang } = useLanguage()
+  const { lang, t } = useLanguage()
   const tr = (en: string, ar: string, ur: string) => (lang === 'en' ? en : lang === 'ur' ? ur : ar)
 
   const [q, setQ] = useState('')
   const [category, setCategory] = useState<ServiceCategory | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  const allLabel = t('categories_browse_all')
+  const currentCat = useMemo(
+    () => (category ? SERVICE_CATEGORIES.find((c) => c.key === category) ?? null : null),
+    [category],
+  )
+  const currentEmoji = currentCat?.emoji ?? '📇'
+  const currentLabel = currentCat
+    ? lang === 'en' ? currentCat.labelEn : lang === 'ur' ? currentCat.labelUr : currentCat.labelAr
+    : allLabel
+  const isFiltered = category !== null
+
+  const pickerOptions = useMemo<CategoryOption[]>(
+    () => [
+      { value: null, emoji: '📇', label: allLabel },
+      ...SERVICE_CATEGORIES.map<CategoryOption>((c) => ({
+        value: c.key,
+        emoji: c.emoji,
+        label: lang === 'en' ? c.labelEn : lang === 'ur' ? c.labelUr : c.labelAr,
+      })),
+    ],
+    [lang, allLabel],
+  )
   const [contacts, setContacts] = useState<PublicServiceContact[]>([])
   const [viewerId, setViewerId] = useState<string | null>(null)
   const [canModerate, setCanModerate] = useState(false)
@@ -99,26 +126,39 @@ export default function ServiceContactsPanel({
         )}
       </div>
 
-      {/* Service-category chips */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
-        <button
-          type="button"
-          onClick={() => setCategory(null)}
-          className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold ${category === null ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
-        >
-          {tr('All', 'الكل', 'سب')}
-        </button>
-        {SERVICE_CATEGORIES.map((c) => (
-          <button
-            key={c.key}
-            type="button"
-            onClick={() => setCategory((cur) => (cur === c.key ? null : c.key))}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap ${category === c.key ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
-          >
-            {c.emoji} {lang === 'en' ? c.labelEn : lang === 'ur' ? c.labelUr : c.labelAr}
-          </button>
-        ))}
-      </div>
+      {/* Service-category picker — one dropdown trigger that opens
+          the bottom-sheet vertical list. Same affordance as the Places
+          tab + the Feed so the elderly / low-tech audience never has
+          to swipe a hidden chip row to find a category. */}
+      <button
+        type="button"
+        onClick={() => { hapticLight(); setPickerOpen(true) }}
+        aria-haspopup="dialog"
+        aria-expanded={pickerOpen}
+        className={`w-full inline-flex items-center justify-between gap-2 px-4 py-3 rounded-xl text-[15px] font-bold transition-colors active:scale-[0.98] shadow-[0_2px_10px_rgba(14,165,233,0.12)] ${
+          isFiltered
+            ? 'bg-primary-100 dark:bg-primary-900/35 border-2 border-primary-500 dark:border-primary-500 text-primary-900 dark:text-primary-100'
+            : 'bg-primary-50 dark:bg-primary-900/20 border-2 border-primary-300 dark:border-primary-700/60 text-gray-900 dark:text-white'
+        }`}
+      >
+        <span className="inline-flex items-center gap-2.5 min-w-0">
+          <span className="text-lg flex-shrink-0" aria-hidden>{currentEmoji}</span>
+          <span className="truncate">{currentLabel}</span>
+        </span>
+        <FiChevronDown
+          className={`w-5 h-5 flex-shrink-0 text-primary-600 dark:text-primary-300 transition-transform ${
+            pickerOpen ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
+      <CategoryPickerSheet
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        selected={category}
+        onSelect={(v) => setCategory(v as ServiceCategory | null)}
+        title={t('categories_pick_dir')}
+        options={pickerOptions}
+      />
 
       {loading ? (
         <div className="py-2"><HaiLoader size="md" /></div>
