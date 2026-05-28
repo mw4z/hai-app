@@ -22,6 +22,7 @@ import { fullName } from '@/lib/displayName'
 import HighlightsSection, { type HighlightItemPayload } from '@/components/HighlightsSection'
 import HomeActionCard from '@/components/feed/HomeActionCard'
 import FirstRunGuide from '@/components/FirstRunGuide'
+import CategoryPickerSheet, { type CategoryOption } from '@/components/CategoryPickerSheet'
 
 // v2 filter chips — REQUESTS is a special intent-based chip (not a
 // PostCategory value) elevated to position 2 to surface request
@@ -214,6 +215,10 @@ export default function FeedClient({
   const [openRides, setOpenRides] = useState<any[]>(initialRides)
   const [polls, setPolls] = useState<any[]>(initialPolls)
   const [showFilter, setShowFilter] = useState(false)
+  /** When true, the bottom-sheet category picker is mounted —
+   *  the discoverable replacement for "scroll the chip row to
+   *  find your category." See <CategoryPickerSheet>. */
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false)
   // Poll-creation state (showPollForm / pollQuestion / pollOptions /
   // pollLoading) was removed when the admin poll form moved to its
   // own /polls/new page. Surface is now reachable via the BottomNav
@@ -554,8 +559,13 @@ export default function FeedClient({
           </Link>
         </div>
 
-        {/* Category Tabs */}
-        <div data-tour="categories" className="hai-row-2 hai-pb-2 hai-ps-4">
+        {/* Category Tabs. Layout: leading filter icon · scrollable chip
+            strip (flex-1) · trailing "All categories" pill. The trailing
+            pill is the explicit discoverability anchor — non-tech users
+            who don't realise the chips scroll horizontally still see one
+            obviously-tappable button and get a vertical list of every
+            category via CategoryPickerSheet. */}
+        <div data-tour="categories" className="hai-row-2 hai-pb-2 hai-ps-4 hai-pe-4">
           {/* Filter icon — always visible */}
           <button
             onClick={() => setShowFilter(!showFilter)}
@@ -568,7 +578,7 @@ export default function FeedClient({
             )}
           </button>
           {/* Category tabs */}
-          <div className="hai-row-2 hai-overflow-x-auto hai-flex-1 hai-pe-4 hai-tabs-mask">
+          <div className="hai-row-2 hai-overflow-x-auto hai-flex-1 hai-tabs-mask">
             {categories.map((cat) => {
               // Presence dot — NOT a count. Reads as "there's recent
               // activity in this filter" rather than "X unread", so
@@ -614,6 +624,19 @@ export default function FeedClient({
               )
             })}
           </div>
+          {/* Trailing "All categories" pill — gradient + emoji so it
+              reads as a distinct affordance, not just another chip.
+              Always visible (sits outside the scrollable area). */}
+          <button
+            type="button"
+            onClick={() => { hapticLight(); setCategoryPickerOpen(true) }}
+            className="hai-shrink-0 ms-1 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-primary-500 to-emerald-500 text-white shadow-[0_2px_8px_rgba(16,185,129,0.35)] active:scale-95 transition-transform"
+            aria-label={t('categories_browse_all')}
+            title={t('categories_browse_all')}
+          >
+            <span aria-hidden>📂</span>
+            <span>{t('categories_browse_all')}</span>
+          </button>
         </div>
         {/* Filter panel (expands below tabs) */}
         {showFilter && (
@@ -1015,6 +1038,23 @@ export default function FeedClient({
         allNeighborhoods={lazyNeighborhoods.length > 0 ? lazyNeighborhoods : allNeighborhoods}
         loading={loadingNeighborhoods && lazyNeighborhoods.length === 0}
         isReadOnly={isReadOnly}
+      />
+
+      {/* Bottom-sheet replacement for the horizontally-scrolling chip
+          row. Built from the same CATEGORIES list so the order matches
+          what the chip strip shows. Tapping a row applies the filter
+          and closes — one-tap commit. */}
+      <CategoryPickerSheet
+        open={categoryPickerOpen}
+        onClose={() => setCategoryPickerOpen(false)}
+        selected={selectedCategory === 'ALL' ? null : selectedCategory}
+        onSelect={(v) => { hapticLight(); handleCategoryChange(v ?? 'ALL') }}
+        title={t('categories_pick_feed')}
+        options={categories.map<CategoryOption>((c) => ({
+          value: c.key === 'ALL' ? null : c.key,
+          emoji: c.icon,
+          label: t(c.tKey),
+        }))}
       />
     </div>
   )
