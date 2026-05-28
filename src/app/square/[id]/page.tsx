@@ -29,7 +29,11 @@ export default async function SquareThreadDetailPage({ params }: Params) {
   if (!isSquareAdminRole(user.role)) notFound()
 
   const { id } = await params
-  const row = await db.squareThread.findUnique({
+  // Graceful failure if the table doesn't exist yet (migration not
+  // applied). A 404 reads to the user as "thread not found" — the
+  // best fallback when there's literally no data to show. Lambda
+  // wrapper preserves the include shape for downstream type checks.
+  const fetchThread = () => db.squareThread.findUnique({
     where: { id },
     include: {
       author: {
@@ -40,6 +44,12 @@ export default async function SquareThreadDetailPage({ params }: Params) {
       },
     },
   })
+  let row: Awaited<ReturnType<typeof fetchThread>> = null
+  try {
+    row = await fetchThread()
+  } catch (err) {
+    console.error('[square] thread fetch failed — migration may not be applied yet', err)
+  }
   if (!row) notFound()
   // Neighborhood scope — same-hood only, unless PLATFORM_MOD / SUPER.
   if (
@@ -48,25 +58,33 @@ export default async function SquareThreadDetailPage({ params }: Params) {
     user.role !== 'SUPER_ADMIN'
   ) notFound()
 
-  const [replies, follow] = await Promise.all([
-    db.squareReply.findMany({
-      where: { threadId: id, status: 'ACTIVE' },
-      orderBy: { createdAt: 'asc' },
-      take: FIRST_REPLY_PAGE + 1,
-      include: {
-        author: {
-          select: {
-            id: true, name: true, lastName: true, avatarUrl: true,
-            reputation: true, membership: true, role: true,
-          },
+  // Replies + follow lookup — same graceful-failure pattern as the
+  // thread fetch, lambdas preserve the include shape for the
+  // serializer's downstream type checks.
+  const fetchReplies = () => db.squareReply.findMany({
+    where: { threadId: id, status: 'ACTIVE' as const },
+    orderBy: { createdAt: 'asc' as const },
+    take: FIRST_REPLY_PAGE + 1,
+    include: {
+      author: {
+        select: {
+          id: true, name: true, lastName: true, avatarUrl: true,
+          reputation: true, membership: true, role: true,
         },
       },
-    }),
-    db.squareFollow.findUnique({
-      where: { threadId_userId: { threadId: id, userId: user.id } },
-      select: { id: true },
-    }),
-  ])
+    },
+  })
+  const fetchFollow = () => db.squareFollow.findUnique({
+    where: { threadId_userId: { threadId: id, userId: user.id } },
+    select: { id: true },
+  })
+  let replies: Awaited<ReturnType<typeof fetchReplies>> = []
+  let follow: Awaited<ReturnType<typeof fetchFollow>> = null
+  try {
+    [replies, follow] = await Promise.all([fetchReplies(), fetchFollow()])
+  } catch (err) {
+    console.error('[square] replies/follow fetch failed', err)
+  }
 
   const hasMoreReplies = replies.length > FIRST_REPLY_PAGE
   const replySlice = hasMoreReplies ? replies.slice(0, FIRST_REPLY_PAGE) : replies

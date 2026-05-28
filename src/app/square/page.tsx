@@ -33,14 +33,19 @@ export default async function SquarePage() {
   if (!user.neighborhoodId) notFound()
   if (!isSquareAdminRole(user.role)) notFound()
 
-  const rows = await db.squareThread.findMany({
+  // Graceful failure if the SquareThread table isn't there yet (deploy
+  // ordering: code can ship before the manual migration is applied —
+  // see the runbook in the PR / project memory). The page renders the
+  // empty state instead of crashing with a 500. The lambda preserves
+  // the include shape so TypeScript still sees `row.author` downstream.
+  const fetchThreadRows = () => db.squareThread.findMany({
     where: {
-      neighborhoodId: user.neighborhoodId,
-      status: 'ACTIVE',
+      neighborhoodId: user.neighborhoodId!,
+      status: 'ACTIVE' as const,
     },
     orderBy: [
-      { isPinned: 'desc' },
-      { lastActivityAt: 'desc' },
+      { isPinned: 'desc' as const },
+      { lastActivityAt: 'desc' as const },
     ],
     take: PAGE_SIZE + 1,
     include: {
@@ -52,15 +57,27 @@ export default async function SquarePage() {
       },
     },
   })
+  let rows: Awaited<ReturnType<typeof fetchThreadRows>> = []
+  try {
+    rows = await fetchThreadRows()
+  } catch (err) {
+    console.error('[square] list query failed — migration may not be applied yet', err)
+  }
 
   const hasMore = rows.length > PAGE_SIZE
   const slice = hasMore ? rows.slice(0, PAGE_SIZE) : rows
-  const followingThreadIds = new Set(
-    (await db.squareFollow.findMany({
-      where: { userId: user.id, threadId: { in: slice.map((t) => t.id) } },
-      select: { threadId: true },
-    })).map((f) => f.threadId),
-  )
+  let followingThreadIds = new Set<string>()
+  if (slice.length > 0) {
+    try {
+      const follows = await db.squareFollow.findMany({
+        where: { userId: user.id, threadId: { in: slice.map((t) => t.id) } },
+        select: { threadId: true },
+      })
+      followingThreadIds = new Set(follows.map((f) => f.threadId))
+    } catch (err) {
+      console.error('[square] follow query failed', err)
+    }
+  }
   const initialThreads: PublicSquareThread[] = slice.map((row) =>
     serializeSquareThread(row, { viewerId: user.id, followingThreadIds }),
   )

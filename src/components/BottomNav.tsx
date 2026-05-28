@@ -24,11 +24,28 @@ const NAV_ITEMS_DEFAULT: NavItem[] = [
   { key: 'profile', href: '/profile', icon: FiUser,          tKey: 'nav_profile' },
 ]
 
-/** Admin variant of the bottom nav — replaces the Market slot with the
- *  staged-rollout الساحة (Square) entry. Same 4-tabs + FAB layout so
- *  no CSS/markup churn; flipping the feature open to all users will
- *  replace this with the default array and add Market back as a 5th
- *  slot OR a tertiary entry. */
+/**
+ * Admin-only bottom-nav variant for the staged الساحة (Square) rollout.
+ *
+ *   ──────────────────────────────────────────────────────────────────
+ *   ⚠️ TEMPORARY: Market is swapped out for Square IN THIS ARRAY ONLY.
+ *   ──────────────────────────────────────────────────────────────────
+ *   - Only admins (NEIGHBORHOOD_MOD / PLATFORM_MOD / SUPER_ADMIN) ever
+ *     hit this branch — regular residents keep NAV_ITEMS_DEFAULT
+ *     completely unchanged (Feed / Market / Threads / Profile).
+ *   - Why Market: it's the most easily re-reachable surface (feed
+ *     category chip, Market page link in profile, deep links). Threads
+ *     and Profile are higher-frequency primary destinations, so they
+ *     stay.
+ *   - When Square opens to all residents, the plan is to add Market
+ *     back as a 5th slot (or a tertiary entry) and drop this special-
+ *     case array. There is NO production change to the resident nav
+ *     between then and now — every code path for non-admin users runs
+ *     through NAV_ITEMS_DEFAULT.
+ *
+ * TODO(square-ga): when Square exits staged rollout, delete this array
+ *                  and unify the nav (Market kept, Square added).
+ */
 const NAV_ITEMS_ADMIN: NavItem[] = [
   { key: 'feed',    href: '/feed',    icon: FiHome,          tKey: 'nav_feed'    },
   { key: 'square',  href: '/square',  icon: FiCompass,       tKey: 'nav_square'  },

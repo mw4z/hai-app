@@ -46,42 +46,48 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url)
   const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0)
 
-  const rows = await db.squareThread.findMany({
-    where: {
-      neighborhoodId: me.neighborhoodId,
-      status: 'ACTIVE',
-    },
-    orderBy: [
-      { isPinned: 'desc' },
-      { lastActivityAt: 'desc' },
-    ],
-    skip: offset,
-    take: PAGE_SIZE + 1,
-    include: {
-      author: {
-        select: {
-          id: true, name: true, lastName: true, avatarUrl: true,
-          reputation: true, membership: true, role: true,
+  // Graceful failure if the migration hasn't been applied yet — the
+  // endpoint returns an empty list instead of bubbling a 500.
+  try {
+    const rows = await db.squareThread.findMany({
+      where: {
+        neighborhoodId: me.neighborhoodId,
+        status: 'ACTIVE',
+      },
+      orderBy: [
+        { isPinned: 'desc' },
+        { lastActivityAt: 'desc' },
+      ],
+      skip: offset,
+      take: PAGE_SIZE + 1,
+      include: {
+        author: {
+          select: {
+            id: true, name: true, lastName: true, avatarUrl: true,
+            reputation: true, membership: true, role: true,
+          },
         },
       },
-    },
-  })
+    })
 
-  const hasMore = rows.length > PAGE_SIZE
-  const slice = hasMore ? rows.slice(0, PAGE_SIZE) : rows
+    const hasMore = rows.length > PAGE_SIZE
+    const slice = hasMore ? rows.slice(0, PAGE_SIZE) : rows
 
-  // Single follow lookup for the page.
-  const followingThreadIds = new Set(
-    (await db.squareFollow.findMany({
-      where: { userId: me.id, threadId: { in: slice.map((t) => t.id) } },
-      select: { threadId: true },
-    })).map((f) => f.threadId),
-  )
+    const followingThreadIds = new Set(
+      (await db.squareFollow.findMany({
+        where: { userId: me.id, threadId: { in: slice.map((t) => t.id) } },
+        select: { threadId: true },
+      })).map((f) => f.threadId),
+    )
 
-  const threads: PublicSquareThread[] = slice.map((row) =>
-    serializeSquareThread(row, { viewerId: me.id, followingThreadIds }),
-  )
-  return NextResponse.json({ threads, hasMore })
+    const threads: PublicSquareThread[] = slice.map((row) =>
+      serializeSquareThread(row, { viewerId: me.id, followingThreadIds }),
+    )
+    return NextResponse.json({ threads, hasMore })
+  } catch (err) {
+    console.error('[square] GET /api/square failed', err)
+    return NextResponse.json({ threads: [], hasMore: false })
+  }
 }
 
 /**
