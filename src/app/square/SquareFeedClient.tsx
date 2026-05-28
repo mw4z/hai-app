@@ -563,36 +563,41 @@ function SquareActionSheet({
             {lang === 'en' ? 'Copy text' : 'نسخ النص'}
           </span>
         </button>
-        {canConvertToPost && (
-          <button
-            type="button"
-            onClick={onConvertToPost}
-            className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-gray-50 dark:active:bg-gray-800/60 text-start"
-          >
-            <FiEdit3 className="w-5 h-5 text-primary-600" />
-            <span className="text-[15px] font-semibold text-gray-900 dark:text-white">
-              {lang === 'en' ? 'Convert to a post' : 'حوّلها إلى منشور'}
-            </span>
-          </button>
+        {/* Promoted action pills — convert-to-post + notify-neighbors
+            sit at the top of the row stack as prominent primary /
+            amber tiles, NOT regular menu rows. Matches the "post"
+            and "broadcast" affordance language elsewhere in the
+            app so the eye lands on them immediately. */}
+        {(canConvertToPost || canNotifyNeighbors) && (
+          <div className="px-4 pt-2 pb-1 flex gap-2">
+            {canConvertToPost && (
+              <button
+                type="button"
+                onClick={onConvertToPost}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3 rounded-2xl bg-primary-600 text-white text-[13.5px] font-bold shadow-sm active:scale-[0.98] transition-transform"
+              >
+                <FiEdit3 className="w-4 h-4" />
+                <span>{lang === 'en' ? 'Make a post' : 'حوّلها لمنشور'}</span>
+              </button>
+            )}
+            {canNotifyNeighbors && (
+              <button
+                type="button"
+                onClick={onNotifyNeighbors}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3 rounded-2xl bg-amber-500 text-white text-[13.5px] font-bold shadow-sm active:scale-[0.98] transition-transform"
+              >
+                <FiBell className="w-4 h-4" />
+                <span>{lang === 'en' ? 'Broadcast' : 'نبّه الحي'}</span>
+              </button>
+            )}
+          </div>
         )}
         {canNotifyNeighbors && (
-          <button
-            type="button"
-            onClick={onNotifyNeighbors}
-            className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-gray-50 dark:active:bg-gray-800/60 text-start"
-          >
-            <FiBell className="w-5 h-5 text-amber-500" />
-            <span className="flex-1">
-              <span className="block text-[15px] font-semibold text-gray-900 dark:text-white">
-                {lang === 'en' ? 'Notify neighbors' : 'نبّه الجيران'}
-              </span>
-              <span className="block text-[11.5px] text-gray-500 dark:text-gray-400 mt-0.5">
-                {lang === 'en'
-                  ? 'One per message · one per 24 hours'
-                  : 'مرة لكل رسالة · مرة كل 24 ساعة'}
-              </span>
-            </span>
-          </button>
+          <p className="px-5 -mt-0.5 pb-1.5 text-[10.5px] text-gray-400 dark:text-gray-500 leading-relaxed">
+            {lang === 'en'
+              ? 'Broadcast: one per message · one per 24 hours'
+              : 'التنبيه: مرة لكل رسالة · مرة كل 24 ساعة'}
+          </p>
         )}
         {!isOwn && (
           <button

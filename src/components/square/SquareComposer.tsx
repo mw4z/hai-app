@@ -265,10 +265,11 @@ export default function SquareComposer({
                   })
                   router.push(href)
                 }}
-                className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-bold text-amber-800 dark:text-amber-200 active:scale-95 transition-transform"
+                className="mt-2 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold bg-primary-600 text-white shadow-sm active:scale-[0.98] transition-transform"
               >
+                <span aria-hidden>📝</span>
                 <span>{lang === 'en' ? 'Convert to a post' : 'حوّلها إلى منشور'}</span>
-                <FiArrowRight className={`w-3.5 h-3.5 ${lang !== 'en' ? 'rotate-180' : ''}`} />
+                <FiArrowRight className={`w-4 h-4 ${lang !== 'en' ? 'rotate-180' : ''}`} />
               </button>
             )}
           </div>
