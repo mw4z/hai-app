@@ -289,6 +289,43 @@ input, textarea, [contenteditable="true"] {
   .glow-ask, .dark .glow-ask { animation: none; }
 }
 
+/* Directory banner pulse — emerald/teal counterpoint to the sky-blue
+   .glow-ask, so the top-of-feed دليل الحي card visibly "breathes" and
+   pulls the eye first. */
+.glow-directory {
+  animation: hai-directory-glow 2.6s ease-in-out infinite;
+}
+.dark .glow-directory {
+  animation-name: hai-directory-glow-dark;
+}
+@keyframes hai-directory-glow {
+  0%, 100% {
+    box-shadow:
+      0 4px 14px rgba(16, 185, 129, 0.30),
+      0 0 0 2px rgba(16, 185, 129, 0.12);
+  }
+  50% {
+    box-shadow:
+      0 8px 24px rgba(16, 185, 129, 0.45),
+      0 0 0 3px rgba(16, 185, 129, 0.22);
+  }
+}
+@keyframes hai-directory-glow-dark {
+  0%, 100% {
+    box-shadow:
+      0 4px 14px rgba(52, 211, 153, 0.28),
+      0 0 0 2px rgba(52, 211, 153, 0.12);
+  }
+  50% {
+    box-shadow:
+      0 8px 24px rgba(52, 211, 153, 0.42),
+      0 0 0 3px rgba(52, 211, 153, 0.22);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glow-directory, .dark .glow-directory { animation: none; }
+}
+
 /* Notification/badge glow */
 .glow-badge {
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.4), 0 0 20px rgba(239, 68, 68, 0.15);

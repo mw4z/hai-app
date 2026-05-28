@@ -52,19 +52,30 @@ export default function DirectoryEntryCard({
     )
   }
 
+  const cta =
+    lang === 'en' ? 'Open' : lang === 'ur' ? 'کھولیں' : 'افتح'
+
   return (
     <Link
       href={href}
-      className="flex items-center justify-between gap-3 rounded-2xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800/60 px-4 py-3 active:scale-[0.99] transition-transform"
+      className="glow-directory relative flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 dark:from-emerald-600 dark:via-teal-600 dark:to-cyan-700 px-5 py-4 active:scale-[0.99] transition-transform overflow-hidden"
     >
-      <div className="flex items-center gap-2.5">
-        <span className="text-xl" aria-hidden>🏘️</span>
+      {/* Soft top-corner highlight — gives the card depth and a sun-lit
+          feel so it reads as raised, not flat coloured. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.28),transparent_60%)]"
+      />
+      <div className="relative flex items-center gap-3.5">
+        <span className="text-3xl drop-shadow-md" aria-hidden>🏘️</span>
         <div className="leading-tight">
-          <p className="text-sm font-bold text-primary-900 dark:text-primary-200">{title}</p>
-          <p className="text-[11px] text-primary-700/80 dark:text-primary-300/70">{subtitle}</p>
+          <p className="text-base font-extrabold text-white drop-shadow-sm">{title}</p>
+          <p className="text-[12px] text-white/90 mt-0.5">{subtitle}</p>
         </div>
       </div>
-      <span className="text-primary-600 dark:text-primary-400 text-sm">›</span>
+      <span className="relative bg-white text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm flex-shrink-0">
+        {cta}
+      </span>
     </Link>
   )
 }

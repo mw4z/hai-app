@@ -734,45 +734,21 @@ export default function FeedClient({
         </div>
       )}
 
-      {/* Quick Ask bar — only in own neighborhood */}
-      {!isReadOnly && (
-        <div className="px-4 pt-4">
-          {/* Plain button — NOT a real input. The previous <input
-              readOnly> trigger caused the browser to auto-scroll the
-              feed when the keyboard pushed the input out of the
-              viewport. With a button there's no native focus, no
-              scroll-into-view, no keyboard rise on the trigger
-              itself — the sheet's textarea is what raises the
-              keyboard, and it does so as soon as the sheet flips
-              display: block (see useLayoutEffect in QuickAskSheet). */}
-          <button
-            data-tour="new-post"
-            data-firstrun="post"
-            type="button"
-            onClick={() => {
-              // Order matters on iOS:
-              //   1) focus the textarea SYNCHRONOUSLY inside the
-              //      tap's gesture chain — that's what raises the
-              //      WKWebView keyboard. The textarea is always in
-              //      the DOM thanks to QuickAskSheet's pre-mount
-              //      + translateY hide pattern.
-              //   2) preventScroll:true is REQUIRED on iOS — without
-              //      it, iOS WKWebView scrolls the document down to
-              //      try to show the offscreen translateY(110%)
-              //      textarea, which is what produced the 'feed
-              //      scrolls down' bug.
-              //   3) THEN set showAsk so React can flip the sheet's
-              //      transform: translateY(110%) → translateY(0) in
-              //      the next frame.
-              askTextareaRef.current?.focus({ preventScroll: true })
-              setShowAsk(true)
-            }}
-            className="glow-ask w-full flex items-center gap-3 bg-white border border-sky-100 rounded-2xl px-4 py-3 transition-shadow"
-          >
-            <span className="text-lg">🔎</span>
-            <span className="flex-1 text-start text-sm text-gray-400">{t('feed_ask_placeholder')}</span>
-            <span className="text-xs bg-sky-600 text-white px-3 py-1 rounded-full font-medium flex-shrink-0">{t('feed_quick_ask_btn')}</span>
-          </button>
+      {/* Neighborhood Directory CTA — gated entirely on
+          NEXT_PUBLIC_DIRECTORY_ENABLED. When the flag is unset
+          (default), DirectoryEntryCard returns null and this
+          wrapping div renders an empty fragment — no visual
+          residue, no extra spacing. Shown only on the ALL chip
+          so it doesn't clutter category filters.
+          When the feed is in cross-neighborhood browse mode,
+          forward the same nbhd id to /directory so the link
+          stays in browse context. */}
+      {selectedCategory === 'ALL' && (
+        <div className="px-4 pt-3">
+          <DirectoryEntryCard
+            variant="card"
+            browseNeighborhoodId={isReadOnly ? browseNeighborhood?.id ?? null : null}
+          />
         </div>
       )}
 
@@ -848,21 +824,45 @@ export default function FeedClient({
         </div>
       )}
 
-      {/* Neighborhood Directory CTA — gated entirely on
-          NEXT_PUBLIC_DIRECTORY_ENABLED. When the flag is unset
-          (default), DirectoryEntryCard returns null and this
-          wrapping div renders an empty fragment — no visual
-          residue, no extra spacing. Shown only on the ALL chip
-          so it doesn't clutter category filters.
-          When the feed is in cross-neighborhood browse mode,
-          forward the same nbhd id to /directory so the link
-          stays in browse context. */}
-      {selectedCategory === 'ALL' && (
-        <div className="px-4 pt-3">
-          <DirectoryEntryCard
-            variant="card"
-            browseNeighborhoodId={isReadOnly ? browseNeighborhood?.id ?? null : null}
-          />
+      {/* Quick Ask bar — only in own neighborhood */}
+      {!isReadOnly && (
+        <div className="px-4 pt-4">
+          {/* Plain button — NOT a real input. The previous <input
+              readOnly> trigger caused the browser to auto-scroll the
+              feed when the keyboard pushed the input out of the
+              viewport. With a button there's no native focus, no
+              scroll-into-view, no keyboard rise on the trigger
+              itself — the sheet's textarea is what raises the
+              keyboard, and it does so as soon as the sheet flips
+              display: block (see useLayoutEffect in QuickAskSheet). */}
+          <button
+            data-tour="new-post"
+            data-firstrun="post"
+            type="button"
+            onClick={() => {
+              // Order matters on iOS:
+              //   1) focus the textarea SYNCHRONOUSLY inside the
+              //      tap's gesture chain — that's what raises the
+              //      WKWebView keyboard. The textarea is always in
+              //      the DOM thanks to QuickAskSheet's pre-mount
+              //      + translateY hide pattern.
+              //   2) preventScroll:true is REQUIRED on iOS — without
+              //      it, iOS WKWebView scrolls the document down to
+              //      try to show the offscreen translateY(110%)
+              //      textarea, which is what produced the 'feed
+              //      scrolls down' bug.
+              //   3) THEN set showAsk so React can flip the sheet's
+              //      transform: translateY(110%) → translateY(0) in
+              //      the next frame.
+              askTextareaRef.current?.focus({ preventScroll: true })
+              setShowAsk(true)
+            }}
+            className="glow-ask w-full flex items-center gap-3 bg-white border border-sky-100 rounded-2xl px-4 py-3 transition-shadow"
+          >
+            <span className="text-lg">🔎</span>
+            <span className="flex-1 text-start text-sm text-gray-400">{t('feed_ask_placeholder')}</span>
+            <span className="text-xs bg-sky-600 text-white px-3 py-1 rounded-full font-medium flex-shrink-0">{t('feed_quick_ask_btn')}</span>
+          </button>
         </div>
       )}
 
