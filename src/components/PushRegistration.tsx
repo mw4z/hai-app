@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { showPushToast } from './PushToast'
 
 /**
@@ -18,6 +19,12 @@ import { showPushToast } from './PushToast'
 export default function PushRegistration() {
   const registeredRef = useRef(false)
   const deeplinkReadyRef = useRef(false)
+  const router = useRouter()
+  // Keep the latest router in a ref so the eager listener (which
+  // installs once and lives for the page's lifetime) always calls
+  // the current instance rather than capturing a stale closure.
+  const routerRef = useRef(router)
+  routerRef.current = router
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -98,37 +105,63 @@ export default function PushRegistration() {
               // and retry once on the next tick if the URL didn't move.
               // assign() is more reliable than href= on Capacitor (forces
               // a navigation even when the WebView is mid-load).
-              // Cold-start race fix v2: WKWebView silently drops the
-              // initial assign() AND can drop the first ~1-2s of retries
-              // while it finishes hydrating React + applying Capacitor
-              // bridge setup. The previous "1 retry @ 400ms" left the
-              // user on /feed when the iOS WebView swallowed both
-              // attempts — the symptom is "DM push opens but lands on
-              // feed not the conversation."
+              // Cold-start race fix v3: WKWebView silently drops the
+              // initial assign() while React is still hydrating + the
+              // Capacitor bridge is wiring up, which left users on
+              // /feed instead of the DM (symptom: "tap push, opens
+              // app, lands on feed not the conversation").
               //
-              // Now: assign() immediately, then keep verifying every
-              // 250ms for up to ~4s, re-firing assign() any time the
-              // URL hasn't moved. Idempotent — once we're on the
-              // target, the loop short-circuits. Bails after 16 tries
-              // so we don't fight a router that legitimately put the
-              // user somewhere else (e.g. /login interstitial).
+              // Two-layer strategy:
+              //   1. Try Next.js's client-side router first
+              //      (history.pushState — NEVER dropped by WKWebView
+              //      because it doesn't touch the WebView's
+              //      navigation pipeline at all).
+              //   2. If after 500ms we still haven't landed on the
+              //      target (e.g. the route didn't match a Next page
+              //      so the push was a no-op), fall back to
+              //      window.location.assign with a retry loop, same
+              //      shape as before.
+              //
+              // Logs at every step so we can see in the iOS Web
+              // Inspector exactly which path the deep-link took.
               const navigate = () => {
-                let attempts = 0
-                const MAX_ATTEMPTS = 16
-                const tick = () => {
-                  const cur = window.location.pathname + window.location.search
-                  if (cur === target) return
-                  try { window.location.assign(target) } catch (err) {
-                    console.error('[PUSH] assign failed:', err)
-                  }
-                  attempts++
-                  if (attempts < MAX_ATTEMPTS) {
-                    setTimeout(tick, 250)
-                  } else {
-                    console.warn('[PUSH] navigation exhausted retries; on', cur, 'wanted', target)
-                  }
+                console.log('[PUSH] navigate() → target:', target, 'current:', window.location.pathname + window.location.search)
+                // Layer 1: router.push (client-side, history API).
+                try {
+                  routerRef.current.push(target)
+                  console.log('[PUSH] router.push fired')
+                } catch (err) {
+                  console.error('[PUSH] router.push threw:', err)
                 }
-                tick()
+                // Verify after a beat; if we're not on target, fall
+                // back to a full assign() with retries.
+                setTimeout(() => {
+                  const cur1 = window.location.pathname + window.location.search
+                  if (cur1 === target) {
+                    console.log('[PUSH] router.push landed correctly')
+                    return
+                  }
+                  console.warn('[PUSH] router.push did NOT land (on', cur1, ') — falling back to window.location.assign')
+                  let attempts = 0
+                  const MAX_ATTEMPTS = 16
+                  const tick = () => {
+                    const cur = window.location.pathname + window.location.search
+                    if (cur === target) {
+                      console.log('[PUSH] assign() landed on attempt', attempts)
+                      return
+                    }
+                    try { window.location.assign(target) } catch (err) {
+                      console.error('[PUSH] assign failed:', err)
+                    }
+                    attempts++
+                    if (attempts < MAX_ATTEMPTS) {
+                      setTimeout(tick, 250)
+                    } else {
+                      console.warn('[PUSH] navigation exhausted; stuck on', cur, 'wanted', target)
+                    }
+                  }
+                  tick()
+                }, 500)
               }
               if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', navigate, { once: true })
