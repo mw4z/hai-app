@@ -6,16 +6,32 @@ import { useBodyScrollLock, consumeNextClick } from '@/hooks/useBodyScrollLock'
 import { pushBackHandler } from '@/lib/backHandler'
 import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus, FiEdit3, FiSearch } from 'react-icons/fi'
+import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus, FiEdit3, FiSearch, FiCompass } from 'react-icons/fi'
+import { isSquareAdminRole } from '@/lib/square/isSquareAdmin'
 import { useLanguage } from '@/hooks/useLanguage'
 import { hapticMedium } from '@/lib/haptic'
 import { playTap } from '@/lib/sound'
 import { useConfirm } from '@/components/ConfirmProvider'
 import type { TranslationKey } from '@/lib/i18n'
 
-const NAV_ITEMS: { key: string; href: string; icon: React.ComponentType<{ className?: string }>; tKey: TranslationKey; badgeKey?: 'messages' | 'other' }[] = [
+type NavItem = { key: string; href: string; icon: React.ComponentType<{ className?: string }>; tKey: TranslationKey; badgeKey?: 'messages' | 'other' }
+
+const NAV_ITEMS_DEFAULT: NavItem[] = [
   { key: 'feed',    href: '/feed',    icon: FiHome,          tKey: 'nav_feed'    },
   { key: 'market',  href: '/market',  icon: FiShoppingBag,   tKey: 'nav_market'  },
+  // center FAB slot
+  { key: 'threads', href: '/threads', icon: FiMessageSquare, tKey: 'nav_threads', badgeKey: 'messages' },
+  { key: 'profile', href: '/profile', icon: FiUser,          tKey: 'nav_profile' },
+]
+
+/** Admin variant of the bottom nav — replaces the Market slot with the
+ *  staged-rollout الساحة (Square) entry. Same 4-tabs + FAB layout so
+ *  no CSS/markup churn; flipping the feature open to all users will
+ *  replace this with the default array and add Market back as a 5th
+ *  slot OR a tertiary entry. */
+const NAV_ITEMS_ADMIN: NavItem[] = [
+  { key: 'feed',    href: '/feed',    icon: FiHome,          tKey: 'nav_feed'    },
+  { key: 'square',  href: '/square',  icon: FiCompass,       tKey: 'nav_square'  },
   // center FAB slot
   { key: 'threads', href: '/threads', icon: FiMessageSquare, tKey: 'nav_threads', badgeKey: 'messages' },
   { key: 'profile', href: '/profile', icon: FiUser,          tKey: 'nav_profile' },
@@ -35,11 +51,13 @@ const SHOW_BOTTOM_NAV_ON = new Set([
   '/contests',
   '/neighborhood-reports',
   '/support',
+  '/square',
 ])
 
 function activeKeyForPath(path: string): string {
   if (path.startsWith('/feed')) return 'feed'
   if (path.startsWith('/market')) return 'market'
+  if (path.startsWith('/square')) return 'square'
   if (path === '/threads') return 'threads'
   if (path.startsWith('/profile') || path.startsWith('/support')) return 'profile'
   return ''
@@ -88,6 +106,11 @@ export default function BottomNav({
   }, [userRole])
 
   const isSuperAdmin = userRole === 'SUPER_ADMIN'
+  // Square (ساحة الحي) is staged behind admin roles — the bottom-nav
+  // entry swaps in for the Market slot for admins only. Regular users
+  // keep the unchanged 4-tab layout.
+  const showSquareTab = isSquareAdminRole(userRole)
+  const NAV_ITEMS = showSquareTab ? NAV_ITEMS_ADMIN : NAV_ITEMS_DEFAULT
   // Admins / mods skip the resident "suggest a poll" review flow
   // and post polls directly — the same tertiary entry-sheet link
   // routes them to /polls/new instead of /polls/request.
