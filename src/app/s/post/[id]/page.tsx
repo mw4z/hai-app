@@ -15,13 +15,18 @@ export type PublicPost = {
   snippet: string | null    // ~120-char body teaser when a separate title exists
   category: PostCategory
   neighborhoodName: string | null
+  /** First image attached to the post — used as the og:image so
+   *  WhatsApp / Twitter previews show the actual post photo instead
+   *  of the generic Hai app icon. Null when the post has no images;
+   *  the metadata builder then falls back to OG_IMAGE. */
+  coverImage: string | null
 } | null
 
 async function getPost(id: string): Promise<PublicPost> {
   try {
     const p = await db.post.findUnique({
       where: { id },
-      select: { title: true, body: true, category: true, status: true, neighborhoodId: true },
+      select: { title: true, body: true, category: true, status: true, neighborhoodId: true, imageUrls: true },
     })
     // Only ACTIVE posts are surfaced publicly — never hidden/removed ones.
     if (!p || p.status !== 'ACTIVE') return null
@@ -42,7 +47,15 @@ async function getPost(id: string): Promise<PublicPost> {
         .catch(() => null)
       neighborhoodName = n?.name ?? null
     }
-    return { headline, snippet, category: p.category, neighborhoodName }
+
+    // First valid https:// image, if any. Defensive: drops blob:/data:/relative
+    // entries that could sneak in from old drafts or corrupt rows.
+    const rawImages = Array.isArray(p.imageUrls) ? p.imageUrls : []
+    const coverImage = rawImages.find(
+      (u): u is string => typeof u === 'string' && u.startsWith('https://'),
+    ) ?? null
+
+    return { headline, snippet, category: p.category, neighborhoodName, coverImage }
   } catch {
     return null
   }
@@ -55,6 +68,18 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     ? `منشور من ${post.neighborhoodName} — افتحه في تطبيق حي`
     : 'افتحه في تطبيق حي'
   const url = `${ORIGIN}/s/post/${params.id}`
+
+  // Prefer the post's own first photo as the share-card image (what
+  // people are actually about to look at). Fall back to the app icon
+  // when the post has no images. With a real photo, switch the
+  // Twitter card to summary_large_image so the preview renders the
+  // image full-width instead of as a small thumbnail.
+  const hasCover = !!post?.coverImage
+  const shareImage = post?.coverImage ?? OG_IMAGE
+  const ogImages = hasCover
+    ? [{ url: shareImage, alt: post?.headline || 'Hai' }]
+    : [{ url: shareImage, width: 1024, height: 1024, alt: 'Hai' }]
+
   return {
     title,
     description,
@@ -64,9 +89,14 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       url,
       siteName: 'حي · Hai',
       type: 'website',
-      images: [{ url: OG_IMAGE, width: 1024, height: 1024, alt: 'Hai' }],
+      images: ogImages,
     },
-    twitter: { card: 'summary', title, description, images: [OG_IMAGE] },
+    twitter: {
+      card: hasCover ? 'summary_large_image' : 'summary',
+      title,
+      description,
+      images: [shareImage],
+    },
   }
 }
 
