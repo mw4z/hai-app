@@ -58,8 +58,10 @@ export async function GET(req: NextRequest) {
   }
   if (hashToE164.size === 0) return NextResponse.json({ matches: {} })
 
+  const hashes = Array.from(hashToE164.keys())
+  const e164List = Array.from(hashToE164.values())
   const identities = await db.serviceIdentity.findMany({
-    where: { phoneHash: { in: Array.from(hashToE164.keys()) } },
+    where: { phoneHash: { in: hashes } },
     select: {
       phoneHash: true,
       contacts: {
@@ -84,7 +86,7 @@ export async function GET(req: NextRequest) {
     category: string
     whatsapp: boolean
   } | null> = {}
-  for (const e164 of hashToE164.values()) {
+  for (const e164 of e164List) {
     matches[e164] = null
   }
   for (const id of identities) {
