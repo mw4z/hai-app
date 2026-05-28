@@ -190,7 +190,14 @@ export default function SquareBubble({
             </button>
           )}
 
-          <div className="max-w-[85%]" data-msg-id={message.id} {...longPress}>
+          {/* No max-w here — the OUTER row already caps the bubble at
+              max-w-[85%] of the screen. A percentage max-w on this
+              wrapper would resolve against the content-sized column
+              (no definite width → effectively 0), which collapsed the
+              bubble to its min-content width — break-words then
+              shredded short Arabic words like "تجربة" character-by-
+              character. */}
+          <div data-msg-id={message.id} {...longPress}>
             {(replyTo || replyUnavailable) && (
               <SquareReplyQuote
                 reply={
