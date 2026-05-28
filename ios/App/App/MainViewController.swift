@@ -33,12 +33,25 @@ class MainViewController: CAPBridgeViewController {
     /// Prevents a recursion if the offline page itself ever fails.
     private var showingOfflineFallback = false
 
-    /// Cold launch (especially from a tapped notification) often fails the
-    /// FIRST load because the radio isn't up yet. Retry the remote URL a
-    /// couple of times before falling back to the offline page, so that
-    /// screen doesn't flash for a second or two on every cold start.
+    /// Cold launch (especially from a tapped DM/notification) often fails the
+    /// FIRST load because the radio isn't up yet — and for some carriers the
+    /// radio + DNS can take 15-25s to warm up after the device was idle. We
+    /// retry the remote URL patiently before falling back to the offline page
+    /// so the user never sees "no internet" on a cold-start-from-notification
+    /// that would have worked given another few seconds.
+    ///
+    /// Schedule: 5 retries × 1s, 5 × 2s, 5 × 3s = ~30s budget. The Capacitor
+    /// splash stays up throughout (we never call hide() ourselves), so the
+    /// user just sees the launch screen during the warmup, not a broken page.
+    /// The PushNotifications plugin caches the launch action and replays it
+    /// when the React listener attaches, so the DM target survives the retry.
     private var loadRetries = 0
-    private static let maxLoadRetries = 8
+    private static let maxLoadRetries = 15
+    private func retryDelay(forAttempt n: Int) -> TimeInterval {
+        if n < 5  { return 1.0 }
+        if n < 10 { return 2.0 }
+        return 3.0
+    }
 
     /// `nil` until viewDidLoad runs — created lazily so we don't pay
     /// for the path monitor when the app is fully online.
@@ -209,8 +222,8 @@ class MainViewController: CAPBridgeViewController {
             // flashes the offline page AND the web app never runs, so the
             // notification's deep-link is lost. Splash stays up meanwhile.
             if loadRetries < MainViewController.maxLoadRetries {
+                let delay = retryDelay(forAttempt: loadRetries)
                 loadRetries += 1
-                let delay = 1.0
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                     self?.webView?.load(URLRequest(url: url))
                 }
