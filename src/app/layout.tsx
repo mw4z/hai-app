@@ -12,6 +12,7 @@ import SwUpdateReload from '@/components/SwUpdateReload'
 import CropHost from '@/components/CropHost'
 import DebugOverlay from '@/components/DebugOverlay'
 import PushRegistration from '@/components/PushRegistration'
+import PushDebugOverlay from '@/components/PushDebugOverlay'
 import NotificationPermissionNudge from '@/components/NotificationPermissionNudge'
 import SwipeBack from '@/components/SwipeBack'
 import AndroidBackButton from '@/components/AndroidBackButton'
@@ -192,6 +193,7 @@ export default function RootLayout({
         <CapacitorBridge />
         <DebugOverlay />
         <PushRegistration />
+        <PushDebugOverlay />
         <NotificationPermissionNudge />
         <LangProvider initialLang={lang}>
           <NetworkProvider>
