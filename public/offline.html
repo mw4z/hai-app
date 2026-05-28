@@ -9,13 +9,18 @@
   <title>حي | Hai</title>
   <style>
     :root {
-      --bg-light: radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #e0f7f2 40%, #fff 100%);
-      --bg-dark:  radial-gradient(ellipse at 50% 42%, #101619 0%, #070b0d 40%, #000000 100%);
+      --bg-light: radial-gradient(ellipse at 50% 35%, #e8f5e9 0%, #e0f7f2 45%, #ffffff 100%);
+      --bg-dark:  radial-gradient(ellipse at 50% 35%, #1c2832 0%, #1a262c 45%, #19232a 100%);
       --primary: #006d57;
+      --primary-soft: #00a884;
       --text-light: #1a1a1a;
-      --text-muted-light: #6b7280;
+      --text-muted-light: #5b6770;
       --text-dark: #e9edef;
       --text-muted-dark: #8696a0;
+      --card-light: rgba(255,255,255,0.62);
+      --card-dark:  rgba(255,255,255,0.04);
+      --card-border-light: rgba(0, 109, 87, 0.12);
+      --card-border-dark:  rgba(0, 168, 132, 0.16);
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body {
@@ -23,7 +28,7 @@
       padding: 0;
       height: 100%;
       width: 100%;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "IBM Plex Sans Arabic", system-ui, sans-serif;
+      font-family: "IBM Plex Sans Arabic", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
       background: var(--bg-light);
       color: var(--text-light);
       overflow: hidden;
@@ -33,120 +38,218 @@
     @media (prefers-color-scheme: dark) {
       html, body { background: var(--bg-dark); color: var(--text-dark); }
     }
+
     .wrap {
       position: fixed;
       inset: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
       padding: 32px 24px;
-      padding-top: calc(32px + env(safe-area-inset-top, 0px));
-      padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
-      gap: 20px;
+      padding-top: calc(56px + env(safe-area-inset-top, 0px));
+      padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
       text-align: center;
     }
-    .icon {
-      width: 84px;
-      height: 84px;
-      border-radius: 50%;
-      background: rgba(0, 109, 87, 0.1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--primary);
-    }
-    @media (prefers-color-scheme: dark) {
-      .icon { background: rgba(0, 168, 132, 0.15); color: #00a884; }
-    }
-    h1 {
-      font-size: 19px;
-      font-weight: 700;
-      margin: 0;
-    }
-    p {
-      font-size: 14px;
-      color: var(--text-muted-light);
-      margin: 0;
-      line-height: 1.6;
-      max-width: 320px;
-    }
-    @media (prefers-color-scheme: dark) {
-      p { color: var(--text-muted-dark); }
-    }
-    .row {
+
+    /* ── Hero block: logo + tagline ─────────────────────── */
+    .hero {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      align-items: center;
+      gap: 14px;
       width: 100%;
-      max-width: 280px;
     }
-    button {
-      font: inherit;
+    .logo {
+      width: 84px;
+      height: 84px;
+      border-radius: 22px;
+      box-shadow: 0 10px 32px rgba(0, 109, 87, 0.22);
+      animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(10px) scale(0.92); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .name {
+      font-size: 30px;
+      font-weight: 800;
+      color: var(--primary);
+      letter-spacing: -0.5px;
+      line-height: 1;
+      margin: 0;
+      animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
+    }
+    @media (prefers-color-scheme: dark) {
+      .name { color: var(--primary-soft); }
+    }
+    .name-en {
+      font-size: 11px;
       font-weight: 600;
+      color: #98a2b3;
+      letter-spacing: 4px;
+      margin-top: 2px;
+    }
+    .tagline-ar {
       font-size: 15px;
-      padding: 14px 22px;
+      color: var(--text-muted-light);
+      max-width: 300px;
+      line-height: 1.65;
+      margin: 4px 0 0;
+      animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
+    }
+    @media (prefers-color-scheme: dark) {
+      .tagline-ar { color: var(--text-muted-dark); }
+    }
+
+    /* ── Feature cards ──────────────────────────────────── */
+    .features {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      width: 100%;
+      max-width: 360px;
+      margin-top: 28px;
+      animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) 260ms both;
+    }
+    .feature {
+      background: var(--card-light);
+      border: 1px solid var(--card-border-light);
       border-radius: 16px;
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    @media (prefers-color-scheme: dark) {
+      .feature { background: var(--card-dark); border-color: var(--card-border-dark); }
+    }
+    .feature-icon { font-size: 22px; line-height: 1; }
+    .feature-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-light);
+      line-height: 1.35;
+    }
+    @media (prefers-color-scheme: dark) {
+      .feature-label { color: var(--text-dark); }
+    }
+
+    /* ── Footer connecting strip ────────────────────────── */
+    .footer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      max-width: 320px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 16px;
+      background: rgba(0, 109, 87, 0.08);
+      border: 1px solid rgba(0, 109, 87, 0.15);
+      border-radius: 999px;
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    @media (prefers-color-scheme: dark) {
+      .pill {
+        background: rgba(0, 168, 132, 0.10);
+        border-color: rgba(0, 168, 132, 0.20);
+        color: var(--primary-soft);
+      }
+    }
+    .spinner {
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(0, 109, 87, 0.25);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @media (prefers-color-scheme: dark) {
+      .spinner { border-color: rgba(0, 168, 132, 0.25); border-top-color: var(--primary-soft); }
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .retry-btn {
+      font: inherit;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 12px 22px;
+      border-radius: 14px;
       border: 0;
       background: var(--primary);
       color: #fff;
       cursor: pointer;
       transition: transform 80ms ease, opacity 80ms ease;
       width: 100%;
+      box-shadow: 0 6px 18px rgba(0, 109, 87, 0.28);
     }
-    button:active { transform: scale(0.97); opacity: 0.9; }
-    button[disabled] { opacity: 0.5; cursor: default; transform: none; }
-    .meta {
-      font-size: 11px;
-      opacity: 0.6;
-      margin-top: 4px;
-    }
-    .en { direction: ltr; text-align: center; }
-    .en h1 { font-size: 16px; opacity: 0.9; }
-    .spinner {
+    .retry-btn:active { transform: scale(0.97); opacity: 0.92; }
+    .retry-btn[disabled] { opacity: 0.6; cursor: default; transform: none; }
+    .retry-btn .spinner {
       width: 14px;
       height: 14px;
-      border: 2px solid rgba(255,255,255,0.35);
+      border-color: rgba(255,255,255,0.35);
       border-top-color: #fff;
-      border-radius: 50%;
+      margin-inline-end: 8px;
       display: inline-block;
       vertical-align: middle;
-      margin-inline-end: 8px;
-      animation: spin 0.8s linear infinite;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="icon" aria-hidden="true">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="1" y1="1" x2="23" y2="23"></line>
-        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
-        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
-        <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
-        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
-        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
-        <line x1="12" y1="20" x2="12.01" y2="20"></line>
-      </svg>
+
+    <!-- ── Hero ─────────────────────────────────────────── -->
+    <div class="hero">
+      <img class="logo" src="/icon-192.png" alt="Hai" onerror="this.style.display='none'" />
+      <div>
+        <h1 class="name">حَيّ</h1>
+        <div class="name-en">HAI</div>
+      </div>
+      <p class="tagline-ar">منصّتك للتعرّف على جيرانك،<br/>وكل ما يخص حَيّك من خدمات ومنشورات.</p>
     </div>
 
-    <div>
-      <h1>لا يوجد اتصال بالإنترنت</h1>
-      <p>تحقق من اتصالك وحاول مرة أخرى</p>
+    <!-- ── Feature cards ────────────────────────────────── -->
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">🏘️</div>
+        <div class="feature-label">حيّك في يدك</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">💬</div>
+        <div class="feature-label">تواصل مع جيرانك</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🛒</div>
+        <div class="feature-label">سوق محلي</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📒</div>
+        <div class="feature-label">دليل خدمات الحي</div>
+      </div>
     </div>
 
-    <div class="en">
-      <h1>No internet connection</h1>
-      <p>Check your connection and try again</p>
-    </div>
-
-    <div class="row">
-      <button id="retry" type="button">
-        <span id="retry-label">إعادة المحاولة · Try again</span>
+    <!-- ── Connecting strip ─────────────────────────────── -->
+    <div class="footer">
+      <div class="pill" id="status-pill">
+        <span class="spinner" aria-hidden="true"></span>
+        <span id="status">جاري التحضير…</span>
+      </div>
+      <button class="retry-btn" id="retry" type="button" style="display:none;">
+        <span id="retry-label">ابدأ · Start</span>
       </button>
-      <span class="meta" id="status">في انتظار الاتصال…</span>
     </div>
+
   </div>
 
   <script>
@@ -155,23 +258,17 @@
       var btn = document.getElementById('retry')
       var label = document.getElementById('retry-label')
       var status = document.getElementById('status')
+      var statusPill = document.getElementById('status-pill')
       var attempting = false
+      var showedRetry = false
 
       function setStatus(text) { if (status) status.textContent = text }
-      function setBusy(busy) {
-        attempting = busy
-        if (!btn) return
-        btn.disabled = busy
-        if (busy) {
-          label.innerHTML = '<span class="spinner"></span>جاري المحاولة…'
-        } else {
-          label.textContent = 'إعادة المحاولة · Try again'
-        }
+      function showRetryButton() {
+        if (showedRetry) return
+        showedRetry = true
+        if (btn) btn.style.display = ''
       }
 
-      // Probe the server with a tiny request before navigating. Avoids
-      // a flicker-loop where the WebView keeps reloading the offline
-      // page on every failure of the full SSR fetch.
       function probe() {
         return new Promise(function (resolve) {
           var ctrl = new AbortController()
@@ -193,52 +290,51 @@
 
       function attemptRetry(silent) {
         if (attempting) return
-        if (!silent) setBusy(true)
-        setStatus('جاري الفحص…')
+        if (!silent) {
+          attempting = true
+          if (btn) btn.disabled = true
+          setStatus('جاري التحضير…')
+        }
         probe().then(function (ok) {
+          attempting = false
+          if (btn) btn.disabled = false
           if (ok) {
-            setStatus('تم الاتصال — جاري التحميل…')
-            window.location.href = REMOTE_URL
-          } else {
-            setBusy(false)
-            setStatus('لا يزال غير متصل')
+            setStatus('تم — جاري التحميل…')
+            try { window.location.href = REMOTE_URL } catch (_) {}
           }
         })
       }
 
-      // Manual button tap → ALWAYS navigate, no probe gate. Older
-      // builds got stuck here because the probe fetch was blocked by
-      // CORS (offline.html runs from file://, /api/ping wasn't
-      // returning ACAO). Trust the native WebView error handler
-      // (MainActivity / MainViewController) to re-show this page if
-      // the load still fails. If we're truly offline, the user lands
-      // back here within a second or two; if connectivity has
-      // returned, they get the live app.
-      function manualRetry() {
+      function manualStart() {
         if (attempting) return
-        setBusy(true)
-        setStatus('جاري التحميل…')
+        attempting = true
+        if (btn) btn.disabled = true
+        if (label) label.innerHTML = '<span class="spinner"></span>جاري التحميل…'
         try { window.location.href = REMOTE_URL } catch (_) {}
-        // Safety: re-enable the button after a few seconds in case
-        // the navigation was somehow no-op'd.
-        setTimeout(function () { setBusy(false) }, 4000)
+        setTimeout(function () {
+          attempting = false
+          if (btn) btn.disabled = false
+          if (label) label.textContent = 'ابدأ · Start'
+        }, 4000)
       }
 
-      if (btn) btn.addEventListener('click', manualRetry)
+      if (btn) btn.addEventListener('click', manualStart)
 
-      // Auto-retry on the browser's online event AND on a slow poll —
-      // navigator.onLine can lie behind captive portals. silent=true
-      // means we don't flip the button into the busy state, so the
-      // user can still tap it freely.
+      // Auto-retry on `online` event AND on a fast poll. Combined with
+      // the 2s probe timeout, the page navigates to the app the instant
+      // connectivity returns — so this screen reads as a brief intro,
+      // not as an error.
       window.addEventListener('online', function () { attemptRetry(true) })
-      // Cold launch (esp. from a notification): the radio is warming up, so
-      // retry fast — every 500ms for the first ~12s — then back off to 4s.
-      // Combined with the 2s probe timeout, the page navigates to the app the
-      // instant connectivity returns, so this screen is a blink, not seconds.
+
       var _tries = 0
       function _retryLoop () {
         attemptRetry(true)
         _tries++
+        // After ~8s of failed probes, surface a manual "Start" button
+        // so the user has agency. Up to that point we just show the
+        // intro + the "preparing…" pill, which feels like a launch
+        // screen rather than an error.
+        if (_tries === 16) showRetryButton()
         setTimeout(_retryLoop, _tries < 24 ? 500 : 4000)
       }
       setTimeout(_retryLoop, 120)
