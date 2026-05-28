@@ -105,59 +105,52 @@ export default function SquareBubble({
         </div>
       )}
 
-      {/* Outer row — horizontal flex so the avatar can sit beside the
-          bubble column. `items-end` aligns the avatar with the last
-          bubble. Document-order flex puts the avatar on the leading
-          edge in both LTR and RTL (RTL flips the physical direction
-          automatically), so no `flex-row-reverse` needed. */}
+      {/* Outermost wrapper PLACES the chat-row on the correct screen
+          side via justify-content — direction-aware so own goes RIGHT
+          in both LTR and RTL, other goes LEFT in both. The inner row
+          is content-sized (max-w 85%) so it actually clusters at the
+          justified edge instead of spanning the full width. */}
       <div
-        className={`flex items-end gap-2 ${
+        className={`flex w-full ${
           isLastInGroup ? 'mb-2' : 'mb-[3px]'
-        } ${isFirstInGroup && !showDate ? 'mt-3' : ''}`}
+        } ${isFirstInGroup && !showDate ? 'mt-3' : ''} ${
+          isMe
+            ? 'ltr:justify-end rtl:justify-start'
+            : 'ltr:justify-start rtl:justify-end'
+        }`}
       >
-        {!isMe && (
-          <div className="w-7 shrink-0 flex justify-center">
-            {isLastInGroup ? (
-              <button
-                type="button"
-                onClick={() => onAvatarTap(message.author.id)}
-                aria-label={lang === 'en' ? 'Open profile' : 'فتح الملف'}
-                className="active:scale-95 transition-transform"
-              >
-                {message.author.avatarUrl ? (
-                  <img
-                    src={message.author.avatarUrl}
-                    alt=""
-                    className="w-7 h-7 rounded-full object-cover shadow-sm"
-                  />
-                ) : (
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
-                    {(message.author.name || '؟').slice(0, 1)}
-                  </div>
-                )}
-              </button>
-            ) : (
-              // Spacer keeps the bubble column at a consistent inset
-              // for every row in the group, even when the avatar
-              // isn't drawn here.
-              <span aria-hidden className="w-7 h-1" />
-            )}
-          </div>
-        )}
+        {/* Inner chat-row: avatar + bubble column. `rtl:flex-row-reverse`
+            forces visual DOM order (avatar first → LEFT, bubble next →
+            to its right) in BOTH LTR and RTL, so the avatar never
+            ends up isolated on the opposite half of the screen. */}
+        <div className="flex items-end gap-2 max-w-[85%] rtl:flex-row-reverse">
+          {/* Avatar slot — placed in the DOM at the "outer edge" of
+              the row. For OTHER it sits at DOM position 0 (renders
+              on the row's LEFT). For OWN it sits AFTER the column
+              (renders on the row's RIGHT) — see the matching slot
+              below the column. */}
+          {!isMe && (
+            <AvatarTile
+              authorId={message.author.id}
+              avatarUrl={message.author.avatarUrl}
+              name={message.author.name}
+              isLastInGroup={isLastInGroup}
+              onAvatarTap={onAvatarTap}
+              lang={lang}
+            />
+          )}
 
-        {/* Bubble column. flex-1 so it spans the rest of the row;
-            the bubble itself caps at max-w-[85%] inside the column.
-            Use ltr:/rtl: variants so OWN messages sit on the RIGHT
-            in Arabic (RTL) and on the RIGHT in English (LTR) —
-            without the variants, every bubble clumps at the row's
-            start (= right in RTL) regardless of sender. */}
-        <div
-          className={`flex flex-col flex-1 min-w-0 ${
-            isMe
-              ? 'ltr:items-end rtl:items-start'
-              : 'ltr:items-start rtl:items-end'
-          }`}
-        >
+          {/* Bubble column. Content-sized (no flex-1), so the inner
+              row clusters tightly at the justified screen edge.
+              Children align to the bubble's anchor side using the
+              same DM ltr:/rtl: pattern. */}
+          <div
+            className={`flex flex-col min-w-0 ${
+              isMe
+                ? 'ltr:items-end rtl:items-start'
+                : 'ltr:items-start rtl:items-end'
+            }`}
+          >
           {showSenderLabel && (
             <button
               type="button"
@@ -424,7 +417,74 @@ export default function SquareBubble({
             </p>
           )}
         </div>
+
+        {/* Own avatar — matches the other-user slot but rendered AFTER
+            the bubble column so it lands on the row's outer edge
+            (right of own bubble in both LTR and RTL). Same isLastInGroup
+            spacer rules so a run of own messages doesn't repeat the
+            avatar five times. */}
+        {isMe && (
+          <AvatarTile
+            authorId={message.author.id}
+            avatarUrl={message.author.avatarUrl}
+            name={message.author.name}
+            isLastInGroup={isLastInGroup}
+            onAvatarTap={onAvatarTap}
+            lang={lang}
+          />
+        )}
+        </div>
       </div>
+    </div>
+  )
+}
+
+interface AvatarTileProps {
+  authorId: string
+  avatarUrl: string | null
+  name: string | null
+  isLastInGroup: boolean
+  onAvatarTap: (userId: string) => void
+  lang: string
+}
+
+/** Reusable avatar tile — circular profile picture (or gradient + initial
+ *  fallback) anchored to the bottom of the bubble column via the parent
+ *  row's `items-end`. Only renders on the LAST bubble in a same-sender
+ *  group; intermediate rows get a spacer so the column inset stays
+ *  consistent across the whole group. */
+function AvatarTile({
+  authorId,
+  avatarUrl,
+  name,
+  isLastInGroup,
+  onAvatarTap,
+  lang,
+}: AvatarTileProps) {
+  return (
+    <div className="w-7 shrink-0 flex justify-center">
+      {isLastInGroup ? (
+        <button
+          type="button"
+          onClick={() => onAvatarTap(authorId)}
+          aria-label={lang === 'en' ? 'Open profile' : 'فتح الملف'}
+          className="active:scale-95 transition-transform"
+        >
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt=""
+              className="w-7 h-7 rounded-full object-cover shadow-sm"
+            />
+          ) : (
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+              {(name || '؟').slice(0, 1)}
+            </div>
+          )}
+        </button>
+      ) : (
+        <span aria-hidden className="w-7 h-1" />
+      )}
     </div>
   )
 }

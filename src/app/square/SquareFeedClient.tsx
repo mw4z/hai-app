@@ -244,7 +244,10 @@ export default function SquareFeedClient({
     }
   }
   function handleAvatarTap(userId: string) {
-    if (userId && userId !== currentUserId) setProfileUserId(userId)
+    // Now allows OWN avatar taps too — opens the same UserProfileSheet
+    // for self, which renders the same public profile every other
+    // viewer sees (useful sanity check + entry to /profile editor).
+    if (userId) setProfileUserId(userId)
   }
   async function handleDeleteForMe() {
     if (!selectedMsg) return
