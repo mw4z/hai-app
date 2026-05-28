@@ -4,6 +4,43 @@ const withPWA = require('next-pwa')({
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
   runtimeCaching: [
+    // Page navigations (HTML). NetworkFirst with a tight 2s timeout —
+    // on a healthy connection the user gets fresh HTML; on a slow /
+    // cold-start network they get the last-cached page instantly
+    // instead of staring at a white screen. This is the single
+    // biggest UX win for app-shell speed and the reason pages now
+    // feel "WhatsApp-instant" on second visit.
+    {
+      urlPattern: ({ request }) => request.mode === 'navigate',
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'pages',
+        networkTimeoutSeconds: 2,
+        expiration: { maxEntries: 40, maxAgeSeconds: 7 * 24 * 60 * 60 },
+      },
+    },
+    // Next.js immutable hashed chunks under /_next/static — content
+    // is fingerprinted, so it can be cached effectively forever.
+    // CacheFirst skips the network entirely on repeat loads.
+    {
+      urlPattern: /\/_next\/static\/.*/i,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'next-static',
+        expiration: { maxEntries: 200, maxAgeSeconds: 365 * 24 * 60 * 60 },
+      },
+    },
+    // Next.js per-route data payloads (RSC / getServerSideProps JSON).
+    // SWR — show the cached payload right away, refresh in the
+    // background so the *next* navigation has fresh data.
+    {
+      urlPattern: /\/_next\/data\/.*/i,
+      handler: 'StaleWhileRevalidate',
+      options: {
+        cacheName: 'next-data',
+        expiration: { maxEntries: 60, maxAgeSeconds: 24 * 60 * 60 },
+      },
+    },
     {
       urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
       handler: 'CacheFirst',
