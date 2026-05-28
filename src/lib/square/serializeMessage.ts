@@ -26,6 +26,11 @@ export interface PublicSquareReplyTo {
 
 export type SquareMessageType = 'TEXT' | 'LOCATION' | 'PDF' | 'VOICE' | 'STICKER'
 
+export interface SquareReaction {
+  emoji: string
+  userId: string
+}
+
 export interface PublicSquareMessage {
   id: string
   type: SquareMessageType
@@ -38,6 +43,9 @@ export interface PublicSquareMessage {
    *  message. Drives the small 🔔 indicator on the bubble and the
    *  "already fired" guard in the long-press menu. */
   notificationFiredAt: string | null
+  /** Per-user reactions, same shape DM Message uses. One entry per
+   *  reactor; the toggle endpoint enforces uniqueness. */
+  reactions: SquareReaction[]
   replyToMessageId: string | null
   replyTo: PublicSquareReplyTo | null
   createdAt: string
@@ -77,6 +85,7 @@ interface RawMessage {
   isPinned: boolean
   pinnedAt: Date | null
   notificationFiredAt: Date | null
+  reactions: unknown
   replyToMessageId: string | null
   createdAt: Date
   authorId: string
@@ -115,6 +124,11 @@ export function serializeSquareMessage(
     notificationFiredAt: row.notificationFiredAt
       ? row.notificationFiredAt.toISOString()
       : null,
+    reactions: Array.isArray(row.reactions)
+      ? (row.reactions as SquareReaction[]).filter(
+          (r) => r && typeof r.emoji === 'string' && typeof r.userId === 'string',
+        )
+      : [],
     replyToMessageId: row.replyToMessageId,
     replyTo: row.replyTo
       ? {

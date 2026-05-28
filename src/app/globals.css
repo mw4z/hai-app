@@ -220,6 +220,25 @@ input, textarea, [contenteditable="true"] {
   .chat-focus-mode [data-msg-row] { transition: none; }
 }
 
+/* Jump-to-reply glow — applied to the matched [data-msg-row] for ~1.4s
+   after the user taps a reply quote and the list scrolls to the
+   original message. Pulses a sky-blue background tint so the eye
+   locks onto the right row even on a dense screen. Independent
+   from chat-bubble-focus (which only does anything inside
+   chat-focus-mode); this one is self-contained. */
+@keyframes chat-bubble-highlight-pulse {
+  0%   { background-color: transparent; }
+  20%  { background-color: rgba(14, 165, 233, 0.20); }
+  100% { background-color: transparent; }
+}
+[data-msg-row].chat-bubble-highlight {
+  animation: chat-bubble-highlight-pulse 1.4s ease-out;
+  border-radius: 14px;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-msg-row].chat-bubble-highlight { animation: none; background-color: rgba(14, 165, 233, 0.12); }
+}
+
 /* Glass bottom bar */
 .glass-bottom {
   background: #ffffff !important;

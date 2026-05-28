@@ -20,11 +20,18 @@ import { hapticLight } from '@/lib/haptic'
 import SquareBubble from '@/components/square/SquareBubble'
 import SquareComposer from '@/components/square/SquareComposer'
 import ReportUserSheet from '@/components/ReportUserSheet'
+import UserProfileSheet from '@/components/UserProfileSheet'
 import { buildConvertToPostHref } from '@/lib/square/convertToPost'
 import type {
   PublicSquareMessage,
   PublicSquareReplyTo,
 } from '@/lib/square/serializeMessage'
+
+const QUICK_EMOJIS = ['❤️', '👍', '👎', '😂', '😮', '🤲']
+/** Same-sender messages within this many ms count as one group (no
+ *  repeated sender label, no repeated timestamp). Mirrors the
+ *  ~5-minute convention used by WhatsApp / iMessage. */
+const GROUP_TIME_GAP_MS = 5 * 60 * 1000
 
 interface Props {
   /** First page of messages, oldest→newest (server returns ascending). */
@@ -64,6 +71,9 @@ export default function SquareFeedClient({
   /** When the user picks "Report" from the action menu, target the
    *  message author for the report sheet. */
   const [reportTargetUserId, setReportTargetUserId] = useState<string | null>(null)
+  /** When the user taps an avatar or sender name, open the shared
+   *  UserProfileSheet for that user. */
+  const [profileUserId, setProfileUserId] = useState<string | null>(null)
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const endAnchorRef = useRef<HTMLDivElement | null>(null)
@@ -144,9 +154,16 @@ export default function SquareFeedClient({
     const el = document.querySelector<HTMLElement>(`[data-msg-row="${CSS.escape(targetId)}"]`)
     if (!el) return
     el.scrollIntoView({ block: 'center', behavior: 'smooth' })
-    // Brief flash so the user sees which message we landed on.
-    el.classList.add('chat-bubble-focus')
-    setTimeout(() => el.classList.remove('chat-bubble-focus'), 1100)
+    // Brief glow so the user sees exactly which message we landed on.
+    // chat-bubble-highlight (in globals.css) pulses a sky-blue
+    // background tint for ~1.4s. We retrigger the class even if the
+    // user spam-taps the quote by removing-then-readding it.
+    el.classList.remove('chat-bubble-highlight')
+    // Force a reflow so the animation restarts.
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    el.offsetWidth
+    el.classList.add('chat-bubble-highlight')
+    setTimeout(() => el.classList.remove('chat-bubble-highlight'), 1500)
   }
 
   // ── Long-press action handlers ─────────────────────────────────────
@@ -183,6 +200,50 @@ export default function SquareFeedClient({
     router.push(buildConvertToPostHref({ body: selectedMsg.body }))
     setSelectedMsg(null)
   }
+  async function handleToggleReaction(messageId: string, emoji: string) {
+    // Optimistically flip the reaction so the chip lights up
+    // instantly; the server response is the truth and replaces our
+    // optimistic shape.
+    const me = currentUserId
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m
+        const mine = m.reactions.find((r) => r.userId === me)
+        let next = m.reactions
+        if (mine && mine.emoji === emoji) {
+          next = m.reactions.filter((r) => r.userId !== me)
+        } else if (mine) {
+          next = m.reactions.map((r) => (r.userId === me ? { emoji, userId: me } : r))
+        } else {
+          next = [...m.reactions, { emoji, userId: me }]
+        }
+        return { ...m, reactions: next }
+      }),
+    )
+    try {
+      const res = await fetch(`/api/square/messages/${messageId}/react`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emoji }),
+      })
+      if (!res.ok) {
+        toast.error(lang === 'en' ? 'Reaction failed' : 'تعذر إرسال التفاعل')
+        return
+      }
+      const data = await res.json().catch(() => ({}))
+      if (Array.isArray(data?.reactions)) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, reactions: data.reactions } : m)),
+        )
+      }
+    } catch {
+      // Optimistic flip already happened; on transient errors the
+      // next list refresh will reconcile. No toast spam.
+    }
+  }
+  function handleAvatarTap(userId: string) {
+    if (userId && userId !== currentUserId) setProfileUserId(userId)
+  }
   async function handleNotifyNeighbors() {
     if (!selectedMsg) return
     const target = selectedMsg
@@ -216,8 +277,11 @@ export default function SquareFeedClient({
   const empty = messages.length === 0
 
   // Pre-compute the per-message "is first / last in same-sender group"
-  // + "show day-divider above this row" flags ONCE per messages change
-  // — same logic ChatClient uses, just inlined into a memo here.
+  // + "show day-divider" flags. Group break happens when EITHER the
+  // sender changes OR the time gap from the previous message exceeds
+  // GROUP_TIME_GAP_MS — so a sender's quick run stays one group and
+  // their later message (hours apart) starts a new one with its own
+  // sender label + timestamp + avatar.
   const decorated = useMemo(() => {
     let lastDay = ''
     return messages.map((msg, idx) => {
@@ -226,9 +290,16 @@ export default function SquareFeedClient({
       if (showDate) lastDay = day
       const prev = messages[idx - 1]
       const next = messages[idx + 1]
-      const isFirstInGroup =
-        showDate || !prev || prev.author.id !== msg.author.id
-      const isLastInGroup = !next || next.author.id !== msg.author.id
+      const sameSenderAsPrev =
+        prev && prev.author.id === msg.author.id
+      const sameSenderAsNext =
+        next && next.author.id === msg.author.id
+      const closeToPrev =
+        prev && (Date.parse(msg.createdAt) - Date.parse(prev.createdAt)) < GROUP_TIME_GAP_MS
+      const closeToNext =
+        next && (Date.parse(next.createdAt) - Date.parse(msg.createdAt)) < GROUP_TIME_GAP_MS
+      const isFirstInGroup = showDate || !sameSenderAsPrev || !closeToPrev
+      const isLastInGroup = !sameSenderAsNext || !closeToNext
       return { msg, isFirstInGroup, isLastInGroup, showDate, dateLabel: dateLabelFor(msg.createdAt, lang) }
     })
   }, [messages, lang])
@@ -323,6 +394,8 @@ export default function SquareFeedClient({
                 selected={selectedMsg?.id === msg.id}
                 onLongPress={() => { hapticLight(); setSelectedMsg(msg) }}
                 onJumpToReply={handleJumpToReply}
+                onAvatarTap={handleAvatarTap}
+                onToggleReaction={handleToggleReaction}
               />
             ))
           )}
@@ -345,6 +418,9 @@ export default function SquareFeedClient({
       {selectedMsg && (
         <SquareActionSheet
           isOwn={selectedMsg.author.id === currentUserId}
+          myReactionEmoji={
+            selectedMsg.reactions.find((r) => r.userId === currentUserId)?.emoji ?? null
+          }
           /** Only TEXT messages with non-empty body can be repurposed
            *  into a post. Stickers/voice/PDF/location don't map to a
            *  post body cleanly. */
@@ -363,6 +439,11 @@ export default function SquareFeedClient({
             !selectedMsg.notificationFiredAt &&
             selectedMsg.status === 'ACTIVE'
           }
+          onReact={(emoji) => {
+            const id = selectedMsg.id
+            setSelectedMsg(null)
+            handleToggleReaction(id, emoji)
+          }}
           onReply={handleReply}
           onCopy={handleCopy}
           onConvertToPost={handleConvertToPost}
@@ -378,14 +459,27 @@ export default function SquareFeedClient({
         onClose={() => setReportTargetUserId(null)}
         targetUserId={reportTargetUserId ?? ''}
       />
+
+      {/* Profile sheet — opens when the user taps an other-user's
+          avatar or sender name. The shared sheet handles its own
+          fetch + render. */}
+      {profileUserId && (
+        <UserProfileSheet
+          profileUserId={profileUserId}
+          currentUserId={currentUserId}
+          onClose={() => setProfileUserId(null)}
+        />
+      )}
     </div>
   )
 }
 
 interface ActionSheetProps {
   isOwn: boolean
+  myReactionEmoji: string | null
   canConvertToPost: boolean
   canNotifyNeighbors: boolean
+  onReact: (emoji: string) => void
   onReply: () => void
   onCopy: () => void
   onConvertToPost: () => void
@@ -396,13 +490,15 @@ interface ActionSheetProps {
 
 /**
  * Bottom action sheet shown when the user long-presses a bubble.
- * Rows (in order): Reply, Copy text, [Convert to post], [Notify
- * neighbors], Report (hidden for own messages).
+ * Quick-emoji row at the top (matches DM), then Reply / Copy /
+ * [Convert to post] / [Notify neighbors] / Report.
  */
 function SquareActionSheet({
   isOwn,
+  myReactionEmoji,
   canConvertToPost,
   canNotifyNeighbors,
+  onReact,
   onReply,
   onCopy,
   onConvertToPost,
@@ -422,6 +518,27 @@ function SquareActionSheet({
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.5rem)' }}
       >
         <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto my-2.5" />
+        {/* Quick reactions — tap to add / replace / toggle off the
+            current user's reaction (server enforces one per user). */}
+        <div className="px-4 pt-1 pb-2 flex items-center justify-around">
+          {QUICK_EMOJIS.map((emoji) => {
+            const mine = myReactionEmoji === emoji
+            return (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => onReact(emoji)}
+                className={`text-[24px] leading-none w-10 h-10 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
+                  mine ? 'bg-primary-100 dark:bg-primary-900/40' : ''
+                }`}
+                aria-label={emoji}
+              >
+                {emoji}
+              </button>
+            )
+          })}
+        </div>
+        <div className="h-px bg-gray-100 dark:bg-gray-800 mx-4 mb-1" />
         <button
           type="button"
           onClick={onReply}

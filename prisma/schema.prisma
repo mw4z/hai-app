@@ -2588,6 +2588,11 @@ model SquareMessage {
   // API blocks a second firing from the same author within 24h.
   notificationFiredAt DateTime?
 
+  // Per-user emoji reactions — same shape DM Message uses
+  // ([{emoji, userId}, ...]). One reaction per user per message
+  // (enforced at the API; the toggle replaces or removes).
+  reactions Json @default("[]")
+
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
