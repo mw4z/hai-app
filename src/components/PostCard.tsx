@@ -412,6 +412,12 @@ export default function PostCard({
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(post.title)
   const [editBody, setEditBody] = useState(post.body)
+  // Edit-mode price draft. Stored as a string so the empty / partial
+  // typing states ("", "1.") don't fight a numeric controlled input.
+  // Empty on save → sends `price: null` (clears the price).
+  const [editPrice, setEditPrice] = useState<string>(
+    post.price != null ? String(post.price) : '',
+  )
   // Separate edit-mode image list so the user can add/remove/reorder
   // without touching the original post.imageUrls until they hit Save.
   const [editImages, setEditImages] = useState<string[]>(post.imageUrls || [])
@@ -420,7 +426,13 @@ export default function PostCard({
   const editCameraInputRef = useRef<HTMLInputElement>(null)
   const [showEditImageSheet, setShowEditImageSheet] = useState(false)
   const [editLoading, setEditLoading] = useState(false)
-  const [postData, setPostData] = useState({ title: post.title, body: post.body, editedAt: post.editedAt, imageUrls: post.imageUrls || [] as string[] })
+  const [postData, setPostData] = useState<{
+    title: string
+    body: string
+    editedAt: Date | string | null
+    imageUrls: string[]
+    price: number | null
+  }>({ title: post.title, body: post.body, editedAt: post.editedAt ?? null, imageUrls: post.imageUrls || [], price: post.price ?? null })
   // Auto-translation. Detected language comes from the raw title+body;
   // the translate button only surfaces if it differs from the user's
   // UI language. Cached per-card in state so toggling off/on is free.
@@ -1466,6 +1478,21 @@ export default function PostCard({
             className="hai-input"
             rows={3}
           />
+          {/* Price edit. Empty clears it (sends price: null). Numeric
+              keyboard hint via inputMode="decimal" so iOS shows the
+              comma/period pad. Capped at 1,000,000 server-side. */}
+          <input
+            type="text"
+            inputMode="decimal"
+            value={editPrice}
+            onChange={(e) => {
+              const v = e.target.value.replace(/[^\d.]/g, '')
+              setEditPrice(v)
+            }}
+            placeholder={lang === 'en' ? 'Price (optional, SAR)' : 'السعر (اختياري، ر.س)'}
+            className="hai-input"
+            aria-label={lang === 'en' ? 'Price' : 'السعر'}
+          />
 
           {/* Image editor — thumbnail strip of current photos + add
               button. Tapping the X on a thumbnail drops it from the
@@ -1589,6 +1616,24 @@ export default function PostCard({
               disabled={editLoading || editImageUploading}
               onClick={async () => {
                 setEditLoading(true)
+                // Translate the price input string into the API's
+                // expected shape: empty = null (clear price), valid
+                // number = number, anything else = skip the field
+                // entirely so we don't silently null on a typo.
+                const trimmedPrice = editPrice.trim()
+                let priceUpdate: number | null | undefined
+                if (trimmedPrice === '') {
+                  priceUpdate = null
+                } else {
+                  const parsed = parseFloat(trimmedPrice)
+                  if (Number.isFinite(parsed) && parsed > 0) {
+                    priceUpdate = parsed
+                  } else {
+                    toast.error(lang === 'en' ? 'Invalid price' : 'السعر غير صالح')
+                    setEditLoading(false)
+                    return
+                  }
+                }
                 const res = await fetch(`/api/posts/${post.id}`, {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
@@ -1596,6 +1641,7 @@ export default function PostCard({
                     title: editTitle.trim(),
                     body: editBody.trim(),
                     imageUrls: editImages,
+                    price: priceUpdate,
                   }),
                 })
                 if (res.ok) {
@@ -1605,6 +1651,7 @@ export default function PostCard({
                     body: d.body,
                     editedAt: d.editedAt,
                     imageUrls: Array.isArray(d.imageUrls) ? d.imageUrls : editImages,
+                    price: d.price ?? null,
                   })
                   setEditing(false)
                   toast.success(lang === 'en' ? 'Updated' : lang === 'ur' ? 'ترمیم شدہ' : 'تم التعديل')
@@ -1624,6 +1671,7 @@ export default function PostCard({
                 setEditTitle(postData.title)
                 setEditBody(postData.body)
                 setEditImages(postData.imageUrls || [])
+                setEditPrice(postData.price != null ? String(postData.price) : '')
               }}
               className="hai-btn-ghost hai-btn-sm"
             >
@@ -1694,25 +1742,30 @@ export default function PostCard({
         </>
       )}
 
-      {(post.price || (post.isOffer && post.originalPrice)) && (
+      {/* Use postData.price (live, updates after edit) instead of
+          post.price (the SSR-frozen prop) so a Save reflects right
+          away without a feed refresh. isOffer + originalPrice still
+          come from the prop because the inline editor doesn't touch
+          them yet. */}
+      {(postData.price != null || (post.isOffer && post.originalPrice)) && (
         <div className="hai-mt-2 flex items-center flex-wrap gap-2">
           {post.isOffer && (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-[11px] font-bold px-2 py-0.5">
               🏷️ {lang === 'en' ? 'Offer' : lang === 'ur' ? 'آفر' : 'عرض'}
             </span>
           )}
-          {post.price != null && (
-            <span className="hai-price">{post.price.toLocaleString('ar-SA')} <RiyalIcon /></span>
+          {postData.price != null && (
+            <span className="hai-price">{postData.price.toLocaleString('ar-SA')} <RiyalIcon /></span>
           )}
           {/* "Was" price struck-through + discount %, only a genuine drop */}
-          {post.isOffer && post.originalPrice != null && post.originalPrice > (post.price ?? 0) && (
+          {post.isOffer && post.originalPrice != null && post.originalPrice > (postData.price ?? 0) && (
             <>
               <span className="text-sm text-gray-400 line-through decoration-rose-400">
                 {post.originalPrice.toLocaleString('ar-SA')} <RiyalIcon />
               </span>
-              {post.price != null && post.price > 0 && (
+              {postData.price != null && postData.price > 0 && (
                 <span className="rounded-md bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 text-[11px] font-bold px-1.5 py-0.5 tabular-nums">
-                  -{Math.round((1 - post.price / post.originalPrice) * 100)}%
+                  -{Math.round((1 - postData.price / post.originalPrice) * 100)}%
                 </span>
               )}
             </>
