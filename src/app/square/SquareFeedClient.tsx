@@ -7,7 +7,6 @@ import toast from 'react-hot-toast'
 import {
   FiArrowLeft,
   FiArrowRight,
-  FiTrash2,
   FiBell,
   FiCopy,
   FiCornerUpLeft,
