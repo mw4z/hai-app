@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import {
   FiArrowLeft,
@@ -9,6 +10,7 @@ import {
   FiCopy,
   FiCornerUpLeft,
   FiCornerUpRight,
+  FiEdit3,
   FiFlag,
   FiX,
 } from 'react-icons/fi'
@@ -17,6 +19,7 @@ import { hapticLight } from '@/lib/haptic'
 import SquareBubble from '@/components/square/SquareBubble'
 import SquareComposer from '@/components/square/SquareComposer'
 import ReportUserSheet from '@/components/ReportUserSheet'
+import { buildConvertToPostHref } from '@/lib/square/convertToPost'
 import type {
   PublicSquareMessage,
   PublicSquareReplyTo,
@@ -45,6 +48,7 @@ export default function SquareFeedClient({
   currentUserId,
 }: Props) {
   const { t, lang } = useLanguage()
+  const router = useRouter()
 
   const [messages, setMessages] = useState<PublicSquareMessage[]>(initialMessages)
   const [hasMoreOlder, setHasMoreOlder] = useState(initialHasMore)
@@ -171,6 +175,11 @@ export default function SquareFeedClient({
   function handleReport() {
     if (!selectedMsg) return
     setReportTargetUserId(selectedMsg.author.id)
+    setSelectedMsg(null)
+  }
+  function handleConvertToPost() {
+    if (!selectedMsg) return
+    router.push(buildConvertToPostHref({ body: selectedMsg.body }))
     setSelectedMsg(null)
   }
 
@@ -306,8 +315,17 @@ export default function SquareFeedClient({
       {selectedMsg && (
         <SquareActionSheet
           isOwn={selectedMsg.author.id === currentUserId}
+          /** Only TEXT messages with non-empty body can be repurposed
+           *  into a post. Stickers/voice/PDF/location don't map to a
+           *  post body cleanly. */
+          canConvertToPost={
+            selectedMsg.author.id === currentUserId &&
+            selectedMsg.type === 'TEXT' &&
+            !!(selectedMsg.body && selectedMsg.body.trim())
+          }
           onReply={handleReply}
           onCopy={handleCopy}
+          onConvertToPost={handleConvertToPost}
           onReport={handleReport}
           onClose={() => setSelectedMsg(null)}
         />
@@ -325,19 +343,28 @@ export default function SquareFeedClient({
 
 interface ActionSheetProps {
   isOwn: boolean
+  canConvertToPost: boolean
   onReply: () => void
   onCopy: () => void
+  onConvertToPost: () => void
   onReport: () => void
   onClose: () => void
 }
 
 /**
  * Bottom action sheet shown when the user long-presses a bubble.
- * Three rows max, large tap targets, dismisses on backdrop tap.
- * Report row is hidden when the user long-pressed their own message
- * (reporting yourself is silly).
+ * Rows (in order): Reply, Copy text, [Convert to post — own TEXT
+ * messages only], Report (hidden for own messages).
  */
-function SquareActionSheet({ isOwn, onReply, onCopy, onReport, onClose }: ActionSheetProps) {
+function SquareActionSheet({
+  isOwn,
+  canConvertToPost,
+  onReply,
+  onCopy,
+  onConvertToPost,
+  onReport,
+  onClose,
+}: ActionSheetProps) {
   const { lang } = useLanguage()
   return (
     <div
@@ -374,6 +401,18 @@ function SquareActionSheet({ isOwn, onReply, onCopy, onReport, onClose }: Action
             {lang === 'en' ? 'Copy text' : 'نسخ النص'}
           </span>
         </button>
+        {canConvertToPost && (
+          <button
+            type="button"
+            onClick={onConvertToPost}
+            className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-gray-50 dark:active:bg-gray-800/60 text-start"
+          >
+            <FiEdit3 className="w-5 h-5 text-primary-600" />
+            <span className="text-[15px] font-semibold text-gray-900 dark:text-white">
+              {lang === 'en' ? 'Convert to a post' : 'حوّلها إلى منشور'}
+            </span>
+          </button>
+        )}
         {!isOwn && (
           <button
             type="button"

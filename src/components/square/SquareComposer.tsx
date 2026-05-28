@@ -1,11 +1,16 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiAlertCircle, FiPaperclip, FiSend, FiSmile, FiX } from 'react-icons/fi'
+import { FiAlertCircle, FiArrowRight, FiPaperclip, FiSend, FiSmile, FiX } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { hapticLight } from '@/lib/haptic'
 import { detectSquareIntent } from '@/lib/square/detectIntent'
+import {
+  buildConvertToPostHref,
+  squareIntentToPostCategory,
+} from '@/lib/square/convertToPost'
 import { fullName } from '@/lib/displayName'
 import AttachmentMenu from '@/components/AttachmentMenu'
 import PlacePickerSheet from '@/components/places/PlacePickerSheet'
@@ -56,6 +61,7 @@ export default function SquareComposer({
   setReplyingTo,
 }: Props) {
   const { t, lang } = useLanguage()
+  const router = useRouter()
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
 
@@ -231,14 +237,40 @@ export default function SquareComposer({
       >
         {intent && (
           <div
-            className={`flex items-start gap-2 mx-1 mt-2 px-3 py-2 rounded-xl text-[12px] leading-relaxed ${
+            className={`mx-1 mt-2 px-3 py-2 rounded-xl text-[12px] leading-relaxed ${
               intent.hard
                 ? 'bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-200'
                 : 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-100'
             }`}
           >
-            <FiAlertCircle className="w-4 h-4 mt-[2px] flex-shrink-0" />
-            <span>{intent.messageAr}</span>
+            <div className="flex items-start gap-2">
+              <FiAlertCircle className="w-4 h-4 mt-[2px] flex-shrink-0" />
+              <span>{intent.messageAr}</span>
+            </div>
+            {/* Convert-to-post escape hatch — appears below the soft
+                nudge body so the user can carry their already-typed
+                text into the proper section composer (Services /
+                Lost & Found / Marketplace / Neighborhood Reports)
+                instead of losing it. Hidden for HARD blocks (group
+                invites / repeat-promo) — those are policy refusals,
+                not redirects. */}
+            {!intent.hard && (
+              <button
+                type="button"
+                onClick={() => {
+                  hapticLight()
+                  const href = buildConvertToPostHref({
+                    body,
+                    category: squareIntentToPostCategory(intent.code),
+                  })
+                  router.push(href)
+                }}
+                className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-bold text-amber-800 dark:text-amber-200 active:scale-95 transition-transform"
+              >
+                <span>{lang === 'en' ? 'Convert to a post' : 'حوّلها إلى منشور'}</span>
+                <FiArrowRight className={`w-3.5 h-3.5 ${lang !== 'en' ? 'rotate-180' : ''}`} />
+              </button>
+            )}
           </div>
         )}
 

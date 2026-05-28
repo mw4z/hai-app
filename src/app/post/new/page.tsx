@@ -409,14 +409,20 @@ export default function NewPostPage() {
       })
       .catch(() => {})
   }, [isSuperAdmin, allNeighborhoods.length, initialNeighborhoodParam])
-  const [title, setTitle] = useState('')
+  // Optional ?title= / ?body= query params — used by the Square
+  // "Convert to post" flow (and any future caller that wants to seed
+  // the composer with text the user already typed elsewhere). Read
+  // lazily on first mount only so subsequent navigation doesn't
+  // overwrite the in-progress draft.
+  const initialBodyParam = searchParams?.get('body') || ''
+  const initialTitleParam = searchParams?.get('title') || ''
+  const [title, setTitle] = useState(initialTitleParam)
   // Collapsed title-input state — shown only after the user taps
-  // "Add a title (optional)" on conversational categories. When a
-  // category requires a title, this flag is ignored (the input is
-  // always rendered). A draft restore that includes a non-empty
-  // title also flips this true so the input is visible on remount.
-  const [showOptionalTitle, setShowOptionalTitle] = useState(false)
-  const [body, setBody] = useState('')
+  // "Add a title (optional)" on conversational categories. A
+  // non-empty pre-fill (?title=) also expands it so the user sees
+  // what was carried over.
+  const [showOptionalTitle, setShowOptionalTitle] = useState(!!initialTitleParam)
+  const [body, setBody] = useState(initialBodyParam)
   const [price, setPrice] = useState('')
   // "Mark as offer" — sets isOffer=true so the post surfaces in the
   // "عروض / Offers" feed chip + Market Offers tab. Optional; off by
