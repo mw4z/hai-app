@@ -23,8 +23,25 @@ export default function SwUpdateReload() {
     if (!navigator.serviceWorker.controller) return
 
     let reloaded = false
+    const RECENT_DEEPLINK_WINDOW_MS = 30_000
     const onControllerChange = () => {
       if (reloaded) return
+      // If a push deep-link landed on this page in the last 30s,
+      // skip the auto-reload entirely. The new SW will activate on
+      // the next cold start anyway — better to land the user on the
+      // conversation cleanly than to fight a flaky cold-start reload
+      // that can fall through to offline.html and bounce them back
+      // to /feed via the bare-URL redirect.
+      try {
+        const ts = sessionStorage.getItem('hai:deeplink-landed-at')
+        if (ts) {
+          const age = Date.now() - Number(ts)
+          if (Number.isFinite(age) && age < RECENT_DEEPLINK_WINDOW_MS) {
+            console.log('[SW] skipping reload — deeplink landed', age, 'ms ago')
+            return
+          }
+        }
+      } catch {}
       reloaded = true
       window.location.reload()
     }

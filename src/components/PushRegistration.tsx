@@ -63,7 +63,12 @@ export default function PushRegistration() {
       try {
         const cur0 = window.location.pathname + window.location.search
         if (cur0 === target) {
-          try { sessionStorage.removeItem(PENDING_KEY) } catch {}
+          try {
+            sessionStorage.removeItem(PENDING_KEY)
+            // Mark that a deeplink just landed so SwUpdateReload
+            // skips its auto-reload — see SwUpdateReload.tsx for why.
+            sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))
+          } catch {}
           return
         }
         console.log('[PUSH] navigateToTarget →', target, 'from', cur0)
@@ -75,7 +80,12 @@ export default function PushRegistration() {
         setTimeout(() => {
           const cur1 = window.location.pathname + window.location.search
           if (cur1 === target) {
-            try { sessionStorage.removeItem(PENDING_KEY) } catch {}
+            try {
+            sessionStorage.removeItem(PENDING_KEY)
+            // Mark that a deeplink just landed so SwUpdateReload
+            // skips its auto-reload — see SwUpdateReload.tsx for why.
+            sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))
+          } catch {}
             return
           }
           // Fallback: full assign with retries
@@ -84,7 +94,12 @@ export default function PushRegistration() {
           const tick = () => {
             const cur = window.location.pathname + window.location.search
             if (cur === target) {
-              try { sessionStorage.removeItem(PENDING_KEY) } catch {}
+              try {
+            sessionStorage.removeItem(PENDING_KEY)
+            // Mark that a deeplink just landed so SwUpdateReload
+            // skips its auto-reload — see SwUpdateReload.tsx for why.
+            sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))
+          } catch {}
               return
             }
             try { window.location.assign(target) } catch (err) {
@@ -173,7 +188,12 @@ export default function PushRegistration() {
               // an unnecessary reload if the app was already on the page.
               const currentPath = window.location.pathname + window.location.search
               if (currentPath === target) {
-                try { sessionStorage.removeItem(PENDING_KEY) } catch {}
+                try {
+            sessionStorage.removeItem(PENDING_KEY)
+            // Mark that a deeplink just landed so SwUpdateReload
+            // skips its auto-reload — see SwUpdateReload.tsx for why.
+            sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))
+          } catch {}
                 return
               }
               // Use the shared helper so the event handler AND the
