@@ -77,6 +77,33 @@ export default function SquareBubble({
   const { lang } = useLanguage()
   const rowRef = useRef<HTMLDivElement | null>(null)
   const longPress = useSquareLongPress(onLongPress)
+
+  const isMe = message.author.id === currentUserId
+  const authorName = isMe
+    ? null
+    : fullName(message.author) || message.author.name || (lang === 'en' ? 'Neighbor' : 'جار')
+  const isVerified = message.author.membership === 'VERIFIED_RESIDENT'
+  const showSenderLabel = !isMe && isFirstInGroup
+
+  const timeStr = formatTime(message.createdAt, lang)
+
+  const hasReplyId = !!message.replyToMessageId
+  const replyTo = message.replyTo
+  const replyUnavailable = hasReplyId && (!replyTo || replyTo.status === 'HIDDEN')
+
+  // Group reactions by emoji + know my own reaction so the chip can
+  // light up the one I tapped.
+  const reactionsGrouped = useMemo(() => {
+    const groups = new Map<string, { count: number; mine: boolean }>()
+    for (const r of message.reactions) {
+      const cur = groups.get(r.emoji) || { count: 0, mine: false }
+      cur.count += 1
+      if (r.userId === currentUserId) cur.mine = true
+      groups.set(r.emoji, cur)
+    }
+    return Array.from(groups.entries())
+  }, [message.reactions, currentUserId])
+
   // Live-updated viewer count. Seeded from the server-sent value, then
   // bumped to the server's authoritative number on POST and on the
   // periodic poll while the bubble is on screen.
@@ -130,32 +157,6 @@ export default function SquareBubble({
     const id = setInterval(poll, 25_000)
     return () => { cancelled = true; clearInterval(id) }
   }, [bubbleVisible, message.id, message.type])
-
-  const isMe = message.author.id === currentUserId
-  const authorName = isMe
-    ? null
-    : fullName(message.author) || message.author.name || (lang === 'en' ? 'Neighbor' : 'جار')
-  const isVerified = message.author.membership === 'VERIFIED_RESIDENT'
-  const showSenderLabel = !isMe && isFirstInGroup
-
-  const timeStr = formatTime(message.createdAt, lang)
-
-  const hasReplyId = !!message.replyToMessageId
-  const replyTo = message.replyTo
-  const replyUnavailable = hasReplyId && (!replyTo || replyTo.status === 'HIDDEN')
-
-  // Group reactions by emoji + know my own reaction so the chip can
-  // light up the one I tapped.
-  const reactionsGrouped = useMemo(() => {
-    const groups = new Map<string, { count: number; mine: boolean }>()
-    for (const r of message.reactions) {
-      const cur = groups.get(r.emoji) || { count: 0, mine: false }
-      cur.count += 1
-      if (r.userId === currentUserId) cur.mine = true
-      groups.set(r.emoji, cur)
-    }
-    return Array.from(groups.entries())
-  }, [message.reactions, currentUserId])
 
   return (
     <div
