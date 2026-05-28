@@ -159,33 +159,55 @@ export default function PushRegistration() {
       watchdogDriftCount = 0
       if (watchdogInterval) clearInterval(watchdogInterval)
       console.log('[PUSH] watchdog → guarding', target, 'for', STICKINESS_MS, 'ms')
+
+      // Once the URL has been on target for SETTLED_TICKS consecutive
+      // 200ms polls (= 1 second), we consider the navigation "settled"
+      // and release the watchdog immediately. Any URL change after
+      // that point is the USER (back button, bottom-nav tap, link
+      // click) and we must NOT fight them — fighting back-navigation
+      // is the "I press back, the app loops me into the DM" symptom.
+      let consecutiveOnTarget = 0
+      const SETTLED_TICKS = 5
+      let settled = false
+
+      const release = (reason: string) => {
+        console.log('[PUSH] watchdog → releasing (' + reason + ')')
+        if (watchdogInterval) clearInterval(watchdogInterval)
+        watchdogInterval = null
+        watchdogTarget = null
+        try {
+          sessionStorage.removeItem(PENDING_KEY)
+          sessionStorage.removeItem(NAV_ATTEMPT_KEY)
+          sessionStorage.removeItem(NAV_LAST_KEY)
+        } catch {}
+      }
+
       watchdogInterval = setInterval(() => {
         if (Date.now() > watchdogDeadline) {
-          console.log('[PUSH] watchdog → window elapsed, releasing')
-          if (watchdogInterval) clearInterval(watchdogInterval)
-          watchdogInterval = null
-          watchdogTarget = null
-          // Now safe to clear the pending key — we held the URL as
-          // long as we reasonably can. Also clear the anti-loop
-          // counter so a future deeplink starts with a fresh budget.
-          try {
-            sessionStorage.removeItem(PENDING_KEY)
-            sessionStorage.removeItem(NAV_ATTEMPT_KEY)
-            sessionStorage.removeItem(NAV_LAST_KEY)
-          } catch {}
+          release('window elapsed')
           return
         }
         if (!watchdogTarget) return
         const cur = window.location.pathname + window.location.search
-        if (cur === watchdogTarget) return
+        if (cur === watchdogTarget) {
+          consecutiveOnTarget++
+          if (!settled && consecutiveOnTarget >= SETTLED_TICKS) {
+            settled = true
+            release('settled on target')
+          }
+          return
+        }
+        // URL drifted off target. If we'd already settled, this is
+        // user-initiated navigation — release without fighting.
+        if (settled) {
+          release('user navigated away')
+          return
+        }
+        consecutiveOnTarget = 0
         watchdogDriftCount++
         console.warn('[PUSH] watchdog → drift #' + watchdogDriftCount + ' to', cur, '— forcing back to', watchdogTarget)
         // First two drifts: try router.push (cheap, client-side).
-        // After that: escalate to window.location.assign which is a
-        // full navigation that the server can't redirect away from
-        // (Next.js root-page redirect only applies to bare `/`, not
-        // /threads/<id>). assign also clears any pending router
-        // transition that the bouncer might have hijacked.
+        // After that: escalate to window.location.assign.
         if (watchdogDriftCount <= 2) {
           try {
             routerRef.current.push(watchdogTarget)
