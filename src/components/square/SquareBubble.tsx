@@ -140,8 +140,12 @@ export default function SquareBubble({
   }, [message.id, message.type, isMe])
 
   // Live count while on-screen: re-fetch every 25s (paused when the
-  // tab is hidden) so the number climbs as other neighbors view.
+  // tab is hidden) so the number climbs as neighbors view. Polling
+  // is gated on isMe because only the sender sees the eye/count
+  // chip on their own bubble — no point polling for messages whose
+  // count is never rendered.
   useEffect(() => {
+    if (!isMe) return
     if (!bubbleVisible) return
     if (message.type === 'DELETED') return
     let cancelled = false
@@ -156,7 +160,7 @@ export default function SquareBubble({
     }
     const id = setInterval(poll, 25_000)
     return () => { cancelled = true; clearInterval(id) }
-  }, [bubbleVisible, message.id, message.type])
+  }, [isMe, bubbleVisible, message.id, message.type])
 
   return (
     <div
@@ -511,7 +515,7 @@ export default function SquareBubble({
                 </span>
               )}
               <span>{timeStr}</span>
-              {message.type !== 'DELETED' && viewCount > 0 && (
+              {isMe && message.type !== 'DELETED' && viewCount > 0 && (
                 <span
                   className="inline-flex items-center gap-0.5 opacity-70"
                   aria-label={lang === 'en' ? `${viewCount} views` : `${viewCount} مشاهدة`}
