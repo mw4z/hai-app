@@ -59,79 +59,32 @@ export default function PushRegistration() {
     // (router.push first, fall back to window.location.assign with
     // retries). Kept inline so the launch handler AND the mount-time
     // resume effect both call the same code.
+    // Slimmer navigateToTarget — kicks the watchdog, fires
+    // router.push, and trusts the watchdog to drag the URL back if
+    // anything bounces it. CRUCIALLY: does NOT clear PENDING_KEY on
+    // any momentary landing. If we cleared on the brief DM render
+    // before the bouncer wins, then on the subsequent full-page nav
+    // remount there'd be nothing in sessionStorage to resume from,
+    // and the user lands permanently on /feed (the symptom in the
+    // user's screenshot). Only the watchdog clears PENDING_KEY,
+    // after its 15-second guard window expires.
     const navigateToTarget = (target: string) => {
       try {
         const cur0 = window.location.pathname + window.location.search
-        // ALWAYS kick the stickiness watchdog the moment we're asked
-        // to navigate. The previous design only started it AFTER a
-        // successful 500ms-check landing — but the cold-start
-        // bouncer (server-redirect of `/` → /feed, plus the React
-        // #419 hydration error breaking router.push) wins that race
-        // and the watchdog never starts. With the watchdog kicked
-        // at entry, it polls every 250ms for 10s and re-asserts the
-        // target no matter what else is yanking the URL.
+        // Kick the watchdog FIRST, regardless of current URL.
         try {
           window.dispatchEvent(new CustomEvent('hai:deeplink-landed', { detail: target }))
         } catch {}
-        if (cur0 === target) {
-          try {
-            sessionStorage.removeItem(PENDING_KEY)
-            sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))
-          } catch {}
-          return
-        }
+        // Always refresh the landed-at timestamp so SwUpdateReload's
+        // guard window keeps extending while we're chasing the target.
+        try { sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now())) } catch {}
+        if (cur0 === target) return
         console.log('[PUSH] navigateToTarget →', target, 'from', cur0)
         try {
           routerRef.current.push(target)
         } catch (err) {
           console.error('[PUSH] router.push threw:', err)
         }
-        setTimeout(() => {
-          const cur1 = window.location.pathname + window.location.search
-          if (cur1 === target) {
-            try {
-            sessionStorage.removeItem(PENDING_KEY)
-            // Mark that a deeplink just landed so SwUpdateReload
-            // skips its auto-reload — see SwUpdateReload.tsx for why.
-            sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))
-          } catch {}
-          // Activate the stickiness watchdog on this target — if any
-          // other code re-navigates to /feed within 10s, we'll catch
-          // it and force a return here.
-          try {
-            window.dispatchEvent(new CustomEvent('hai:deeplink-landed', { detail: target }))
-          } catch {}
-            return
-          }
-          // Fallback: full assign with retries
-          let attempts = 0
-          const MAX_ATTEMPTS = 16
-          const tick = () => {
-            const cur = window.location.pathname + window.location.search
-            if (cur === target) {
-              try {
-            sessionStorage.removeItem(PENDING_KEY)
-            // Mark that a deeplink just landed so SwUpdateReload
-            // skips its auto-reload — see SwUpdateReload.tsx for why.
-            sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))
-          } catch {}
-          // Activate the stickiness watchdog on this target — if any
-          // other code re-navigates to /feed within 10s, we'll catch
-          // it and force a return here.
-          try {
-            window.dispatchEvent(new CustomEvent('hai:deeplink-landed', { detail: target }))
-          } catch {}
-              return
-            }
-            try { window.location.assign(target) } catch (err) {
-              console.error('[PUSH] assign failed:', err)
-            }
-            attempts++
-            if (attempts < MAX_ATTEMPTS) setTimeout(tick, 250)
-            else console.warn('[PUSH] nav exhausted; on', cur, 'wanted', target)
-          }
-          tick()
-        }, 500)
       } catch (err) {
         console.error('[PUSH] navigateToTarget failed:', err)
       }
