@@ -56,9 +56,18 @@ export async function GET(req: NextRequest) {
   const categoryParam = url.searchParams.get('category')
   const q = (url.searchParams.get('q') || '').trim()
   // Browse is offset-paginated so a big neighborhood (hundreds of contacts)
-  // isn't capped at one page. Search is a single wider window filtered in JS.
+  // isn't capped at one page.
   const offset = q ? 0 : Math.min(100_000, Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0))
 
+  // SEARCH FIX (2026-06-02): when a query is set, fetch the WHOLE
+  // neighborhood's contacts and JS-filter. Previously `take: PAGE_SIZE*6`
+  // capped the prefetch at ~120 rows ordered by verification/rating, so
+  // any contact ranked below that window was invisible to search — most
+  // visible when the category filter was "All" (the result set is then
+  // the entire neighborhood, easy to overflow the cap). With a specific
+  // category the set is small enough that the cap rarely hit. Take is
+  // unbounded only when q is non-empty; the bare browse path still
+  // paginates the same way.
   const rows = await db.directoryServiceContact.findMany({
     where: {
       neighborhoodId: targetNeighborhoodId,
@@ -66,7 +75,7 @@ export async function GET(req: NextRequest) {
       ...(categoryParam && isValidServiceCategory(categoryParam) ? { category: categoryParam } : {}),
     },
     orderBy: [{ verification: 'desc' }, { ratingAvg: 'desc' }, { createdAt: 'desc' }],
-    ...(q ? { take: PAGE_SIZE * 6 } : { take: PAGE_SIZE, skip: offset }),
+    ...(q ? {} : { take: PAGE_SIZE, skip: offset }),
     include: { serviceIdentity: { select: { phoneEnc: true, ownerUserId: true } } },
   })
 

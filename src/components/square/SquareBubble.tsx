@@ -138,12 +138,17 @@ export default function SquareBubble({
           </div>
         )}
 
-        {/* Bubble column. items-end / items-start handles the
-            within-column alignment of the sender label, bubble,
-            reactions chip and timestamp. */}
+        {/* Bubble column. flex-1 so it spans the rest of the row;
+            the bubble itself caps at max-w-[85%] inside the column.
+            Use ltr:/rtl: variants so OWN messages sit on the RIGHT
+            in Arabic (RTL) and on the RIGHT in English (LTR) —
+            without the variants, every bubble clumps at the row's
+            start (= right in RTL) regardless of sender. */}
         <div
-          className={`flex flex-col min-w-0 max-w-[85%] ${
-            isMe ? 'items-end' : 'items-start'
+          className={`flex flex-col flex-1 min-w-0 ${
+            isMe
+              ? 'ltr:items-end rtl:items-start'
+              : 'ltr:items-start rtl:items-end'
           }`}
         >
           {showSenderLabel && (
@@ -165,7 +170,7 @@ export default function SquareBubble({
             </button>
           )}
 
-          <div data-msg-id={message.id} {...longPress}>
+          <div className="max-w-[85%]" data-msg-id={message.id} {...longPress}>
             {(replyTo || replyUnavailable) && (
               <SquareReplyQuote
                 reply={
