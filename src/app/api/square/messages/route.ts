@@ -53,6 +53,8 @@ export async function GET(req: NextRequest) {
   try {
     // Pull `take + 1` newest-first so we can answer hasMore in one
     // query; then reverse the slice for ascending-order rendering.
+    // replyTo is included one level deep (author name only) so each
+    // bubble can render its quote inline without a second roundtrip.
     const rows = await db.squareMessage.findMany({
       where: {
         neighborhoodId: me.neighborhoodId,
@@ -66,6 +68,12 @@ export async function GET(req: NextRequest) {
           select: {
             id: true, name: true, lastName: true, avatarUrl: true,
             reputation: true, membership: true, role: true,
+          },
+        },
+        replyTo: {
+          select: {
+            id: true, authorId: true, body: true, status: true,
+            author: { select: { name: true, lastName: true } },
           },
         },
       },
@@ -200,6 +208,12 @@ export async function POST(req: NextRequest) {
         select: {
           id: true, name: true, lastName: true, avatarUrl: true,
           reputation: true, membership: true, role: true,
+        },
+      },
+      replyTo: {
+        select: {
+          id: true, authorId: true, body: true, status: true,
+          author: { select: { name: true, lastName: true } },
         },
       },
     },

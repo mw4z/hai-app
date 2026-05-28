@@ -1,53 +1,77 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-import { FiAlertCircle, FiSend } from 'react-icons/fi'
+import { FiAlertCircle, FiPaperclip, FiSend, FiX } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import { hapticLight } from '@/lib/haptic'
 import { detectSquareIntent } from '@/lib/square/detectIntent'
-import type { PublicSquareMessage } from '@/lib/square/serializeMessage'
+import { fullName } from '@/lib/displayName'
+import PlacePickerSheet from '@/components/places/PlacePickerSheet'
+import { formatContactSnippet } from '@/lib/contactPicker'
+import type {
+  PublicSquareMessage,
+  PublicSquareReplyTo,
+} from '@/lib/square/serializeMessage'
 
-/** Body-class flag that signals "the Square composer is focused, the
- *  iOS keyboard is open, hide the global BottomNav so it doesn't
- *  fight the composer for the same strip of pixels". The matching
- *  CSS rule lives in globals.css. */
+/** Body-class flag — present while the composer's input has focus and
+ *  the iOS keyboard is up. The matching CSS rule in globals.css hides
+ *  the global BottomNav so the composer doesn't fight it for the
+ *  same strip of pixels above the keyboard. */
 const KBD_BODY_CLASS = 'square-composer-focused'
 
 interface Props {
-  /** Called after a successful send so the parent can append to the
-   *  list + auto-scroll. Receives the freshly-created message. */
+  /** Identity of the viewer — used to render "You" in the reply
+   *  preview when the staged reply targets the user's own message. */
+  currentUserId: string
+  /** Fires after a successful send so the parent can append + auto-scroll. */
   onSent: (message: PublicSquareMessage) => void
+  /** Reply target ("staging" state) — when non-null, a preview bar
+   *  appears above the input row with an X to cancel. Send POSTS
+   *  with replyToMessageId set; on success the parent clears this. */
+  replyingTo: PublicSquareReplyTo | null
+  setReplyingTo: (r: PublicSquareReplyTo | null) => void
 }
 
 /**
- * Sticky bottom Square composer. Single text field + send button.
+ * The Square composer — adapted from the DM composer in ChatClient.tsx
+ * with Square's stricter rules:
  *
- * Deliberately bare:
- *   - NO title field (this is a chronological message space, not a
- *     thread composer).
- *   - NO media affordances (text-only is enforced server-side too).
- *   - NO kind picker in MVP — messages default to GENERAL. The schema
- *     keeps the column for a future, post-data UI nudge.
+ *   - Same glass-bottom wrapper + safe-area padding.
+ *   - Same reply preview bar above the input.
+ *   - Same input + circular send button styling.
+ *   - Single attach button (paperclip) that opens PlacePickerSheet
+ *     directly — Square's only allowed attachment is a directory
+ *     place, so a multi-option menu would be needless friction.
+ *     Picked places land in the body as "/directory/<id>"; the bubble
+ *     renderer uses SmartTextWithPlacePreviews to surface the card.
+ *   - No sticker button, no voice composer, no image upload, no
+ *     contact attach, no location attach.
  *
- * Soft-nudge banner runs detectSquareIntent() on every keystroke; HARD
- * signals (group invite, repeated phone) show the same banner red and
- * the API rejects on send.
+ * Keyboard handling matches DM: on focus, the BottomNav is hidden
+ * (body class) and the composer drops to env(safe-area-inset-bottom)
+ * so it sits flush above the keyboard rather than 4rem up over the
+ * lifted nav.
  */
-export default function SquareComposer({ onSent }: Props) {
+export default function SquareComposer({
+  currentUserId,
+  onSent,
+  replyingTo,
+  setReplyingTo,
+}: Props) {
   const { t, lang } = useLanguage()
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
-  /** True while the textarea has focus and the soft keyboard is up.
-   *  Drives both (a) the composer's own `bottom` (drops to 0 when
-   *  focused so it sits flush above the keyboard) and (b) a body
-   *  class that hides the global BottomNav so the two don't overlap
-   *  on the same pixels — iOS WKWebView slides BOTH up with the
-   *  visual viewport and they collide. */
   const [focused, setFocused] = useState(false)
+  const [placePickerOpen, setPlacePickerOpen] = useState(false)
+  const inputRef = useRef<HTMLInputElement | null>(null)
 
-  // Add/remove the body class in lockstep with focus. Cleanup on
-  // unmount so navigating away (back button, etc.) never leaves the
-  // BottomNav hidden across screens.
+  const intent = useMemo(() => detectSquareIntent(body), [body])
+
+  // Hide the global BottomNav while the input is focused (iOS keyboard
+  // raises both nav and composer with the visual viewport and they
+  // would otherwise share pixels). Cleanup on unmount so a back-press
+  // mid-typing never leaves the nav hidden across other screens.
   useEffect(() => {
     if (typeof document === 'undefined') return
     if (focused) document.body.classList.add(KBD_BODY_CLASS)
@@ -55,7 +79,13 @@ export default function SquareComposer({ onSent }: Props) {
     return () => { document.body.classList.remove(KBD_BODY_CLASS) }
   }, [focused])
 
-  const intent = useMemo(() => detectSquareIntent(body), [body])
+  // When the parent stages a reply, refocus the input so the user
+  // can type immediately without an extra tap. Mirrors DM behavior.
+  useEffect(() => {
+    if (replyingTo) {
+      try { inputRef.current?.focus() } catch { /* ignore */ }
+    }
+  }, [replyingTo])
 
   async function send(e?: React.FormEvent) {
     e?.preventDefault()
@@ -66,7 +96,10 @@ export default function SquareComposer({ onSent }: Props) {
       const res = await fetch('/api/square/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: trimmed }),
+        body: JSON.stringify({
+          body: trimmed,
+          ...(replyingTo ? { replyToMessageId: replyingTo.id } : {}),
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -80,6 +113,7 @@ export default function SquareComposer({ onSent }: Props) {
       if (data?.message) {
         onSent(data.message as PublicSquareMessage)
         setBody('')
+        setReplyingTo(null)
       }
     } catch {
       toast.error(t('square_send_failed'))
@@ -88,30 +122,53 @@ export default function SquareComposer({ onSent }: Props) {
     }
   }
 
+  // Place picker handler — inserts /directory/<id> into the body
+  // (same encoding DM uses). The bubble's SmartTextWithPlacePreviews
+  // renders the place card under the text on the receiving end.
+  function handlePickPlace(item: { kind: 'place' | 'service'; id: string; name: string; phone?: string | null }) {
+    const snippet =
+      item.kind === 'service'
+        ? (item.phone ? formatContactSnippet({ name: item.name, phone: item.phone }) : item.name)
+        : `/directory/${item.id}`
+    if (!snippet) return
+    setBody((prev) => {
+      if (!prev) return snippet
+      if (prev.includes(snippet)) return prev
+      return `${prev.trimEnd()}\n${snippet}`
+    })
+    try { inputRef.current?.focus() } catch { /* ignore */ }
+  }
+
+  const replyAuthorLabel = replyingTo
+    ? replyingTo.authorId === currentUserId
+      ? (lang === 'en' ? 'You' : lang === 'ur' ? 'آپ' : 'أنت')
+      : (fullName({ name: replyingTo.authorName, lastName: replyingTo.authorLastName })
+          || replyingTo.authorName
+          || (lang === 'en' ? 'Neighbor' : 'جار'))
+    : ''
+
   return (
-    <form
-      onSubmit={send}
-      className="fixed inset-x-0 z-20 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 transition-[bottom] duration-200"
-      style={{
-        // Two positions:
-        //  - blurred  → sits above the BottomNav AND clears the FAB's
-        //    -translate-y-5 (20px) protrusion. BN content height is
-        //    ~4rem + safe-bottom; the extra ~1rem on top gives a
-        //    clean visual gap above the FAB instead of flushing into
-        //    the green ring poking up through the nav.
-        //  - focused  → drops flush to the viewport bottom (above the
-        //    keyboard's visual-viewport inset); the BottomNav is
-        //    hidden via the body class so they don't share pixels.
-        bottom: focused
-          ? 'env(safe-area-inset-bottom, 0px)'
-          : 'calc(var(--hai-safe-bottom, 0px) + 5rem)',
-        paddingBottom: focused ? '0px' : 'env(safe-area-inset-bottom, 0px)',
-      }}
-    >
-      <div className="max-w-[640px] mx-auto px-3 py-2 space-y-1.5">
+    <>
+      <div
+        className="glass-bottom fixed inset-x-0 z-20 px-4 w-full transition-[bottom] duration-200"
+        style={{
+          // Mirrors the keyboard fix from the message-only composer:
+          //  - blurred → 5rem above the BottomNav (clears the FAB
+          //    -translate-y-5 protrusion)
+          //  - focused → flush at the visual-viewport bottom (the
+          //    keyboard sits below); BottomNav is hidden via the
+          //    body class so the two don't share pixels.
+          bottom: focused
+            ? 'env(safe-area-inset-bottom, 0px)'
+            : 'calc(var(--hai-safe-bottom, 0px) + 5rem)',
+          paddingBottom: focused
+            ? '0px'
+            : 'calc(var(--hai-safe-bottom, 0px) + 10px)',
+        }}
+      >
         {intent && (
           <div
-            className={`flex items-start gap-2 px-3 py-2 rounded-xl text-[12px] leading-relaxed ${
+            className={`flex items-start gap-2 mx-1 mt-2 px-3 py-2 rounded-xl text-[12px] leading-relaxed ${
               intent.hard
                 ? 'bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-200'
                 : 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-100'
@@ -121,34 +178,72 @@ export default function SquareComposer({ onSent }: Props) {
             <span>{intent.messageAr}</span>
           </div>
         )}
-        <div className="flex items-end gap-2">
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            placeholder={t('square_message_placeholder')}
-            rows={1}
-            maxLength={900}
-            className="flex-1 px-3 py-2.5 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-[14px] leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-            style={{ maxHeight: 140 }}
-          />
+
+        {/* Reply preview bar — same look as DM. Tapping the X cancels
+            the staged reply; the input keeps its content. */}
+        {replyingTo && (
+          <div className="flex items-center gap-2 px-1 pt-2 pb-1">
+            <div className="flex-1 min-w-0 border-s-2 border-primary-500 ps-2.5 py-0.5">
+              <p className="text-[10px] font-bold text-primary-600 dark:text-primary-400">
+                {replyAuthorLabel}
+              </p>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                {(replyingTo.body || '').slice(0, 80)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReplyingTo(null)}
+              className="p-1 text-gray-400 active:scale-90"
+              aria-label={lang === 'en' ? 'Cancel reply' : 'إلغاء الرد'}
+            >
+              <FiX className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 py-2.5">
           <button
-            type="submit"
-            disabled={!body.trim() || sending}
-            className={`px-4 py-2.5 rounded-2xl text-[14px] font-bold transition-transform active:scale-95 inline-flex items-center gap-1.5 ${
-              body.trim() && !sending
-                ? 'bg-primary-600 text-white'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-            }`}
-            aria-label={t('square_message_send')}
+            type="button"
+            onClick={() => { hapticLight(); setPlacePickerOpen(true) }}
+            aria-label={lang === 'en' ? 'Attach from directory' : 'إرفاق من الدليل'}
+            className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-primary-400 active:scale-90 transition-all flex-shrink-0"
           >
-            <FiSend className="w-4 h-4" />
-            <span className="hidden sm:inline">{t('square_message_send')}</span>
+            <FiPaperclip className="w-5 h-5" />
           </button>
+
+          <form onSubmit={send} className="flex-1 min-w-0 flex items-center gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder={t('square_message_placeholder')}
+              maxLength={900}
+              className="flex-1 min-w-0 bg-white/10 dark:bg-white/10 rounded-full px-4 py-2.5 text-[15px] text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-400/40 focus:border-primary-400/30 transition-shadow"
+            />
+            <button
+              type="submit"
+              disabled={sending || !body.trim()}
+              className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white disabled:opacity-30 flex-shrink-0 active:scale-90 transition-all shadow-sm hover:bg-primary-700 glow-primary"
+              aria-label={t('square_message_send')}
+            >
+              <FiSend
+                className="w-4.5 h-4.5"
+                style={lang !== 'en' ? { transform: 'scaleX(-1)' } : undefined}
+              />
+            </button>
+          </form>
         </div>
       </div>
-      <span className="sr-only" aria-hidden>{lang}</span>
-    </form>
+
+      <PlacePickerSheet
+        open={placePickerOpen}
+        onClose={() => setPlacePickerOpen(false)}
+        onSelect={handlePickPlace}
+      />
+    </>
   )
 }

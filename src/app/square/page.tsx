@@ -56,6 +56,12 @@ export default async function SquarePage() {
           reputation: true, membership: true, role: true,
         },
       },
+      replyTo: {
+        select: {
+          id: true, authorId: true, body: true, status: true,
+          author: { select: { name: true, lastName: true } },
+        },
+      },
     },
   })
   let rows: Awaited<ReturnType<typeof fetchRecent>> = []
@@ -84,6 +90,7 @@ export default async function SquarePage() {
       initialMessages={initialMessages}
       hasMoreOlder={hasMoreOlder}
       neighborhoodName={user.neighborhood?.name ?? ''}
+      currentUserId={user.id}
     />
   )
 }
