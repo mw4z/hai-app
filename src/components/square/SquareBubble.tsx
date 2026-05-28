@@ -88,7 +88,6 @@ export default function SquareBubble({
     ? null
     : fullName(message.author) || message.author.name || (lang === 'en' ? 'Neighbor' : 'جار')
   const isVerified = message.author.membership === 'VERIFIED_RESIDENT'
-  const showSenderLabel = !isMe && isFirstInGroup
 
   const timeStr = formatTime(message.createdAt, lang)
 
@@ -167,6 +166,82 @@ export default function SquareBubble({
     return () => { cancelled = true; clearInterval(id) }
   }, [isMe, bubbleVisible, message.id, message.type])
 
+  // ── Bubble chrome (rendered INSIDE each per-type bubble) ──────────
+  // Sender name at the top: shown for OTHER users on the first
+  // bubble of a same-sender group, tapped to open the profile sheet.
+  // Time / reply / bell / view count at the bottom: shown on the
+  // LAST bubble of a group. Both pieces are kept as variables so the
+  // five per-type branches below can drop them in without copying
+  // the JSX five times.
+  const senderHeader = (!isMe && isFirstInGroup) ? (
+    <button
+      type="button"
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAvatarTap(message.author.id) }}
+      className="block mb-1 text-[12.5px] font-bold text-primary-600 dark:text-primary-400 inline-flex items-center gap-1 active:opacity-70 transition-opacity"
+    >
+      <span className="truncate max-w-[200px]">{authorName}</span>
+      {isVerified && (
+        <span
+          className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300"
+          aria-label={lang === 'en' ? 'Verified resident' : 'ساكن مؤكد'}
+          title={lang === 'en' ? 'Verified resident' : 'ساكن مؤكد'}
+        >
+          <FiCheck className="w-2 h-2" strokeWidth={3} />
+        </span>
+      )}
+    </button>
+  ) : null
+
+  const footerTone = isMe
+    ? 'text-white/65'
+    : 'text-gray-500 dark:text-gray-400'
+  const footerArrowTone = isMe
+    ? 'text-white/65 hover:text-white'
+    : 'text-gray-400 hover:text-primary-600 dark:hover:text-primary-400'
+  const metaFooter = isLastInGroup ? (
+    <p
+      className={`text-[10.5px] mt-1.5 inline-flex items-center gap-1.5 ${footerTone} ${
+        isMe ? 'ltr:justify-start rtl:justify-start' : 'ltr:justify-end rtl:justify-end'
+      }`}
+    >
+      {message.type !== 'DELETED' && (
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onQuickReply(message) }}
+          className={`inline-flex items-center justify-center w-4 h-4 rounded-full active:scale-95 transition-colors ${footerArrowTone}`}
+          aria-label={lang === 'en' ? 'Reply' : 'رد'}
+          title={lang === 'en' ? 'Reply' : 'رد'}
+        >
+          <FiCornerUpLeft className="w-3 h-3" strokeWidth={2.5} />
+        </button>
+      )}
+      {message.notificationFiredAt && (
+        <span
+          className={`inline-flex items-center justify-center w-3.5 h-3.5 rounded-full ${
+            isMe
+              ? 'bg-white/20 text-white'
+              : 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300'
+          }`}
+          aria-label={lang === 'en' ? 'Notified neighbors' : 'تم تنبيه الجيران'}
+          title={lang === 'en' ? 'Notified neighbors' : 'تم تنبيه الجيران'}
+        >
+          <FiBell className="w-2.5 h-2.5" strokeWidth={3} />
+        </span>
+      )}
+      <span>{timeStr}</span>
+      {isMe && message.type !== 'DELETED' && (
+        <span
+          className="inline-flex items-center gap-0.5 opacity-80"
+          aria-label={lang === 'en' ? `${viewCount} views` : `${viewCount} مشاهدة`}
+          title={lang === 'en' ? `${viewCount} views` : `${viewCount} مشاهدة`}
+        >
+          <FiEye className="w-2.5 h-2.5" />
+          <span>{viewCount}</span>
+        </span>
+      )}
+    </p>
+  ) : null
+
   return (
     <div
       ref={rowRef}
@@ -241,25 +316,6 @@ export default function SquareBubble({
                 : 'ltr:items-start rtl:items-end'
             }`}
           >
-          {showSenderLabel && (
-            <button
-              type="button"
-              onClick={() => onAvatarTap(message.author.id)}
-              className="px-1 mb-0.5 text-[11px] font-bold text-primary-600 dark:text-primary-400 inline-flex items-center gap-1 active:opacity-70 transition-opacity"
-            >
-              <span className="truncate max-w-[200px]">{authorName}</span>
-              {isVerified && (
-                <span
-                  className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300"
-                  aria-label={lang === 'en' ? 'Verified resident' : 'ساكن مؤكد'}
-                  title={lang === 'en' ? 'Verified resident' : 'ساكن مؤكد'}
-                >
-                  <FiCheck className="w-2 h-2" strokeWidth={3} />
-                </span>
-              )}
-            </button>
-          )}
-
           {/* No max-w here — the OUTER row already caps the bubble at
               max-w-[85%] of the screen. A percentage max-w on this
               wrapper would resolve against the content-sized column
@@ -294,7 +350,7 @@ export default function SquareBubble({
 
             {message.type === 'DELETED' ? (
               <div
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 border border-dashed ${
+                className={`max-w-[85%] rounded-2xl px-4 py-3 border border-dashed ${
                   isMe
                     ? `bg-primary-600/30 border-primary-400/40 ${
                         isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
@@ -304,8 +360,9 @@ export default function SquareBubble({
                       }`
                 }`}
               >
+                {senderHeader}
                 <p
-                  className={`text-[13px] italic ${
+                  className={`text-[13.5px] italic ${
                     isMe
                       ? 'text-primary-100'
                       : 'text-gray-600 dark:text-gray-400'
@@ -315,14 +372,24 @@ export default function SquareBubble({
                     ? (lang === 'en' ? 'You deleted this message' : 'حذفت هذه الرسالة')
                     : (lang === 'en' ? 'This message was deleted' : 'تم حذف هذه الرسالة')}
                 </p>
+                {metaFooter}
               </div>
             ) : message.type === 'STICKER' ? (() => {
               const stickerId = parseStickerRef(message.imageUrl || '')
               if (!stickerId) return null
-              return <Sticker id={stickerId} size={120} />
+              // Stickers are transparent floating art, not a bubble —
+              // wrap them in a minimal container so we still get the
+              // sender name above and the time/reply/views below.
+              return (
+                <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                  {senderHeader}
+                  <Sticker id={stickerId} size={120} />
+                  {metaFooter}
+                </div>
+              )
             })() : message.type === 'VOICE' && message.audioUrl ? (
               <div
-                className={`relative rounded-2xl px-3 py-2.5 shadow-sm ${
+                className={`relative rounded-2xl px-4 py-3 shadow-md ${
                   isMe
                     ? `bg-primary-600 ${
                         isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
@@ -332,15 +399,17 @@ export default function SquareBubble({
                       }`
                 }`}
               >
+                {senderHeader}
                 <VoicePlayer
                   src={message.audioUrl}
                   durationMs={message.audioDurationMs ?? undefined}
                   isMe={isMe}
                 />
+                {metaFooter}
               </div>
             ) : message.type === 'PDF' && message.pdfUrl ? (
               <div
-                className={`relative rounded-2xl px-2.5 py-2 shadow-sm ${
+                className={`relative rounded-2xl px-4 py-3 shadow-md ${
                   isMe
                     ? `bg-primary-600 ${
                         isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
@@ -350,6 +419,7 @@ export default function SquareBubble({
                       }`
                 }`}
               >
+                {senderHeader}
                 <PdfTile
                   url={message.pdfUrl}
                   name={message.pdfName}
@@ -358,17 +428,18 @@ export default function SquareBubble({
                 />
                 {message.body && (
                   <p
-                    className={`mt-1.5 text-[13.5px] leading-relaxed whitespace-pre-wrap break-words ${
+                    className={`mt-2 text-[14px] leading-relaxed whitespace-pre-wrap break-words ${
                       isMe ? 'text-white' : 'text-gray-800 dark:text-gray-100'
                     }`}
                   >
                     {message.body}
                   </p>
                 )}
+                {metaFooter}
               </div>
             ) : message.type === 'LOCATION' && message.lat != null && message.lng != null ? (
               <div
-                className={`relative rounded-2xl px-3.5 py-2.5 shadow-sm ${
+                className={`relative rounded-2xl px-4 py-3 shadow-md ${
                   isMe
                     ? `bg-primary-600 text-white ${
                         isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
@@ -378,6 +449,7 @@ export default function SquareBubble({
                       }`
                 }`}
               >
+                {senderHeader}
                 <div className={`flex items-center gap-1.5 mb-1 ${isMe ? 'text-primary-100' : 'text-primary-600 dark:text-primary-400'}`}>
                   <FiMapPin className="w-3.5 h-3.5" />
                   <span className="text-xs font-medium">
@@ -408,14 +480,15 @@ export default function SquareBubble({
                   </p>
                 </a>
                 {message.body && (
-                  <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap break-words mt-1">
+                  <p className="text-[14px] leading-relaxed whitespace-pre-wrap break-words mt-1">
                     {message.body}
                   </p>
                 )}
+                {metaFooter}
               </div>
             ) : (
               <div
-                className={`relative rounded-2xl px-3 py-2 shadow-sm ${
+                className={`relative rounded-2xl px-4 py-3 shadow-md ${
                   isMe
                     ? `bg-primary-600 text-white ${
                         isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
@@ -425,12 +498,14 @@ export default function SquareBubble({
                       }`
                 }`}
               >
-                <div className="text-[14.5px] leading-relaxed whitespace-pre-wrap break-words">
+                {senderHeader}
+                <div className="text-[15px] leading-relaxed whitespace-pre-wrap break-words">
                   <SmartTextWithPlacePreviews
                     text={message.body || ''}
                     variant={isMe ? 'onGreen' : 'light'}
                   />
                 </div>
+                {metaFooter}
               </div>
             )}
           </div>
@@ -496,61 +571,9 @@ export default function SquareBubble({
             </div>
           )}
 
-          {/* Timestamp — ONLY on the last bubble in a same-sender group
-              so a run of quick messages doesn't repeat the same time
-              under each one. The 🔔 indicator rides along the same
-              row when notify-neighbors fired. */}
-          {isLastInGroup && (
-            <p
-              className={`text-[10px] mt-1 px-1 text-gray-400 inline-flex items-center gap-1 ${
-                isMe ? 'ltr:text-start rtl:text-end' : 'ltr:text-end rtl:text-start'
-              }`}
-            >
-              {/* Quick-reply arrow — always visible (except on
-                  DELETED tombstones), tap fires onQuickReply which
-                  stages the message in the composer's reply bar.
-                  Saves a long-press on a feature users hit constantly. */}
-              {message.type !== 'DELETED' && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    onQuickReply(message)
-                  }}
-                  className="inline-flex items-center justify-center w-4 h-4 rounded-full text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 active:scale-95 transition-colors"
-                  aria-label={lang === 'en' ? 'Reply' : 'رد'}
-                  title={lang === 'en' ? 'Reply' : 'رد'}
-                >
-                  <FiCornerUpLeft className="w-3 h-3" strokeWidth={2.5} />
-                </button>
-              )}
-              {message.notificationFiredAt && (
-                <span
-                  className={`inline-flex items-center justify-center w-3.5 h-3.5 rounded-full ${
-                    isMe
-                      ? 'bg-primary-100 text-primary-700'
-                      : 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300'
-                  }`}
-                  aria-label={lang === 'en' ? 'Notified neighbors' : 'تم تنبيه الجيران'}
-                  title={lang === 'en' ? 'Notified neighbors' : 'تم تنبيه الجيران'}
-                >
-                  <FiBell className="w-2.5 h-2.5" strokeWidth={3} />
-                </span>
-              )}
-              <span>{timeStr}</span>
-              {isMe && message.type !== 'DELETED' && (
-                <span
-                  className="inline-flex items-center gap-0.5 opacity-70"
-                  aria-label={lang === 'en' ? `${viewCount} views` : `${viewCount} مشاهدة`}
-                  title={lang === 'en' ? `${viewCount} views` : `${viewCount} مشاهدة`}
-                >
-                  <FiEye className="w-2.5 h-2.5" />
-                  <span>{viewCount}</span>
-                </span>
-              )}
-            </p>
-          )}
+          {/* Outside timestamp row removed — metaFooter (time / reply
+              arrow / bell / view count) is now rendered INSIDE each
+              per-type bubble above. */}
         </div>
 
         {/* Own avatar — matches the other-user slot but rendered AFTER

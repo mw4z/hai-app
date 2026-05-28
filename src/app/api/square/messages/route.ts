@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
   const me = await db.user.findUnique({
     where: { id: session.userId },
     select: {
-      id: true, role: true, status: true,
+      id: true, name: true, role: true, status: true,
       neighborhoodId: true, createdAt: true, reputation: true,
     },
   })
