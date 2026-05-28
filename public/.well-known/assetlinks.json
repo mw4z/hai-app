@@ -1,11 +1,15 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "com.hai.app",
       "sha256_cert_fingerprints": [
-        "01:52:0C:DD:1D:2D:29:D5:24:33:C5:46:43:65:4D:4D:69:A3:55:25:D6:16:ED:3B:9B:83:3F:3D:CE:22:8D:A8"
+        "01:52:0C:DD:1D:2D:29:D5:24:33:C5:46:43:65:4D:4D:69:A3:55:25:D6:16:ED:3B:9B:83:3F:3D:CE:22:8D:A8",
+        "44:EC:68:49:AC:E8:4A:96:68:24:02:22:54:DD:B9:E5:2C:BF:3E:26:22:2B:7A:DA:82:BE:AC:6C:F1:0C:33:38"
       ]
     }
   }
