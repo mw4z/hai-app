@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { apiError } from '@/lib/validation'
 import { isSquareAdminRole } from '@/lib/square/isSquareAdmin'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 
 interface Params { params: Promise<{ id: string }> }
 
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params
   const msg = await db.squareMessage.findUnique({
     where: { id },
-    select: { id: true, neighborhoodId: true, status: true, reactions: true },
+    select: { id: true, neighborhoodId: true, status: true, reactions: true, authorId: true, body: true, type: true },
   })
   if (!msg || msg.neighborhoodId !== me.neighborhoodId) {
     return NextResponse.json(apiError('Not found', 404), { status: 404 })
@@ -90,6 +91,57 @@ export async function POST(req: NextRequest, { params }: Params) {
     data: { reactions: next as unknown as object[] },
     select: { reactions: true },
   })
+
+  // ── Reaction notification ─────────────────────────────────────────
+  // Fire ONLY on an additive reaction (no prior mine, or replace) —
+  // not on removal (no point pinging someone because a reaction was
+  // un-set). Skip self-reactions. Dedup key is (messageId, reactorId,
+  // emoji) so flipping emoji X→Y→X doesn't spam the author.
+  const isAddition = !mine || mine.emoji !== emoji
+  if (isAddition && msg.authorId !== me.id) {
+    try {
+      const actor = await db.user.findUnique({
+        where: { id: me.id },
+        select: { name: true },
+      })
+      const actorName = (actor?.name || '').trim() || 'جار'
+      const preview = (msg.body || '').trim().slice(0, 180) ||
+        (msg.type === 'VOICE' ? '🎙️' : msg.type === 'PDF' ? '📄' : msg.type === 'LOCATION' ? '📍' : msg.type === 'STICKER' ? '✨' : '')
+      await db.$transaction(async (tx) => {
+        await tx.notification.create({
+          data: {
+            type: 'SYSTEM' as const,
+            userId: msg.authorId,
+            actorId: me.id,
+            actorName,
+            title: `${emoji} تفاعل جديد على رسالتك`,
+            titleEn: `${emoji} New reaction on your message`,
+            body: preview,
+            bodyEn: preview,
+          },
+        })
+        await tx.notifJob.create({
+          data: {
+            type: 'square_reaction',
+            priority: 'normal',
+            targetType: 'user',
+            targetRef: msg.authorId,
+            dedupKey: `square_reaction:${msg.id}:${me.id}:${emoji}`,
+            payload: {
+              messageId: msg.id,
+              emoji,
+              actorId: me.id,
+              actorName,
+              preview,
+            },
+          },
+        })
+      })
+      try { kickNotifCron() } catch { /* fire-and-forget */ }
+    } catch (err) {
+      console.warn('[SQUARE_REACTION_NOTIF] failed:', (err as Error)?.message)
+    }
+  }
 
   return NextResponse.json({ reactions: updated.reactions })
 }

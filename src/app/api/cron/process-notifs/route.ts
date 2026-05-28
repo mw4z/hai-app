@@ -531,6 +531,117 @@ async function processSquareNotify(job: JobRow): Promise<JobOutcome> {
   return 'done'
 }
 
+/**
+ * Single-recipient push for a Square reply: notifies the author of
+ * the original message that someone replied. targetRef = recipient
+ * user id. dedupKey on the job is per-reply so a repost of the same
+ * reply doesn't double-fire.
+ */
+async function processSquareReply(job: JobRow): Promise<JobOutcome> {
+  const p = (job.payload || {}) as {
+    messageId?: string
+    parentMessageId?: string
+    actorId?: string
+    actorName?: string
+    preview?: string
+  }
+  const { messageId, parentMessageId, actorId, actorName, preview } = p
+  if (!messageId || !parentMessageId || !actorId) return 'dropped'
+
+  // Verify the reply still exists + is ACTIVE before paging anyone.
+  const reply = await db.squareMessage.findUnique({
+    where: { id: messageId },
+    select: { status: true, type: true, neighborhoodId: true },
+  })
+  if (!reply || reply.status !== 'ACTIVE' || reply.type === 'DELETED') return 'dropped'
+
+  const { tokens, userExists } = await resolveUserTokens(job.targetRef, 'commentOnYours')
+  if (!userExists) return 'dropped'
+  if (tokens.length === 0) return 'dropped'
+
+  const cleanActor = (actorName || '').trim() || 'جار'
+  const safePreview = (preview || '').trim().slice(0, 180) || 'رد جديد على رسالتك'
+
+  const result = await sendPushBatch(tokens, {
+    title: `↩️ ${cleanActor} رد على رسالتك`,
+    body: safePreview,
+    priority: 'normal',
+    refs: { contentType: 'squareMessage', contentId: messageId },
+    collapseId: `square-reply:${messageId}`,
+    data: {
+      type: 'square_reply',
+      messageId,
+      parentMessageId,
+      deeplink: 'hai://square',
+    },
+  })
+
+  await cleanupInvalidTokens(result.invalidTokens, job.id, job.type)
+  if (result.success === 0 && result.failed > 0) {
+    throw new Error(result.firstError || 'all push sends failed')
+  }
+  return 'done'
+}
+
+/**
+ * Single-recipient push for a Square reaction: notifies the message's
+ * author that someone reacted. The job's dedupKey includes the
+ * (messageId, reactorId, emoji) tuple so flipping the same emoji
+ * twice doesn't notify twice.
+ */
+async function processSquareReaction(job: JobRow): Promise<JobOutcome> {
+  const p = (job.payload || {}) as {
+    messageId?: string
+    emoji?: string
+    actorId?: string
+    actorName?: string
+    preview?: string
+  }
+  const { messageId, emoji, actorId, actorName, preview } = p
+  if (!messageId || !emoji || !actorId) return 'dropped'
+
+  // Make sure the reactor's emoji is still on the message — if it
+  // was un-reacted before this job ran, drop the push.
+  const msg = await db.squareMessage.findUnique({
+    where: { id: messageId },
+    select: { status: true, type: true, reactions: true },
+  })
+  if (!msg || msg.status !== 'ACTIVE' || msg.type === 'DELETED') return 'dropped'
+  const stillThere = Array.isArray(msg.reactions)
+    && (msg.reactions as Array<{ emoji?: string; userId?: string }>)
+        .some((r) => r?.userId === actorId && r?.emoji === emoji)
+  if (!stillThere) return 'dropped'
+
+  const { tokens, userExists } = await resolveUserTokens(job.targetRef, 'reactionOnYours')
+  if (!userExists) return 'dropped'
+  if (tokens.length === 0) return 'dropped'
+
+  const cleanActor = (actorName || '').trim() || 'جار'
+  const safePreview = (preview || '').trim().slice(0, 180)
+
+  const result = await sendPushBatch(tokens, {
+    title: `${emoji} ${cleanActor} تفاعل مع رسالتك`,
+    body: safePreview || 'تفاعل جديد على رسالتك في الساحة',
+    priority: 'normal',
+    refs: { contentType: 'squareMessage', contentId: messageId },
+    // Collapse all reactions on the same message into one banner so
+    // the recipient isn't spammed with one push per emoji.
+    collapseId: `square-react:${messageId}`,
+    data: {
+      type: 'square_reaction',
+      messageId,
+      emoji,
+      deeplink: 'hai://square',
+    },
+  })
+
+  await cleanupInvalidTokens(result.invalidTokens, job.id, job.type)
+  if (result.success === 0 && result.failed > 0) {
+    throw new Error(result.firstError || 'all push sends failed')
+  }
+  return 'done'
+}
+
 async function resolveEmergencyTokens(
   neighborhoodId: string,
 ): Promise<ResolvedTokens> {
@@ -2040,6 +2151,12 @@ async function handle(req: NextRequest) {
           break
         case 'square_notify':
           outcome = await processSquareNotify(job)
+          break
+        case 'square_reply':
+          outcome = await processSquareReply(job)
+          break
+        case 'square_reaction':
+          outcome = await processSquareReaction(job)
           break
         case 'user_report':
           outcome = await processUserReport(job)

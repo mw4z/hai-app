@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FiBell, FiCheck, FiEdit3, FiEye, FiMapPin } from 'react-icons/fi'
+import { FiBell, FiCheck, FiCornerUpLeft, FiEdit3, FiEye, FiMapPin } from 'react-icons/fi'
 
 // Shared per-session "already reported" set so navigating away and
 // back doesn't double-POST the same message — mirrors PostCard's
@@ -44,6 +44,10 @@ interface Props {
   /** Inline "نبّه الحي" chip — own messages that haven't been fired
    *  on yet. Server still enforces the 24h-per-user rate limit. */
   onNotify: (message: PublicSquareMessage) => void
+  /** Quick-reply arrow on the bubble — stages this message as the
+   *  composer's reply target without going through the long-press
+   *  action sheet. */
+  onQuickReply: (message: PublicSquareMessage) => void
   selected: boolean
 }
 
@@ -72,6 +76,7 @@ export default function SquareBubble({
   onToggleReaction,
   onMakePost,
   onNotify,
+  onQuickReply,
   selected,
 }: Props) {
   const { lang } = useLanguage()
@@ -501,6 +506,25 @@ export default function SquareBubble({
                 isMe ? 'ltr:text-start rtl:text-end' : 'ltr:text-end rtl:text-start'
               }`}
             >
+              {/* Quick-reply arrow — always visible (except on
+                  DELETED tombstones), tap fires onQuickReply which
+                  stages the message in the composer's reply bar.
+                  Saves a long-press on a feature users hit constantly. */}
+              {message.type !== 'DELETED' && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onQuickReply(message)
+                  }}
+                  className="inline-flex items-center justify-center w-4 h-4 rounded-full text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 active:scale-95 transition-colors"
+                  aria-label={lang === 'en' ? 'Reply' : 'رد'}
+                  title={lang === 'en' ? 'Reply' : 'رد'}
+                >
+                  <FiCornerUpLeft className="w-3 h-3" strokeWidth={2.5} />
+                </button>
+              )}
               {message.notificationFiredAt && (
                 <span
                   className={`inline-flex items-center justify-center w-3.5 h-3.5 rounded-full ${

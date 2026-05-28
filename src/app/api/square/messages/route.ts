@@ -7,6 +7,7 @@ import { isSuperAdminRole } from '@/lib/isSuperAdmin'
 import { detectSquareIntent } from '@/lib/square/detectIntent'
 import { checkSquareMessageRateLimit } from '@/lib/square/rateLimit'
 import { isSquareTableMissingError } from '@/lib/square/migrationGate'
+import { kickNotifCron } from '@/lib/kickNotifCron'
 import {
   serializeSquareMessage,
   type PublicSquareMessage,
@@ -261,10 +262,12 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Reply target validation — same scope as v1 ───────────────────
+  // Also pull authorId here so we can notify them after the create.
+  let replyParentAuthorId: string | null = null
   if (replyToMessageId) {
     const parent = await db.squareMessage.findUnique({
       where: { id: replyToMessageId },
-      select: { neighborhoodId: true, status: true },
+      select: { neighborhoodId: true, status: true, authorId: true },
     })
     const sameHood = parent && parent.neighborhoodId === me.neighborhoodId
     const visible = parent && parent.status === 'ACTIVE'
@@ -274,6 +277,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       )
     }
+    replyParentAuthorId = parent?.authorId ?? null
   }
 
   const created = await db.squareMessage.create({
@@ -286,6 +290,52 @@ export async function POST(req: NextRequest) {
     },
     include: messageInclude,
   })
+
+  // ── Reply notification — bell row + push job ──────────────────────
+  // Fire when a reply target exists and the replier is NOT the
+  // original message's author (no self-notifications). Best-effort;
+  // a failure here never blocks the message creation.
+  if (replyParentAuthorId && replyParentAuthorId !== me.id) {
+    try {
+      const actorName = (me.name || '').trim() || 'جار'
+      const previewSource = (created.body || '').trim()
+        || (created.type === 'VOICE' ? '🎙️' : created.type === 'PDF' ? '📄' : created.type === 'LOCATION' ? '📍' : created.type === 'STICKER' ? '✨' : '')
+      const preview = previewSource.slice(0, 180)
+      await db.$transaction(async (tx) => {
+        await tx.notification.create({
+          data: {
+            type: 'SYSTEM' as const,
+            userId: replyParentAuthorId,
+            actorId: me.id,
+            actorName,
+            title: 'رد جديد على رسالتك',
+            titleEn: 'New reply to your message',
+            body: preview,
+            bodyEn: preview,
+          },
+        })
+        await tx.notifJob.create({
+          data: {
+            type: 'square_reply',
+            priority: 'normal',
+            targetType: 'user',
+            targetRef: replyParentAuthorId,
+            dedupKey: `square_reply:${created.id}`,
+            payload: {
+              messageId: created.id,
+              parentMessageId: replyToMessageId,
+              actorId: me.id,
+              actorName,
+              preview,
+            },
+          },
+        })
+      })
+      try { kickNotifCron() } catch { /* fire-and-forget */ }
+    } catch (err) {
+      console.warn('[SQUARE_REPLY_NOTIF] failed:', (err as Error)?.message)
+    }
+  }
 
   return NextResponse.json({
     message: serializeSquareMessage(created, { viewerId: me.id }),

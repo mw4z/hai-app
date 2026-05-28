@@ -207,6 +207,21 @@ export default function SquareFeedClient({
     })
     setSelectedMsg(null)
   }
+
+  // Quick-reply variant: triggered by the small reply arrow on the
+  // bubble itself, so we DON'T have a long-press-selected message to
+  // pull from — the bubble passes the target directly.
+  function handleQuickReply(msg: PublicSquareMessage) {
+    setReplyingTo({
+      id: msg.id,
+      authorId: msg.author.id,
+      authorName: msg.author.name,
+      authorLastName: msg.author.lastName,
+      body: msg.body,
+      type: msg.type,
+      status: msg.status,
+    })
+  }
   async function handleCopy() {
     if (!selectedMsg) return
     try {
@@ -524,6 +539,7 @@ export default function SquareFeedClient({
                 onToggleReaction={handleToggleReaction}
                 onMakePost={handleMakePostForMessage}
                 onNotify={handleNotifyForMessage}
+                onQuickReply={handleQuickReply}
               />
             ))
           )}
