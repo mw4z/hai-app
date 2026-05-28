@@ -2,21 +2,23 @@ import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { isSquareAdminRole } from '@/lib/square/isSquareAdmin'
-import { serializeSquareThread, type PublicSquareThread } from '@/lib/square/serializeThread'
-import SquareListClient from './SquareListClient'
+import {
+  serializeSquareMessage,
+  type PublicSquareMessage,
+} from '@/lib/square/serializeMessage'
+import SquareFeedClient from './SquareFeedClient'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Square (ساحة الحي) list page. Admin-only in MVP — non-admins get
- * notFound() (matches the /mod/pinned convention; we don't advertise
- * the feature's existence to users it isn't open for yet).
+ * Square (ساحة الحي) — single shared neighborhood message space.
+ * Admin-only in MVP; non-admins get notFound() (matches the /mod
+ * convention — we don't advertise the feature's existence yet).
  *
- * SSR seeds the first page of threads (PINNED first, then by
- * lastActivityAt desc) so first paint has content; client component
- * handles paginated load-more.
+ * SSR seeds the most-recent page so the first paint already shows
+ * content; client paginates older on scroll-up.
  */
-const PAGE_SIZE = 20
+const PAGE_SIZE = 30
 
 export default async function SquarePage() {
   const session = await getSession()
@@ -33,20 +35,15 @@ export default async function SquarePage() {
   if (!user.neighborhoodId) notFound()
   if (!isSquareAdminRole(user.role)) notFound()
 
-  // Graceful failure if the SquareThread table isn't there yet (deploy
-  // ordering: code can ship before the manual migration is applied —
-  // see the runbook in the PR / project memory). The page renders the
-  // empty state instead of crashing with a 500. The lambda preserves
-  // the include shape so TypeScript still sees `row.author` downstream.
-  const fetchThreadRows = () => db.squareThread.findMany({
+  // Graceful failure: if the migration hasn't been applied yet, render
+  // the empty state instead of bubbling a 500. Lambda wrapper preserves
+  // the include shape for the serializer.
+  const fetchRecent = () => db.squareMessage.findMany({
     where: {
       neighborhoodId: user.neighborhoodId!,
       status: 'ACTIVE' as const,
     },
-    orderBy: [
-      { isPinned: 'desc' as const },
-      { lastActivityAt: 'desc' as const },
-    ],
+    orderBy: { createdAt: 'desc' as const },
     take: PAGE_SIZE + 1,
     include: {
       author: {
@@ -57,35 +54,26 @@ export default async function SquarePage() {
       },
     },
   })
-  let rows: Awaited<ReturnType<typeof fetchThreadRows>> = []
+  let rows: Awaited<ReturnType<typeof fetchRecent>> = []
   try {
-    rows = await fetchThreadRows()
+    rows = await fetchRecent()
   } catch (err) {
     console.error('[square] list query failed — migration may not be applied yet', err)
   }
 
-  const hasMore = rows.length > PAGE_SIZE
-  const slice = hasMore ? rows.slice(0, PAGE_SIZE) : rows
-  let followingThreadIds = new Set<string>()
-  if (slice.length > 0) {
-    try {
-      const follows = await db.squareFollow.findMany({
-        where: { userId: user.id, threadId: { in: slice.map((t) => t.id) } },
-        select: { threadId: true },
-      })
-      followingThreadIds = new Set(follows.map((f) => f.threadId))
-    } catch (err) {
-      console.error('[square] follow query failed', err)
-    }
-  }
-  const initialThreads: PublicSquareThread[] = slice.map((row) =>
-    serializeSquareThread(row, { viewerId: user.id, followingThreadIds }),
+  const hasMoreOlder = rows.length > PAGE_SIZE
+  const slice = hasMoreOlder ? rows.slice(0, PAGE_SIZE) : rows
+  // Server returns desc; reverse to ascending so the client can append
+  // at the bottom and prepend at the top without shuffling.
+  const ascending = [...slice].reverse()
+  const initialMessages: PublicSquareMessage[] = ascending.map((row) =>
+    serializeSquareMessage(row, { viewerId: user.id }),
   )
 
   return (
-    <SquareListClient
-      initialThreads={initialThreads}
-      hasMore={hasMore}
+    <SquareFeedClient
+      initialMessages={initialMessages}
+      hasMoreOlder={hasMoreOlder}
       neighborhoodName={user.neighborhood?.name ?? ''}
     />
   )

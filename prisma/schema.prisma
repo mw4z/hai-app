@@ -41,7 +41,7 @@ model Neighborhood {
   directoryContributions DirectoryContribution[]
   pinnedItems            NeighborhoodPinnedItem[]
   neighborhoodClaims     NeighborhoodClaim[] @relation("neighborhoodClaims")
-  squareThreads          SquareThread[]
+  squareMessages         SquareMessage[]
   createdAt DateTime @default(now())
 }
 
@@ -187,15 +187,12 @@ model User {
   submittedPollRequests PollRequest[] @relation("PollRequestSubmitter")
   reviewedPollRequests  PollRequest[] @relation("PollRequestReviewer")
 
-  // ── Square (ساحة الحي) — admin-only in MVP, opens to all users in
-  // a later phase. Threads they authored, replies they wrote, threads
-  // they follow, and audit relations for pin/hide moderator actions.
-  squareThreads        SquareThread[] @relation("SquareThreadAuthor")
-  squareReplies        SquareReply[]  @relation("SquareReplyAuthor")
-  squareFollows        SquareFollow[]
-  squareThreadsPinned  SquareThread[] @relation("SquareThreadPinner")
-  squareThreadsHidden  SquareThread[] @relation("SquareThreadHider")
-  squareRepliesHidden  SquareReply[]  @relation("SquareReplyHider")
+  // ── Square (ساحة الحي) — single shared neighborhood message space,
+  // admin-only in MVP. Messages this user authored + audit relations
+  // for the (Phase 2) pin / soft-hide moderator actions.
+  squareMessages        SquareMessage[] @relation("SquareMessageAuthor")
+  squareMessagesPinned  SquareMessage[] @relation("SquareMessagePinner")
+  squareMessagesHidden  SquareMessage[] @relation("SquareMessageHider")
 
   // ── Neighborhood Directory (دليل الحي) ─────────────────────────
   // Place submissions are gated by DIRECTORY_ENABLED (server) and
@@ -2498,16 +2495,18 @@ enum PinnedItemAction {
 }
 
 // ─── Square (ساحة الحي) ───────────────────────────────────────────────────────
-// Structured neighborhood discussion space — text-only by design, not a
-// chat room. See src/lib/square/* for the policy + nudge logic, and
-// src/app/square/* for the screens. Admin-only in MVP (gate enforced in
-// API + page layer); opens to all residents in a later phase.
+// Single shared neighborhood message space — text-only, not a chat clone.
+// Every neighborhood has ONE Square; messages render chronologically with
+// a sticky bottom composer. Admin-only in MVP (API + page-level gate);
+// opens to all residents in a later phase. The thread-based first cut
+// was replaced by this single-feed pivot (see migration
+// 20260529_square_message_pivot).
 
-enum SquareType {
-  QUESTION    // سؤال
-  NOTE        // ملاحظة
-  DISCUSSION  // نقاش
-  LIGHT_ALERT // تنبيه خفيف
+enum SquareKind {
+  GENERAL      // عام (default; no UI in MVP — every message defaults here)
+  QUESTION     // سؤال
+  NOTE         // ملاحظة
+  LIGHT_ALERT  // تنبيه خفيف
 }
 
 enum SquareStatus {
@@ -2515,79 +2514,43 @@ enum SquareStatus {
   HIDDEN
 }
 
-model SquareThread {
-  id              String       @id @default(cuid())
-  neighborhoodId  String
-  authorId        String
-  // Title is required; body is optional (question-only threads are
-  // common). Both are bound-checked at the API layer.
-  title           String
-  body            String?
-  type            SquareType   @default(DISCUSSION)
-  status          SquareStatus @default(ACTIVE)
-  isPinned        Boolean      @default(false)
-  pinnedAt        DateTime?
-  pinnedById      String?
-  // Denormalized counters so the list view never has to aggregate.
-  // Maintained inside the same transaction as the insert/update.
-  replyCount      Int          @default(0)
-  followerCount   Int          @default(0)
-  // Updated on every new ACTIVE reply — drives the default list sort.
-  lastActivityAt  DateTime     @default(now())
-  hiddenAt        DateTime?
-  hiddenById      String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+model SquareMessage {
+  id                String         @id @default(cuid())
+  neighborhoodId    String
+  authorId          String
+  body              String
+  kind              SquareKind     @default(GENERAL)
+  status            SquareStatus   @default(ACTIVE)
 
-  neighborhood    Neighborhood   @relation(fields: [neighborhoodId], references: [id])
-  author          User           @relation("SquareThreadAuthor", fields: [authorId], references: [id])
-  pinnedBy        User?          @relation("SquareThreadPinner",  fields: [pinnedById], references: [id])
-  hiddenBy        User?          @relation("SquareThreadHider",   fields: [hiddenById], references: [id])
-  replies         SquareReply[]
-  follows         SquareFollow[]
+  // Optional self-reference for a future "reply to specific message"
+  // affordance. NO UI in MVP — the column exists so we can add the
+  // interaction later without a second migration. ON DELETE SET NULL
+  // so an orphaned reply stays visible if the parent is hard-deleted.
+  replyToMessageId  String?
+  replyTo           SquareMessage? @relation("SquareMessageReplyTo", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  repliesTo         SquareMessage[] @relation("SquareMessageReplyTo")
 
-  // Default list query: neighborhood, status, pinned-first, then
-  // lastActivityAt desc. The composite index covers it directly.
-  @@index([neighborhoodId, status, isPinned, lastActivityAt])
+  // Pin (mod action — Phase 2 UI; schema-ready now).
+  isPinned          Boolean        @default(false)
+  pinnedAt          DateTime?
+  pinnedById        String?
+
+  // Soft-hide (mod action — Phase 2 UI; schema-ready now).
+  hiddenAt          DateTime?
+  hiddenById        String?
+
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  neighborhood      Neighborhood   @relation(fields: [neighborhoodId], references: [id])
+  author            User           @relation("SquareMessageAuthor", fields: [authorId],   references: [id])
+  pinnedBy          User?          @relation("SquareMessagePinner", fields: [pinnedById], references: [id])
+  hiddenBy          User?          @relation("SquareMessageHider",  fields: [hiddenById], references: [id])
+
+  // List query: neighborhood + status + createdAt asc (chronological,
+  // newest at the bottom of the visible list).
+  @@index([neighborhoodId, status, createdAt])
+  @@index([neighborhoodId, isPinned])
   @@index([authorId])
-}
-
-model SquareReply {
-  id              String       @id @default(cuid())
-  threadId        String
-  authorId        String
-  body            String
-  status          SquareStatus @default(ACTIVE)
-  // Author or moderator can mark one reply as the helpful answer
-  // (Phase 2 UI — schema-ready now to avoid a second migration).
-  isMarkedHelpful Boolean      @default(false)
-  hiddenAt        DateTime?
-  hiddenById      String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-
-  thread          SquareThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  author          User         @relation("SquareReplyAuthor", fields: [authorId], references: [id])
-  hiddenBy        User?        @relation("SquareReplyHider",  fields: [hiddenById], references: [id])
-
-  @@index([threadId, createdAt])
-  @@index([authorId])
-}
-
-model SquareFollow {
-  id             String       @id @default(cuid())
-  threadId       String
-  userId         String
-  createdAt      DateTime     @default(now())
-  // Last time we sent THIS follower a push for THIS thread — used to
-  // throttle aggregated notifications (Phase 2). One column lets us
-  // implement the "max 1 push per 10 min per follower per thread"
-  // rule without a separate audit table.
-  lastNotifiedAt DateTime?
-
-  thread         SquareThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([threadId, userId])
-  @@index([userId])
+  @@index([replyToMessageId])
 }
