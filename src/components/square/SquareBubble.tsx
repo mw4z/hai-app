@@ -231,20 +231,18 @@ export default function SquareBubble({
   // tiny chevron we used to tuck into the footer line. Always
   // visible (except on DELETED tombstones).
   //
-  // Vertical alignment is type-aware: regular bubbles anchor the
-  // arrow to the bottom (self-end) so it visually pairs with the
-  // last line of text + the avatar on the row's outer edge.
-  // STICKERS are tall/square floating art with no "tail" — bottom-
-  // aligning makes the arrow look orphaned. Center it instead so
-  // it reads as "this arrow goes with the sticker."
-  const arrowAlignClass = message.type === 'STICKER' ? 'self-center' : 'self-end'
+  // Vertically centered next to the bubble regardless of message
+  // type. Bottom-aligning (self-end) made the arrow look detached
+  // and floating below tall bubbles — the user reported it as
+  // "should be in the middle, not down." self-center keeps it
+  // anchored to the bubble's vertical midpoint in every case.
   const replyArrowButton = message.type !== 'DELETED' ? (
     <button
       type="button"
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); onQuickReply(message) }}
       aria-label={lang === 'en' ? 'Reply' : 'رد'}
       title={lang === 'en' ? 'Reply' : 'رد'}
-      className={`flex-shrink-0 ${arrowAlignClass} inline-flex items-center justify-center w-9 h-9 rounded-full bg-white dark:bg-[#242625] border border-gray-200 dark:border-gray-700 text-primary-600 dark:text-primary-400 shadow-sm hover:bg-primary-50 dark:hover:bg-primary-900/30 active:scale-90 transition-all`}
+      className="flex-shrink-0 self-center inline-flex items-center justify-center w-9 h-9 rounded-full bg-white dark:bg-[#242625] border border-gray-200 dark:border-gray-700 text-primary-600 dark:text-primary-400 shadow-sm hover:bg-primary-50 dark:hover:bg-primary-900/30 active:scale-90 transition-all"
     >
       <FiCornerUpLeft className="w-4 h-4" strokeWidth={2.5} />
     </button>
