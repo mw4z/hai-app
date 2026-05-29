@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { isSquareAdminRole } from '@/lib/square/isSquareAdmin'
+import { resolveSquareLock } from '@/lib/square/lock'
 import { isSquareTableMissingError } from '@/lib/square/migrationGate'
 import {
   serializeSquareMessage,
@@ -29,7 +30,14 @@ export default async function SquarePage() {
     where: { id: session.userId },
     select: {
       id: true, role: true, neighborhoodId: true,
-      neighborhood: { select: { name: true, nameEn: true } },
+      neighborhood: {
+        select: {
+          name: true, nameEn: true,
+          squareLockedAt: true,
+          squareLockedUntil: true,
+          squareLockedById: true,
+        },
+      },
     },
   })
   if (!user) redirect('/login')
@@ -86,6 +94,17 @@ export default async function SquarePage() {
     serializeSquareMessage(row, { viewerId: user.id }),
   )
 
+  // Resolve the lock state SSR so the first paint shows the
+  // correct composer/banner immediately. Client refreshes via
+  // /api/square/lock-status whenever the admin changes it.
+  const initialLock = user.neighborhood
+    ? resolveSquareLock({
+        squareLockedAt: user.neighborhood.squareLockedAt,
+        squareLockedUntil: user.neighborhood.squareLockedUntil,
+        squareLockedById: user.neighborhood.squareLockedById,
+      })
+    : { isLocked: false, isScheduled: false, lockedAt: null, lockedUntil: null, lockedById: null }
+
   return (
     <SquareFeedClient
       initialMessages={initialMessages}
@@ -93,6 +112,13 @@ export default async function SquarePage() {
       neighborhoodName={user.neighborhood?.name ?? ''}
       currentUserId={user.id}
       currentUserRole={user.role}
+      initialLock={{
+        isLocked: initialLock.isLocked,
+        isScheduled: initialLock.isScheduled,
+        lockedAt: initialLock.lockedAt?.toISOString() ?? null,
+        lockedUntil: initialLock.lockedUntil?.toISOString() ?? null,
+        lockedById: initialLock.lockedById,
+      }}
     />
   )
 }

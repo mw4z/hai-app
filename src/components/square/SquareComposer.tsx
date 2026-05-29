@@ -31,6 +31,9 @@ interface Props {
   onSent: (message: PublicSquareMessage) => void
   replyingTo: PublicSquareReplyTo | null
   setReplyingTo: (r: PublicSquareReplyTo | null) => void
+  /** When true, the composer is rendered read-only — all send
+   *  affordances disabled. Used when an admin has locked the chat. */
+  disabled?: boolean
 }
 
 /**
@@ -59,6 +62,7 @@ export default function SquareComposer({
   onSent,
   replyingTo,
   setReplyingTo,
+  disabled = false,
 }: Props) {
   const { t, lang } = useLanguage()
   const router = useRouter()
@@ -68,7 +72,7 @@ export default function SquareComposer({
   const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [placePickerOpen, setPlacePickerOpen] = useState(false)
   const [showStickers, setShowStickers] = useState(false)
-  const pdfInputRef = useRef<HTMLInputElement | null>(null)
+  // PDF input removed — Square no longer accepts PDF uploads.
 
   const inputRef = useRef<HTMLInputElement | null>(null)
   const intent = useMemo(() => detectSquareIntent(body), [body])
@@ -151,22 +155,7 @@ export default function SquareComposer({
     }
   }
 
-  async function handlePdfFile(file: File) {
-    if (sending) return
-    setSending(true)
-    try {
-      const url = await uploadPdf(file)
-      if (!url) {
-        toast.error(lang === 'en' ? 'Upload failed' : 'فشل الرفع')
-        return
-      }
-      await postMessage({ type: 'PDF', pdfUrl: url, pdfName: file.name })
-    } catch {
-      toast.error(lang === 'en' ? 'Upload failed' : 'فشل الرفع')
-    } finally {
-      setSending(false)
-    }
-  }
+  // handlePdfFile removed — PDF attachments are disabled on Square.
 
   async function sendVoice(blob: Blob, mimeType: string, durationMs: number, sizeBytes: number) {
     if (sending) return
@@ -228,6 +217,11 @@ export default function SquareComposer({
     replyingTo?.type === 'LOCATION' ? '📍 ' :
     replyingTo?.type === 'STICKER' ? (lang === 'en' ? '🖼️ Sticker ' : '🖼️ ملصق ') :
     ''
+
+  // When the admin lock is on for a non-mod, the parent renders an
+  // explanatory banner above us; hide the composer entirely so the
+  // resident isn't tempted to type into a dead field.
+  if (disabled) return null
 
   return (
     <>
@@ -297,19 +291,12 @@ export default function SquareComposer({
         )}
 
         <div className="flex items-center gap-2 py-2.5">
-          {/* Hidden PDF input — the AttachmentMenu's "Document" option
-              triggers a click on this. Same flow DM uses. */}
-          <input
-            ref={pdfInputRef}
-            type="file"
-            accept="application/pdf"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file) handlePdfFile(file)
-              if (pdfInputRef.current) pdfInputRef.current.value = ''
-            }}
-          />
+          {/* PDF attachments are DISABLED in Square per content
+              policy — the AttachmentMenu below no longer renders the
+              "Document" tile, and this composer's PDF file input
+              and handler are gone. PDF rendering for legacy/older
+              messages still works in SquareBubble; only new uploads
+              are blocked. */}
 
           <button
             type="button"
@@ -365,7 +352,6 @@ export default function SquareComposer({
         onClose={() => setShowAttachMenu(false)}
         onPickContact={attachContact}
         onPickLocation={pickLocation}
-        onPickDocument={() => pdfInputRef.current?.click()}
         onPickPlace={() => setPlacePickerOpen(true)}
       />
 

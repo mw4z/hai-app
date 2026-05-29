@@ -42,6 +42,21 @@ model Neighborhood {
   pinnedItems            NeighborhoodPinnedItem[]
   neighborhoodClaims     NeighborhoodClaim[] @relation("neighborhoodClaims")
   squareMessages         SquareMessage[]
+
+  // ── Square moderation lock ─────────────────────────────────────
+  // When `squareLockedAt` is set AND in the past AND
+  // `squareLockedUntil` is null-or-in-the-future, the neighborhood's
+  // Square chat is in admin-only mode: residents see a banner and
+  // the composer is disabled; only roles in the admin set can post.
+  // `squareLockedAt` can be a FUTURE time — that's a scheduled lock
+  // that "activates" naturally when the clock crosses it (no cron;
+  // resolution is done at every read / post).
+  // `squareLockedUntil` is the auto-unlock time. Null = stays locked
+  // until an admin manually unlocks.
+  squareLockedAt      DateTime?
+  squareLockedUntil   DateTime?
+  squareLockedById    String?
+
   createdAt DateTime @default(now())
 }
 

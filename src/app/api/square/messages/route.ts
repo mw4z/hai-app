@@ -8,6 +8,7 @@ import { detectSquareIntent } from '@/lib/square/detectIntent'
 import { checkSquareMessageRateLimit } from '@/lib/square/rateLimit'
 import { isSquareTableMissingError } from '@/lib/square/migrationGate'
 import { kickNotifCron } from '@/lib/kickNotifCron'
+import { isSquareModRole, resolveSquareLock } from '@/lib/square/lock'
 import {
   serializeSquareMessage,
   type PublicSquareMessage,
@@ -143,6 +144,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(apiError('حسابك موقوف', 403, 'BANNED'), { status: 403 })
   }
 
+  // ── Square lock enforcement ──────────────────────────────────────
+  // Admins (mods + super) bypass the lock. Everyone else hits a
+  // 403 with a friendly message + unlock time when the chat is in
+  // admin-only mode. Resolved on-the-fly from the neighborhood row
+  // — no cron, no race.
+  if (!isSquareModRole(me.role)) {
+    const hood = await db.neighborhood.findUnique({
+      where: { id: me.neighborhoodId },
+      select: {
+        squareLockedAt: true,
+        squareLockedUntil: true,
+        squareLockedById: true,
+      },
+    })
+    const lockState = hood ? resolveSquareLock(hood) : null
+    if (lockState?.isLocked) {
+      return NextResponse.json(
+        apiError('الساحة مغلقة من قِبل المشرفين حالياً', 403, 'SQUARE_LOCKED'),
+        { status: 403 },
+      )
+    }
+  }
+
   const body = await req.json().catch(() => null)
   if (!body || typeof body !== 'object') {
     return NextResponse.json(apiError('Bad request', 400), { status: 400 })
@@ -208,14 +232,15 @@ export async function POST(req: NextRequest) {
     data.lng = lng
     data.body = text || null
   } else if (type === SquareMessageType.PDF) {
-    const pdfUrl = typeof body.pdfUrl === 'string' ? body.pdfUrl.trim() : ''
-    const pdfName = typeof body.pdfName === 'string' ? body.pdfName.trim() : ''
-    if (!pdfUrl.startsWith('https://') || pdfUrl.length > 500) {
-      return NextResponse.json(apiError('ملف PDF غير صالح.', 400, 'PDF_INVALID'), { status: 400 })
-    }
-    data.pdfUrl = pdfUrl
-    data.pdfName = (pdfName || 'document.pdf').slice(0, PDF_NAME_MAX)
-    data.body = text || null
+    // PDF attachments are NO LONGER ACCEPTED on Square (content
+    // policy). Existing PDF messages already in the DB still render
+    // via the bubble; new uploads are blocked at the API layer
+    // regardless of the client. Use 403 so a stale client knows
+    // it's not a network/format issue.
+    return NextResponse.json(
+      apiError('رفع ملفات PDF غير متاح في الساحة.', 403, 'PDF_DISABLED'),
+      { status: 403 },
+    )
   } else if (type === SquareMessageType.VOICE) {
     const audioUrl = typeof body.audioUrl === 'string' ? body.audioUrl.trim() : ''
     const audioDurationMs = Number.isFinite(body.audioDurationMs) ? Math.floor(body.audioDurationMs) : 0

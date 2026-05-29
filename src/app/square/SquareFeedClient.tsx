@@ -8,6 +8,8 @@ import {
   FiArrowLeft,
   FiArrowRight,
   FiImage,
+  FiLock,
+  FiUnlock,
   FiBell,
   FiCopy,
   FiCornerUpLeft,
@@ -37,6 +39,14 @@ const QUICK_EMOJIS = ['❤️', '👍', '👎', '😂', '😮', '🤲']
  *  ~5-minute convention used by WhatsApp / iMessage. */
 const GROUP_TIME_GAP_MS = 5 * 60 * 1000
 
+interface InitialLock {
+  isLocked: boolean
+  isScheduled: boolean
+  lockedAt: string | null
+  lockedUntil: string | null
+  lockedById: string | null
+}
+
 interface Props {
   /** First page of messages, oldest→newest (server returns ascending). */
   initialMessages: PublicSquareMessage[]
@@ -47,6 +57,9 @@ interface Props {
   /** Caller's role — used to gate the destructive "wipe all messages"
    *  button on the header. SUPER_ADMIN only. */
   currentUserRole: string
+  /** SSR-resolved lock state — used for first paint. Client refreshes
+   *  via /api/square/lock-status whenever the admin acts. */
+  initialLock: InitialLock
 }
 
 const LAST_SEEN_KEY_PREFIX = 'square-last-seen-'
@@ -64,9 +77,17 @@ export default function SquareFeedClient({
   neighborhoodName,
   currentUserId,
   currentUserRole,
+  initialLock,
 }: Props) {
   const isSuperAdmin = currentUserRole === 'SUPER_ADMIN'
+  const isMod = currentUserRole === 'NEIGHBORHOOD_MOD'
+    || currentUserRole === 'PLATFORM_MOD'
+    || currentUserRole === 'SUPER_ADMIN'
   const [wipeBusy, setWipeBusy] = useState(false)
+  // Square lock state — SSR-seeded, refreshed from the server after
+  // any admin action.
+  const [lock, setLock] = useState<InitialLock>(initialLock)
+  const [showLockSheet, setShowLockSheet] = useState(false)
   // Wallpaper — shared preference with DM via localStorage. Picking
   // here syncs to /threads and any other open Square tab via the
   // 'storage' event the hook listens for.
@@ -257,6 +278,37 @@ export default function SquareFeedClient({
       alert((lang === 'en' ? 'Wipe failed: ' : 'فشل الحذف: ') + (err as Error)?.message)
     } finally {
       setWipeBusy(false)
+    }
+  }
+
+  // ── Square lock handlers ──────────────────────────────────────────
+  async function refreshLockStatus() {
+    try {
+      const res = await fetch('/api/square/lock-status', { credentials: 'include' })
+      if (!res.ok) return
+      const data = await res.json() as InitialLock
+      setLock(data)
+    } catch {}
+  }
+
+  async function applyLock(payload: { from?: string | null; until?: string | null; clear?: boolean }) {
+    if (!isMod) return
+    try {
+      const res = await fetch('/api/square/lock', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        alert(lang === 'en' ? `Lock failed: ${data?.error || res.status}` : `فشل القفل: ${data?.error || res.status}`)
+        return
+      }
+      await refreshLockStatus()
+      setShowLockSheet(false)
+    } catch (err) {
+      alert((lang === 'en' ? 'Lock failed: ' : 'فشل القفل: ') + (err as Error)?.message)
     }
   }
 
@@ -536,6 +588,28 @@ export default function SquareFeedClient({
             </p>
           )}
         </div>
+        {/* Lock / unlock — moderators only. Tap to open the schedule
+            sheet (which also offers "lock now indefinitely" + "unlock
+            now"). Visible only when the user can actually use it. */}
+        {isMod && (
+          <button
+            type="button"
+            onClick={() => setShowLockSheet(true)}
+            className={`flex-shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full border active:scale-95 transition-all ${
+              lock.isLocked
+                ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800/60'
+                : 'text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700'
+            }`}
+            aria-label={lang === 'en' ? 'Lock chat' : 'قفل الساحة'}
+            title={
+              lock.isLocked
+                ? (lang === 'en' ? 'Square is locked (mods only)' : 'الساحة مغلقة — اضغط لإدارة القفل')
+                : (lang === 'en' ? 'Lock the Square chat' : 'قفل الساحة (اضغط للجدولة)')
+            }
+          >
+            {lock.isLocked ? <FiLock className="w-4 h-4" /> : <FiUnlock className="w-4 h-4" />}
+          </button>
+        )}
         {/* Wallpaper picker — opens the shared bottom-sheet from
             ChatWallpaperPicker. Available to everyone (it's a
             personal preference, stored in localStorage). Same key
@@ -629,11 +703,31 @@ export default function SquareFeedClient({
         </div>
       </div>
 
+      {/* Lock banner — only shows for non-mods when the chat is
+          actively locked. Mods see this state via the lock icon
+          in the header; their composer stays enabled so they can
+          still post during the lock window. */}
+      {lock.isLocked && !isMod && (
+        <div className="flex-shrink-0 px-4 py-3 bg-amber-50 dark:bg-amber-900/30 border-t border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 text-[13px] text-center">
+          <FiLock className="inline w-3.5 h-3.5 ltr:mr-1 rtl:ml-1 -mt-0.5" />
+          {lang === 'en' ? 'Square is currently in admin-only mode' : 'الساحة الآن في وضع المشرفين فقط — لا يمكن الإرسال'}
+          {lock.lockedUntil && (
+            <span className="block text-[11px] opacity-80 mt-0.5">
+              {lang === 'en' ? 'Until ' : 'حتى '}
+              {new Date(lock.lockedUntil).toLocaleString(lang === 'en' ? 'en-US' : 'ar-SA', {
+                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+              })}
+            </span>
+          )}
+        </div>
+      )}
+
       <SquareComposer
         currentUserId={currentUserId}
         onSent={handleSent}
         replyingTo={replyingTo}
         setReplyingTo={setReplyingTo}
+        disabled={lock.isLocked && !isMod}
       />
 
       {/* Long-press action sheet — Reply / Copy / Report. Same three
@@ -716,7 +810,178 @@ export default function SquareFeedClient({
         currentId={wallpaperId}
         onSelect={setWallpaperId}
       />
+
+      {/* Lock management sheet — mods only (we gate the trigger too,
+          this is belt-and-braces against a stale isMod). */}
+      {isMod && showLockSheet && (
+        <SquareLockSheet
+          lock={lock}
+          onClose={() => setShowLockSheet(false)}
+          onApply={applyLock}
+          lang={lang}
+        />
+      )}
     </div>
+  )
+}
+
+// ── Lock management bottom sheet ────────────────────────────────────
+function SquareLockSheet({
+  lock, onClose, onApply, lang,
+}: {
+  lock: InitialLock
+  onClose: () => void
+  onApply: (p: { from?: string | null; until?: string | null; clear?: boolean }) => Promise<void>
+  lang: string
+}) {
+  const [fromStr, setFromStr] = useState('')
+  const [untilStr, setUntilStr] = useState('')
+  const en = lang === 'en'
+
+  const lockNowFor = (hours: number) => {
+    const until = new Date(Date.now() + hours * 3600_000).toISOString()
+    void onApply({ until })
+  }
+  const lockNowIndefinite = () => void onApply({})
+  const schedule = () => {
+    void onApply({
+      from: fromStr ? new Date(fromStr).toISOString() : null,
+      until: untilStr ? new Date(untilStr).toISOString() : null,
+    })
+  }
+  const clear = () => void onApply({ clear: true })
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={onClose} />
+      <div className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl">
+        <div className="px-5 pt-3 pb-3 touch-none">
+          <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-2" />
+          <h3 className="font-bold text-gray-900 dark:text-white text-center">
+            {en ? 'Square moderation' : 'إدارة الساحة'}
+          </h3>
+          <p className="text-[12px] text-gray-500 dark:text-gray-400 text-center mt-1">
+            {en
+              ? 'Lock the chat so only moderators can post — now or on a schedule.'
+              : 'أوقف الكتابة لغير المشرفين الآن أو على موعد محدد.'}
+          </p>
+        </div>
+        <div className="px-5 pb-6 space-y-4" style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 1.5rem)' }}>
+
+          {/* Current state */}
+          <div className="rounded-2xl bg-gray-50 dark:bg-gray-900/50 p-3 text-[13px]">
+            <div className="font-bold text-gray-900 dark:text-white mb-1">
+              {en ? 'Current state' : 'الحالة الحالية'}
+            </div>
+            {lock.isLocked ? (
+              <div className="text-amber-700 dark:text-amber-300">
+                {en ? '🔒 Admin-only mode' : '🔒 وضع المشرفين فقط'}
+                {lock.lockedUntil && (
+                  <div className="text-[12px] opacity-80 mt-0.5">
+                    {en ? 'until ' : 'حتى '}
+                    {new Date(lock.lockedUntil).toLocaleString(en ? 'en-US' : 'ar-SA')}
+                  </div>
+                )}
+              </div>
+            ) : lock.isScheduled ? (
+              <div className="text-blue-700 dark:text-blue-300">
+                {en ? '⏱ Scheduled lock' : '⏱ قفل مجدول'}
+                <div className="text-[12px] opacity-80 mt-0.5">
+                  {en ? 'starts ' : 'يبدأ '}
+                  {lock.lockedAt && new Date(lock.lockedAt).toLocaleString(en ? 'en-US' : 'ar-SA')}
+                  {lock.lockedUntil && (en ? ' · ends ' : ' · ينتهي ')}
+                  {lock.lockedUntil && new Date(lock.lockedUntil).toLocaleString(en ? 'en-US' : 'ar-SA')}
+                </div>
+              </div>
+            ) : (
+              <div className="text-emerald-700 dark:text-emerald-300">
+                {en ? '🟢 Open — anyone can post' : '🟢 مفتوحة — الجميع يستطيع الكتابة'}
+              </div>
+            )}
+          </div>
+
+          {/* Quick actions */}
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+              {en ? 'Quick lock' : 'قفل سريع'}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { h: 1, label: en ? '1 hour' : 'ساعة' },
+                { h: 8, label: en ? '8 hours' : '٨ ساعات' },
+                { h: 24, label: en ? '24 hours' : '٢٤ ساعة' },
+              ].map(({ h, label }) => (
+                <button
+                  key={h}
+                  type="button"
+                  onClick={() => lockNowFor(h)}
+                  className="rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-200 text-[13px] font-bold py-2.5 transition-colors"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={lockNowIndefinite}
+              className="mt-2 w-full rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/30 dark:hover:bg-rose-900/50 border border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-200 text-[13px] font-bold py-2.5 transition-colors"
+            >
+              {en ? '🔒 Lock indefinitely' : '🔒 قفل بدون موعد'}
+            </button>
+          </div>
+
+          {/* Schedule */}
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+              {en ? 'Schedule' : 'جدولة'}
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              <label className="block">
+                <span className="block text-[11px] text-gray-600 dark:text-gray-300 mb-1">
+                  {en ? 'Start' : 'يبدأ'}
+                </span>
+                <input
+                  type="datetime-local"
+                  value={fromStr}
+                  onChange={(e) => setFromStr(e.target.value)}
+                  className="hai-input w-full"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-[11px] text-gray-600 dark:text-gray-300 mb-1">
+                  {en ? 'End (optional)' : 'ينتهي (اختياري)'}
+                </span>
+                <input
+                  type="datetime-local"
+                  value={untilStr}
+                  onChange={(e) => setUntilStr(e.target.value)}
+                  className="hai-input w-full"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={schedule}
+                disabled={!fromStr && !untilStr}
+                className="mt-1 w-full rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-default text-white text-[13px] font-bold py-2.5 transition-colors"
+              >
+                {en ? 'Save schedule' : 'حفظ الجدولة'}
+              </button>
+            </div>
+          </div>
+
+          {/* Unlock */}
+          {(lock.isLocked || lock.isScheduled) && (
+            <button
+              type="button"
+              onClick={clear}
+              className="w-full rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-200 text-[13px] font-bold py-2.5 transition-colors"
+            >
+              {en ? '🟢 Unlock now' : '🟢 فتح الساحة الآن'}
+            </button>
+          )}
+        </div>
+      </div>
+    </>
   )
 }
 
