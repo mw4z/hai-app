@@ -219,6 +219,11 @@ export default function FeedClient({
     const tryScroll = () => {
       const el = document.getElementById(`post-${highlightPostId}`)
       if (el) {
+        // Clear the deeplink-redirect flag now that we've located
+        // the target post. AppSplash watches this key — leaving it
+        // set would keep the splash up on the next navigation
+        // (e.g. tapping the BottomNav after the highlight lands).
+        try { sessionStorage.removeItem('hai:deeplink-redirect') } catch {}
         // Scroll the post into view, then trigger the triple-pulse
         // flash. We delay the class toggle by ~350ms so the smooth
         // scroll settles before the animation starts — otherwise
@@ -239,7 +244,14 @@ export default function FeedClient({
       // first tick — but on cold-start the WebView takes longer
       // to hydrate, and the previous 4s window was bailing
       // before the post mounted.
-      if (++tries < 32) timer = setTimeout(tryScroll, 250)
+      if (++tries < 32) {
+        timer = setTimeout(tryScroll, 250)
+      } else {
+        // Gave up. Clear the deeplink-redirect flag so the splash
+        // doesn't get stuck rendered forever on a subsequent
+        // navigation.
+        try { sessionStorage.removeItem('hai:deeplink-redirect') } catch {}
+      }
     }
     timer = setTimeout(tryScroll, 200)
     return () => clearTimeout(timer)

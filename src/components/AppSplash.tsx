@@ -35,8 +35,25 @@ function alreadyShown() {
   try { return !!sessionStorage.getItem(SESSION_KEY) } catch { return false }
 }
 
+/**
+ * Deeplink redirect in flight (set by PostShareView right before
+ * window.location.replace('/feed?post=…') and cleared by FeedClient
+ * after the highlight effect fires). When true, AppSplash IGNORES
+ * the alreadyShown guard and renders again — keeping a continuous
+ * splash overlay across both cold-start hops so the user perceives
+ * a single launch animation instead of "splash → blank flash → splash".
+ */
+function deeplinkRedirectActive() {
+  try { return sessionStorage.getItem('hai:deeplink-redirect') === '1' } catch { return false }
+}
+
 export default function AppSplash() {
-  const [phase, setPhase] = useState<'show' | 'fade' | 'gone'>(() => alreadyShown() ? 'gone' : 'show')
+  const [phase, setPhase] = useState<'show' | 'fade' | 'gone'>(() => (
+    // Re-show on the second cold-start hop so the user doesn't see
+    // the chrome-less interstitial /feed render briefly between the
+    // share-link tap and the redirect to /feed?post=<id>.
+    !alreadyShown() || deeplinkRedirectActive() ? 'show' : 'gone'
+  ))
   const dismissed = useRef(false)
   const mountTime = useRef(Date.now())
 

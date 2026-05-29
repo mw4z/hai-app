@@ -28,11 +28,18 @@ export default function PostShareView({ post, postId }: { post: PublicPost; post
   useEffect(() => {
     const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : ''
     if (/HaiNativeApp/i.test(ua)) {
-      // Mark a deeplink-landed timestamp BEFORE the redirect so
-      // SwUpdateReload's guard (which reads this same key)
-      // skips the mid-load page-reload that was wiping the
-      // ?post=<id> query param mid-cold-start.
-      try { sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now())) } catch {}
+      // Flag the deeplink redirect so AppSplash keeps rendering
+      // on the SECOND cold-start hop (the /feed?post=<id> mount).
+      // Without this flag, alreadyShown() returns true on the
+      // second mount → splash returns null → user sees a brief
+      // chrome-less /feed paint between the two redirects.
+      // FeedClient clears the flag after the highlight effect
+      // fires so subsequent navigations don't keep re-rendering
+      // the splash.
+      try {
+        sessionStorage.setItem('hai:deeplink-redirect', '1')
+        sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))
+      } catch {}
       window.location.replace(`/feed?post=${postId}`)
       return
     }
