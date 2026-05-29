@@ -42,9 +42,15 @@ interface Props {
   onToggleReaction: (messageId: string, emoji: string) => void
   /** Inline "حوّلها لمنشور" chip — own TEXT messages with a body. */
   onMakePost: (message: PublicSquareMessage) => void
-  /** Inline "نبّه الحي" chip — own messages that haven't been fired
-   *  on yet. Server still enforces the 24h-per-user rate limit. */
+  /** Inline "نبّه الحي" chip. For regular residents it only shows
+   *  on own messages that haven't been fired on yet (one-shot UX).
+   *  For mods the chip stays visible after firing too — they need
+   *  the option to broadcast again, and the server lets them
+   *  bypass the per-message + 24h gates. */
   onNotify: (message: PublicSquareMessage) => void
+  /** True when the viewer is a Square moderator. Controls whether
+   *  the notify chip stays visible after a previous fire. */
+  isMod?: boolean
   /** Quick-reply arrow on the bubble — stages this message as the
    *  composer's reply target without going through the long-press
    *  action sheet. */
@@ -78,6 +84,7 @@ export default function SquareBubble({
   onMakePost,
   onNotify,
   onQuickReply,
+  isMod = false,
   selected,
 }: Props) {
   const { lang } = useLanguage()
@@ -591,7 +598,15 @@ export default function SquareBubble({
                   <span>{lang === 'en' ? 'Make a post' : 'حوّلها لمنشور'}</span>
                 </button>
               )}
-              {!message.notificationFiredAt && message.status === 'ACTIVE' && (
+              {/* Notify chip:
+                  - Residents: shown until the message has been fired
+                    on (one-shot UX, matches the per-message lock).
+                  - Mods: ALWAYS shown — they can re-broadcast a
+                    message if more eyes are needed. Server-side
+                    bypass for the per-message + 24h rate gates
+                    lives in /api/square/messages/[id]/notify. */}
+              {message.status === 'ACTIVE'
+                && (isMod || !message.notificationFiredAt) && (
                 <button
                   type="button"
                   onClick={() => onNotify(message)}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { isSquareTableMissingError } from '@/lib/square/migrationGate'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,20 +32,29 @@ export async function POST(_req: NextRequest) {
   if (!me?.neighborhoodId) return NextResponse.json({ error: 'no_neighborhood' }, { status: 404 })
 
   const expiresAt = new Date(Date.now() + TTL_MS)
-  await db.squareTypingSignal.upsert({
-    where: {
-      neighborhoodId_userId: {
+  try {
+    await db.squareTypingSignal.upsert({
+      where: {
+        neighborhoodId_userId: {
+          neighborhoodId: me.neighborhoodId,
+          userId: session.userId,
+        },
+      },
+      create: {
         neighborhoodId: me.neighborhoodId,
         userId: session.userId,
+        expiresAt,
       },
-    },
-    create: {
-      neighborhoodId: me.neighborhoodId,
-      userId: session.userId,
-      expiresAt,
-    },
-    update: { expiresAt },
-  })
+      update: { expiresAt },
+    })
+  } catch (err) {
+    // Brief deploy-before-migration window: the table doesn't exist
+    // yet. The feed page already swallows this for messages — do
+    // the same here so the composer's 2.5s typing-pings don't 500
+    // and spam logs. Once the migration lands, this branch goes
+    // unused.
+    if (!isSquareTableMissingError(err)) throw err
+  }
 
   return NextResponse.json({ ok: true })
 }
@@ -70,15 +80,24 @@ export async function GET(_req: NextRequest) {
   if (!me?.neighborhoodId) return NextResponse.json({ users: [] })
 
   const now = new Date()
-  const rows = await db.squareTypingSignal.findMany({
-    where: {
-      neighborhoodId: me.neighborhoodId,
-      expiresAt: { gt: now },
-      userId: { not: session.userId },
-    },
-    orderBy: { updatedAt: 'desc' },
-    take: 6,
-  })
+  let rows: Array<{ userId: string }> = []
+  try {
+    rows = await db.squareTypingSignal.findMany({
+      where: {
+        neighborhoodId: me.neighborhoodId,
+        expiresAt: { gt: now },
+        userId: { not: session.userId },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 6,
+    })
+  } catch (err) {
+    // Same table-missing guard as the POST handler — the page polls
+    // this every 2s, so any error throws spam logs hard. Empty list
+    // is the right fallback (no typing indicator until migration).
+    if (isSquareTableMissingError(err)) return NextResponse.json({ users: [] })
+    throw err
+  }
 
   if (rows.length === 0) return NextResponse.json({ users: [] })
 

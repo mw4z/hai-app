@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { apiError } from '@/lib/validation'
 import { isSquareAdminRole } from '@/lib/square/isSquareAdmin'
 import { isSuperAdminRole } from '@/lib/isSuperAdmin'
+import { isSquareModRole } from '@/lib/square/lock'
 import { kickNotifCron } from '@/lib/kickNotifCron'
 import { fullName } from '@/lib/displayName'
 
@@ -78,15 +79,21 @@ export async function POST(_req: NextRequest, { params }: Params) {
       { status: 400 },
     )
   }
-  if (msg.notificationFiredAt) {
+  // Mods (NEIGHBORHOOD_MOD / PLATFORM_MOD / SUPER_ADMIN) bypass
+  // both the "already fired" lock and the 24h rate limit — they
+  // can re-broadcast a message if it needs more eyes. Residents
+  // still get the one-shot per-message rule + the daily ceiling.
+  const isMod = isSquareModRole(me.role)
+  if (msg.notificationFiredAt && !isMod) {
     return NextResponse.json(
       apiError('تم التنبيه على هذه الرسالة من قبل.', 400, 'NOTIFY_ALREADY_FIRED'),
       { status: 400 },
     )
   }
 
-  // Per-user 24h rate limit — SUPER_ADMIN bypasses.
-  if (!isSuperAdminRole(me.role)) {
+  // Per-user 24h rate limit — SUPER_ADMIN bypasses (and now all
+  // mods too, via the broader isMod check above).
+  if (!isMod && !isSuperAdminRole(me.role)) {
     const since = new Date(Date.now() - RATE_LIMIT_WINDOW_MS)
     const recent = await db.squareMessage.findFirst({
       where: {

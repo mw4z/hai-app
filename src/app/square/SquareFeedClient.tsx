@@ -21,6 +21,7 @@ import {
   FiX,
 } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useConfirm } from '@/components/ConfirmProvider'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import { hapticLight } from '@/lib/haptic'
 import SquareBubble from '@/components/square/SquareBubble'
@@ -115,6 +116,7 @@ export default function SquareFeedClient({
   const { id: wallpaperId, wallpaper, isDark: wpIsDark, setWallpaperId } = useChatWallpaper()
   const [showWallpaperPicker, setShowWallpaperPicker] = useState(false)
   const { t, lang } = useLanguage()
+  const confirm = useConfirm()
   const router = useRouter()
 
   const [messages, setMessages] = useState<PublicSquareMessage[]>(initialMessages)
@@ -801,9 +803,25 @@ export default function SquareFeedClient({
   /** Shared "notify neighbors" handler. Used by both the long-press
    *  sheet (operates on selectedMsg) and the inline bubble chip
    *  (operates on the bubble's own message), so the API call,
-   *  optimistic update, and toasts live in one place. */
+   *  optimistic update, and toasts live in one place.
+   *
+   *  Asks for explicit native-style confirmation FIRST — a tap on
+   *  the broadcast pill pushes a notification to everyone in the
+   *  neighborhood, which is destructive-ish (can't unsend), so we
+   *  surface a confirm dialog the same way DM ChatClient does for
+   *  end-conversation / report-user actions. */
   async function notifyMessage(target: PublicSquareMessage) {
     if (target.notificationFiredAt || target.status !== 'ACTIVE') return
+    const ok = await confirm({
+      title: lang === 'en' ? 'Notify everyone?' : 'تنبيه كل سكان الحي؟',
+      message: lang === 'en'
+        ? 'A push notification will be sent to every neighbor about this message. You can only do this once per message.'
+        : 'سيتم إرسال إشعار لكل سكان الحي بهذه الرسالة. يمكنك تنبيه الجيران مرة واحدة فقط لكل رسالة.',
+      confirmText: lang === 'en' ? 'Notify' : 'تنبيه',
+      cancelText: lang === 'en' ? 'Cancel' : 'إلغاء',
+      variant: 'default',
+    })
+    if (!ok) return
     try {
       const res = await fetch(`/api/square/messages/${target.id}/notify`, { method: 'POST' })
       const data = await res.json().catch(() => ({}))
@@ -1038,6 +1056,7 @@ export default function SquareFeedClient({
                 onMakePost={handleMakePostForMessage}
                 onNotify={handleNotifyForMessage}
                 onQuickReply={handleQuickReply}
+                isMod={isMod}
               />
             ))
           )}
