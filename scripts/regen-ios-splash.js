@@ -130,7 +130,7 @@ async function renderVariant({ inkHex, bgHex, fileName, outDir }) {
 async function main() {
   const variants = [
     { inkHex: '#0a0a0a', bgHex: '#ffffff', mode: 'light' },
-    { inkHex: '#ffffff', bgHex: '#000000', mode: 'dark' },
+    { inkHex: '#ffffff', bgHex: '#19232a', mode: 'dark' },
   ]
 
   // ─── iOS Splash.imageset ──────────────────────────────────
@@ -175,7 +175,7 @@ async function main() {
     outDir: ANDROID_DRAWABLE,
   })
   await renderVariant({
-    inkHex: '#ffffff', bgHex: '#000000',
+    inkHex: '#ffffff', bgHex: '#19232a',
     fileName: 'splash_composite.png',
     outDir: ANDROID_DRAWABLE_NIGHT,
   })
