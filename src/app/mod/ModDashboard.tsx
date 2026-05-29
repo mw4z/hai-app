@@ -180,11 +180,19 @@ export default function ModDashboard({ data }: Props) {
     return () => { cancelled = true; clearTimeout(handle) }
   }, [tab, pollsFilter, pollsQuery])
 
-  // Export a poll-result card as a PNG. We render the card off-screen
-  // at a high pixel-ratio so the downloaded image is sharp on retina
-  // displays. The DOM node carries id="poll-export-<id>" — the card
-  // markup in the polls-archive panel uses that id so we can grab
-  // it directly without ref-juggling.
+  // Export a poll-result card as a PNG. The DOM node carries
+  // id="poll-export-<id>" — the card markup uses that id so we
+  // can grab it directly without ref-juggling.
+  //
+  // On NATIVE (iOS/Android via Capacitor): an <a download> link
+  // doesn't reach the photo gallery — it writes to the WebView's
+  // private sandbox where the user can never find it. We write
+  // the PNG to the native cache directory via Filesystem, then
+  // pop the native Share sheet via Share — the user picks "Save
+  // to Photos" / "Save to Files" / WhatsApp / etc.
+  //
+  // On WEB: the dataURL download works fine, save to the browser's
+  // Downloads folder.
   async function exportPollResult(poll: PollArchiveRow) {
     if (pollsExporting) return
     setPollsExporting(poll.id)
@@ -194,26 +202,53 @@ export default function ModDashboard({ data }: Props) {
         toast.error(dn('تعذر التصدير', 'Could not export'))
         return
       }
+      // Snapshot the card. The card's own bg is theme-aware (dark
+      // gray in dark mode), so passing a single backgroundColor
+      // would either letter-box white around a dark card or vice
+      // versa. Leave bg undefined → html-to-image uses the
+      // element's own computed background.
       const dataUrl = await htmlToImage.toPng(node, {
-        // 2× pixel ratio for crisp output on high-DPI; bg color set
-        // explicitly so transparent corners (from rounded-2xl on the
-        // card) don't render as a black tile on viewers that don't
-        // honor PNG alpha.
         pixelRatio: 2,
-        backgroundColor: '#ffffff',
         cacheBust: true,
       })
-      // Trigger a download from the data URL.
+
       const filename = `hai-poll-${poll.id}.png`
-      const link = document.createElement('a')
-      link.download = filename
-      link.href = dataUrl
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      toast.success(dn('تم الحفظ ✓', 'Saved ✓'))
-    } catch (err) {
-      toast.error(dn('فشل التصدير', 'Export failed'))
+      const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform()
+
+      if (isNative) {
+        // Native path: write to cache, open share sheet so the
+        // user can route to the gallery / share to WhatsApp / etc.
+        const base64 = dataUrl.split(',')[1] || ''
+        const { Filesystem, Directory } = await import('@capacitor/filesystem')
+        const written = await Filesystem.writeFile({
+          path: filename,
+          data: base64,
+          directory: Directory.Cache,
+        })
+        const { Share } = await import('@capacitor/share')
+        await Share.share({
+          title: dn('نتيجة الاستطلاع', 'Poll result'),
+          url: written.uri,
+          dialogTitle: dn('حفظ أو مشاركة', 'Save or share'),
+        })
+        toast.success(dn('اختر "حفظ الصورة"', 'Pick "Save Image"'))
+      } else {
+        // Web path: plain dataURL download.
+        const link = document.createElement('a')
+        link.download = filename
+        link.href = dataUrl
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        toast.success(dn('تم الحفظ ✓', 'Saved ✓'))
+      }
+    } catch (err: any) {
+      // User dismissing the native share sheet throws — don't toast
+      // an error in that case.
+      const msg = String(err?.message || err || '')
+      if (!/cancell?ed/i.test(msg) && !/dismissed/i.test(msg)) {
+        toast.error(dn('فشل التصدير', 'Export failed'))
+      }
     } finally {
       setPollsExporting(null)
     }
@@ -896,17 +931,17 @@ export default function ModDashboard({ data }: Props) {
                           const isWinner = top && opt.label === top.label && opt.votes > 0
                           return (
                             <div key={idx} className="relative">
-                              <div className="absolute inset-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700/60">
+                              <div className="absolute inset-0 rounded-lg overflow-hidden bg-gray-200/70 dark:bg-gray-700">
                                 <div
-                                  className={`h-full ${isWinner ? 'bg-primary-500/80' : 'bg-gray-300 dark:bg-gray-600'}`}
-                                  style={{ width: `${pct}%` }}
+                                  className={`h-full ${isWinner ? 'bg-primary-500/85' : 'bg-primary-500/30 dark:bg-primary-500/35'}`}
+                                  style={{ width: `${Math.max(pct, opt.votes > 0 ? 3 : 0)}%` }}
                                 />
                               </div>
                               <div className="relative flex items-center justify-between px-3 py-2 text-xs font-medium">
                                 <span className={`${isWinner ? 'text-white' : 'text-gray-800 dark:text-gray-100'}`} dir="auto">
                                   {opt.label}
                                 </span>
-                                <span className={`${isWinner ? 'text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>
+                                <span className={`${isWinner ? 'text-white/90' : 'text-gray-600 dark:text-gray-300'}`}>
                                   {opt.votes} · {pct}%
                                 </span>
                               </div>
