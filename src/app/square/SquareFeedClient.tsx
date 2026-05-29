@@ -313,6 +313,67 @@ export default function SquareFeedClient({
     }
   }
 
+  // ── Live lock-status sync ────────────────────────────────────────
+  // Keep every connected client honest about the current lock state
+  // — if a mod locks the chat, residents see the banner appear
+  // within ~15s without reloading. And on tab focus / app foreground
+  // we refresh immediately so coming back to the app is always
+  // current. Also clock-aware: if the lock has a scheduled start
+  // or auto-unlock, the page picks up the transition as the server
+  // resolves it (the API computes isLocked from the columns + now).
+  useEffect(() => {
+    let cancelled = false
+    const tick = async () => {
+      if (cancelled) return
+      // Skip the network round-trip when the page isn't on screen.
+      if (typeof document !== 'undefined' && document.hidden) return
+      try {
+        const res = await fetch('/api/square/lock-status', {
+          credentials: 'include',
+          cache: 'no-store',
+        })
+        if (!res.ok || cancelled) return
+        const data = await res.json() as InitialLock
+        // Object identity is fine here — setLock just triggers a
+        // re-render; React bails if the values match.
+        setLock((prev) => {
+          if (
+            prev.isLocked === data.isLocked
+            && prev.isScheduled === data.isScheduled
+            && prev.lockedAt === data.lockedAt
+            && prev.lockedUntil === data.lockedUntil
+            && prev.lockedById === data.lockedById
+          ) return prev
+          return data
+        })
+      } catch {/* ignore — next tick will catch up */}
+    }
+    const intervalId = setInterval(tick, 15_000)
+    const onVisibility = () => { if (!document.hidden) void tick() }
+    const onFocus = () => void tick()
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('focus', onFocus)
+    // Capacitor App resume — the WebView's `focus` event doesn't
+    // fire on iOS when the app comes back from background, so we
+    // listen for the platform's own appStateChange too.
+    let appHandle: { remove: () => void } | null = null
+    ;(async () => {
+      try {
+        const { App } = await import('@capacitor/app')
+        appHandle = await App.addListener('appStateChange', ({ isActive }: { isActive: boolean }) => {
+          if (isActive) void tick()
+        })
+      } catch { /* not native — fine */ }
+    })()
+    return () => {
+      cancelled = true
+      clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('focus', onFocus)
+      try { appHandle?.remove() } catch {}
+    }
+  }, [])
+
   // Quick-reply variant: triggered by the small reply arrow on the
   // bubble itself, so we DON'T have a long-press-selected message to
   // pull from — the bubble passes the target directly.
