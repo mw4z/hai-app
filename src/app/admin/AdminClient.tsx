@@ -1275,7 +1275,7 @@ function ActiveUsersPanel({ lang }: { lang: string }) {
             </span>
           </div>
         </div>
-        {loading && <HaiSpinner size="sm" />}
+        {loading && <HaiSpinner />}
       </div>
 
       <div className="p-3">
