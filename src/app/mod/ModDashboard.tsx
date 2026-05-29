@@ -411,7 +411,7 @@ export default function ModDashboard({ data }: Props) {
     { key: 'poll_requests', icon: <FiFileText className="w-4 h-4" />, ar: 'اقتراحات استفتاء', en: 'Poll requests', count: pollRequests?.length },
     ...(canModerateUsers(role) ? [{ key: 'claimed_residents' as Tab, icon: <FiMapPin className="w-4 h-4" />, ar: 'طلبات تأكيد السكن', en: 'Residency claims', count: claims?.length }] : []),
     { key: 'hidden', icon: <FiEyeOff className="w-4 h-4" />, ar: 'المخفية', en: 'Hidden', count: data.hiddenPosts.length },
-    { key: 'banned', icon: <FiUserX className="w-4 h-4" />, ar: 'المحظورين', en: 'Banned', count: data.bannedUsers.length },
+    { key: 'banned', icon: <FiUserX className="w-4 h-4" />, ar: 'محظورون / محذوفون', en: 'Banned / deleted', count: data.bannedUsers.length },
     // User list (block / stop only) — all mod roles, neighborhood-scoped.
     ...(canModerateUsers(role) ? [{ key: 'users' as Tab, icon: <FiSearch className="w-4 h-4" />, ar: 'المستخدمون', en: 'Users' }] : []),
     // Provider verification — PLATFORM_MOD + SUPER_ADMIN only (audit H-3).
@@ -778,28 +778,72 @@ export default function ModDashboard({ data }: Props) {
           )
         )}
 
-        {/* Banned Tab */}
-        {tab === 'banned' && (
-          data.bannedUsers.length === 0 ? (
-            <EmptyState icon="👥" text={dn('لا يوجد مستخدمين محظورين', 'No banned users')} />
-          ) : (
-            data.bannedUsers.map(user => (
-              <div key={user.id} className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</p>
-                  <p className="text-[11px] text-gray-400">{user.status === 'BANNED_TEMP' ? dn('حظر مؤقت', 'Temp ban') : dn('حظر دائم', 'Perm ban')} · {user.reputation} rep</p>
+        {/* Banned + self-deleted tab. The self-delete flow
+            (/api/account/delete) sets status=BANNED_PERM AND
+            deletedAt, so without splitting on deletedAt the
+            mod dashboard couldn't tell whether someone was
+            kicked by an admin or had walked away on their own.
+            Now we render two clearly-labelled groups under the
+            same tab, gray-dimmed for self-deletes and red-tinted
+            for admin bans. */}
+        {tab === 'banned' && (() => {
+          const selfDeleted = data.bannedUsers.filter((u: any) => !!u.deletedAt)
+          const adminBanned = data.bannedUsers.filter((u: any) => !u.deletedAt)
+          if (data.bannedUsers.length === 0) {
+            return <EmptyState icon="👥" text={dn('لا يوجد مستخدمين محظورين', 'No banned users')} />
+          }
+          return (
+            <div className="space-y-5">
+              {adminBanned.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-[11px] font-bold uppercase tracking-wide text-red-600 dark:text-red-400 flex items-center gap-1.5">
+                    🚫 {dn('محظورون من قِبل الإشراف', 'Banned by admin')}
+                    <span className="text-[10px] font-normal text-gray-400">· {adminBanned.length}</span>
+                  </h3>
+                  {adminBanned.map((user: any) => (
+                    <div key={user.id} className="bg-red-50/40 dark:bg-red-900/15 rounded-2xl p-4 border border-red-200 dark:border-red-800/50 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</p>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                          {user.status === 'BANNED_TEMP' ? dn('حظر مؤقت', 'Temp ban') : dn('حظر دائم', 'Perm ban')} · {user.reputation} rep
+                        </p>
+                      </div>
+                      {user.status === 'BANNED_TEMP' && (
+                        <button onClick={() => modAction('unban_user', { targetId: user.id })}
+                          disabled={!!actionLoading}
+                          className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-3 py-1.5 rounded-xl text-xs font-medium disabled:opacity-50">
+                          {dn('رفع الحظر', 'Unban')}
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                {user.status === 'BANNED_TEMP' && (
-                  <button onClick={() => modAction('unban_user', { targetId: user.id })}
-                    disabled={!!actionLoading}
-                    className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-3 py-1.5 rounded-xl text-xs font-medium disabled:opacity-50">
-                    {dn('رفع الحظر', 'Unban')}
-                  </button>
-                )}
-              </div>
-            ))
+              )}
+              {selfDeleted.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                    🗑️ {dn('حذفوا حسابهم', 'Self-deleted accounts')}
+                    <span className="text-[10px] font-normal text-gray-400">· {selfDeleted.length}</span>
+                  </h3>
+                  {selfDeleted.map((user: any) => (
+                    <div key={user.id} className="bg-gray-50 dark:bg-gray-900/40 rounded-2xl p-4 border border-gray-200 dark:border-gray-700 opacity-80">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{user.name}</p>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                          {dn('حذف الحساب', 'Account deleted')}
+                          {user.deletedAt && ' · ' + new Date(user.deletedAt).toLocaleDateString(lang !== 'en' ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      </div>
+                      {/* No unban affordance — the user walked away
+                          on their own; an admin acting on the row
+                          would just be confusing. */}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )
-        )}
+        })()}
 
         {/* Activity Tab */}
         {tab === 'activity' && (

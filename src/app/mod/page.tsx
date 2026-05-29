@@ -55,10 +55,14 @@ export default async function ModPage() {
       take: 20,
     }),
 
-    // Banned users in neighborhood
+    // Banned + self-deleted users in neighborhood. Pulled together
+    // (same query) so the client can split them client-side without
+    // a second roundtrip; the self-delete handler sets status=
+    // BANNED_PERM + deletedAt, so without deletedAt in the select
+    // the two cases were indistinguishable.
     db.user.findMany({
       where: { neighborhoodId: nbId, status: { in: ['BANNED_TEMP', 'BANNED_PERM'] } },
-      select: { id: true, name: true, lastName: true, phone: true, status: true, reputation: true },
+      select: { id: true, name: true, lastName: true, phone: true, status: true, reputation: true, deletedAt: true },
     }),
 
     // Recent mod logs by this user
