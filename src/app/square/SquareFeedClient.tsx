@@ -414,6 +414,8 @@ export default function SquareFeedClient({
 
     const platform = (window as any).Capacitor?.getPlatform?.() || 'web'
     const isIos = platform === 'ios'
+    const isAndroid = platform === 'android'
+    const isNative = isIos || isAndroid
 
     const setHeight = (visibleHeight: number) => {
       root.style.height = `calc(${visibleHeight}px - env(safe-area-inset-top, 0px))`
@@ -422,25 +424,35 @@ export default function SquareFeedClient({
     setHeight(vv.height)
     const onVV = () => {
       setHeight(vv.height)
-      // Heuristic fallback for Android / web: if the visual
-      // viewport is notably shorter than the window, the
-      // keyboard is up. Drives the composer's safe-area padding
-      // toggle the same way the iOS willShow listener does.
-      const open = (window.innerHeight - vv.height) > 150
-      setKeyboardOpen(open)
+      // Heuristic fallback for WEB only. On Android (resize:body)
+      // both window.innerHeight AND vv.height shrink together
+      // when the keyboard opens, so their difference stays ~0 —
+      // we can't detect the keyboard from visualViewport alone.
+      // The Capacitor Keyboard listeners below are the only
+      // reliable source on Android.
+      if (!isNative) {
+        const open = (window.innerHeight - vv.height) > 150
+        setKeyboardOpen(open)
+      }
     }
     vv.addEventListener('resize', onVV)
     vv.addEventListener('scroll', onVV)
 
+    // Capacitor Keyboard listeners on BOTH iOS and Android.
+    //   - iOS: drives setHeight too (visualViewport doesn't fire
+    //     when WKWebView's frame stays fixed).
+    //   - Android: ONLY drives the keyboardOpen flag, not
+    //     setHeight (visualViewport already shrinks the root
+    //     correctly when resize:body fires).
     let cleanupKb: (() => void) | null = null
-    if (isIos) {
+    if (isNative) {
       import('@capacitor/keyboard').then(({ Keyboard }) => {
         const h1 = Keyboard.addListener('keyboardWillShow', (info) => {
-          setHeight(window.innerHeight - info.keyboardHeight)
+          if (isIos) setHeight(window.innerHeight - info.keyboardHeight)
           setKeyboardOpen(true)
         })
         const h2 = Keyboard.addListener('keyboardWillHide', () => {
-          setHeight(window.innerHeight)
+          if (isIos) setHeight(window.innerHeight)
           setKeyboardOpen(false)
         })
         cleanupKb = () => {
