@@ -170,67 +170,21 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning>
-        {/* Cover overlay rendered in the HTML markup BEFORE React
-            mounts — bridges the brief gaps where AppSplash isn't on
-            screen yet (initial WebView paint, and every page-nav
-            re-mount on cold-start deeplinks). Previously this was a
-            bare gradient → during gaps the user saw the icon
-            disappear and reappear ("show / hide / show / hide /
-            show / hide" on share-link cold start the user
-            reported). Now it carries the same brand mark as
-            AppSplash so the icon stays visible THROUGH the gaps,
-            giving the visual of one continuous splash. */}
+        {/* Bare-gradient cover. NO icon here — adding one was a
+            mistake (commit 55d60f6 then reverted): it rendered at
+            a different vertical position than AppSplash's icon
+            because they used different centering models, so every
+            preload → AppSplash → preload transition produced a
+            visible "icon shift" instead of a continuous hold. */}
         <div id="__hai_preload" style={{
           position: 'fixed',
           top: 0, right: 0, bottom: 0, left: 0,
           minWidth: '100%', minHeight: '100%',
           zIndex: 99999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
           background: serverIsDark
             ? 'radial-gradient(ellipse at 50% 42%, #1c2832 0%, #1a262c 40%, #19232a 100%)'
             : 'radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #e0f7f2 40%, #fff 100%)',
-        }}>
-          {/* Brand mark — same artwork the AppSplash component
-              renders, inlined here so it's visible the instant
-              the HTML paints (no React mount required). Sized
-              68px to match AppSplash's logo dimensions exactly,
-              so the handoff has no visible "icon size pop". */}
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 192 192"
-            width="68"
-            height="68"
-            style={{ borderRadius: 15, boxShadow: '0 6px 24px rgba(0, 168, 132, 0.32)' }}
-          >
-            <defs>
-              <linearGradient id="hai-pre-brand" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#00b894" />
-                <stop offset="100%" stopColor="#005c48" />
-              </linearGradient>
-              <radialGradient id="hai-pre-glow" cx="40%" cy="32%" r="58%">
-                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
-                <stop offset="60%" stopColor="#ffffff" stopOpacity="0" />
-              </radialGradient>
-              <radialGradient id="hai-pre-vig" cx="82%" cy="92%" r="70%">
-                <stop offset="0%" stopColor="#000000" stopOpacity="0.22" />
-                <stop offset="80%" stopColor="#000000" stopOpacity="0" />
-              </radialGradient>
-              <radialGradient id="hai-pre-dot" cx="35%" cy="32%" r="80%">
-                <stop offset="0%" stopColor="#ffffff" />
-                <stop offset="100%" stopColor="#eef9f4" />
-              </radialGradient>
-            </defs>
-            <rect width="192" height="192" rx="42" fill="url(#hai-pre-brand)" />
-            <rect width="192" height="192" rx="42" fill="url(#hai-pre-glow)" />
-            <rect width="192" height="192" rx="42" fill="url(#hai-pre-vig)" />
-            <circle cx="96" cy="96" r="19.5" fill="url(#hai-pre-dot)" />
-            <circle cx="96" cy="39" r="11.25" fill="#ffffff" />
-            <circle cx="145.5" cy="124.5" r="11.25" fill="#ffffff" />
-            <circle cx="46.5" cy="124.5" r="11.25" fill="#ffffff" />
-          </svg>
-        </div>
+        }} />
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){
             var d = document.documentElement.classList.contains('dark');
