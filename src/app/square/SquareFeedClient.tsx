@@ -21,6 +21,7 @@ import {
   FiX,
 } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
+import { useDragToDismiss } from '@/hooks/useDragToDismiss'
 import { hapticLight } from '@/lib/haptic'
 import SquareBubble from '@/components/square/SquareBubble'
 import SquareComposer from '@/components/square/SquareComposer'
@@ -837,6 +838,11 @@ function SquareLockSheet({
   const [fromStr, setFromStr] = useState('')
   const [untilStr, setUntilStr] = useState('')
   const en = lang === 'en'
+  // Swipe-down-to-dismiss, same hook the wallpaper picker uses. The
+  // sheetRef gets the touch listener; the handleRef is the "grab"
+  // strip at the top so swiping from there is what triggers the
+  // dismiss (not a stray touch on the form fields below).
+  const drag = useDragToDismiss<HTMLDivElement, HTMLDivElement>({ open: true, onDismiss: onClose })
 
   const lockNowFor = (hours: number) => {
     const until = new Date(Date.now() + hours * 3600_000).toISOString()
@@ -854,8 +860,8 @@ function SquareLockSheet({
   return (
     <>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={onClose} />
-      <div className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl">
-        <div className="px-5 pt-3 pb-3 touch-none">
+      <div ref={drag.sheetRef} className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto z-50 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl">
+        <div ref={drag.handleRef} className="px-5 pt-3 pb-3 touch-none">
           <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-2" />
           <h3 className="font-bold text-gray-900 dark:text-white text-center">
             {en ? 'Square moderation' : 'إدارة الساحة'}
