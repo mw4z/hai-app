@@ -273,7 +273,7 @@ export default function BottomNav({
                 <Icon className="w-5 h-5" />
                 {showNewPill && (
                   <span
-                    className="absolute -top-2 -end-3 px-1.5 py-[1px] rounded-full text-[8.5px] font-extrabold bg-rose-500 text-white shadow-sm leading-none animate-pulse-glow"
+                    className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-1.5 py-[1px] rounded-full text-[8.5px] font-extrabold bg-rose-500 text-white shadow-sm leading-none animate-pulse-glow whitespace-nowrap"
                     aria-label={lang === 'en' ? 'New feature' : 'ميزة جديدة'}
                   >
                     {lang === 'en' ? 'NEW' : 'جديد'}
