@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import {
   FiArrowLeft,
   FiArrowRight,
+  FiImage,
   FiBell,
   FiCopy,
   FiCornerUpLeft,
@@ -23,6 +24,7 @@ import SquareBubble from '@/components/square/SquareBubble'
 import SquareComposer from '@/components/square/SquareComposer'
 import ReportUserSheet from '@/components/ReportUserSheet'
 import UserProfileSheet from '@/components/UserProfileSheet'
+import ChatWallpaperPicker, { useChatWallpaper } from '@/components/ChatWallpaperPicker'
 import { buildConvertToPostHref } from '@/lib/square/convertToPost'
 import type {
   PublicSquareMessage,
@@ -65,6 +67,11 @@ export default function SquareFeedClient({
 }: Props) {
   const isSuperAdmin = currentUserRole === 'SUPER_ADMIN'
   const [wipeBusy, setWipeBusy] = useState(false)
+  // Wallpaper — shared preference with DM via localStorage. Picking
+  // here syncs to /threads and any other open Square tab via the
+  // 'storage' event the hook listens for.
+  const { id: wallpaperId, wallpaper, isDark: wpIsDark, setWallpaperId } = useChatWallpaper()
+  const [showWallpaperPicker, setShowWallpaperPicker] = useState(false)
   const { t, lang } = useLanguage()
   const router = useRouter()
 
@@ -529,6 +536,19 @@ export default function SquareFeedClient({
             </p>
           )}
         </div>
+        {/* Wallpaper picker — opens the shared bottom-sheet from
+            ChatWallpaperPicker. Available to everyone (it's a
+            personal preference, stored in localStorage). Same key
+            DM uses, so picking here affects both surfaces. */}
+        <button
+          type="button"
+          onClick={() => setShowWallpaperPicker(true)}
+          className="flex-shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 border border-primary-200 dark:border-primary-800/60 hover:bg-primary-100 dark:hover:bg-primary-900/50 active:scale-95 transition-all"
+          aria-label={lang === 'en' ? 'Chat wallpaper' : 'خلفية المحادثة'}
+          title={lang === 'en' ? 'Chat wallpaper' : 'خلفية المحادثة'}
+        >
+          <FiImage className="w-4 h-4" />
+        </button>
         {/* SUPER_ADMIN-only destructive wipe button. Hidden for
             everyone else. Native confirm() before firing so a stray
             tap can't nuke the chat. */}
@@ -555,6 +575,7 @@ export default function SquareFeedClient({
         className="flex-1 overflow-y-auto overscroll-y-contain"
         style={{
           WebkitOverflowScrolling: 'touch',
+          background: wpIsDark ? wallpaper.dark : wallpaper.light,
         }}
       >
         <div className="max-w-[640px] mx-auto px-3 pt-4">
@@ -686,6 +707,15 @@ export default function SquareFeedClient({
           onClose={() => setProfileUserId(null)}
         />
       )}
+
+      {/* Wallpaper picker bottom sheet — shared component, same one
+          we'll swap into DM next. Renders nothing when closed. */}
+      <ChatWallpaperPicker
+        open={showWallpaperPicker}
+        onClose={() => setShowWallpaperPicker(false)}
+        currentId={wallpaperId}
+        onSelect={setWallpaperId}
+      />
     </div>
   )
 }
