@@ -28,6 +28,11 @@ export default function PostShareView({ post, postId }: { post: PublicPost; post
   useEffect(() => {
     const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : ''
     if (/HaiNativeApp/i.test(ua)) {
+      // Mark a deeplink-landed timestamp BEFORE the redirect so
+      // SwUpdateReload's guard (which reads this same key)
+      // skips the mid-load page-reload that was wiping the
+      // ?post=<id> query param mid-cold-start.
+      try { sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now())) } catch {}
       window.location.replace(`/feed?post=${postId}`)
       return
     }

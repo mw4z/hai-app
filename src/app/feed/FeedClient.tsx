@@ -200,6 +200,18 @@ export default function FeedClient({
   // comment/reaction notification), scroll to that post and flash it so the
   // user immediately sees which post the notification was about — like
   // Instagram. Retries briefly to cover async list paint.
+  //
+  // Suppress SwUpdateReload while a highlight is pending: when the
+  // user lands here via a share link or notification, a service-
+  // worker activation mid-mount triggers a window.location.reload()
+  // that wipes the URL search params and the user lands on /feed
+  // with no highlight. The SwUpdateReload guard reads this
+  // sessionStorage timestamp — write it BEFORE the scroll effect
+  // starts so the reload is skipped during the cold-start window.
+  useEffect(() => {
+    if (!highlightPostId) return
+    try { sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now())) } catch {}
+  }, [highlightPostId])
   useEffect(() => {
     if (!highlightPostId) return
     let tries = 0
