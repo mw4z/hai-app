@@ -35,9 +35,55 @@ const PRESETS = [
   { label: 'Telegram dark', value: '#212d3b' },
 ]
 
+/**
+ * Apply the picked color in TWO ways for maximum coverage:
+ *
+ *  1. Set the CSS variable on documentElement — picked up by the
+ *     new bundle's `bg-[var(--bubble-other)]` rule.
+ *
+ *  2. Inject a high-specificity <style> override targeting EVERY
+ *     hex variant we've ever shipped for the dark bubble bg.
+ *     This is the bulletproof path for users whose WebView has a
+ *     stale JS/CSS bundle cached (still rendering the old
+ *     hardcoded-hex classes) — the !important rule wins
+ *     regardless of which class string the bubble carries.
+ *
+ *  Once you settle on a final color, both paths can be retired in
+ *  favour of the hardcoded value. Until then this guarantees
+ *  the picker reaches the bubble on EVERY cache state.
+ */
+const STALE_HEX_VARIANTS = [
+  '#242625', '#27323a', '#33424f', '#475569', '#5a6b7e',
+]
+
 function applyVar(hex: string) {
   if (typeof document === 'undefined') return
   document.documentElement.style.setProperty('--bubble-other', hex)
+
+  const STYLE_ID = '__hai_debug_bubble_style'
+  let style = document.getElementById(STYLE_ID) as HTMLStyleElement | null
+  if (!style) {
+    style = document.createElement('style')
+    style.id = STYLE_ID
+    document.head.appendChild(style)
+  }
+
+  // Escape '#' as '\\#' for use in attribute selectors. Tailwind
+  // arbitrary-value classes embed the hex straight into the class
+  // name, so the selector must match exactly.
+  const variantSelectors = STALE_HEX_VARIANTS.flatMap((h) => {
+    const esc = h.replace('#', '\\#')
+    return [
+      `html.dark .dark\\:bg-\\[${esc}\\]`,
+      `html.dark .dark\\:bg-\\[${esc}\\]\\/60`,
+    ]
+  }).join(',\n  ')
+
+  style.textContent = `
+  ${variantSelectors},
+  html.dark .dark\\:bg-\\[var\\(--bubble-other\\)\\] {
+    background-color: ${hex} !important;
+  }`
 }
 
 export default function BubbleColorPicker() {
