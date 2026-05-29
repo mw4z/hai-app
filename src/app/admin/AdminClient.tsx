@@ -398,15 +398,18 @@ export default function AdminClient({
         {/* ─── Overview ─── */}
         {tab === 'overview' && (
           stats ? (
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard label={t('admin_active_posts')} value={stats.totalPosts} />
-              <StatCard label={lang === 'en' ? 'All users' : 'إجمالي المستخدمين'} value={stats.allUsers} />
-              <StatCard label={t('admin_users_count')} value={stats.totalUsers} />
-              <StatCard label={t('admin_pending_reports')} value={stats.reportedPosts} color="amber" />
-              <StatCard label={t('admin_transfer_reqs')} value={stats.pendingRequests} color="blue" />
-              <StatCard label={t('admin_removed')} value={stats.hiddenPosts} color="red" />
-              <StatCard label={t('admin_banned')} value={stats.bannedUsers} color="red" />
-            </div>
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard label={t('admin_active_posts')} value={stats.totalPosts} />
+                <StatCard label={lang === 'en' ? 'All users' : 'إجمالي المستخدمين'} value={stats.allUsers} />
+                <StatCard label={t('admin_users_count')} value={stats.totalUsers} />
+                <StatCard label={t('admin_pending_reports')} value={stats.reportedPosts} color="amber" />
+                <StatCard label={t('admin_transfer_reqs')} value={stats.pendingRequests} color="blue" />
+                <StatCard label={t('admin_removed')} value={stats.hiddenPosts} color="red" />
+                <StatCard label={t('admin_banned')} value={stats.bannedUsers} color="red" />
+              </div>
+              <ActiveUsersPanel lang={lang} />
+            </>
           ) : (
             <div className="py-8"><HaiLoader size="md" /></div>
           )
@@ -1179,6 +1182,164 @@ function StatCard({ label, value, color = 'gray' }: { label: string; value: numb
     <div className={`rounded-xl p-3 border ${s.bg} ${s.border}`}>
       <p className={`text-2xl font-bold ${s.text}`}>{value}</p>
       <p className={`text-xs ${s.sub}`}>{label}</p>
+    </div>
+  )
+}
+
+/**
+ * Live "who's active right now" panel for the SUPER_ADMIN overview.
+ * Polls /api/admin/active-users every 30s while the tab is visible
+ * and aggregates the response by city + neighborhood. Cities
+ * collapse / expand to keep the panel scannable when there are
+ * many of them.
+ */
+function ActiveUsersPanel({ lang }: { lang: string }) {
+  interface Hood {
+    neighborhoodId: string
+    neighborhoodName: string | null
+    neighborhoodNameEn: string | null
+    cityId: string | null
+    cityName: string | null
+    cityNameEn: string | null
+    activeCount: number
+  }
+  interface City {
+    cityId: string
+    cityName: string | null
+    cityNameEn: string | null
+    activeCount: number
+    neighborhoodCount: number
+  }
+  interface Payload {
+    totalActive: number
+    windowMs: number
+    cities: City[]
+    neighborhoods: Hood[]
+    fetchedAt: string
+  }
+  const en = lang === 'en'
+  const [data, setData] = useState<Payload | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [expandedCity, setExpandedCity] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const fetchActive = async () => {
+      try {
+        const res = await fetch('/api/admin/active-users', { cache: 'no-store' })
+        if (!res.ok || cancelled) return
+        const json = await res.json() as Payload
+        if (!cancelled) {
+          setData(json)
+          setLoading(false)
+        }
+      } catch {/* silent — next tick will retry */}
+    }
+    void fetchActive()
+    const id = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return
+      void fetchActive()
+    }, 30_000)
+    const onVis = () => { if (!document.hidden) void fetchActive() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [])
+
+  const windowLabel = data
+    ? (en
+        ? `last ${Math.round(data.windowMs / 60000)} min`
+        : `آخر ${Math.round(data.windowMs / 60000)} دقائق`)
+    : ''
+
+  return (
+    <div className="mt-5 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            {en ? 'Active now' : 'النشاط الآن'}
+          </div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="relative flex items-center justify-center">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="absolute w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+            </span>
+            <span className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+              {data?.totalActive ?? '—'}
+            </span>
+            <span className="text-[12px] text-gray-500 dark:text-gray-400">
+              {en ? 'users' : 'مستخدم'} · {windowLabel}
+            </span>
+          </div>
+        </div>
+        {loading && <HaiSpinner size="sm" />}
+      </div>
+
+      <div className="p-3">
+        {(!data || data.cities.length === 0) ? (
+          <p className="text-center text-gray-400 text-[12.5px] py-4">
+            {en ? 'No active users right now.' : 'لا يوجد مستخدمون نشطون الآن.'}
+          </p>
+        ) : (
+          <ul className="space-y-1.5">
+            {data.cities.map((c) => {
+              const isOpen = expandedCity === c.cityId
+              const hoodsForCity = data.neighborhoods.filter((n) => n.cityId === c.cityId)
+              const cityLabel = en
+                ? (c.cityNameEn || c.cityName || c.cityId)
+                : (c.cityName || c.cityNameEn || c.cityId)
+              return (
+                <li key={c.cityId} className="rounded-xl bg-gray-50 dark:bg-gray-900/40 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedCity(isOpen ? null : c.cityId)}
+                    className="w-full flex items-center justify-between px-3 py-2.5 active:bg-gray-100 dark:active:bg-gray-800 transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-[14px] font-semibold text-gray-900 dark:text-white">{cityLabel}</span>
+                      <span className="text-[10.5px] text-gray-500 dark:text-gray-400">
+                        {c.neighborhoodCount}{' '}
+                        {en
+                          ? (c.neighborhoodCount === 1 ? 'neighborhood' : 'neighborhoods')
+                          : 'حي'}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="inline-flex items-center justify-center min-w-[28px] h-6 px-2 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-[12px] font-bold tabular-nums">
+                        {c.activeCount}
+                      </span>
+                      <span className="text-gray-400 text-[14px]">{isOpen ? '▾' : '▸'}</span>
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <ul className="px-3 pb-2.5">
+                      {hoodsForCity.map((n) => {
+                        const hoodLabel = en
+                          ? (n.neighborhoodNameEn || n.neighborhoodName || n.neighborhoodId)
+                          : (n.neighborhoodName || n.neighborhoodNameEn || n.neighborhoodId)
+                        return (
+                          <li
+                            key={n.neighborhoodId}
+                            className="flex items-center justify-between py-1.5 ltr:pl-2 rtl:pr-2 ltr:border-l-2 rtl:border-r-2 border-emerald-200 dark:border-emerald-800/60 ltr:ml-1 rtl:mr-1"
+                          >
+                            <span className="text-[13px] text-gray-700 dark:text-gray-200 truncate">{hoodLabel}</span>
+                            <span className="text-[11.5px] font-semibold text-emerald-700 dark:text-emerald-300 tabular-nums ltr:ml-2 rtl:mr-2 flex-shrink-0">
+                              {n.activeCount}
+                            </span>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }
