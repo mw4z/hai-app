@@ -790,6 +790,16 @@ function resolveDeeplink(data: Record<string, string>): string {
         q.set('post', seg[1])
         return `/feed?${q.toString()}`
       }
+      // Square: ensure ?msg=<id> is on the URL even if the deeplink
+      // string doesn't include it (old pushes had just 'hai://square'
+      // with the id only in data.messageId). Merge the two sources
+      // so OS-tap navigations always carry the scroll target.
+      if (seg[0] === 'square') {
+        const q = new URLSearchParams(rawQuery)
+        if (data.messageId && !q.get('msg')) q.set('msg', data.messageId)
+        const qs = q.toString()
+        return qs ? `/square?${qs}` : '/square'
+      }
       // Other host/path combos map 1:1 to web routes.
       return '/' + rest
     }
