@@ -34,6 +34,11 @@ interface Props {
   /** When true, the composer is rendered read-only — all send
    *  affordances disabled. Used when an admin has locked the chat. */
   disabled?: boolean
+  /** Keyboard is currently up — drop the safe-area inset below the
+   *  composer (the bottom of the visual viewport IS the keyboard,
+   *  so we don't need the home-indicator gap). Caller toggles this
+   *  from its keyboardWillShow / Hide listener. */
+  keyboardOpen?: boolean
 }
 
 /**
@@ -63,6 +68,7 @@ export default function SquareComposer({
   replyingTo,
   setReplyingTo,
   disabled = false,
+  keyboardOpen = false,
 }: Props) {
   const { t, lang } = useLanguage()
   const router = useRouter()
@@ -260,7 +266,10 @@ export default function SquareComposer({
     <>
       <div
         className="glass-bottom px-4 w-full z-20 flex-shrink-0"
-        style={{ paddingBottom: 'calc(var(--hai-safe-bottom, 0px) + 10px)' }}
+        style={{
+          paddingBottom: keyboardOpen ? '10px' : 'calc(var(--hai-safe-bottom, 0px) + 10px)',
+          transition: 'padding-bottom 180ms ease-out',
+        }}
       >
         {intent && (
           <div

@@ -100,6 +100,12 @@ export default function SquareFeedClient({
   // and carries the exact final height, so we can snap the root
   // to its target size immediately.
   const rootRef = useRef<HTMLDivElement | null>(null)
+  // Keyboard-open flag drives the composer's bottom safe-area
+  // padding. When the keyboard is up, the home-indicator inset
+  // becomes a visible gap between the composer and the keyboard
+  // — drop it to a tight 10px to close the gap. The composer
+  // CSS-transitions the change so it doesn't pop.
+  const [keyboardOpen, setKeyboardOpen] = useState(false)
   // Live "who's typing" list. Polled every 2s while the page is
   // visible; rendered as a small ellipsis row above the composer.
   const [typingUsers, setTypingUsers] = useState<Array<{ id: string; name: string | null; lastName: string | null }>>([])
@@ -414,7 +420,15 @@ export default function SquareFeedClient({
     }
 
     setHeight(vv.height)
-    const onVV = () => setHeight(vv.height)
+    const onVV = () => {
+      setHeight(vv.height)
+      // Heuristic fallback for Android / web: if the visual
+      // viewport is notably shorter than the window, the
+      // keyboard is up. Drives the composer's safe-area padding
+      // toggle the same way the iOS willShow listener does.
+      const open = (window.innerHeight - vv.height) > 150
+      setKeyboardOpen(open)
+    }
     vv.addEventListener('resize', onVV)
     vv.addEventListener('scroll', onVV)
 
@@ -423,9 +437,11 @@ export default function SquareFeedClient({
       import('@capacitor/keyboard').then(({ Keyboard }) => {
         const h1 = Keyboard.addListener('keyboardWillShow', (info) => {
           setHeight(window.innerHeight - info.keyboardHeight)
+          setKeyboardOpen(true)
         })
         const h2 = Keyboard.addListener('keyboardWillHide', () => {
           setHeight(window.innerHeight)
+          setKeyboardOpen(false)
         })
         cleanupKb = () => {
           h1.then((x) => x.remove())
@@ -1024,6 +1040,7 @@ export default function SquareFeedClient({
         replyingTo={replyingTo}
         setReplyingTo={setReplyingTo}
         disabled={lock.isLocked && !isMod}
+        keyboardOpen={keyboardOpen}
       />
 
       {/* Long-press action sheet — Reply / Copy / Report. Same three
