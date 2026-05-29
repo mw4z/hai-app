@@ -8,7 +8,6 @@ import RouteTransition from '@/components/RouteTransition'
 import BottomNav from '@/components/BottomNav'
 import ArrivalAlert from '@/components/ArrivalAlert'
 import CapacitorBridge from '@/components/CapacitorBridge'
-import BubbleColorPicker from '@/components/BubbleColorPicker'
 // SwUpdateReload removed — the auto-page-reload on service-worker
 // activation was eating cold-start deeplinks (Square push taps,
 // share-link "highlight" effect, "splash shows twice" report) and
@@ -186,10 +185,6 @@ export default function RootLayout({
             React-router navigations during a deeplink chain. */}
         <AppSplash />
         <CapacitorBridge />
-        {/* SUPER_ADMIN-only debug widget — pick the dark-mode chat
-            bubble color live and persist it locally. Renders nothing
-            for non-admins. Remove after the color is settled. */}
-        <BubbleColorPicker />
         <DebugOverlay />
         <PushRegistration />
         <NotificationPermissionNudge />
