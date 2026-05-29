@@ -32,29 +32,64 @@ const CANVAS = 2732
 //     gap so the composition reads as "icon in the middle, brand
 //     down at the foot" — NOT a single tightly-stacked block.
 
-// Icon ~12 % of canvas — visibly larger than the 9 % we had.
+// Icon ~12 % of canvas.
 const ICON_SIZE = Math.round(CANVAS * 0.12)
-// Icon vertically centered (no y-offset). The brand text is
-// pinned to the bottom region instead of being directly under
-// the icon, so we don't need to shift the icon up.
 const ICON_Y_OFFSET = 0
 
-// Font sizes calibrated against the 2732 canvas. Maps to ~30 px
-// for the Arabic and ~12 px for HAI on a 393 px iPhone screen.
-const AR_SIZE = Math.round(CANVAS * 0.075)
-const EN_SIZE = Math.round(CANVAS * 0.030)
-const EN_TRACKING = Math.round(CANVAS * 0.012)
+// Font sizes — slimmed down per user feedback. Was 7.5 % / 3.0 %,
+// felt oversized on the phone. New 4.5 % / 1.8 % maps to ~17 px
+// Arabic / ~7 px HAI on a 393 px iPhone (cropped aspect), in
+// line with the X / Instagram intro reference proportions.
+const AR_SIZE = Math.round(CANVAS * 0.045)
+const EN_SIZE = Math.round(CANVAS * 0.018)
+const EN_TRACKING = Math.round(CANVAS * 0.010)
 
-// Brand text positions (fractions of canvas height) — pin to
-// the bottom region instead of computed-from-icon spacing.
-const AR_BASELINE_FRAC = 0.80   // 80 % down — حَيّ baseline
-const EN_BASELINE_FRAC = 0.855  // 85.5 % down — HAI baseline
+// Brand text positions — pushed further toward the foot per
+// user feedback. Was 80 % / 85.5 %, now 88 % / 92 %.
+const AR_BASELINE_FRAC = 0.88
+const EN_BASELINE_FRAC = 0.92
 
-// Use a font stack widely available on Windows (where this
-// script runs locally) AND macOS / Linux CI. Segoe UI and
-// Tahoma both ship with strong Arabic glyphs on Windows; the
-// fallbacks cover other build environments.
-const FONT_STACK = `"Segoe UI", "Tahoma", "Arial", sans-serif`
+// Embed IBM Plex Sans Arabic (the same font the web app loads
+// from Google Fonts) directly into the SVG via @font-face with
+// a base64 data URL. This gives the native splash the same
+// Arabic typography as the rest of the app, AND removes any
+// dependency on system fonts during rasterization — librsvg
+// uses the embedded font directly.
+const FONT_PATH = path.resolve(__dirname, 'fonts', 'IBMPlexSansArabic-Bold.ttf')
+const FONT_NAME = 'IBM Plex Sans Arabic'
+// Use single quotes for every name so the whole stack can be
+// wrapped in DOUBLE quotes in the SVG attribute without quote
+// collisions.
+const FONT_STACK = `'${FONT_NAME}', 'Segoe UI', 'Tahoma', 'Arial', sans-serif`
+
+function fontBase64() {
+  if (!fs.existsSync(FONT_PATH)) {
+    console.warn(`[regen-splash] font file missing at ${FONT_PATH} — falling back to system Arabic font`)
+    return null
+  }
+  // Detect actual format from extension so the data URL mime-type
+  // matches (woff2 vs ttf). Google Fonts returns either depending
+  // on the request.
+  const ext = path.extname(FONT_PATH).toLowerCase()
+  const mime = ext === '.woff2' ? 'font/woff2'
+             : ext === '.woff'  ? 'font/woff'
+             : 'font/ttf'
+  const buf = fs.readFileSync(FONT_PATH)
+  return { mime, base64: buf.toString('base64') }
+}
+
+function fontFaceCss() {
+  const font = fontBase64()
+  if (!font) return ''
+  return `
+    @font-face {
+      font-family: '${FONT_NAME}';
+      font-weight: 700;
+      font-style: normal;
+      src: url(data:${font.mime};base64,${font.base64}) format('${font.mime === 'font/woff2' ? 'woff2' : font.mime === 'font/woff' ? 'woff' : 'truetype'}');
+    }
+  `
+}
 
 function brandIcon(inkColor, originX, originY) {
   // 192-viewBox icon at ICON_SIZE pixels, positioned at (originX, originY).
@@ -90,17 +125,20 @@ function compositeSvg(inkColor, bgColor) {
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${CANVAS} ${CANVAS}" width="${CANVAS}" height="${CANVAS}">
+  <defs>
+    <style type="text/css"><![CDATA[${fontFaceCss()}]]></style>
+  </defs>
   <rect width="${CANVAS}" height="${CANVAS}" fill="${bgColor}"/>
   ${brandIcon(inkColor, iconX, iconY)}
   <text x="${cx}" y="${arBaselineY}"
         text-anchor="middle"
-        font-family='${FONT_STACK}'
+        font-family="${FONT_STACK}"
         font-size="${AR_SIZE}"
         font-weight="700"
         fill="${inkColor}">حَيّ</text>
   <text x="${cx}" y="${enBaselineY}"
         text-anchor="middle"
-        font-family='${FONT_STACK}'
+        font-family="${FONT_STACK}"
         font-size="${EN_SIZE}"
         font-weight="600"
         letter-spacing="${EN_TRACKING}"
