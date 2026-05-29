@@ -1,37 +1,43 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 
 /*
- * AppSplash — senior-pass X-style intro.
+ * AppSplash — root-level transparent transition overlay.
  *
- * 1:1 port of .tmp-splash-preview.html. Total 2.4 s. Monochrome
- * ink per OS theme (black on white / white on black). Anticipation
- * wind-up → telegraphed ring pulse → parallax exit (satellites
- * whirl outward, core counter-rotates) → iris-open reveals the
- * page beneath, like a portal from the center dot.
+ * ARCHITECTURE NOTE (do not move this component back into
+ * layout.tsx's normal React tree):
  *
- * Timeline (percent of 2400 ms):
- *   0–8 %    entry overshoot scale 0.30 → 1.06
- *   8–60 %  breath ±1 %
- *   60–70 %  wind-up tighten to 0.92
- *   60–78 %  faint ring pulse telegraphs the climax
- *   70–100 % parent: scale → 14, rotate → +110°, opacity → 0 (last 8 %)
- *            satellites: stack +160° (~+270° net), scale → 1.75
- *            core: counter-rotate −40°, scale → 0.82
- *            splash bg: holds opaque through 92 %, then snap-fades
- *            to 0 in the final 8 %. The previous iris-mask reveal
- *            looked great on pre-signin pages but exposed the
- *            busy /feed content mid-animation on signed-in users
- *            (giant icon zoom + colored feed cards bleeding
- *            through = chaotic). Single snap-fade at the very
- *            end keeps every route looking clean.
+ *   The intro is intentionally semi-transparent — it should
+ *   reveal the screen underneath during the smooth transition,
+ *   not act as a solid cover. Because of that, layout matters
+ *   more than for an opaque splash: any ancestor that creates
+ *   a containing block for position:fixed (a transform, filter,
+ *   will-change, contain:paint, etc.) would re-anchor this
+ *   element to that ancestor's box and not the viewport. The
+ *   visible result on pages with such ancestors (e.g. /feed
+ *   wrapped by Next.js template.tsx during route transitions)
+ *   is a misaligned/cropped splash even though the same JSX
+ *   is rendered.
  *
- * Native handoff: capacitor.config.ts has launchAutoHide:false.
- * AppSplash calls SplashScreen.hide() with zero fade duration on
- * its first painted frame (rAF×2) so the native overlay dies
- * INTO an already-rendered AppSplash with matching icon — no
- * crossfade gap.
+ *   To make the mount bulletproof regardless of route layout,
+ *   we render the splash through React.createPortal directly
+ *   into document.body. This DETACHES the rendered DOM from
+ *   the React tree so wrappers added by future auth/app layouts
+ *   can never influence the splash's stacking context, size,
+ *   or position. The component MUST stay a portal — see the
+ *   exhaustive bug report on pre-auth vs post-auth misalignment.
+ *
+ * Visual goal:
+ *   - Semi-transparent layer + backdrop-filter blur so the
+ *     underlying page is visible BUT softened — feels like a
+ *     pane sliding in front of the app, not a solid block.
+ *   - Same icon choreography as .tmp-splash-preview.html
+ *     (entry overshoot, breath, wind-up, parallax exit, ring
+ *     pulse telegraph, brand release).
+ *   - At the climax, blur clears and opacity drops together
+ *     — the page sharpens into focus in one smooth beat.
  */
 
 const SESSION_KEY = 'hai_splash'
@@ -47,14 +53,18 @@ function deeplinkPending() {
 }
 
 export default function AppSplash() {
-  // Initial phase logic — fresh load OR active deeplink → play
-  // splash. Otherwise (in-session navigation) → skip.
   const [phase, setPhase] = useState<'show' | 'gone'>(() => {
     if (!alreadyShown()) return 'show'
     if (deeplinkPending()) return 'show'
     return 'gone'
   })
+  const [mounted, setMounted] = useState(false)
   const mountTime = useRef(Date.now())
+
+  // Portal target only exists client-side. Defer mount one tick
+  // so document.body is guaranteed available and SSR doesn't try
+  // to render the portal.
+  useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
     if (phase === 'show') {
@@ -76,9 +86,6 @@ export default function AppSplash() {
       return
     }
 
-    // Wait two frames so AppSplash has painted before the native
-    // overlay disappears. Zero-duration fade — AppSplash already
-    // matches the native PNG so a crossfade isn't needed.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => hideNativeSplash(0))
     })
@@ -86,25 +93,18 @@ export default function AppSplash() {
     let goneTimer: ReturnType<typeof setTimeout>
     let pollTimer: ReturnType<typeof setTimeout> | null = null
 
-    function unmount() {
-      setPhase('gone')
-    }
-
     function tryStart() {
       const elapsed = Date.now() - mountTime.current
       if (elapsed >= HOLD_CEILING_MS) {
         try { sessionStorage.removeItem('hai:deeplink-redirect') } catch {}
-        goneTimer = setTimeout(unmount, TOTAL_MS + 60)
+        goneTimer = setTimeout(() => setPhase('gone'), TOTAL_MS + 60)
         return
       }
       if (deeplinkPending()) {
         pollTimer = setTimeout(tryStart, 150)
         return
       }
-      // Once load is in and no deeplink is pending, schedule the
-      // unmount for the end of the 2.4 s animation. The CSS plays
-      // automatically from mount.
-      goneTimer = setTimeout(unmount, TOTAL_MS + 60)
+      goneTimer = setTimeout(() => setPhase('gone'), TOTAL_MS + 60)
     }
 
     if (document.readyState === 'complete') {
@@ -120,23 +120,23 @@ export default function AppSplash() {
     }
   }, [])
 
-  if (phase === 'gone') return null
+  if (!mounted || phase === 'gone') return null
 
-  return (
+  const overlay = (
     <div className="_sp" aria-hidden="true">
-      {/* Solid bg layer with a radial-gradient mask that grows a
-          transparent hole from the icon's center at 70 %–100 % of
-          the timeline. The hole reveals the page content beneath
-          AppSplash (children of layout.tsx). */}
+      {/* Semi-transparent bg with backdrop-filter blur. NOT a solid
+          cover — the page underneath is visible but softened, which
+          is what gives the transition its "pane sliding in" feel.
+          During the climax (last 30 %), both the bg opacity and the
+          backdrop blur reduce to zero, sharpening the page into
+          focus. */}
       <div className="_sp-bg" />
 
-      {/* Faint pre-explosion ring (telegraphs the boom). */}
+      {/* Faint pre-explosion ring (telegraphs the climax). */}
       <div className="_sp-ring" />
 
       <div className="_sp-icon-wrap">
         <svg className="_sp-icon" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
-          {/* Core: square outline + inner rings + center dot.
-              Exits SLOWER than satellites (scale 0.82 vs 1.75). */}
           <g className="_sp-core">
             <rect x="6" y="6" width="180" height="180" rx="40"
                   fill="none" stroke="currentColor" strokeWidth="12" />
@@ -146,7 +146,6 @@ export default function AppSplash() {
                     fill="none" stroke="currentColor" strokeOpacity="0.34" strokeWidth="1.6" />
             <circle cx="96" cy="96" r="19.5" fill="currentColor" />
           </g>
-          {/* Satellites: exit FASTER than core (parallax depth). */}
           <g className="_sp-sats">
             <circle cx="96"    cy="39"    r="9.5" fill="currentColor" />
             <circle cx="145.5" cy="124.5" r="9.5" fill="currentColor" />
@@ -162,42 +161,45 @@ export default function AppSplash() {
 
       <style jsx>{`
         ._sp {
+          /* StyleSheet.absoluteFillObject equivalent — top/right/
+             bottom/left:0 explicitly so even old WebViews that
+             mis-handle inset:0 still get full coverage. */
           position: fixed;
           top: 0; right: 0; bottom: 0; left: 0;
-          z-index: 9990;
+          width: 100vw;
+          height: 100vh;
+          z-index: 2147483647;        /* max signed-int z-index — beats any user-defined overlay */
           color: #0a0a0a;
-          pointer-events: none;
-          /* Isolate the splash from page layout reflows so /feed's
-             rendering work below us doesn't recompute our box. */
-          contain: layout style paint;
-          /* Force a fresh stacking context + GPU layer so subsequent
-             transforms inside never hit the main thread. */
-          isolation: isolate;
-          transform: translateZ(0);
+          background: transparent;     /* must NOT be a solid color */
+          pointer-events: auto;        /* swallow taps during the splash */
+          /* No transform/filter/will-change here so the portal's
+             child can never re-anchor its own position:fixed
+             descendants in a weird way. Animation will-change
+             lives on the actual animated children below. */
         }
         :global(.dark) ._sp { color: #ffffff; }
 
-        /* Solid bg holds opaque through the entire animation so the
-           page content underneath (which can be visually busy on
-           /feed and other signed-in routes) is NEVER exposed
-           mid-animation. Single snap-fade in the last 8 % of the
-           timeline reveals the app in one clean beat — no busy
-           feed bleeding through behind a zooming icon. */
+        /* Semi-transparent bg layer with backdrop blur.
+           Animates from "softened pane" to "fully transparent"
+           during the climax window. */
         ._sp-bg {
           position: absolute;
           inset: 0;
-          background: #ffffff;
+          background: rgba(255, 255, 255, 0.92);
+          -webkit-backdrop-filter: blur(28px) saturate(1.05);
+          backdrop-filter: blur(28px) saturate(1.05);
           z-index: 1;
           animation: _sp-bg ${TOTAL_MS}ms cubic-bezier(0.55, 0, 0.1, 1) both;
           will-change: opacity;
         }
-        :global(.dark) ._sp-bg { background: #000000; }
+        :global(.dark) ._sp-bg {
+          background: rgba(0, 0, 0, 0.92);
+        }
         @keyframes _sp-bg {
-          0%, 92% { opacity: 1; }
+          0%, 78% { opacity: 1; }
           100%    { opacity: 0; }
         }
 
-        /* Faint ring telegraph — only visible during the wind-up. */
         ._sp-ring {
           position: absolute;
           top: 50%; left: 50%;
@@ -218,13 +220,8 @@ export default function AppSplash() {
           100%     { opacity: 0; transform: translateZ(0) scale(3.5); }
         }
 
-        /* Icon stage — sits ABOVE the iris bg so it stays visible
-           as the iris opens beneath. */
         ._sp-icon-wrap {
           position: absolute;
-          /* Center via margin so the transform property is reserved
-             ENTIRELY for the keyframes — no fixed -50%/-50% translate
-             gets re-applied on every frame. Cheaper paint. */
           top: 50%; left: 50%;
           width: 84px; height: 84px;
           margin: -42px 0 0 -42px;
@@ -235,11 +232,6 @@ export default function AppSplash() {
           animation-timing-function: linear;
         }
         ._sp-icon { width: 100%; height: 100%; display: block; }
-        /* Keyframes use ONLY transform + opacity — both run on the
-           GPU compositor and don't touch the main thread. The old
-           filter: blur(...) animation forced WebKit to re-rasterize
-           the icon on the CPU every frame; on a heavy page like
-           /feed that crushed the framerate. Dropping it. */
         @keyframes _sp-icon {
           0%   { transform: translateZ(0) scale(0.30); opacity: 0; }
           4%   { transform: translateZ(0) scale(0.60); opacity: 1; }
@@ -254,9 +246,6 @@ export default function AppSplash() {
           100% { transform: translateZ(0) scale(14)   rotate(110deg); opacity: 0; }
         }
 
-        /* Satellites stack rotation+scale on top of the parent's
-           transform. They whirl outward (+160°) while core
-           counter-rotates (−40°) — gear-like depth. */
         ._sp-sats {
           animation: _sp-sats ${TOTAL_MS}ms both;
           transform-origin: 96px 96px;
@@ -296,10 +285,6 @@ export default function AppSplash() {
           opacity: 0.55;
           color: currentColor;
         }
-        /* Brand uses transform + opacity only — no letter-spacing
-           animation. letter-spacing change triggers a layout reflow
-           every frame, which on /feed could trigger the whole page
-           below to be re-measured. Was the worst offender for jank. */
         @keyframes _sp-brand {
           0%   { opacity: 0; transform: translate3d(0, 8px, 0) scale(1); }
           7%   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
@@ -316,4 +301,12 @@ export default function AppSplash() {
       `}</style>
     </div>
   )
+
+  // Portal mount target = document.body. This is the architectural
+  // fix the bug report requested: the splash is no longer rendered
+  // inside layout.tsx's React subtree (which includes Template's
+  // hai-page-enter wrapper, LangProvider, NetworkProvider, etc.).
+  // No ancestor in document.body can re-anchor our position:fixed,
+  // so the visual must be identical pre-auth and post-auth.
+  return createPortal(overlay, document.body)
 }
