@@ -355,6 +355,65 @@ export default async function FeedPage({
     balanced.push(post)
   }
 
+  // Deeplink hoist: when /feed is opened with ?post=<id> (a shared
+  // link cold-start, a notification tap, etc.) and that post ISN'T
+  // already in the SSR'd batch (it's older than the last 20 ranked
+  // results), fetch it separately and prepend so the client's
+  // scroll-and-flash effect can find post-<id> in the DOM on first
+  // paint instead of giving up after the 4s retry window.
+  const highlightedPostId = typeof searchParams.post === 'string' ? searchParams.post : null
+  if (highlightedPostId && !balanced.some((p) => p.id === highlightedPostId)) {
+    try {
+      const extra = await db.post.findUnique({
+        where: { id: highlightedPostId },
+        include: {
+          author: {
+            select: {
+              id: true, name: true, lastName: true,
+              reputation: true, accountType: true, providerStatus: true,
+              membership: true,
+              role: true, avatarUrl: true, gender: true, showGender: true,
+              createdAt: true,
+              neighborhood: { select: { name: true, nameEn: true } },
+            },
+          },
+          reactions: { select: { emoji: true, userId: true } },
+          _count: { select: { comments: true, reactions: true } },
+          comments: {
+            where: { parentId: null },
+            orderBy: [
+              { likes: { _count: 'desc' } },
+              { createdAt: 'desc' },
+            ],
+            take: 1,
+            include: {
+              author: {
+                select: {
+                  id: true, name: true, lastName: true,
+                  reputation: true, accountType: true, providerStatus: true,
+                  avatarUrl: true,
+                },
+              },
+              _count: { select: { likes: true } },
+            },
+          },
+        },
+      })
+      // Same visibility rules as the feed query — only ACTIVE /
+      // IN_PROGRESS posts make it in. Don't leak removed/banned
+      // content just because the URL referenced it.
+      if (
+        extra
+        && (extra.status === 'ACTIVE' || extra.status === 'IN_PROGRESS')
+        && extra.neighborhoodId === activeNeighborhoodId
+      ) {
+        // Prepend so the highlight effect finds the row before
+        // the user has to scroll. Hoisted, not re-ranked.
+        balanced.unshift(extra as any)
+      }
+    } catch { /* prefetch is best-effort; main feed still ships */ }
+  }
+
   // Soft guarantee: if the first 5 posts don't include a REQUEST,
   // splice the highest-scored REQUEST in at position 4 (0-indexed: 3).
   // Doesn't touch ranking — just a single visibility nudge for the

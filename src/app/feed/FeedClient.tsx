@@ -221,7 +221,13 @@ export default function FeedClient({
         }, 350)
         return
       }
-      if (++tries < 16) timer = setTimeout(tryScroll, 250) // ~4s window
+      // Up to 32 tries × 250ms = ~8s. The server-side prefetch
+      // in /feed/page.tsx now hoists the target post into the
+      // first batch, so the element is usually there on the
+      // first tick — but on cold-start the WebView takes longer
+      // to hydrate, and the previous 4s window was bailing
+      // before the post mounted.
+      if (++tries < 32) timer = setTimeout(tryScroll, 250)
     }
     timer = setTimeout(tryScroll, 200)
     return () => clearTimeout(timer)
