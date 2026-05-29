@@ -127,6 +127,13 @@ export async function POST(_req: NextRequest) {
       sql: `CREATE INDEX IF NOT EXISTS "SquareTypingSignal_neighborhoodId_expiresAt_idx"
               ON "SquareTypingSignal"("neighborhoodId", "expiresAt");`,
     },
+
+    // ── Notification.squareMessageId column ──
+    {
+      name: 'Notification.squareMessageId column',
+      sql: `ALTER TABLE "Notification"
+              ADD COLUMN IF NOT EXISTS "squareMessageId" TEXT;`,
+    },
   ]
 
   const results: Array<{ name: string; ok: boolean; error?: string }> = []

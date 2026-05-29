@@ -949,6 +949,10 @@ model Notification {
   commentId String?
   threadId       String?
   rideRequestId  String?
+  /** Set on Square broadcast/reply/reaction bell rows so the
+   *  in-app /notifications page can deeplink straight to the
+   *  message (and the Square page can scroll + glow it). */
+  squareMessageId String?
   title          String?
   titleEn        String?
   body           String?

@@ -118,6 +118,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             titleEn: `${emoji} New reaction on your message`,
             body: preview,
             bodyEn: preview,
+            squareMessageId: msg.id,
           },
         })
         await tx.notifJob.create({

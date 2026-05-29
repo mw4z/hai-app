@@ -148,7 +148,9 @@ export async function POST(_req: NextRequest, { params }: Params) {
       data: { notificationFiredAt: new Date() },
     })
     if (recipients.length > 0) {
-      // In-app bell entries for each recipient.
+      // In-app bell entries for each recipient. Tag every row with
+      // the broadcast message id so the in-app /notifications page
+      // can deeplink straight to /square?msg=<id>.
       await tx.notification.createMany({
         data: recipients.map((u) => ({
           type: 'SYSTEM' as const,
@@ -159,6 +161,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
           titleEn,
           body: bodyAr,
           bodyEn,
+          squareMessageId: msg.id,
         })),
       })
       // ALSO enqueue ONE NotifJob so the push cron actually fans out

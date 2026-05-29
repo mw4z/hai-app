@@ -20,6 +20,7 @@ interface Notification {
   postTitle: string | null
   threadId: string | null
   rideRequestId: string | null
+  squareMessageId: string | null
   title: string | null
   titleEn: string | null
   body: string | null
@@ -142,6 +143,10 @@ export default function NotificationsClient({
   function getLink(n: Notification): string {
     if (n.rideRequestId) return `/rides/${n.rideRequestId}`
     if (n.threadId) return `/threads/${n.threadId}`
+    // Square broadcast / reply / reaction — checked BEFORE the
+    // generic postId fallback so the in-app list deeplinks to
+    // the right bubble (matches the OS-push behaviour).
+    if (n.squareMessageId) return `/square?msg=${encodeURIComponent(n.squareMessageId)}`
     // Owner-confirmation prompt for a service-contact number matched to
     // this user → the "is this your number?" claim screen.
     if (n.type === 'SYSTEM' && (n.title?.includes('اقتراح رقمك') || n.titleEn?.includes('suggested as a service'))) {

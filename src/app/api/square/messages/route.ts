@@ -337,6 +337,10 @@ export async function POST(req: NextRequest) {
             titleEn: 'New reply to your message',
             body: preview,
             bodyEn: preview,
+            // Tag the bell row with the original message id so the
+            // in-app /notifications page can deeplink to the exact
+            // bubble (NotificationsClient.getLink → /square?msg=…).
+            squareMessageId: replyToMessageId,
           },
         })
         await tx.notifJob.create({
