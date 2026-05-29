@@ -113,19 +113,31 @@ export default function BottomNav({
   const isReadOnly = isReadOnlyOverride ?? (pathname.startsWith('/feed') && !!queryNbhdId)
 
   // Role is fetched in-line on first mount when not supplied — the
-  // /api/profile endpoint already returns it and is cheap.
-  const [userRole, setUserRole] = useState<string | undefined>(userRoleOverride)
+  // /api/profile endpoint already returns it and is cheap. To avoid
+  // the cold-start label flicker (السوق → الساحة) we ALSO seed the
+  // initial state from a cached role in localStorage. First-paint
+  // then uses last-known-role; the /api/profile call afterwards
+  // corrects any drift (e.g. role changed since last visit).
+  const ROLE_CACHE_KEY = 'hai_user_role'
+  const [userRole, setUserRole] = useState<string | undefined>(() => {
+    if (userRoleOverride) return userRoleOverride
+    try {
+      const cached = localStorage.getItem(ROLE_CACHE_KEY)
+      return cached || undefined
+    } catch { return undefined }
+  })
   useEffect(() => {
-    if (userRole) return
     let cancelled = false
     fetch('/api/profile', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (!cancelled && d?.role) setUserRole(d.role)
+        if (cancelled || !d?.role) return
+        setUserRole(d.role)
+        try { localStorage.setItem(ROLE_CACHE_KEY, d.role) } catch {}
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [userRole])
+  }, [])
 
   const isSuperAdmin = userRole === 'SUPER_ADMIN'
   // Square (ساحة الحي) is staged behind admin roles — the bottom-nav
