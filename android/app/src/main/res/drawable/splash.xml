@@ -1,22 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Capacitor SplashScreen drawable. Previously this was just the
-    background color — fine when AppSplash (the JS overlay) was the
-    layer that actually drew the icon. With AppSplash removed and
-    capacitor.config.ts holding this splash up until the WebView
-    is ready, this IS what the user sees during launch, so it has
-    to contain the brand mark too.
+    Capacitor SplashScreen plugin drawable.
 
-    Layer order: background fill, then the brand icon centered at
-    a fixed 120dp box. Icon comes from ic_launcher_splash (the
-    same vector the Android 12+ system splash uses), so cold-start
-    transitions don't jump between two different mark designs.
+    Now references splash_composite.png (rendered offline by
+    scripts/regen-ios-splash.js) which contains the FULL composition:
+    background fill + smaller brand icon + "حَيّ" Arabic + "HAI"
+    subordinate text below. Light variant lives in this drawable/
+    folder; dark variant lives in drawable-night/splash_composite.png.
+
+    Android automatically picks the right one based on the system's
+    Night Mode. Capacitor's ImageView renders the bitmap with
+    CENTER_CROP, so the centered icon+text composition stays
+    visually centered on the screen regardless of device aspect.
+
+    The previous layer-list referencing @drawable/ic_launcher_splash
+    (icon-only vector) is no longer needed for this overlay — the
+    ic_launcher_splash drawable is still kept for the Android 12+
+    SYSTEM splash (windowSplashScreenAnimatedIcon), which is
+    constrained to a 108dp circle and can't show text.
 -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/splash_bg"/>
-    <item
-        android:width="120dp"
-        android:height="120dp"
-        android:gravity="center"
-        android:drawable="@drawable/ic_launcher_splash"/>
-</layer-list>
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/splash_composite"
+    android:gravity="center" />

@@ -30,8 +30,8 @@ import { useEffect, useRef } from 'react'
  * to true / launchShowDuration back to 0.
  */
 
-const MIN_MS = 600
-const HOLD_CEILING_MS = 8000
+const MIN_MS = 150
+const HOLD_CEILING_MS = 6000
 
 function deeplinkPending() {
   try { return sessionStorage.getItem('hai:deeplink-redirect') === '1' } catch { return false }
@@ -49,9 +49,9 @@ export default function AppSplash() {
     async function hideNativeSplash() {
       try {
         const { SplashScreen } = await import('@capacitor/splash-screen')
-        // 300 ms fade so the handoff to the live WebView is smooth
-        // — not a hard cut.
-        await SplashScreen.hide({ fadeOutDuration: 300 })
+        // 180 ms fade — quick enough to feel snappy, slow enough
+        // not to be a hard cut.
+        await SplashScreen.hide({ fadeOutDuration: 180 })
       } catch {}
     }
 
@@ -73,15 +73,15 @@ export default function AppSplash() {
       hideNativeSplash()
     }
 
-    if (document.readyState === 'complete') {
-      tryHide()
-    } else {
-      window.addEventListener('load', tryHide, { once: true })
-    }
+    // Fire ASAP. React has already hydrated by the time this
+    // useEffect runs, so the page is interactive — no reason to
+    // wait for window.load (which would otherwise block on
+    // images / fonts). MIN_MS below is the floor; tryHide will
+    // wait that long even on an instant-mount.
+    tryHide()
 
     return () => {
       if (pollTimer) clearTimeout(pollTimer)
-      window.removeEventListener('load', tryHide)
     }
   }, [])
 
