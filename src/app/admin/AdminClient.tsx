@@ -787,6 +787,24 @@ export default function AdminClient({
                   {u.neighborhood && (
                     <p className="text-[11px] text-gray-400 mt-0.5">📍 {lang === 'en' ? (u.neighborhood.nameEn || u.neighborhood.name) : u.neighborhood.name}{u.neighborhood.city ? ` — ${lang === 'en' ? (u.neighborhood.city.nameEn || u.neighborhood.city.name) : u.neighborhood.city.name}` : ''}</p>
                   )}
+                  {/* Signup timestamp — full date + time so admins
+                      can pinpoint exactly when a user joined
+                      (useful for incident triage, e.g. "all signups
+                      in the last hour"). */}
+                  {u.createdAt && (() => {
+                    const d = new Date(u.createdAt)
+                    const dateStr = d.toLocaleDateString(lang !== 'en' ? 'ar-SA' : 'en-US', {
+                      year: 'numeric', month: 'short', day: 'numeric',
+                    })
+                    const timeStr = d.toLocaleTimeString(lang !== 'en' ? 'ar-SA' : 'en-US', {
+                      hour: '2-digit', minute: '2-digit',
+                    })
+                    return (
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        📅 {lang === 'en' ? 'Joined' : 'انضم في'} {dateStr} · {timeStr}
+                      </p>
+                    )
+                  })()}
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     {(() => {
                       const p = getPrimaryBadge(u.accountType || 'NORMAL', (u as any).providerStatus)
