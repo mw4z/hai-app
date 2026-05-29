@@ -13,6 +13,7 @@ import UserBadgeDisplay, { TierLabel } from './UserBadge'
 import MembershipPill from './MembershipPill'
 import SocialChips from './SocialChips'
 import ServiceCatalog from './ServiceCatalog'
+import { consumeNextClick } from '@/hooks/useBodyScrollLock'
 
 /**
  * The user profile sheet shown when tapping a name/avatar — extracted from
@@ -59,12 +60,26 @@ export default function UserProfileSheet({
 
   const u = fetched
 
+  // Backdrop / X-button dismiss wrapper.
+  //
+  // Without consumeNextClick(), tapping the backdrop to dismiss the
+  // sheet would fire a phantom "click" on whatever sits underneath
+  // the touch point once the sheet unmounts — feels like a ghost
+  // tap that fires the post / row / button you happened to be over.
+  // The shared one-shot capture-phase listener in useBodyScrollLock
+  // swallows that next click before it reaches any handler. Auto-
+  // cleared after 600 ms so it never lingers.
+  const safeClose = () => {
+    consumeNextClick()
+    onClose()
+  }
+
   // Loading / unresolved → branded loader (never a half-empty card).
   if (!u) {
     return (
       <div
         className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={safeClose}
       >
         <div
           className="bg-white dark:bg-gray-800 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-sm mx-auto py-20 flex items-center justify-center"
@@ -88,7 +103,7 @@ export default function UserProfileSheet({
       onPointerDown={(e) => {
         if (e.target !== e.currentTarget) return
         e.preventDefault()
-        onClose()
+        safeClose()
       }}
     >
       <div
@@ -103,7 +118,7 @@ export default function UserProfileSheet({
           )}
           <div className="absolute top-0 left-0 right-0 h-72 pointer-events-none"
             style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.1) 30%, transparent 100%)' }} />
-          <button onClick={onClose} className="absolute top-3 left-3 bg-black/30 hover:bg-black/50 backdrop-blur-sm rounded-full p-1.5 z-10">
+          <button onClick={safeClose} className="absolute top-3 left-3 bg-black/30 hover:bg-black/50 backdrop-blur-sm rounded-full p-1.5 z-10">
             <FiX className="w-4 h-4 text-white" />
           </button>
         </div>
