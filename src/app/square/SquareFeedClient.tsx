@@ -811,15 +811,26 @@ export default function SquareFeedClient({
    *  surface a confirm dialog the same way DM ChatClient does for
    *  end-conversation / report-user actions. */
   async function notifyMessage(target: PublicSquareMessage) {
-    if (target.notificationFiredAt || target.status !== 'ACTIVE') return
+    // Always block on hidden/deleted messages — there's nothing
+    // to broadcast about. But ONLY block on "already fired" for
+    // non-mods; mods can re-broadcast a message (server allows
+    // it), and the early return here was silently swallowing
+    // their tap so the confirm dialog never appeared.
+    if (target.status !== 'ACTIVE') return
+    if (!isMod && target.notificationFiredAt) return
+    const alreadyFired = !!target.notificationFiredAt
     const ok = await confirm({
       title: lang === 'en' ? 'Notify everyone?' : 'تنبيه كل سكان الحي؟',
       message: lang === 'en'
-        ? 'A push notification will be sent to every neighbor about this message. You can only do this once per message.'
-        : 'سيتم إرسال إشعار لكل سكان الحي بهذه الرسالة. يمكنك تنبيه الجيران مرة واحدة فقط لكل رسالة.',
-      confirmText: lang === 'en' ? 'Notify' : 'تنبيه',
+        ? (alreadyFired
+            ? 'A push notification was already sent for this message. Sending again will notify every neighbor a second time.'
+            : 'A push notification will be sent to every neighbor about this message. You can only do this once per message.')
+        : (alreadyFired
+            ? 'تم تنبيه الجيران على هذه الرسالة من قبل. إعادة الإرسال ستنبّههم مرة أخرى.'
+            : 'سيتم إرسال إشعار لكل سكان الحي بهذه الرسالة. يمكنك تنبيه الجيران مرة واحدة فقط لكل رسالة.'),
+      confirmText: lang === 'en' ? (alreadyFired ? 'Send again' : 'Notify') : (alreadyFired ? 'إعادة الإرسال' : 'تنبيه'),
       cancelText: lang === 'en' ? 'Cancel' : 'إلغاء',
-      variant: 'default',
+      variant: alreadyFired ? 'danger' : 'default',
     })
     if (!ok) return
     try {
