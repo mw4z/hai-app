@@ -33,18 +33,16 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      // KEEP the native splash visible until JS explicitly hides it.
-      // The native storyboard (iOS) / launch drawable (Android) shows
-      // the branded "حي" icon from app launch; Capacitor's SplashScreen
-      // plugin layers its own splash on top once the WebView is ready,
-      // and we hold that until CapacitorBridge confirms the page has
-      // loaded AND any pending share-link / push deeplink has resolved.
-      // No JS-side AppSplash component — that was running on top of
-      // the native splash and producing visible re-mount flicker on
-      // cold-start deeplinks. One native layer, one fade-out, done.
+      // NATIVE-ONLY intro. The OS storyboard (iOS) / system splash
+      // (Android) shows the brand mark immediately, then Capacitor's
+      // native overlay holds the same mark on top of the WebView
+      // while JS loads. JS controls only WHEN to dismiss the overlay
+      // (after the page has loaded), nothing else. No JS-side
+      // animation, no fade choreography — just a clean static
+      // brand-mark splash that fades out when the app is ready.
       launchShowDuration: 10000,
       launchAutoHide: false,
-      backgroundColor: '#e0f7f2',
+      backgroundColor: '#ffffff',
       showSpinner: false,
       androidSplashResourceName: 'splash',
       splashFullScreen: true,
