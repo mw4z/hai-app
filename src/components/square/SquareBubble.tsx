@@ -250,9 +250,7 @@ export default function SquareBubble({
   ) : null
   const metaFooter = isLastInGroup ? (
     <p
-      className={`text-[10.5px] mt-1.5 inline-flex items-center gap-1.5 ${footerTone} ${
-        isMe ? 'ltr:justify-start rtl:justify-start' : 'ltr:justify-end rtl:justify-end'
-      }`}
+      className={`text-[10.5px] mt-1.5 flex w-full items-center gap-1.5 ${footerTone}`}
     >
       {message.notificationFiredAt && (
         <span
@@ -278,14 +276,14 @@ export default function SquareBubble({
           <span>{viewCount}</span>
         </span>
       )}
-      {/* Sending status — pending clock while the server hasn't
-          confirmed yet, single check once it has. Own messages
-          only; reused straight from the DM ChatClient pattern
-          via the shared MessageStatus module. */}
+      {/* Sending status pushed to the trailing corner via ms-auto.
+          With the row now flex w-full, the icon sits at the
+          bottom-trailing edge of the bubble — the WhatsApp-style
+          corner check / clock. Own messages only. */}
       {isMe && message.type !== 'DELETED' && (
-        message.id.startsWith('pending-')
-          ? <ChatPendingClock />
-          : <ChatSentCheck />
+        <span className="ms-auto inline-flex items-center" aria-label={message.id.startsWith('pending-') ? 'sending' : 'sent'}>
+          {message.id.startsWith('pending-') ? <ChatPendingClock /> : <ChatSentCheck />}
+        </span>
       )}
     </p>
   ) : null
