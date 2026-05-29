@@ -70,7 +70,7 @@ input, textarea, [contenteditable="true"] {
   --border:         rgba(255, 255, 255, 0.10);
   --border-light:   rgba(255, 255, 255, 0.06);
   --divide:         rgba(255, 255, 255, 0.06);
-  --chat-incoming-bg: #242625;
+  --chat-incoming-bg: #3d4754;
 }
 
 /* ── Dark mode: global Tailwind class overrides ─────────────────────────── */
