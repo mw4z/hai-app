@@ -104,6 +104,29 @@ export async function POST(_req: NextRequest) {
               ADD COLUMN IF NOT EXISTS "squareLockedUntil" TIMESTAMP(3),
               ADD COLUMN IF NOT EXISTS "squareLockedById"  TEXT;`,
     },
+
+    // ── 20260604_square_typing ──
+    {
+      name: 'SquareTypingSignal table',
+      sql: `CREATE TABLE IF NOT EXISTS "SquareTypingSignal" (
+              "id"             TEXT NOT NULL,
+              "neighborhoodId" TEXT NOT NULL,
+              "userId"         TEXT NOT NULL,
+              "expiresAt"      TIMESTAMP(3) NOT NULL,
+              "updatedAt"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              CONSTRAINT "SquareTypingSignal_pkey" PRIMARY KEY ("id")
+            );`,
+    },
+    {
+      name: 'SquareTypingSignal unique (neighborhoodId, userId)',
+      sql: `CREATE UNIQUE INDEX IF NOT EXISTS "SquareTypingSignal_neighborhoodId_userId_key"
+              ON "SquareTypingSignal"("neighborhoodId", "userId");`,
+    },
+    {
+      name: 'SquareTypingSignal index by neighborhood + expiry',
+      sql: `CREATE INDEX IF NOT EXISTS "SquareTypingSignal_neighborhoodId_expiresAt_idx"
+              ON "SquareTypingSignal"("neighborhoodId", "expiresAt");`,
+    },
   ]
 
   const results: Array<{ name: string; ok: boolean; error?: string }> = []

@@ -364,6 +364,19 @@ export default function PushRegistration() {
                 window.dispatchEvent(new CustomEvent('hai:new-message', {
                   detail: data,
                 }))
+              } else if (
+                type === 'square_notify'
+                || type === 'square_reply'
+                || type === 'square_reaction'
+              ) {
+                // Foreground push for Square activity → kick the
+                // open Square page (if any) to refresh its message
+                // list immediately, so the user sees the reply /
+                // reaction / broadcast without waiting for the next
+                // 5s poll tick.
+                window.dispatchEvent(new CustomEvent('hai:square-activity', {
+                  detail: data,
+                }))
               }
             } catch {}
 

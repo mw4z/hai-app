@@ -77,6 +77,26 @@ export default function SquareComposer({
   const inputRef = useRef<HTMLInputElement | null>(null)
   const intent = useMemo(() => detectSquareIntent(body), [body])
 
+  // Typing signal — POST every TYPING_PING_MS while the body has
+  // content. The server's TTL (5s) is intentionally longer than
+  // the ping interval so an in-flight network blip doesn't make
+  // the indicator flicker off. The signal stops naturally when
+  // the user stops typing or sends; we don't issue an explicit
+  // clear.
+  const TYPING_PING_MS = 2_500
+  const lastPingRef = useRef<number>(0)
+  useEffect(() => {
+    if (disabled) return
+    if (!body.trim()) return
+    const now = Date.now()
+    if (now - lastPingRef.current < TYPING_PING_MS) return
+    lastPingRef.current = now
+    fetch('/api/square/typing', {
+      method: 'POST',
+      credentials: 'include',
+    }).catch(() => {})
+  }, [body, disabled])
+
   // Refocus input when a reply is staged (mirrors DM).
   useEffect(() => {
     if (replyingTo) {

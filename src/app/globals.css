@@ -408,6 +408,22 @@ input, textarea, [contenteditable="true"] {
 .animate-slide-in-ltr { animation: slide-in-left  var(--hai-dur-slow) var(--hai-ease-standard); }
 .animate-fade-in-up   { animation: fade-in-up     var(--hai-dur-slow) var(--hai-ease-standard); }
 
+/* Square "is typing…" indicator. Three dots bounce in sequence;
+   per-dot animation-delay is set inline so they stagger. The
+   parent row uses .animate-fade-in (below) to slide in smoothly
+   when the typingUsers list goes from empty → has entries. */
+@keyframes typing-dot {
+  0%, 60%, 100% { transform: translateY(0);    opacity: 0.4; }
+  30%           { transform: translateY(-3px); opacity: 1;   }
+}
+.animate-typing-dot { animation: typing-dot 1s ease-in-out infinite; }
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fade-in { animation: fade-in 220ms var(--hai-ease-standard); }
+
 /* Voice-note waveform idle motion — a gentle traveling wave (staggered
    per-bar delay set inline) so a sent note reads as "voice" even before
    playback. transform-only, so it stays on the compositor. */
@@ -425,6 +441,8 @@ input, textarea, [contenteditable="true"] {
   .animate-slide-in-rtl,
   .animate-slide-in-ltr,
   .animate-fade-in-up,
+  .animate-fade-in,
+  .animate-typing-dot,
   .hai-arc-pin-ltr,
   .hai-arc-pin-rtl,
   .hai-label-in,

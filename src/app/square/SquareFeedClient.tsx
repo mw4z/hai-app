@@ -89,6 +89,9 @@ export default function SquareFeedClient({
   // any admin action.
   const [lock, setLock] = useState<InitialLock>(initialLock)
   const [showLockSheet, setShowLockSheet] = useState(false)
+  // Live "who's typing" list. Polled every 2s while the page is
+  // visible; rendered as a small ellipsis row above the composer.
+  const [typingUsers, setTypingUsers] = useState<Array<{ id: string; name: string | null; lastName: string | null }>>([])
   // Wallpaper — shared preference with DM via localStorage. Picking
   // here syncs to /threads and any other open Square tab via the
   // 'storage' event the hook listens for.
@@ -371,6 +374,136 @@ export default function SquareFeedClient({
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('focus', onFocus)
       try { appHandle?.remove() } catch {}
+    }
+  }, [])
+
+  // ── Live message sync ────────────────────────────────────────────
+  // Polls the latest page of messages every 5s while the page is
+  // visible and re-fetches on tab return / window focus / app
+  // resume. New messages get prepended/appended in time order,
+  // and existing messages get updated in place when their server-
+  // side fields change (reactions, viewCount, notificationFiredAt,
+  // type=DELETED tombstones, body / imageUrl edits).
+  //
+  // Older messages already loaded via "load older" pagination are
+  // PRESERVED — the merge only touches ids the server returned in
+  // this latest page. So scrolling up to load 100s of historical
+  // messages then leaving the page open doesn't lose them.
+  //
+  // Same skip-when-hidden / Capacitor appStateChange triggers as
+  // the lock-status effect above, so a single coherent refresh
+  // happens on every focus event.
+  useEffect(() => {
+    let cancelled = false
+    const tick = async () => {
+      if (cancelled) return
+      if (typeof document !== 'undefined' && document.hidden) return
+      try {
+        const res = await fetch('/api/square/messages', {
+          credentials: 'include',
+          cache: 'no-store',
+        })
+        if (!res.ok || cancelled) return
+        const data = await res.json() as {
+          messages: PublicSquareMessage[]
+          hasMore: boolean
+        }
+        const serverMessages = data.messages || []
+        if (cancelled || serverMessages.length === 0) return
+        setMessages((prev) => {
+          const byId = new Map(prev.map((m) => [m.id, m] as const))
+          let changed = false
+          for (const srv of serverMessages) {
+            const existing = byId.get(srv.id)
+            if (!existing) {
+              byId.set(srv.id, srv)
+              changed = true
+              continue
+            }
+            // Field-by-field equality on everything that can change
+            // server-side without the local user's action. Reactions
+            // are an array of {emoji,userId}; cheapest correct test
+            // is a length check then a JSON compare.
+            const reactionsSame =
+              existing.reactions.length === srv.reactions.length
+              && JSON.stringify(existing.reactions) === JSON.stringify(srv.reactions)
+            if (
+              existing.type === srv.type
+              && existing.status === srv.status
+              && existing.body === srv.body
+              && existing.imageUrl === srv.imageUrl
+              && existing.viewCount === srv.viewCount
+              && existing.notificationFiredAt === srv.notificationFiredAt
+              && existing.isPinned === srv.isPinned
+              && existing.pinnedAt === srv.pinnedAt
+              && reactionsSame
+            ) continue
+            byId.set(srv.id, srv)
+            changed = true
+          }
+          if (!changed) return prev
+          return Array.from(byId.values()).sort((a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+          )
+        })
+      } catch { /* next tick will catch up */ }
+    }
+    const intervalId = setInterval(tick, 5_000)
+    const onVisibility = () => { if (!document.hidden) void tick() }
+    const onFocus = () => void tick()
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('focus', onFocus)
+    let appHandle: { remove: () => void } | null = null
+    ;(async () => {
+      try {
+        const { App } = await import('@capacitor/app')
+        appHandle = await App.addListener('appStateChange', ({ isActive }: { isActive: boolean }) => {
+          if (isActive) void tick()
+        })
+      } catch { /* not native — fine */ }
+    })()
+    // Push-triggered nudge: PushRegistration dispatches these custom
+    // events when a foreground push arrives for Square activity.
+    // Refreshing immediately means the user sees the reply / reaction
+    // / broadcast without waiting up to 5s for the next poll.
+    const onSquarePush = () => void tick()
+    window.addEventListener('hai:square-activity', onSquarePush)
+    return () => {
+      cancelled = true
+      clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('hai:square-activity', onSquarePush)
+      try { appHandle?.remove() } catch {}
+    }
+  }, [])
+
+  // ── Live typing indicator ───────────────────────────────────────
+  // Poll /api/square/typing every 2s for the list of OTHER users
+  // currently typing in this neighborhood. Server-side TTL handles
+  // expiry — we just render whatever the server says is fresh.
+  useEffect(() => {
+    let cancelled = false
+    const tick = async () => {
+      if (cancelled) return
+      if (typeof document !== 'undefined' && document.hidden) return
+      try {
+        const res = await fetch('/api/square/typing', {
+          credentials: 'include',
+          cache: 'no-store',
+        })
+        if (!res.ok || cancelled) return
+        const data = await res.json() as { users: Array<{ id: string; name: string | null; lastName: string | null }> }
+        setTypingUsers(data.users || [])
+      } catch { /* next tick will catch up */ }
+    }
+    const intervalId = setInterval(tick, 2_000)
+    const onVisibility = () => { if (!document.hidden) void tick() }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      cancelled = true
+      clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [])
 
@@ -764,6 +897,38 @@ export default function SquareFeedClient({
           <div ref={endAnchorRef} />
         </div>
       </div>
+
+      {/* Typing indicator — names + smooth-pulsing dots. Renders
+          above the composer (or above the lock banner if both are
+          showing) so it never gets covered by the keyboard. Hidden
+          when nobody is typing. */}
+      {typingUsers.length > 0 && (
+        <div className="flex-shrink-0 px-4 py-2 text-[12px] text-gray-500 dark:text-gray-400 flex items-center gap-2 animate-fade-in">
+          <span className="inline-flex items-center gap-0.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-typing-dot" style={{ animationDelay: '0s' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-typing-dot" style={{ animationDelay: '0.15s' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-typing-dot" style={{ animationDelay: '0.3s' }} />
+          </span>
+          <span className="truncate">
+            {(() => {
+              const names = typingUsers.map((u) => (u.name || (lang === 'en' ? 'Neighbor' : 'جار')).trim())
+              if (names.length === 1) {
+                return lang === 'en'
+                  ? `${names[0]} is typing…`
+                  : `${names[0]} يكتب الآن…`
+              }
+              if (names.length === 2) {
+                return lang === 'en'
+                  ? `${names[0]} and ${names[1]} are typing…`
+                  : `${names[0]} و${names[1]} يكتبون…`
+              }
+              return lang === 'en'
+                ? `${names[0]} and ${names.length - 1} others are typing…`
+                : `${names[0]} و${names.length - 1} آخرون يكتبون…`
+            })()}
+          </span>
+        </div>
+      )}
 
       {/* Lock banner — only shows for non-mods when the chat is
           actively locked. Mods see this state via the lock icon

@@ -2652,6 +2652,26 @@ model SquareMessage {
  * (messageId, userId); unique index makes re-viewing a no-op. Mirrors
  * PostView for the post feed.
  */
+/**
+ * Ephemeral "user is typing" signal for Square. One row per
+ * (neighborhoodId, userId). The composer touches this every
+ * couple seconds while the user has text in the input; the
+ * Square feed polls for rows where expiresAt > now and renders
+ * a typing indicator with the names. Rows naturally lapse —
+ * the GET query filters out expired rows, and inserts use
+ * onConflict-update so we don't grow the table.
+ */
+model SquareTypingSignal {
+  id             String   @id @default(cuid())
+  neighborhoodId String
+  userId         String
+  expiresAt      DateTime
+  updatedAt      DateTime @updatedAt
+
+  @@unique([neighborhoodId, userId])
+  @@index([neighborhoodId, expiresAt])
+}
+
 model SquareMessageView {
   id        String   @id @default(cuid())
   messageId String
