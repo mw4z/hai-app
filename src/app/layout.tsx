@@ -3,12 +3,7 @@ import { cookies } from 'next/headers'
 import { Toaster } from 'react-hot-toast'
 import RepToast from '@/components/RepToast'
 import ErrorBoundary from '@/components/ErrorBoundary'
-// AppSplash removed — the native iOS storyboard + Capacitor
-// SplashScreen plugin are now the ONLY splash layer (see
-// capacitor.config.ts SplashScreen.launchAutoHide:false and
-// CapacitorBridge for the hide trigger). Running a second JS
-// splash on top was the source of the "show / hide / show /
-// hide" flicker on cold-start share-link deeplinks.
+import AppSplash from '@/components/AppSplash'
 import RouteTransition from '@/components/RouteTransition'
 import BottomNav from '@/components/BottomNav'
 import ArrivalAlert from '@/components/ArrivalAlert'
@@ -175,11 +170,20 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning>
-        {/* No HTML/CSS splash overlay here. On native, the iOS
-            storyboard + Capacitor SplashScreen plugin cover the
-            screen until CapacitorBridge hides them — there's no
-            uncovered moment where a gradient cover would matter.
-            On web there's no splash at all; the page just renders. */}
+        {/* Splash chain on native:
+            1. iOS LaunchScreen.storyboard / Android system splash
+               — both now render the brand mark + bg.
+            2. Capacitor SplashScreen plugin overlays the same mark
+               on top of the WebView (launchAutoHide:false in
+               capacitor.config.ts — STAYS until AppSplash dismisses).
+            3. AppSplash mounts on top, plays the animation, then
+               fades out together with the native splash (synchronized
+               SplashScreen.hide inside AppSplash's dismiss()).
+            So the user sees: brand mark → brand mark with animation →
+            single fade to app. No "show/hide/show" flicker because
+            the native splash bridges any inter-mount gaps between
+            React-router navigations during a deeplink chain. */}
+        <AppSplash />
         <CapacitorBridge />
         <DebugOverlay />
         <PushRegistration />
