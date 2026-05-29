@@ -1219,6 +1219,7 @@ export default function SquareFeedClient({
           onClose={() => setShowLockSheet(false)}
           onApply={applyLock}
           lang={lang}
+          isSuperAdmin={isSuperAdmin}
         />
       )}
     </div>
@@ -1227,16 +1228,54 @@ export default function SquareFeedClient({
 
 // ── Lock management bottom sheet ────────────────────────────────────
 function SquareLockSheet({
-  lock, onClose, onApply, lang,
+  lock, onClose, onApply, lang, isSuperAdmin,
 }: {
   lock: InitialLock
   onClose: () => void
   onApply: (p: { from?: string | null; until?: string | null; clear?: boolean }) => Promise<void>
   lang: string
+  isSuperAdmin: boolean
 }) {
   const [fromStr, setFromStr] = useState('')
   const [untilStr, setUntilStr] = useState('')
+  const [migrationBusy, setMigrationBusy] = useState(false)
   const en = lang === 'en'
+
+  // Apply any pending Square DB migrations — SUPER_ADMIN-only
+  // maintenance action. Posts to the existing /admin/square/
+  // run-migrations endpoint and reports per-step results in
+  // a single alert so the user can verify each step landed.
+  // Idempotent — safe to tap multiple times.
+  async function runPendingMigrations() {
+    if (migrationBusy) return
+    setMigrationBusy(true)
+    try {
+      const res = await fetch('/api/admin/square/run-migrations', {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data?.ok === false) {
+        const failed = (data?.results || []).find((r: any) => !r.ok)
+        alert(
+          en
+            ? `Migration failed: ${failed?.name || 'unknown'} — ${failed?.error || res.status}`
+            : `فشل التطبيق: ${failed?.name || 'غير معروف'} — ${failed?.error || res.status}`,
+        )
+        return
+      }
+      const okCount = (data?.results || []).filter((r: any) => r.ok).length
+      alert(
+        en
+          ? `Migrations applied · ${okCount}/${(data?.results || []).length} steps OK`
+          : `تم تطبيق التعديلات · ${okCount} من ${(data?.results || []).length}`,
+      )
+    } catch (err) {
+      alert((en ? 'Migration failed: ' : 'فشل التطبيق: ') + (err as Error)?.message)
+    } finally {
+      setMigrationBusy(false)
+    }
+  }
   // Swipe-down-to-dismiss, same hook the wallpaper picker uses. The
   // sheetRef gets the touch listener; the handleRef is the "grab"
   // strip at the top so swiping from there is what triggers the
@@ -1383,6 +1422,33 @@ function SquareLockSheet({
             >
               {en ? '🟢 Unlock now' : '🟢 فتح الساحة الآن'}
             </button>
+          )}
+
+          {/* SUPER_ADMIN-only DB maintenance. Idempotent — applies
+              any pending Square migrations (view-count, lock,
+              typing) on prod. Replaces the manual fetch-from-
+              browser-console step. */}
+          {isSuperAdmin && (
+            <div className="mt-1">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+                {en ? 'Database' : 'قاعدة البيانات'}
+              </div>
+              <button
+                type="button"
+                onClick={runPendingMigrations}
+                disabled={migrationBusy}
+                className="w-full rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 text-indigo-800 dark:text-indigo-200 text-[13px] font-bold py-2.5 transition-colors disabled:opacity-50 disabled:cursor-default"
+              >
+                {migrationBusy
+                  ? (en ? 'Applying…' : 'جاري التطبيق…')
+                  : (en ? '🛠️ Run pending DB migrations' : '🛠️ تطبيق تحديثات قاعدة البيانات')}
+              </button>
+              <p className="text-[10.5px] text-gray-500 dark:text-gray-400 mt-1.5">
+                {en
+                  ? 'Idempotent. Tap if Square errors mention a missing table.'
+                  : 'آمن للتكرار. اضغط إذا ظهرت أخطاء "جدول غير موجود".'}
+              </p>
+            </div>
           )}
         </div>
       </div>
