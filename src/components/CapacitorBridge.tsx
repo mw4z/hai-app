@@ -197,7 +197,19 @@ export default function CapacitorBridge() {
             else if (seg[0] === 's' && seg[1] === 'poll' && seg[2]) target = '/feed?poll=' + encodeURIComponent(seg[2])
             else target = u.pathname + u.search
             const cur = window.location.pathname + window.location.search
-            if (target && target !== cur) window.location.assign(target)
+            if (target && target !== cur) {
+              // Set the deeplink-redirect flag BEFORE the assign so
+              // AppSplash on the destination page sees it and re-
+              // renders the splash, hiding the chrome-less flicker
+              // of the briefly-visible /feed mount we're navigating
+              // away from. Cleared by FeedClient once the highlight
+              // effect locates the target post.
+              try {
+                sessionStorage.setItem('hai:deeplink-redirect', '1')
+                sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))
+              } catch {}
+              window.location.assign(target)
+            }
           } catch { /* malformed url — ignore */ }
         })
       } catch { /* @capacitor/app not available — no-op on web */ }
