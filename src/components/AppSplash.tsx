@@ -3,476 +3,324 @@
 import { useState, useEffect, useRef } from 'react'
 
 /*
- * AppSplash — "Community Signal" (refined)
+ * AppSplash — X-style senior pass
  *
- * Center logo emits 2 soft pulse rings. 5 neighbor dots fade in around it,
- * connected to center by faint lines. Brand text appears below. Minimal,
- * calm, premium.
+ * Composition:
+ *   - Plain black (dark) / white (light) background
+ *   - Centered outline icon (84 px, 12 px square stroke), monochrome —
+ *     ink color flips per OS theme
+ *   - "حَيّ / HAI" brand pair at the bottom, same ink color
  *
- * Timeline:
- *   0.00s  background visible
- *   0.10s  logo scales in
- *   0.40s  pulse rings begin (1.8s loop, staggered)
- *   0.55s  first dot + line appears (stagger through 1.1s)
- *   0.90s  brand name fades up
- *   1.00s  wave loader fades in
- *   ≥0.80s dismiss when ready, hard cap 2.0s, 400ms fade-out
+ * Timeline (2400 ms total):
+ *   0–8 %    entry overshoot scale-in
+ *   8–60 %   subtle breath (scale ±1 %)
+ *   60–70 %  wind-up tighten (anticipation)
+ *   70–100 % parallax explosion:
+ *               · whole icon scales 0.92 → 14 and rotates 0 → 110°
+ *               · satellites stack +160° rotation, scale 1 → 1.75 (vortex)
+ *               · core counter-rotates −40°, scales 1 → 0.85 (gear)
+ *               · splash bg gets an iris-shaped mask hole growing from
+ *                 the icon's center → reveals the page underneath
+ *               · single faint ring pulse telegraphs the climax (63–78 %)
+ *   final 8 % the icon fades while the iris finishes opening
  *
- * Dismiss: minimum 800ms visible, then dismiss on next idle frame.
- *          Hard maximum 2000ms. Fade-out 400ms. Once per session.
+ * Native splash handoff:
+ *   capacitor.config.ts sets launchAutoHide:false. AppSplash calls
+ *   SplashScreen.hide() at the start of its own climax (70 % mark)
+ *   so the native overlay's 300 ms fade ends in sync with AppSplash's
+ *   iris-open. One continuous reveal, no double-fade.
  */
 
 const SESSION_KEY = 'hai_splash'
-// Timings lengthened so the full pulse-rings + dot stagger play on
-// every launch, not just the slow-load (signed-in/feed) path. The
-// ring loop is 1.8s starting at 0.4s, so we need at least 2.2s for
-// one full cycle to be visible before dismiss kicks in.
-const MIN_MS = 2200
-const MAX_MS = 3000
-const FADE_MS = 400
+const TOTAL_MS = 2400
+const FADE_MS = 700  // climax window (last 30 % of timeline)
 
 function alreadyShown() {
   try { return !!sessionStorage.getItem(SESSION_KEY) } catch { return false }
 }
 
+function deeplinkPending() {
+  try { return sessionStorage.getItem('hai:deeplink-redirect') === '1' } catch { return false }
+}
+
 export default function AppSplash() {
-  const [phase, setPhase] = useState<'show' | 'fade' | 'gone'>(() => alreadyShown() ? 'gone' : 'show')
-  const dismissed = useRef(false)
+  const [phase, setPhase] = useState<'show' | 'gone'>(() => alreadyShown() ? 'gone' : 'show')
   const mountTime = useRef(Date.now())
 
   useEffect(() => {
-    // Mark as shown IMMEDIATELY on client — prevents double-play if page redirects
     if (phase === 'show') {
       try { sessionStorage.setItem(SESSION_KEY, '1') } catch {}
     }
 
-    const isNativePlatform = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform()
+    const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform()
 
     async function hideNativeSplash() {
-      if (!isNativePlatform) return
+      if (!isNative) return
       try {
         const { SplashScreen } = await import('@capacitor/splash-screen')
-        // Fade matches FADE_MS so the native splash and AppSplash
-        // fade out as a single visual event — user sees one fade,
-        // not two stacked ones.
-        await SplashScreen.hide({ fadeOutDuration: FADE_MS })
+        // 300 ms fade — lines up with the JS climax window so the
+        // native overlay's exit finishes during the iris-open.
+        await SplashScreen.hide({ fadeOutDuration: 300 })
       } catch {}
     }
 
     if (phase === 'gone') {
-      // alreadyShown was true on mount — usually means this is a
-      // within-session page navigation, in which case the native
-      // splash is already hidden and hideNativeSplash() is a no-op.
-      // BUT: on a share-link cold start the flow is /s/post (mounts
-      // AppSplash, sets SESSION_KEY) → window.location.assign to
-      // /feed?post (this mount, alreadyShown=true). The native
-      // splash is still up here, and we need to keep it up until
-      // FeedClient's highlight effect locates the target post —
-      // otherwise the splash fades to a /feed paint with no scroll
-      // position yet, then the post jumps in. Poll the deeplink-
-      // redirect flag (cleared by FeedClient on success or after 8s
-      // timeout) before hiding.
-      let deeplinkTimer: ReturnType<typeof setTimeout> | null = null
-      const startedAt = Date.now()
-      const HIDE_CEILING_MS = 8000
-
-      const tryHideAfterDeeplink = () => {
-        let pending = false
-        try { pending = sessionStorage.getItem('hai:deeplink-redirect') === '1' } catch {}
-        const elapsed = Date.now() - startedAt
-        if (pending && elapsed < HIDE_CEILING_MS) {
-          deeplinkTimer = setTimeout(tryHideAfterDeeplink, 150)
-          return
-        }
-        try { sessionStorage.removeItem('hai:deeplink-redirect') } catch {}
-        hideNativeSplash()
-      }
-      tryHideAfterDeeplink()
-      return () => { if (deeplinkTimer) clearTimeout(deeplinkTimer) }
-    }
-
-    let maxTimer: ReturnType<typeof setTimeout>
-    let fadeTimer: ReturnType<typeof setTimeout>
-
-    function dismiss() {
-      if (dismissed.current) return
-      dismissed.current = true
-      try { sessionStorage.setItem(SESSION_KEY, '1') } catch {}
-      // Trigger AppSplash fade-out AND native splash fade-out
-      // simultaneously. They share the same FADE_MS so the eye sees
-      // one smooth fade revealing the app underneath, not two.
-      setPhase('fade')
+      // Returning session / page navigation — AppSplash already
+      // played once. Just ensure the native splash is down.
       hideNativeSplash()
-      fadeTimer = setTimeout(() => setPhase('gone'), FADE_MS)
+      return
     }
 
-    function tryDismiss() {
+    let unmountTimer: ReturnType<typeof setTimeout>
+    let nativeHideTimer: ReturnType<typeof setTimeout>
+    let deeplinkTimer: ReturnType<typeof setTimeout> | null = null
+
+    // Wait for: (a) window.load, (b) any pending share-link / push
+    // deeplink to resolve (FeedClient clears hai:deeplink-redirect
+    // when the highlight effect lands). 8 s ceiling so a non-
+    // finding post can't pin the splash forever.
+    const HOLD_CEILING_MS = 8000
+
+    function startExit() {
+      // Native splash hides synchronized with the climax — the
+      // 70 % mark of the JS animation is when the wind-up tightens
+      // and the explosion begins. Hide native at that moment so
+      // its 300 ms fade ends as the iris finishes opening.
+      const climaxAt = (TOTAL_MS * 70) / 100
+      nativeHideTimer = setTimeout(hideNativeSplash, climaxAt)
+      // Unmount after the full animation finishes.
+      unmountTimer = setTimeout(() => setPhase('gone'), TOTAL_MS + 80)
+    }
+
+    function tryStart() {
       const elapsed = Date.now() - mountTime.current
-      if (elapsed >= MIN_MS) {
-        dismiss()
-      } else {
-        setTimeout(dismiss, MIN_MS - elapsed)
+      // Hard ceiling — start exit no matter what.
+      if (elapsed >= HOLD_CEILING_MS) {
+        try { sessionStorage.removeItem('hai:deeplink-redirect') } catch {}
+        startExit()
+        return
       }
+      // If a deeplink is in flight, wait for it.
+      if (deeplinkPending()) {
+        deeplinkTimer = setTimeout(tryStart, 150)
+        return
+      }
+      // Minimum display so the entry + breath play even on instant loads.
+      const MIN_MS = 600
+      if (elapsed < MIN_MS) {
+        deeplinkTimer = setTimeout(tryStart, MIN_MS - elapsed)
+        return
+      }
+      startExit()
     }
 
-    // Hard cap
-    maxTimer = setTimeout(dismiss, MAX_MS)
-
-    // Dismiss when ready (after min time)
     if (document.readyState === 'complete') {
-      tryDismiss()
+      tryStart()
     } else {
-      window.addEventListener('load', tryDismiss, { once: true })
+      window.addEventListener('load', tryStart, { once: true })
     }
 
     return () => {
-      clearTimeout(maxTimer)
-      clearTimeout(fadeTimer)
-      window.removeEventListener('load', tryDismiss)
+      clearTimeout(unmountTimer)
+      clearTimeout(nativeHideTimer)
+      if (deeplinkTimer) clearTimeout(deeplinkTimer)
+      window.removeEventListener('load', tryStart)
     }
   }, [])
 
   if (phase === 'gone') return null
 
   return (
-    <div className={`_sp ${phase === 'fade' ? '_sp-out' : ''}`} aria-hidden="true">
-
-      {/* Background */}
+    <div className="_sp" aria-hidden="true">
+      {/* Splash bg — solid color until the climax, then iris-out
+          via mask to reveal the page beneath. Sits BELOW the icon
+          stage so the icon stays on top while zooming through. */}
       <div className="_sp-bg" />
 
-      {/* Center composition */}
-      <div className="_sp-stage">
+      {/* Single faint ring that telegraphs the climax — appears at
+          63 %, expands and fades through 78 %. */}
+      <div className="_sp-ring" />
 
-        {/* Pulse rings — 2 only, very soft */}
-        <div className="_sp-ring _sp-r1" />
-        <div className="_sp-ring _sp-r2" />
-
-        {/* Lines from center to each dot */}
-        <svg className="_sp-svg" viewBox="-110 -110 220 220">
-          {DOTS.map((d, i) => (
-            <line
-              key={i}
-              x1="0" y1="0" x2={d.x} y2={d.y}
-              className="_sp-ln"
-              style={{ animationDelay: `${d.delay}s` }}
-            />
-          ))}
+      {/* Icon stage — sits above everything. */}
+      <div className="_sp-icon-wrap">
+        <svg className="_sp-icon" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+          {/* Core: square outline + 2 inner rings + center dot.
+              Exits SLOWER (scale 0.85) and counter-rotates (−40°). */}
+          <g className="_sp-core">
+            <rect x="6" y="6" width="180" height="180" rx="40"
+                  fill="none" stroke="currentColor" strokeWidth="12" />
+            <circle cx="96" cy="96" r="73.5"
+                    fill="none" stroke="currentColor" strokeOpacity="0.18" strokeWidth="1.2" />
+            <circle cx="96" cy="96" r="57"
+                    fill="none" stroke="currentColor" strokeOpacity="0.34" strokeWidth="1.6" />
+            <circle cx="96" cy="96" r="19.5" fill="currentColor" />
+          </g>
+          {/* Satellites: exit FASTER (scale 1.75) and whirl outward
+              (+160° rotation). Stacks the parent's rotation for
+              ~+270° net spin during the climax. */}
+          <g className="_sp-sats">
+            <circle cx="96"    cy="39"    r="9.5" fill="currentColor" />
+            <circle cx="145.5" cy="124.5" r="9.5" fill="currentColor" />
+            <circle cx="46.5"  cy="124.5" r="9.5" fill="currentColor" />
+          </g>
         </svg>
-
-        {/* Neighbor dots */}
-        {DOTS.map((d, i) => (
-          <div
-            key={i}
-            className="_sp-dot"
-            style={{
-              '--x': d.x,
-              '--y': d.y,
-              '--d': `${d.delay}s`,
-              '--s': `${d.size}px`,
-            } as React.CSSProperties}
-          />
-        ))}
-
-        {/* Logo — matches public/icon-192.svg + the native splash
-            drawables (ic_launcher_splash.xml on Android, Splash
-            asset on iOS), so the native splash → AppSplash handoff
-            is the same brand mark in the same position. */}
-        <div className="_sp-logo">
-          <svg viewBox="0 0 192 192" width="68" height="68" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="hai-sp-brand" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#00b894" />
-                <stop offset="100%" stopColor="#005c48" />
-              </linearGradient>
-              <radialGradient id="hai-sp-topGlow" cx="40%" cy="32%" r="58%">
-                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
-                <stop offset="60%" stopColor="#ffffff" stopOpacity="0" />
-              </radialGradient>
-              <radialGradient id="hai-sp-vignette" cx="82%" cy="92%" r="70%">
-                <stop offset="0%" stopColor="#000000" stopOpacity="0.22" />
-                <stop offset="80%" stopColor="#000000" stopOpacity="0" />
-              </radialGradient>
-              <radialGradient id="hai-sp-dotShade" cx="35%" cy="32%" r="80%">
-                <stop offset="0%" stopColor="#ffffff" />
-                <stop offset="100%" stopColor="#eef9f4" />
-              </radialGradient>
-            </defs>
-            <rect width="192" height="192" rx="42" fill="url(#hai-sp-brand)" />
-            <rect width="192" height="192" rx="42" fill="url(#hai-sp-topGlow)" />
-            <rect width="192" height="192" rx="42" fill="url(#hai-sp-vignette)" />
-            <circle cx="96" cy="96" r="73.5" fill="none" stroke="#ffffff" strokeOpacity="0.07" strokeWidth="0.8" />
-            <circle cx="96" cy="96" r="57" fill="none" stroke="#ffffff" strokeOpacity="0.24" strokeWidth="1.4" />
-            <circle cx="96" cy="96" r="19.5" fill="url(#hai-sp-dotShade)" />
-            <circle cx="96" cy="39" r="11.25" fill="#ffffff" />
-            <circle cx="145.5" cy="124.5" r="11.25" fill="#ffffff" />
-            <circle cx="46.5" cy="124.5" r="11.25" fill="#ffffff" />
-          </svg>
-        </div>
       </div>
 
-      {/* Brand — Arabic dominant, English subordinate */}
+      {/* Brand pair — Arabic dominant, English subordinate,
+          monochrome ink. Floats up + scales 1.15 → 1.4 during the
+          climax then fades only in the final 8 %. */}
       <div className="_sp-brand">
         <span className="_sp-ar">حَيّ</span>
         <span className="_sp-en">HAI</span>
       </div>
 
-      {/* Loader dots */}
-      <div className="_sp-ld">
-        <i style={{ animationDelay: '0s' }} />
-        <i style={{ animationDelay: '0.12s' }} />
-        <i style={{ animationDelay: '0.24s' }} />
-      </div>
-
       <style jsx>{`
-        /* ── Root ──────────────────────────────────────────── */
+        /* Ink color flips per OS theme — black on white in light,
+           white on black in dark. Just like X. */
         ._sp {
           position: fixed;
-          /* Pin all four edges explicitly — most bulletproof way to
-             fill the viewport on every iOS/iPadOS version. inset:0
-             and width:100vw/height:100dvh each failed on some iPads
-             (inset was resolved against html's padded box, dvh needs
-             iOS 15.4+ and collapses the element on older OSes). With
-             top/right/bottom/left set, the browser derives width and
-             height from the viewport regardless of ancestor styles
-             and regardless of dvh support. */
-          top: 0;
-          right: 0;
-          bottom: 0;
-          left: 0;
-          width: auto;
-          height: auto;
-          min-width: 100%;
-          min-height: 100%;
+          top: 0; right: 0; bottom: 0; left: 0;
           z-index: 9990;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          opacity: 1;
-          will-change: opacity;
-        }
-        ._sp-out {
-          /* Opacity-only fade. The previous scale(1.15) end state
-             distorted visibly when the splash partly overlapped the
-             next route's content during the handoff. */
-          animation: _spFade ${FADE_MS}ms ease-out forwards;
+          color: #0a0a0a;
           pointer-events: none;
         }
-        @keyframes _spFade {
-          0%   { opacity: 1; }
-          100% { opacity: 0; }
+        :global(.dark) ._sp { color: #ffffff; }
+
+        /* @property declarations let the iris radius animate
+           smoothly between keyframes. Without these, the radial-
+           gradient stops would snap rather than tween. */
+        @property --iris-r {
+          syntax: '<percentage>';
+          inherits: false;
+          initial-value: 0%;
         }
 
-        /* ── Background ───────────────────────────────────── */
         ._sp-bg {
           position: absolute;
           inset: 0;
-          background: radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #e0f7f2 40%, #fff 100%);
+          background: #ffffff;
+          --iris-r: 0%;
+          -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent var(--iris-r), #000 calc(var(--iris-r) + 0.5%));
+          mask-image: radial-gradient(circle at 50% 50%, transparent var(--iris-r), #000 calc(var(--iris-r) + 0.5%));
+          animation: _sp-iris ${TOTAL_MS}ms cubic-bezier(0.55, 0, 0.1, 1) both;
+          will-change: --iris-r;
         }
-        :global(.dark) ._sp-bg {
-          /* Near-black radial — matches --hai-bg so the splash→app
-             handoff has no colour seam. */
-          background: radial-gradient(ellipse at 50% 42%, #1c2832 0%, #1a262c 40%, #19232a 100%);
+        :global(.dark) ._sp-bg { background: #000000; }
+
+        @keyframes _sp-iris {
+          0%, 70% { --iris-r: 0%; }
+          100%    { --iris-r: 160%; }
         }
 
-        /* ── Stage ────────────────────────────────────────── */
-        ._sp-stage {
-          position: relative;
-          width: 220px;
-          height: 220px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
+        /* Icon stage — bigger (84px) than the old AppSplash logo
+           (68px) for stronger presence. Bolder stroke too. */
+        ._sp-icon-wrap {
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 84px; height: 84px;
+          transform: translate(-50%, -50%);
+          z-index: 3;
+          will-change: transform, filter, opacity;
+          animation: _sp-icon ${TOTAL_MS}ms both;
+          animation-timing-function: linear;
+        }
+        ._sp-icon { width: 100%; height: 100%; display: block; }
+
+        @keyframes _sp-icon {
+          0%   { transform: translate(-50%, -50%) scale(0.30); opacity: 0; filter: blur(2px); }
+          4%   { opacity: 1; filter: blur(0); }
+          8%   { transform: translate(-50%, -50%) scale(1.06); }
+          13%  { transform: translate(-50%, -50%) scale(1.00); }
+          32%  { transform: translate(-50%, -50%) scale(1.012); }
+          52%  { transform: translate(-50%, -50%) scale(0.998); }
+          60%  { transform: translate(-50%, -50%) scale(1.00); }
+          70%  { transform: translate(-50%, -50%) scale(0.92) rotate(0deg); filter: blur(0); }
+          82%  { transform: translate(-50%, -50%) scale(2.20) rotate(32deg); filter: blur(0.5px); }
+          92%  { transform: translate(-50%, -50%) scale(7.50) rotate(80deg); opacity: 1; filter: blur(1.5px); }
+          100% { transform: translate(-50%, -50%) scale(14)   rotate(120deg); opacity: 0; filter: blur(5px); }
         }
 
-        /* ── Pulse rings (2, subtle) ──────────────────────── */
+        /* Satellites + core get their own animations on top of the
+           parent's. SVG transforms compose so each group ends up
+           with parent-rotation + own-rotation. */
+        ._sp-sats {
+          animation: _sp-sats ${TOTAL_MS}ms both;
+          transform-origin: 96px 96px;
+        }
+        :global(._sp) ._sp-sats { /* :global ensures SVG group selector works */ }
+        @keyframes _sp-sats {
+          0%, 70%  { transform: scale(1) rotate(0deg); }
+          100%     { transform: scale(1.75) rotate(160deg); }
+        }
+        ._sp-core {
+          animation: _sp-core ${TOTAL_MS}ms both;
+          transform-origin: 96px 96px;
+        }
+        @keyframes _sp-core {
+          0%, 70%  { transform: scale(1) rotate(0deg); }
+          100%     { transform: scale(0.82) rotate(-40deg); }
+        }
+
         ._sp-ring {
           position: absolute;
+          top: 50%; left: 50%;
+          width: 84px; height: 84px;
+          margin: -42px 0 0 -42px;
           border-radius: 50%;
-          border: 1px solid #00a884;
+          border: 1.4px solid currentColor;
           opacity: 0;
-          animation: _rp 1.8s ease-out infinite;
-          will-change: transform, opacity;
-        }
-        :global(.dark) ._sp-ring { border-color: #00a884; }
-
-        ._sp-r1 { width: 100px; height: 100px; animation-delay: 0.4s; }
-        ._sp-r2 { width: 180px; height: 180px; animation-delay: 0.7s; }
-
-        @keyframes _rp {
-          0%   { transform: scale(0.5); opacity: 0.35; }
-          100% { transform: scale(1.2); opacity: 0; }
-        }
-
-        /* ── SVG lines (center→dot) ───────────────────────── */
-        ._sp-svg {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-        }
-        ._sp-ln {
-          stroke: #00a884;
-          stroke-width: 0.6;
-          opacity: 0;
-          animation: _ln 2s ease-in-out infinite;
-          will-change: opacity;
-        }
-        :global(.dark) ._sp-ln { stroke: #00a884; }
-
-        @keyframes _ln {
-          0%, 100% { opacity: 0; }
-          30%, 70% { opacity: 0.12; }
-        }
-
-        /* ── Neighbor dots (5) ────────────────────────────── */
-        ._sp-dot {
-          position: absolute;
-          width: var(--s);
-          height: var(--s);
-          border-radius: 50%;
-          background: #00a884;
-          top: 50%;
-          left: 50%;
-          transform: translate(
-            calc(-50% + var(--x) * 1px),
-            calc(-50% + var(--y) * 1px)
-          ) scale(0);
-          opacity: 0;
-          animation: _dot 2s ease-in-out infinite;
-          animation-delay: var(--d);
-          will-change: opacity, transform;
-        }
-        :global(.dark) ._sp-dot { background: #00a884; }
-
-        @keyframes _dot {
-          0%, 100% {
-            opacity: 0;
-            transform: translate(calc(-50% + var(--x) * 1px), calc(-50% + var(--y) * 1px)) scale(0);
-          }
-          25%, 75% {
-            opacity: 0.6;
-            transform: translate(calc(-50% + var(--x) * 1px), calc(-50% + var(--y) * 1px)) scale(1);
-          }
-        }
-
-        /* ── Logo ─────────────────────────────────────────── */
-        ._sp-logo {
-          position: relative;
           z-index: 2;
-          width: 68px;
-          height: 68px;
-          border-radius: 15px;
-          overflow: hidden;
-          box-shadow: 0 6px 24px rgba(0, 168, 132, 0.32);
-          animation: _logo 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+          animation: _sp-ring ${TOTAL_MS}ms both;
           will-change: transform, opacity;
         }
-        ._sp-logo :global(svg) {
-          display: block;
-          width: 100%;
-          height: 100%;
-        }
-        @keyframes _logo {
-          from { opacity: 0; transform: scale(0.75); }
-          to   { opacity: 1; transform: scale(1); }
+        @keyframes _sp-ring {
+          0%, 56%  { opacity: 0; transform: scale(1); }
+          63%      { opacity: 0.55; transform: scale(1); }
+          70%      { opacity: 0.30; transform: scale(2.4); }
+          78%      { opacity: 0; transform: scale(3.5); }
+          100%     { opacity: 0; transform: scale(3.5); }
         }
 
-        /* ── Brand text ───────────────────────────────────── */
         ._sp-brand {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          margin-top: 14px;
-          animation: _brand 0.5s ease-out 0.9s both;
-          will-change: opacity, transform;
+          position: absolute;
+          bottom: max(env(safe-area-inset-bottom, 0px), 56px);
+          left: 0; right: 0;
+          text-align: center;
+          font-family: 'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, sans-serif;
+          z-index: 3;
+          animation: _sp-brand ${TOTAL_MS}ms both;
+          will-change: transform, opacity;
         }
         ._sp-ar {
-          font-family: 'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, sans-serif;
-          font-size: 26px;
+          font-size: 22px;
           font-weight: 700;
-          color: #006d57;
-          line-height: 1.6;
+          display: block;
+          line-height: 1;
+          color: currentColor;
         }
-        :global(.dark) ._sp-ar { color: #00a884; }
-
         ._sp-en {
           font-size: 10px;
+          margin-top: 6px;
+          letter-spacing: 4px;
           font-weight: 600;
-          color: #9ca3af;
-          letter-spacing: 3px;
-          margin-top: 4px;
-        }
-        :global(.dark) ._sp-en { color: #6b7280; }
-
-        @keyframes _brand {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-
-        /* ── Loader ───────────────────────────────────────── */
-        ._sp-ld {
-          position: absolute;
-          bottom: max(var(--hai-safe-bottom, 20px), 44px);
-          /* Absolute children ignore the flex parent's
-             align-items/justify-content, so without an explicit
-             horizontal anchor this dot row defaulted to left:0 —
-             on iPad (and anywhere the viewport is wider than the
-             loader) that's the bottom-left glitch the user saw on
-             cold start. Center it on the x-axis explicitly. */
-          left: 50%;
-          transform: translateX(-50%);
-          display: flex;
-          gap: 5px;
-          animation: _ldIn 0.3s ease-out 1.0s both;
-        }
-        ._sp-ld i {
           display: block;
-          width: 5px;
-          height: 5px;
-          border-radius: 50%;
-          background: #00a884;
-          animation: _wave 1s ease-in-out infinite;
-          will-change: transform, opacity;
+          opacity: 0.55;
+          color: currentColor;
         }
-        :global(.dark) ._sp-ld i { background: #00a884; }
-
-        @keyframes _wave {
-          0%, 80%, 100% { transform: translateY(0); opacity: 0.3; }
-          40%            { transform: translateY(-6px); opacity: 1; }
-        }
-        @keyframes _ldIn {
-          from { opacity: 0; }
-          to   { opacity: 1; }
+        @keyframes _sp-brand {
+          0%   { opacity: 0; transform: translateY(8px); }
+          7%   { opacity: 1; transform: translateY(0); }
+          70%  { opacity: 1; transform: translateY(0); }
+          92%  { opacity: 1; transform: translateY(-2px) scale(1.15); }
+          100% { opacity: 0; transform: translateY(-6px) scale(1.4); }
         }
 
-        /* ── Reduced motion ───────────────────────────────── */
         @media (prefers-reduced-motion: reduce) {
-          ._sp-ring,
-          ._sp-dot,
-          ._sp-ln,
-          ._sp-ld i {
-            animation: none !important;
+          ._sp-icon-wrap, ._sp-core, ._sp-sats, ._sp-ring, ._sp-brand, ._sp-bg {
+            animation-duration: 0.01s !important;
           }
-          ._sp-ring  { opacity: 0.08; transform: scale(1); }
-          ._sp-dot   { opacity: 0.45; transform: translate(calc(-50% + var(--x) * 1px), calc(-50% + var(--y) * 1px)) scale(1); }
-          ._sp-ln    { opacity: 0.08; }
-          ._sp-ld i  { opacity: 0.5; }
-          ._sp-logo  { animation-duration: 0.01s !important; animation-delay: 0s !important; }
-          ._sp-brand { animation-duration: 0.01s !important; animation-delay: 0s !important; }
-          ._sp-ld    { animation-duration: 0.01s !important; animation-delay: 0s !important; }
         }
       `}</style>
     </div>
   )
 }
-
-// 5 dots, evenly spaced around center, within a ~90px radius
-const DOTS = [
-  { x:   0, y: -85, delay: 0.55, size: 6 },
-  { x:  80, y: -28, delay: 0.67, size: 7 },
-  { x:  50, y:  70, delay: 0.79, size: 5 },
-  { x: -50, y:  70, delay: 0.91, size: 6 },
-  { x: -80, y: -28, delay: 1.03, size: 7 },
-]
