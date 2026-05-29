@@ -91,23 +91,59 @@ export default function BubbleColorPicker() {
   const [open, setOpen] = useState(false)
   const [hex, setHex] = useState<string>(DEFAULT_HEX)
 
-  // Role gate. Read from cached localStorage (same key BottomNav
-  // populates after /api/profile lands), then re-confirm via the
-  // same endpoint so a stale cache can't accidentally render the
-  // picker for non-admins.
+  // Role gate. Multiple paths so the picker shows even when one
+  // of them is slow / failing:
+  //   1) URL query param `?picker=1` forces visible regardless —
+  //      escape hatch when role detection is broken after a fresh
+  //      install / session restore.
+  //   2) localStorage cached role (populated by BottomNav after
+  //      /api/profile lands).
+  //   3) Our own /api/profile fetch, retried up to 3 times because
+  //      a cold-start session restore can return 401 on the first
+  //      attempt before the auth cookie is fully resolved.
   useEffect(() => {
+    // (1) URL override.
+    try {
+      if (new URLSearchParams(window.location.search).get('picker') === '1') {
+        setIsSuper(true)
+        try { localStorage.setItem('hai_force_picker', '1') } catch {}
+        return
+      }
+      if (localStorage.getItem('hai_force_picker') === '1') {
+        setIsSuper(true)
+        return
+      }
+    } catch {}
+
+    // (2) Cached role.
     try {
       const cached = localStorage.getItem(ROLE_CACHE_KEY)
       if (cached === 'SUPER_ADMIN') setIsSuper(true)
     } catch {}
+
+    // (3) Live fetch, retry up to 3 times with backoff.
     let cancelled = false
-    fetch('/api/profile', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (cancelled) return
-        setIsSuper(d?.role === 'SUPER_ADMIN')
-      })
-      .catch(() => {})
+    let attempt = 0
+    const tryFetch = () => {
+      if (cancelled) return
+      attempt++
+      fetch('/api/profile', { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (cancelled) return
+          if (d?.role === 'SUPER_ADMIN') {
+            setIsSuper(true)
+            try { localStorage.setItem(ROLE_CACHE_KEY, d.role) } catch {}
+          } else if (attempt < 3) {
+            setTimeout(tryFetch, attempt * 1000)
+          }
+        })
+        .catch(() => {
+          if (attempt < 3) setTimeout(tryFetch, attempt * 1000)
+        })
+    }
+    tryFetch()
+
     return () => { cancelled = true }
   }, [])
 
