@@ -265,7 +265,7 @@ export default function SquareBubble({
           <FiBell className="w-2.5 h-2.5" strokeWidth={3} />
         </span>
       )}
-      <span>{timeStr}</span>
+      {/* Views chip stays at the LEADING edge alongside the bell. */}
       {isMe && message.type !== 'DELETED' && (
         <span
           className="inline-flex items-center gap-0.5 opacity-80"
@@ -276,15 +276,16 @@ export default function SquareBubble({
           <span>{viewCount}</span>
         </span>
       )}
-      {/* Sending status pushed to the trailing corner via ms-auto.
-          With the row now flex w-full, the icon sits at the
-          bottom-trailing edge of the bubble — the WhatsApp-style
-          corner check / clock. Own messages only. */}
-      {isMe && message.type !== 'DELETED' && (
-        <span className="ms-auto inline-flex items-center" aria-label={message.id.startsWith('pending-') ? 'sending' : 'sent'}>
-          {message.id.startsWith('pending-') ? <ChatPendingClock /> : <ChatSentCheck />}
-        </span>
-      )}
+      {/* Time + sending-status share the TRAILING corner — same
+          cluster WhatsApp uses (HH:MM ✓✓ in the bottom-right of
+          own bubbles). ms-auto pushes the whole cluster to the
+          end of the full-width meta row. */}
+      <span className="ms-auto inline-flex items-center gap-1">
+        <span>{timeStr}</span>
+        {isMe && message.type !== 'DELETED' && (
+          message.id.startsWith('pending-') ? <ChatPendingClock /> : <ChatSentCheck />
+        )}
+      </span>
     </p>
   ) : null
 

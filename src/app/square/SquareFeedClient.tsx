@@ -136,13 +136,26 @@ export default function SquareFeedClient({
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const endAnchorRef = useRef<HTMLDivElement | null>(null)
-  /** Per-user "last seen" boundary captured ONCE on mount. Any
-   *  message whose createdAt is strictly newer than this is below
-   *  the "رسائل جديدة" / "New messages" divider. Drives the
-   *  WhatsApp-style unread separator without a schema column —
-   *  for MVP this is good enough since Square is admin-only and
-   *  sessions are short. */
-  const lastSeenBoundaryRef = useRef<number | null>(null)
+  /** Per-user "last seen" boundary captured ONCE on mount — SYNC
+   *  during the ref's lazy initializer, BEFORE first render, so the
+   *  unread divider is correct on the very first paint. (Previously
+   *  this was assigned inside a useEffect, which only ran AFTER the
+   *  initial render — the divider then appeared a tick late.)
+   *  Any message whose createdAt is strictly newer than this is
+   *  below the "رسائل جديدة" / "New messages" divider. */
+  const lastSeenBoundaryRef = useRef<number | null>((() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const key = LAST_SEEN_KEY_PREFIX + (window.location.pathname || '')
+      const raw = localStorage.getItem(key)
+      const prev = raw ? parseInt(raw, 10) : null
+      // IMPORTANT: write the NEW boundary AFTER capturing the prev,
+      // so re-renders during this same session don't keep moving
+      // the divider out from under the user.
+      localStorage.setItem(key, String(Date.now()))
+      return prev && Number.isFinite(prev) ? prev : null
+    } catch { return null }
+  })())
   /** Captured before a "load older" prepend so we can restore scrollTop
    *  to keep the user's anchor row in view after the DOM grows upward. */
   const preserveScrollFromHeight = useRef<number | null>(null)
@@ -150,24 +163,11 @@ export default function SquareFeedClient({
    *  incoming messages auto-scroll or just sit silently. */
   const nearBottomRef = useRef<boolean>(true)
 
-  // First paint: snap to the bottom so the newest message is in view.
-  // ALSO capture the "last seen" boundary from localStorage BEFORE
-  // updating it. Any message newer than the boundary gets the
-  // unread divider above it. We don't want the boundary to shift
-  // while the user is on the page, so it's stored in a ref captured
-  // exactly once.
+  // First paint: snap to the bottom so the newest message is in
+  // view. The "last seen" boundary is captured synchronously above
+  // in the ref initializer, so the unread divider renders on the
+  // very first paint — no useEffect-delay tick needed here.
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const key = LAST_SEEN_KEY_PREFIX + (window.location.pathname || '')
-      try {
-        const raw = localStorage.getItem(key)
-        const prev = raw ? parseInt(raw, 10) : null
-        lastSeenBoundaryRef.current = prev && Number.isFinite(prev) ? prev : null
-        localStorage.setItem(key, String(Date.now()))
-      } catch {
-        // localStorage blocked / quota — divider just doesn't render.
-      }
-    }
     endAnchorRef.current?.scrollIntoView({ block: 'end', behavior: 'auto' })
   }, [])
 
