@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FiBell, FiCheck, FiCornerUpLeft, FiEdit3, FiEye, FiMapPin } from 'react-icons/fi'
+import { ChatPendingClock, ChatSentCheck } from '@/components/chat/MessageStatus'
 
 // Shared per-session "already reported" set so navigating away and
 // back doesn't double-POST the same message — mirrors PostCard's
@@ -276,6 +277,15 @@ export default function SquareBubble({
           <FiEye className="w-2.5 h-2.5" />
           <span>{viewCount}</span>
         </span>
+      )}
+      {/* Sending status — pending clock while the server hasn't
+          confirmed yet, single check once it has. Own messages
+          only; reused straight from the DM ChatClient pattern
+          via the shared MessageStatus module. */}
+      {isMe && message.type !== 'DELETED' && (
+        message.id.startsWith('pending-')
+          ? <ChatPendingClock />
+          : <ChatSentCheck />
       )}
     </p>
   ) : null

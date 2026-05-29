@@ -29,6 +29,14 @@ import type {
 interface Props {
   currentUserId: string
   onSent: (message: PublicSquareMessage) => void
+  /** Optimistic-send hooks — when these are present the composer
+   *  shows a pending bubble (with a clock status icon) the moment
+   *  the user taps send, then swaps it with the server response or
+   *  drops it on failure. Mirrors the DM ChatClient pattern.
+   *  Optional so legacy callers (none yet) can opt out. */
+  onAddPending?: (placeholder: PublicSquareMessage) => void
+  onSwapPending?: (tempId: string, real: PublicSquareMessage) => void
+  onDropPending?: (tempId: string) => void
   replyingTo: PublicSquareReplyTo | null
   setReplyingTo: (r: PublicSquareReplyTo | null) => void
   /** When true, the composer is rendered read-only — all send
@@ -65,6 +73,9 @@ interface Props {
 export default function SquareComposer({
   currentUserId,
   onSent,
+  onAddPending,
+  onSwapPending,
+  onDropPending,
   replyingTo,
   setReplyingTo,
   disabled = false,
@@ -123,11 +134,59 @@ export default function SquareComposer({
     }
   }, [replyingTo])
 
-  /** Generic POST → /api/square/messages. Returns the created message
-   *  shape so the caller can append + clear reply state on success. */
+  /** Generic POST → /api/square/messages. When the parent provides
+   *  optimistic hooks (onAddPending / onSwapPending / onDropPending),
+   *  we render the message immediately with a 'pending-' id so the
+   *  bubble shows the clock status icon; the real server message
+   *  then replaces it in place, flipping the clock to the sent
+   *  check. */
   async function postMessage(payload: Record<string, unknown>): Promise<boolean> {
     if (sending) return false
     setSending(true)
+
+    // Build an optimistic placeholder when the parent supports it.
+    // The bubble keys by id, so the placeholder's 'pending-' prefix
+    // is the discriminator the status renderer uses.
+    const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    let placeholder: PublicSquareMessage | null = null
+    if (onAddPending) {
+      const stagedReplyTo = replyingTo
+      placeholder = {
+        id: tempId,
+        type: (payload.type as PublicSquareMessage['type']) || 'TEXT',
+        body: typeof payload.body === 'string' ? payload.body : null,
+        kind: 'GENERAL',
+        status: 'ACTIVE',
+        isPinned: false,
+        pinnedAt: null,
+        notificationFiredAt: null,
+        reactions: [],
+        replyToMessageId: stagedReplyTo?.id ?? null,
+        replyTo: stagedReplyTo,
+        createdAt: new Date().toISOString(),
+        author: {
+          id: currentUserId,
+          name: null,
+          lastName: null,
+          avatarUrl: null,
+          reputation: 0,
+          membership: 'RESIDENT',
+          role: 'RESIDENT',
+        },
+        isAuthor: true,
+        lat: typeof payload.lat === 'number' ? payload.lat : null,
+        lng: typeof payload.lng === 'number' ? payload.lng : null,
+        pdfUrl: typeof payload.pdfUrl === 'string' ? payload.pdfUrl : null,
+        pdfName: typeof payload.pdfName === 'string' ? payload.pdfName : null,
+        audioUrl: typeof payload.audioUrl === 'string' ? payload.audioUrl : null,
+        audioDurationMs: typeof payload.audioDurationMs === 'number' ? payload.audioDurationMs : null,
+        audioMimeType: typeof payload.audioMimeType === 'string' ? payload.audioMimeType : null,
+        imageUrl: typeof payload.imageUrl === 'string' ? payload.imageUrl : null,
+        viewCount: 0,
+      }
+      onAddPending(placeholder)
+    }
+
     try {
       const res = await fetch('/api/square/messages', {
         method: 'POST',
@@ -139,6 +198,7 @@ export default function SquareComposer({
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
+        if (placeholder && onDropPending) onDropPending(tempId)
         toast.error(
           typeof data.error === 'string'
             ? data.error
@@ -147,11 +207,17 @@ export default function SquareComposer({
         return false
       }
       if (data?.message) {
-        onSent(data.message as PublicSquareMessage)
+        const real = data.message as PublicSquareMessage
+        if (placeholder && onSwapPending) {
+          onSwapPending(tempId, real)
+        } else {
+          onSent(real)
+        }
         setReplyingTo(null)
       }
       return true
     } catch {
+      if (placeholder && onDropPending) onDropPending(tempId)
       toast.error(t('square_send_failed'))
       return false
     } finally {

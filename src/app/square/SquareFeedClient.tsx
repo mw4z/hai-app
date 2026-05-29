@@ -232,6 +232,38 @@ export default function SquareFeedClient({
     )
   }
 
+  /** Insert an optimistic pending message with a 'pending-' id prefix.
+   *  Bubble renders a clock for own messages whose id starts with
+   *  that prefix; when the real id swaps in (via handleSwapPending),
+   *  the clock flips to the sent check. */
+  function handleAddPending(msg: PublicSquareMessage) {
+    setMessages((prev) => [...prev, msg])
+    setTimeout(
+      () => endAnchorRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }),
+      0,
+    )
+  }
+  /** Replace a pending placeholder with the server-confirmed message
+   *  in place — preserves order and avoids the bubble re-mounting
+   *  (which would replay the slide-in animation). */
+  function handleSwapPending(tempId: string, real: PublicSquareMessage) {
+    setMessages((prev) => {
+      const idx = prev.findIndex((m) => m.id === tempId)
+      if (idx === -1) {
+        // Pending row already gone (rare — refresh fired between
+        // insert and swap). Just add the real one if missing.
+        if (prev.some((m) => m.id === real.id)) return prev
+        return [...prev, real]
+      }
+      const next = prev.slice()
+      next[idx] = real
+      return next
+    })
+  }
+  function handleDropPending(tempId: string) {
+    setMessages((prev) => prev.filter((m) => m.id !== tempId))
+  }
+
   function handleJumpToReply(targetId: string) {
     const el = document.querySelector<HTMLElement>(`[data-msg-row="${CSS.escape(targetId)}"]`)
     if (!el) return
@@ -420,8 +452,22 @@ export default function SquareFeedClient({
     const setHeight = (visibleHeight: number) => {
       root.style.height = `calc(${visibleHeight}px - env(safe-area-inset-top, 0px))`
     }
+    // Pull the bottom of the message list back into view whenever the
+    // keyboard opens — otherwise the freshly-revealed input covers
+    // the last message and the user can't see what they were
+    // replying to. Anchors at the end div so scroll lands on the
+    // last bubble even mid-keyboard-animation.
+    const scrollToBottom = () => {
+      // Wait a frame so the new root height has applied before we
+      // measure scrollHeight; otherwise scrollIntoView lands on the
+      // pre-shrink position and undershoots.
+      requestAnimationFrame(() => {
+        endAnchorRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
+      })
+    }
 
     setHeight(vv.height)
+    let prevKeyboardOpen = false
     const onVV = () => {
       setHeight(vv.height)
       // Heuristic fallback for WEB only. On Android (resize:body)
@@ -433,6 +479,8 @@ export default function SquareFeedClient({
       if (!isNative) {
         const open = (window.innerHeight - vv.height) > 150
         setKeyboardOpen(open)
+        if (open && !prevKeyboardOpen) scrollToBottom()
+        prevKeyboardOpen = open
       }
     }
     vv.addEventListener('resize', onVV)
@@ -444,12 +492,15 @@ export default function SquareFeedClient({
     //   - Android: ONLY drives the keyboardOpen flag, not
     //     setHeight (visualViewport already shrinks the root
     //     correctly when resize:body fires).
+    //   - BOTH platforms call scrollToBottom so the last message
+    //     stays visible above the rising keyboard.
     let cleanupKb: (() => void) | null = null
     if (isNative) {
       import('@capacitor/keyboard').then(({ Keyboard }) => {
         const h1 = Keyboard.addListener('keyboardWillShow', (info) => {
           if (isIos) setHeight(window.innerHeight - info.keyboardHeight)
           setKeyboardOpen(true)
+          scrollToBottom()
         })
         const h2 = Keyboard.addListener('keyboardWillHide', () => {
           if (isIos) setHeight(window.innerHeight)
@@ -1049,6 +1100,9 @@ export default function SquareFeedClient({
       <SquareComposer
         currentUserId={currentUserId}
         onSent={handleSent}
+        onAddPending={handleAddPending}
+        onSwapPending={handleSwapPending}
+        onDropPending={handleDropPending}
         replyingTo={replyingTo}
         setReplyingTo={setReplyingTo}
         disabled={lock.isLocked && !isMod}
