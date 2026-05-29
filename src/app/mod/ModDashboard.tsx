@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 import { useLanguage } from '@/hooks/useLanguage'
-import { FiArrowRight, FiArrowLeft, FiAlertTriangle, FiEyeOff, FiUserX, FiActivity, FiFileText, FiShield, FiSearch, FiSlash, FiPauseCircle, FiMapPin, FiCheck, FiX } from 'react-icons/fi'
+import { FiArrowRight, FiArrowLeft, FiAlertTriangle, FiEyeOff, FiUserX, FiActivity, FiFileText, FiShield, FiSearch, FiSlash, FiPauseCircle, FiMapPin, FiCheck, FiX, FiBarChart2, FiDownload, FiUsers, FiEye } from 'react-icons/fi'
+import * as htmlToImage from 'html-to-image'
 import { useConfirm, usePrompt } from '@/components/ConfirmProvider'
 import { canVerifyProviders, canModerateUsers } from '@/lib/modPermissions'
 import EmergencyCreator from '@/components/EmergencyCreator'
@@ -38,7 +39,21 @@ const ACTION_LABELS: Record<string, { ar: string; en: string }> = {
   CONFLICT_BLOCKED: { ar: 'تم حظر الإجراء (تعارض)', en: 'Action blocked (conflict)' },
 }
 
-type Tab = 'reports' | 'user_reports' | 'poll_requests' | 'claimed_residents' | 'hidden' | 'banned' | 'activity' | 'verify' | 'users'
+type Tab = 'reports' | 'user_reports' | 'poll_requests' | 'polls_archive' | 'claimed_residents' | 'hidden' | 'banned' | 'activity' | 'verify' | 'users'
+
+interface PollArchiveRow {
+  id: string
+  question: string
+  status: 'active' | 'closed'
+  isExpired: boolean
+  viewCount: number
+  createdAt: string
+  expiresAt: string | null
+  totalVotes: number
+  breakdown: { label: string; votes: number }[]
+  author: { id: string; name: string | null; lastName: string | null; avatarUrl: string | null; reputation: number } | null
+  neighborhood: { id: string; name: string; nameEn: string } | null
+}
 
 interface ClaimRow {
   id: string
@@ -114,6 +129,12 @@ export default function ModDashboard({ data }: Props) {
   const [userList, setUserList] = useState<any[] | null>(null)
   const [userQuery, setUserQuery] = useState('')
 
+  // Polls archive — lazy-fetched when the tab opens.
+  const [pollsArchive, setPollsArchive] = useState<PollArchiveRow[] | null>(null)
+  const [pollsFilter, setPollsFilter] = useState<'all' | 'active' | 'closed'>('all')
+  const [pollsQuery, setPollsQuery] = useState('')
+  const [pollsExporting, setPollsExporting] = useState<string | null>(null)
+
   useEffect(() => {
     if (tab !== 'verify' || !canVerifyProviders(role)) return
     let cancelled = false
@@ -138,6 +159,65 @@ export default function ModDashboard({ data }: Props) {
     }, userQuery ? 300 : 0)
     return () => { cancelled = true; clearTimeout(handle) }
   }, [tab, role, userQuery])
+
+  // Polls archive — fetched on tab open + whenever the status filter
+  // or query changes. Debounce the query so each keystroke doesn't
+  // hit the API. The endpoint scopes to the mod's neighborhood (or
+  // all neighborhoods for PLATFORM_MOD / SUPER_ADMIN).
+  useEffect(() => {
+    if (tab !== 'polls_archive') return
+    let cancelled = false
+    setPollsArchive(null)
+    const handle = setTimeout(() => {
+      const params = new URLSearchParams()
+      params.set('status', pollsFilter)
+      if (pollsQuery.trim()) params.set('q', pollsQuery.trim())
+      fetch(`/api/mod/polls/archive?${params.toString()}`, { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : { polls: [] }))
+        .then((d) => { if (!cancelled) setPollsArchive(Array.isArray(d.polls) ? d.polls : []) })
+        .catch(() => { if (!cancelled) setPollsArchive([]) })
+    }, pollsQuery ? 300 : 0)
+    return () => { cancelled = true; clearTimeout(handle) }
+  }, [tab, pollsFilter, pollsQuery])
+
+  // Export a poll-result card as a PNG. We render the card off-screen
+  // at a high pixel-ratio so the downloaded image is sharp on retina
+  // displays. The DOM node carries id="poll-export-<id>" — the card
+  // markup in the polls-archive panel uses that id so we can grab
+  // it directly without ref-juggling.
+  async function exportPollResult(poll: PollArchiveRow) {
+    if (pollsExporting) return
+    setPollsExporting(poll.id)
+    try {
+      const node = document.getElementById(`poll-export-${poll.id}`)
+      if (!node) {
+        toast.error(dn('تعذر التصدير', 'Could not export'))
+        return
+      }
+      const dataUrl = await htmlToImage.toPng(node, {
+        // 2× pixel ratio for crisp output on high-DPI; bg color set
+        // explicitly so transparent corners (from rounded-2xl on the
+        // card) don't render as a black tile on viewers that don't
+        // honor PNG alpha.
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+        cacheBust: true,
+      })
+      // Trigger a download from the data URL.
+      const filename = `hai-poll-${poll.id}.png`
+      const link = document.createElement('a')
+      link.download = filename
+      link.href = dataUrl
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      toast.success(dn('تم الحفظ ✓', 'Saved ✓'))
+    } catch (err) {
+      toast.error(dn('فشل التصدير', 'Export failed'))
+    } finally {
+      setPollsExporting(null)
+    }
+  }
 
   async function verifyAction(id: string, action: 'approve' | 'reject') {
     if (actionLoading) return
@@ -409,6 +489,9 @@ export default function ModDashboard({ data }: Props) {
     // been opened once (lazy-fetched); a Phase 1.5 pass can fold the
     // count into the SSR payload if it becomes load-bearing.
     { key: 'poll_requests', icon: <FiFileText className="w-4 h-4" />, ar: 'اقتراحات استفتاء', en: 'Poll requests', count: pollRequests?.length },
+    // Polls archive — historical results, neighborhood-scoped, with
+    // per-row image export so mods can share results outside the app.
+    { key: 'polls_archive', icon: <FiBarChart2 className="w-4 h-4" />, ar: 'أرشيف الاستطلاعات', en: 'Polls archive' },
     ...(canModerateUsers(role) ? [{ key: 'claimed_residents' as Tab, icon: <FiMapPin className="w-4 h-4" />, ar: 'طلبات تأكيد السكن', en: 'Residency claims', count: claims?.length }] : []),
     { key: 'hidden', icon: <FiEyeOff className="w-4 h-4" />, ar: 'المخفية', en: 'Hidden', count: data.hiddenPosts.length },
     { key: 'banned', icon: <FiUserX className="w-4 h-4" />, ar: 'محظورون / محذوفون', en: 'Banned / deleted', count: data.bannedUsers.length },
@@ -715,6 +798,156 @@ export default function ModDashboard({ data }: Props) {
               </div>
             ))
           )
+        )}
+
+        {/* Polls archive — historical poll results with final tallies.
+            Mods can filter by status (all / active / closed) and
+            search by question. Each row carries an "Export image"
+            button that snapshots the result card to a PNG download.
+            The exportable card itself is wrapped in
+            <div id="poll-export-{id}"> so html-to-image can grab it
+            cleanly without picking up the surrounding chrome. */}
+        {tab === 'polls_archive' && (
+          <>
+            <div className="flex gap-1.5 items-center">
+              <div className="flex gap-1 bg-white dark:bg-gray-800 rounded-xl p-1">
+                {(['all', 'active', 'closed'] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setPollsFilter(f)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      pollsFilter === f
+                        ? 'bg-primary-600 text-white'
+                        : 'text-gray-500 dark:text-gray-400'
+                    }`}
+                  >
+                    {f === 'all' ? dn('الكل', 'All') : f === 'active' ? dn('نشطة', 'Active') : dn('منتهية', 'Closed')}
+                  </button>
+                ))}
+              </div>
+              <div className="relative flex-1">
+                <FiSearch className="absolute top-1/2 -translate-y-1/2 ltr:left-2.5 rtl:right-2.5 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={pollsQuery}
+                  onChange={(e) => setPollsQuery(e.target.value)}
+                  placeholder={dn('ابحث في الأسئلة…', 'Search questions…')}
+                  className="w-full bg-white dark:bg-gray-800 rounded-xl ltr:pl-9 rtl:pr-9 ltr:pr-3 rtl:pl-3 py-2 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 outline-none"
+                />
+              </div>
+            </div>
+
+            {pollsArchive === null ? (
+              <div className="py-8"><HaiLoader size="md" /></div>
+            ) : pollsArchive.length === 0 ? (
+              <EmptyState icon="📊" text={dn('لا يوجد استطلاعات', 'No polls')} />
+            ) : (
+              pollsArchive.map(poll => {
+                const top = poll.totalVotes > 0
+                  ? poll.breakdown.reduce((max, b) => b.votes > max.votes ? b : max, poll.breakdown[0])
+                  : null
+                const createdDate = new Date(poll.createdAt)
+                const isClosed = poll.status === 'closed' || poll.isExpired
+                return (
+                  <div
+                    key={poll.id}
+                    className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden"
+                  >
+                    {/* The card markup INSIDE this wrapper is what
+                        html-to-image snapshots. Anything outside
+                        (like the action footer) is excluded. */}
+                    <div id={`poll-export-${poll.id}`} className="bg-white dark:bg-gray-800 p-4 space-y-3" dir="auto">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            isClosed
+                              ? 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                              : 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300'
+                          }`}>
+                            {isClosed ? dn('منتهي', 'Closed') : dn('نشط', 'Active')}
+                          </span>
+                          <span className="text-[10px] text-gray-400">
+                            {createdDate.toLocaleDateString(lang === 'en' ? 'en-US' : 'ar-SA', {
+                              year: 'numeric', month: 'short', day: 'numeric',
+                            })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px] text-gray-500 dark:text-gray-400">
+                          <span className="inline-flex items-center gap-1">
+                            <FiUsers className="w-3.5 h-3.5" />
+                            {poll.totalVotes}
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <FiEye className="w-3.5 h-3.5" />
+                            {poll.viewCount}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white leading-snug">
+                        {poll.question}
+                      </p>
+                      {/* Option bars — width proportional to vote
+                          share, with absolute counts + % labels on
+                          each row. Winning option gets the brand
+                          tint; others stay neutral. */}
+                      <div className="space-y-2">
+                        {poll.breakdown.map((opt, idx) => {
+                          const pct = poll.totalVotes > 0 ? Math.round((opt.votes / poll.totalVotes) * 100) : 0
+                          const isWinner = top && opt.label === top.label && opt.votes > 0
+                          return (
+                            <div key={idx} className="relative">
+                              <div className="absolute inset-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700/60">
+                                <div
+                                  className={`h-full ${isWinner ? 'bg-primary-500/80' : 'bg-gray-300 dark:bg-gray-600'}`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <div className="relative flex items-center justify-between px-3 py-2 text-xs font-medium">
+                                <span className={`${isWinner ? 'text-white' : 'text-gray-800 dark:text-gray-100'}`} dir="auto">
+                                  {opt.label}
+                                </span>
+                                <span className={`${isWinner ? 'text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>
+                                  {opt.votes} · {pct}%
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {poll.author && (
+                        <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-700/50">
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                            {dn('بواسطة', 'By')} {[poll.author.name, poll.author.lastName].filter(Boolean).join(' ') || dn('مستخدم', 'User')}
+                            {poll.neighborhood && (
+                              <span className="text-gray-400">
+                                {' · '}{lang === 'en' ? poll.neighborhood.nameEn : poll.neighborhood.name}
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-[10px] text-gray-400">
+                            hai-app.net
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    {/* Action footer — OUTSIDE the exportable card
+                        so the export button doesn't appear in the
+                        downloaded image. */}
+                    <div className="px-4 pb-3 flex justify-end">
+                      <button
+                        onClick={() => exportPollResult(poll)}
+                        disabled={pollsExporting === poll.id}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary-600 dark:text-primary-400 px-3 py-1.5 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/30 active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none"
+                      >
+                        <FiDownload className="w-4 h-4" />
+                        {pollsExporting === poll.id ? dn('جاري الحفظ…', 'Saving…') : dn('حفظ كصورة', 'Save image')}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </>
         )}
 
         {/* Claimed-residents (residency claims) Tab */}
