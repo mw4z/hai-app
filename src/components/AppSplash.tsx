@@ -167,6 +167,13 @@ export default function AppSplash() {
           z-index: 9990;
           color: #0a0a0a;
           pointer-events: none;
+          /* Isolate the splash from page layout reflows so /feed's
+             rendering work below us doesn't recompute our box. */
+          contain: layout style paint;
+          /* Force a fresh stacking context + GPU layer so subsequent
+             transforms inside never hit the main thread. */
+          isolation: isolate;
+          transform: translateZ(0);
         }
         :global(.dark) ._sp { color: #ffffff; }
 
@@ -204,38 +211,47 @@ export default function AppSplash() {
           will-change: transform, opacity;
         }
         @keyframes _sp-ring {
-          0%, 56%  { opacity: 0; transform: scale(1); }
-          63%      { opacity: 0.55; transform: scale(1); }
-          70%      { opacity: 0.30; transform: scale(2.4); }
-          78%      { opacity: 0; transform: scale(3.5); }
-          100%     { opacity: 0; transform: scale(3.5); }
+          0%, 56%  { opacity: 0; transform: translateZ(0) scale(1); }
+          63%      { opacity: 0.55; transform: translateZ(0) scale(1); }
+          70%      { opacity: 0.30; transform: translateZ(0) scale(2.4); }
+          78%      { opacity: 0; transform: translateZ(0) scale(3.5); }
+          100%     { opacity: 0; transform: translateZ(0) scale(3.5); }
         }
 
         /* Icon stage — sits ABOVE the iris bg so it stays visible
            as the iris opens beneath. */
         ._sp-icon-wrap {
           position: absolute;
+          /* Center via margin so the transform property is reserved
+             ENTIRELY for the keyframes — no fixed -50%/-50% translate
+             gets re-applied on every frame. Cheaper paint. */
           top: 50%; left: 50%;
           width: 84px; height: 84px;
-          transform: translate(-50%, -50%);
+          margin: -42px 0 0 -42px;
           z-index: 5;
-          will-change: transform, filter, opacity;
+          will-change: transform, opacity;
+          backface-visibility: hidden;
           animation: _sp-icon ${TOTAL_MS}ms both;
           animation-timing-function: linear;
         }
         ._sp-icon { width: 100%; height: 100%; display: block; }
+        /* Keyframes use ONLY transform + opacity — both run on the
+           GPU compositor and don't touch the main thread. The old
+           filter: blur(...) animation forced WebKit to re-rasterize
+           the icon on the CPU every frame; on a heavy page like
+           /feed that crushed the framerate. Dropping it. */
         @keyframes _sp-icon {
-          0%   { transform: translate(-50%, -50%) scale(0.30); opacity: 0; filter: blur(2px); }
-          4%   { opacity: 1; filter: blur(0); }
-          8%   { transform: translate(-50%, -50%) scale(1.06); }
-          13%  { transform: translate(-50%, -50%) scale(1.00); }
-          32%  { transform: translate(-50%, -50%) scale(1.012); }
-          52%  { transform: translate(-50%, -50%) scale(0.998); }
-          60%  { transform: translate(-50%, -50%) scale(1.00); }
-          70%  { transform: translate(-50%, -50%) scale(0.92) rotate(0deg); filter: blur(0); }
-          82%  { transform: translate(-50%, -50%) scale(2.20) rotate(32deg); filter: blur(0.5px); }
-          92%  { transform: translate(-50%, -50%) scale(7.50) rotate(80deg); opacity: 1; filter: blur(1.5px); }
-          100% { transform: translate(-50%, -50%) scale(14)   rotate(110deg); opacity: 0; filter: blur(5px); }
+          0%   { transform: translateZ(0) scale(0.30); opacity: 0; }
+          4%   { transform: translateZ(0) scale(0.60); opacity: 1; }
+          8%   { transform: translateZ(0) scale(1.06); }
+          13%  { transform: translateZ(0) scale(1.00); }
+          32%  { transform: translateZ(0) scale(1.012); }
+          52%  { transform: translateZ(0) scale(0.998); }
+          60%  { transform: translateZ(0) scale(1.00); }
+          70%  { transform: translateZ(0) scale(0.92) rotate(0deg); }
+          82%  { transform: translateZ(0) scale(2.20) rotate(32deg); }
+          92%  { transform: translateZ(0) scale(7.50) rotate(80deg); opacity: 1; }
+          100% { transform: translateZ(0) scale(14)   rotate(110deg); opacity: 0; }
         }
 
         /* Satellites stack rotation+scale on top of the parent's
@@ -244,18 +260,20 @@ export default function AppSplash() {
         ._sp-sats {
           animation: _sp-sats ${TOTAL_MS}ms both;
           transform-origin: 96px 96px;
+          will-change: transform;
         }
         @keyframes _sp-sats {
-          0%, 70%  { transform: scale(1) rotate(0deg); }
-          100%     { transform: scale(1.75) rotate(160deg); }
+          0%, 70%  { transform: translateZ(0) scale(1) rotate(0deg); }
+          100%     { transform: translateZ(0) scale(1.75) rotate(160deg); }
         }
         ._sp-core {
           animation: _sp-core ${TOTAL_MS}ms both;
           transform-origin: 96px 96px;
+          will-change: transform;
         }
         @keyframes _sp-core {
-          0%, 70%  { transform: scale(1) rotate(0deg); }
-          100%     { transform: scale(0.82) rotate(-40deg); }
+          0%, 70%  { transform: translateZ(0) scale(1) rotate(0deg); }
+          100%     { transform: translateZ(0) scale(0.82) rotate(-40deg); }
         }
 
         ._sp-brand {
@@ -278,12 +296,16 @@ export default function AppSplash() {
           opacity: 0.55;
           color: currentColor;
         }
+        /* Brand uses transform + opacity only — no letter-spacing
+           animation. letter-spacing change triggers a layout reflow
+           every frame, which on /feed could trigger the whole page
+           below to be re-measured. Was the worst offender for jank. */
         @keyframes _sp-brand {
-          0%   { opacity: 0; transform: translateY(8px); }
-          7%   { opacity: 1; transform: translateY(0); }
-          70%  { opacity: 1; transform: translateY(0); letter-spacing: 4px; }
-          92%  { opacity: 1; transform: translateY(-2px) scale(1.15); letter-spacing: normal; }
-          100% { opacity: 0; transform: translateY(-6px) scale(1.4); letter-spacing: normal; }
+          0%   { opacity: 0; transform: translate3d(0, 8px, 0) scale(1); }
+          7%   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+          70%  { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+          92%  { opacity: 1; transform: translate3d(0, -2px, 0) scale(1.15); }
+          100% { opacity: 0; transform: translate3d(0, -6px, 0) scale(1.4); }
         }
 
         @media (prefers-reduced-motion: reduce) {
