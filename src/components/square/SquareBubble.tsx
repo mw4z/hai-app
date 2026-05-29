@@ -325,16 +325,22 @@ export default function SquareBubble({
         className={`flex w-full ${
           isLastInGroup ? 'mb-2' : 'mb-[3px]'
         } ${isFirstInGroup && !showDate ? 'mt-3' : ''} ${
-          isMe
-            ? 'ltr:justify-end rtl:justify-start'
-            : 'ltr:justify-start rtl:justify-end'
+          // Pure justify-end/start so the bubble flips with the
+          // writing direction:
+          //   LTR own → right, other → left
+          //   RTL own → LEFT,  other → right
+          // (Previously rtl: overrides forced own to stay on the
+          //  right even in Arabic — the user asked to flip it.)
+          isMe ? 'justify-end' : 'justify-start'
         }`}
       >
-        {/* Inner chat-row: avatar + bubble column. `rtl:flex-row-reverse`
-            forces visual DOM order (avatar first → LEFT, bubble next →
-            to its right) in BOTH LTR and RTL, so the avatar never
-            ends up isolated on the opposite half of the screen. */}
-        <div className="flex items-end gap-2 max-w-[85%] rtl:flex-row-reverse">
+        {/* Inner chat-row: avatar + bubble column. NO flex-row-reverse
+            anymore — Arabic now flips own to the LEFT visually
+            (per user request), so DOM order [arrow][bubble][avatar]
+            for own and [avatar][bubble][arrow] for other naturally
+            puts the avatar on the bubble's outer edge in BOTH
+            directions via RTL's intrinsic visual flip. */}
+        <div className="flex items-end gap-2 max-w-[85%]">
           {/* Avatar slot — placed in the DOM at the "outer edge" of
               the row. For OTHER it sits at DOM position 0 (renders
               on the row's LEFT). For OWN it sits AFTER the column
@@ -351,10 +357,10 @@ export default function SquareBubble({
             />
           )}
           {/* Reply arrow for OWN messages — sits BEFORE the bubble
-              column in the DOM, which places it on the LEFT of the
-              bubble in LTR and (via flex-row-reverse) on the RIGHT
-              in RTL. Either way it lands on the side opposite our
-              avatar (which is the trailing edge). */}
+              column in the DOM. In LTR that's the LEFT of the
+              bubble (avatar on the right); in RTL the natural
+              direction flip puts it on the RIGHT of the bubble
+              (avatar on the left). Always opposite the avatar. */}
           {isMe && replyArrowButton}
 
           {/* Bubble column. Content-sized (no flex-1, no min-w-0 —
@@ -364,9 +370,13 @@ export default function SquareBubble({
               same DM ltr:/rtl: pattern. */}
           <div
             className={`flex flex-col ${
-              isMe
-                ? 'ltr:items-end rtl:items-start'
-                : 'ltr:items-start rtl:items-end'
+              // Children align to the "end" side for own bubbles in
+              // BOTH directions (end = right in LTR, end = left in
+              // RTL — both correct now that Arabic own sits on the
+              // LEFT). Previously rtl: forced own to items-start
+              // (RTL = right side) so the bubble stayed pinned to
+              // the right of the screen even in Arabic.
+              isMe ? 'items-end' : 'items-start'
             }`}
           >
           {/* No max-w here — the OUTER row already caps the bubble at
