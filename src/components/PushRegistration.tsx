@@ -823,13 +823,13 @@ function resolveDeeplink(data: Record<string, string>): string {
     case 'square_notify':
     case 'square_reply':
     case 'square_reaction':
-      // Defensive fallback — normally the `deeplink: 'hai://square'`
+      // Defensive fallback — normally the `deeplink: 'hai://square?msg=…'`
       // field on the payload takes precedence and lands the user on
       // /square via the generic hai:// → / mapping above. These
       // cases catch the rare path where `deeplink` is dropped
-      // en-route. All three Square push types currently land on the
-      // single chat surface; if we ever scroll-to-message, this is
-      // where we'd append the messageId.
+      // en-route. Append the messageId so the page can scroll-and-
+      // glow the exact bubble even on the fallback path.
+      if (data.messageId) return `/square?msg=${encodeURIComponent(data.messageId)}`
       return '/square'
 
     case 'weekly_digest':

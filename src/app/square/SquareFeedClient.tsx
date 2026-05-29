@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 import {
   FiArrowLeft,
@@ -281,6 +281,37 @@ export default function SquareFeedClient({
     el.classList.add('chat-bubble-highlight')
     setTimeout(() => el.classList.remove('chat-bubble-highlight'), 1500)
   }
+
+  // Push-deeplink scroll-and-glow: when /square is opened from a
+  // tapped square_notify / square_reply / square_reaction push,
+  // the deeplink includes ?msg=<id>. Reuse the jump-to-reply
+  // helper to scroll to that bubble and pulse-glow it. Retries
+  // briefly to cover the case where the bubble hasn't mounted yet
+  // (initial page paint or the message-sync poll fetching it).
+  const searchParams = useSearchParams()
+  const targetMsgId = searchParams?.get('msg') || null
+  useEffect(() => {
+    if (!targetMsgId) return
+    let cancelled = false
+    let tries = 0
+    const tick = () => {
+      if (cancelled) return
+      const el = document.querySelector<HTMLElement>(`[data-msg-row="${CSS.escape(targetMsgId)}"]`)
+      if (el) {
+        handleJumpToReply(targetMsgId)
+        return
+      }
+      // Bubble not painted yet — retry up to ~3s while the SSR
+      // hydrates / the message-sync poll catches an out-of-page
+      // target. Bail after that so we don't loop forever for a
+      // genuinely missing message (hidden / deleted).
+      if (++tries > 20) return
+      setTimeout(tick, 150)
+    }
+    // First attempt deferred a tick so the messages list mounts.
+    setTimeout(tick, 50)
+    return () => { cancelled = true }
+  }, [targetMsgId])
 
   // ── Long-press action handlers ─────────────────────────────────────
   function handleReply() {

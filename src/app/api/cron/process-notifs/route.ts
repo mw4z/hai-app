@@ -517,7 +517,11 @@ async function processSquareNotify(job: JobRow): Promise<JobOutcome> {
     data: {
       type: 'square_notify',
       messageId,
-      deeplink: 'hai://square',
+      // Include the messageId so the in-app handler can scroll-to
+      // and glow the exact bubble that was broadcast / replied /
+      // reacted to, rather than just dumping the user at the chat
+      // bottom.
+      deeplink: `hai://square?msg=${messageId}`,
     },
   })
 
@@ -574,7 +578,11 @@ async function processSquareReply(job: JobRow): Promise<JobOutcome> {
       type: 'square_reply',
       messageId,
       parentMessageId,
-      deeplink: 'hai://square',
+      // Include the messageId so the in-app handler can scroll-to
+      // and glow the exact bubble that was broadcast / replied /
+      // reacted to, rather than just dumping the user at the chat
+      // bottom.
+      deeplink: `hai://square?msg=${messageId}`,
     },
   })
 
@@ -632,7 +640,11 @@ async function processSquareReaction(job: JobRow): Promise<JobOutcome> {
       type: 'square_reaction',
       messageId,
       emoji,
-      deeplink: 'hai://square',
+      // Include the messageId so the in-app handler can scroll-to
+      // and glow the exact bubble that was broadcast / replied /
+      // reacted to, rather than just dumping the user at the chat
+      // bottom.
+      deeplink: `hai://square?msg=${messageId}`,
     },
   })
 
