@@ -75,7 +75,7 @@ input, textarea, [contenteditable="true"] {
 
 /* ── Dark mode: global Tailwind class overrides ─────────────────────────── */
 .dark body                                    { background-color: var(--bg); color: var(--text); }
-.dark .bg-white:not([class*="backdrop-blur"]):not([class*="bg-white/"]) { background-color: var(--surface) !important; }
+.dark .bg-white:not([class*="backdrop-blur"]):not([class*="bg-white/"]):not([class*="dark:bg-["]) { background-color: var(--surface) !important; }
 .dark .bg-gray-50:not([class*="backdrop-blur"]) { background-color: var(--surface-alt) !important; }
 .dark .bg-gray-100:not([class*="backdrop-blur"]) { background-color: var(--bg) !important; }
 .dark .bg-gray-200                            { background-color: var(--surface-alt) !important; }
