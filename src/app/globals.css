@@ -43,6 +43,13 @@ input, textarea, [contenteditable="true"] {
 
 :root {
   --primary: #00a884;
+  /* Dark-mode received-bubble color (Square + DM). Overridable
+     live by the SUPER_ADMIN BubbleColorPicker via document.docs
+     style.setProperty('--bubble-other', hex). The default lives
+     here instead of as a Tailwind arbitrary-value fallback
+     because the var(name,#hex) comma form trips Tailwind's
+     JIT parser and the class quietly fails to generate. */
+  --bubble-other:   #5a6b7e;
   --bg:             #ffffff;
   --surface:        #ffffff;
   --surface-alt:    #f9fafb;
