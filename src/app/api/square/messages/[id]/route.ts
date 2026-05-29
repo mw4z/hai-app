@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { apiError } from '@/lib/validation'
 import { isSquareAdminRole } from '@/lib/square/isSquareAdmin'
+import { isSquareModRole } from '@/lib/square/lock'
 
 interface Params { params: Promise<{ id: string }> }
 
@@ -76,9 +77,15 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({ ok: true, scope: 'me' })
   }
 
-  // scope === 'all' — destructive. Author + cutoff window + status.
-  const isSuper = me.role === 'SUPER_ADMIN'
-  if (!isSuper) {
+  // scope === 'all' — destructive. Allowed callers:
+  //   - The author, only within the 60-min cutoff window
+  //     (WhatsApp-style "you can unsend recent messages").
+  //   - Any Square moderator (NEIGHBORHOOD_MOD / PLATFORM_MOD /
+  //     SUPER_ADMIN) on ANY message in their neighborhood, no
+  //     time window. Moderation tier — they need to be able to
+  //     remove abusive content immediately.
+  const isMod = isSquareModRole(me.role)
+  if (!isMod) {
     if (msg.authorId !== me.id) {
       return NextResponse.json(
         apiError('يمكنك حذف رسائلك فقط.', 403, 'DELETE_NOT_AUTHOR'),

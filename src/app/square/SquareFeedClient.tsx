@@ -965,12 +965,14 @@ export default function SquareFeedClient({
         <SquareActionSheet
           isOwn={selectedMsg.author.id === currentUserId}
           isTombstone={selectedMsg.type === 'DELETED'}
-          /** Own + non-tombstone + within the 60-min cutoff. The
-           *  server re-checks; this just hides the row when it
-           *  wouldn't work anyway. */
+          /** Show "Delete for everyone" when EITHER:
+           *    - mod/super_admin on any active message, OR
+           *    - author within the 60-min cutoff.
+           *  Server re-checks; this is just UI hiding. */
           canDeleteForAll={(() => {
-            if (selectedMsg.author.id !== currentUserId) return false
             if (selectedMsg.type === 'DELETED') return false
+            if (isMod) return true
+            if (selectedMsg.author.id !== currentUserId) return false
             const age = Date.now() - Date.parse(selectedMsg.createdAt)
             return age < 60 * 60 * 1000
           })()}
@@ -1389,9 +1391,11 @@ function SquareActionSheet({
             </span>
           </span>
         </button>
-        {/* Delete-for-everyone — own + within the 60-min window only.
-            Destructive; sets tombstone server-side. Red label so the
-            consequence is obvious. */}
+        {/* Delete-for-everyone — destructive; sets tombstone
+            server-side. Red label so the consequence is obvious.
+            Hint copy is context-aware: the author sees the 1-hour
+            cutoff reminder, a mod removing someone else's message
+            sees the moderation-action explanation. */}
         {canDeleteForAll && (
           <button
             type="button"
@@ -1401,12 +1405,18 @@ function SquareActionSheet({
             <FiTrash2 className="w-5 h-5 text-rose-600" />
             <span className="flex-1">
               <span className="block text-[15px] font-semibold text-rose-600">
-                {lang === 'en' ? 'Delete for everyone' : 'حذف للجميع'}
+                {isOwn
+                  ? (lang === 'en' ? 'Delete for everyone' : 'حذف للجميع')
+                  : (lang === 'en' ? 'Remove (mod action)' : 'إزالة (إجراء إشرافي)')}
               </span>
               <span className="block text-[11.5px] text-gray-500 dark:text-gray-400 mt-0.5">
-                {lang === 'en'
-                  ? 'Available for ~1 hour after sending'
-                  : 'متاح لمدة ساعة بعد الإرسال'}
+                {isOwn
+                  ? (lang === 'en'
+                      ? 'Available for ~1 hour after sending'
+                      : 'متاح لمدة ساعة بعد الإرسال')
+                  : (lang === 'en'
+                      ? 'Removes the message from everyone\'s view'
+                      : 'تختفي الرسالة من جميع المستخدمين')}
               </span>
             </span>
           </button>
