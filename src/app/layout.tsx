@@ -8,7 +8,12 @@ import RouteTransition from '@/components/RouteTransition'
 import BottomNav from '@/components/BottomNav'
 import ArrivalAlert from '@/components/ArrivalAlert'
 import CapacitorBridge from '@/components/CapacitorBridge'
-import SwUpdateReload from '@/components/SwUpdateReload'
+// SwUpdateReload removed — the auto-page-reload on service-worker
+// activation was eating cold-start deeplinks (Square push taps,
+// share-link "highlight" effect, "splash shows twice" report) and
+// the visible mid-session reload felt cheap. Updates now land on
+// the next natural app restart instead — acceptable for a Capacitor-
+// wrapped remote app where users foreground/background frequently.
 import CropHost from '@/components/CropHost'
 import DebugOverlay from '@/components/DebugOverlay'
 import PushRegistration from '@/components/PushRegistration'
@@ -188,7 +193,6 @@ export default function RootLayout({
           })();
         `}} />
         <AppSplash />
-        <SwUpdateReload />
         <CapacitorBridge />
         <DebugOverlay />
         <PushRegistration />
