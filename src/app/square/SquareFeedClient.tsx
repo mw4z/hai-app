@@ -290,28 +290,43 @@ export default function SquareFeedClient({
   // (initial page paint or the message-sync poll fetching it).
   const searchParams = useSearchParams()
   const targetMsgId = searchParams?.get('msg') || null
-  useEffect(() => {
-    if (!targetMsgId) return
+
+  // Shared "scroll-and-glow with retries" runner. Used both by
+  // the ?msg= URL path and by the in-page hai:square-jump-to
+  // event the foreground toast dispatches when we're already on
+  // /square (where a setting window.location.href to the same
+  // path doesn't always re-trigger the effect).
+  const jumpAndGlowMessage = (id: string): (() => void) => {
     let cancelled = false
     let tries = 0
     const tick = () => {
       if (cancelled) return
-      const el = document.querySelector<HTMLElement>(`[data-msg-row="${CSS.escape(targetMsgId)}"]`)
+      const el = document.querySelector<HTMLElement>(`[data-msg-row="${CSS.escape(id)}"]`)
       if (el) {
-        handleJumpToReply(targetMsgId)
+        handleJumpToReply(id)
         return
       }
-      // Bubble not painted yet — retry up to ~3s while the SSR
-      // hydrates / the message-sync poll catches an out-of-page
-      // target. Bail after that so we don't loop forever for a
-      // genuinely missing message (hidden / deleted).
       if (++tries > 20) return
       setTimeout(tick, 150)
     }
-    // First attempt deferred a tick so the messages list mounts.
     setTimeout(tick, 50)
     return () => { cancelled = true }
+  }
+
+  useEffect(() => {
+    if (!targetMsgId) return
+    return jumpAndGlowMessage(targetMsgId)
   }, [targetMsgId])
+
+  useEffect(() => {
+    const onJump = (e: Event) => {
+      const detail = (e as CustomEvent<{ messageId?: string }>).detail
+      if (!detail?.messageId) return
+      jumpAndGlowMessage(detail.messageId)
+    }
+    window.addEventListener('hai:square-jump-to', onJump)
+    return () => window.removeEventListener('hai:square-jump-to', onJump)
+  }, [])
 
   // ── Long-press action handlers ─────────────────────────────────────
   function handleReply() {

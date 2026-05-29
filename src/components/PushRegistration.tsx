@@ -415,6 +415,25 @@ export default function PushRegistration() {
                 onTap: target ? () => {
                   try {
                     const cur = window.location.pathname + window.location.search
+                    // Square-specific in-page fast path: if we're
+                    // ALREADY on /square and the target points at a
+                    // specific message, just dispatch the scroll
+                    // event — no full navigation needed. Covers the
+                    // case where setting window.location.href on the
+                    // same path doesn't always re-trigger the
+                    // useSearchParams effect.
+                    if (
+                      (type === 'square_notify'
+                        || type === 'square_reply'
+                        || type === 'square_reaction')
+                      && data.messageId
+                      && window.location.pathname === '/square'
+                    ) {
+                      window.dispatchEvent(new CustomEvent('hai:square-jump-to', {
+                        detail: { messageId: data.messageId },
+                      }))
+                      return
+                    }
                     if (cur !== target) window.location.href = target
                   } catch {}
                 } : undefined,
