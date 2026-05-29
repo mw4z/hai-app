@@ -4,18 +4,19 @@ const withPWA = require('next-pwa')({
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
   runtimeCaching: [
-    // Page navigations (HTML). NetworkFirst with a tight 2s timeout —
-    // on a healthy connection the user gets fresh HTML; on a slow /
-    // cold-start network they get the last-cached page instantly
-    // instead of staring at a white screen. This is the single
-    // biggest UX win for app-shell speed and the reason pages now
-    // feel "WhatsApp-instant" on second visit.
+    // Page navigations (HTML). NetworkFirst with an 8s timeout —
+    // bumped from 2s because users were getting stale HTML (which
+    // pointed at stale JS-chunk hashes) on every reasonably-slow
+    // LTE launch. The HTML carries the JS-chunk URLs, so a stale
+    // HTML pins the whole app to old code until SW eventually
+    // refreshes. 8s gives the network real chance to win; on a
+    // hard offline the cached page still serves immediately.
     {
       urlPattern: ({ request }) => request.mode === 'navigate',
       handler: 'NetworkFirst',
       options: {
-        cacheName: 'pages',
-        networkTimeoutSeconds: 2,
+        cacheName: 'pages-v2',
+        networkTimeoutSeconds: 8,
         expiration: { maxEntries: 40, maxAgeSeconds: 7 * 24 * 60 * 60 },
       },
     },
@@ -68,9 +69,19 @@ const withPWA = require('next-pwa')({
       options: { cacheName: 'images-v2', expiration: { maxEntries: 60, maxAgeSeconds: 7 * 24 * 60 * 60 } },
     },
     {
+      // Non-chunked JS/CSS (anything outside /_next/static, which is
+      // already CacheFirst above because its filenames carry content
+      // hashes). Switched from StaleWhileRevalidate -> NetworkFirst
+      // so a freshly deployed asset wins on cold-start launch instead
+      // of the previous-launch's cached copy. 5s timeout still leaves
+      // the cache as a fallback on slow / offline networks.
       urlPattern: /\.(?:js|css)$/i,
-      handler: 'StaleWhileRevalidate',
-      options: { cacheName: 'static-resources', expiration: { maxEntries: 60, maxAgeSeconds: 24 * 60 * 60 } },
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'static-resources-v2',
+        networkTimeoutSeconds: 5,
+        expiration: { maxEntries: 60, maxAgeSeconds: 24 * 60 * 60 },
+      },
     },
     {
       urlPattern: /^\/api\/.*/i,
