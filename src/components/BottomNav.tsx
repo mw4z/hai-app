@@ -133,6 +133,24 @@ export default function BottomNav({
   // keep the unchanged 4-tab layout.
   const showSquareTab = isSquareAdminRole(userRole)
   const NAV_ITEMS = showSquareTab ? NAV_ITEMS_ADMIN : NAV_ITEMS_DEFAULT
+
+  // "NEW" discovery pill on the Square tab — shows until the user
+  // visits /square at least once. localStorage flag clears it
+  // permanently after the first visit; same pattern Hai uses
+  // elsewhere (e.g. wallpaper-seen). Default true so existing users
+  // see the pill the next time the bottom nav mounts.
+  const [showSquareNewPill, setShowSquareNewPill] = useState(false)
+  useEffect(() => {
+    try {
+      setShowSquareNewPill(!localStorage.getItem('hai_square_seen'))
+    } catch { /* localStorage blocked — just hide the pill */ }
+  }, [])
+  useEffect(() => {
+    if (pathname.startsWith('/square')) {
+      try { localStorage.setItem('hai_square_seen', '1') } catch {}
+      setShowSquareNewPill(false)
+    }
+  }, [pathname])
   // Admins / mods skip the resident "suggest a poll" review flow
   // and post polls directly — the same tertiary entry-sheet link
   // routes them to /polls/new instead of /polls/request.
@@ -233,10 +251,15 @@ export default function BottomNav({
         className="flex items-stretch mx-auto"
         style={{ maxWidth: 'var(--hai-max-width)' }}
       >
-        {/* Left two tabs: Home, Market */}
+        {/* Left two tabs: Home, Market (or Square for admins) */}
         {NAV_ITEMS.slice(0, 2).map((item) => {
           const Icon = item.icon
           const isActive = active === item.key
+          // "NEW" discovery pill — only on the Square tab, only
+          // until the user has visited /square once. Anchored to
+          // the icon so it floats above the tab without affecting
+          // the row's flex sizing.
+          const showNewPill = item.key === 'square' && showSquareNewPill
           return (
             <Link
               key={item.key}
@@ -247,6 +270,14 @@ export default function BottomNav({
             >
               <div className={`relative ${isActive ? 'glow-tab' : ''}`}>
                 <Icon className="w-5 h-5" />
+                {showNewPill && (
+                  <span
+                    className="absolute -top-2 -end-3 px-1.5 py-[1px] rounded-full text-[8.5px] font-extrabold bg-rose-500 text-white shadow-sm leading-none animate-pulse-glow"
+                    aria-label={lang === 'en' ? 'New feature' : 'ميزة جديدة'}
+                  >
+                    {lang === 'en' ? 'NEW' : 'جديد'}
+                  </span>
+                )}
               </div>
               <span className="text-[10px] font-medium">{t(item.tKey)}</span>
             </Link>
