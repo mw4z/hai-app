@@ -1508,7 +1508,7 @@ export default function PostCard({
             }}
             placeholder={
               post.isOffer
-                ? (lang === 'en' ? 'New price (after offer, SAR)' : 'السعر بعد العرض (ر.س)')
+                ? (lang === 'en' ? 'New price (after discount, SAR)' : 'السعر بعد الخصم (ر.س)')
                 : (lang === 'en' ? 'Price (optional, SAR)' : 'السعر (اختياري، ر.س)')
             }
             className="hai-input"
@@ -1523,7 +1523,7 @@ export default function PostCard({
                 const v = e.target.value.replace(/[^\d.]/g, '')
                 setEditOriginalPrice(v)
               }}
-              placeholder={lang === 'en' ? 'Old price (before offer, SAR)' : 'السعر قبل العرض (ر.س)'}
+              placeholder={lang === 'en' ? 'Old price (before discount, SAR)' : 'السعر قبل الخصم (ر.س)'}
               className="hai-input"
               aria-label={lang === 'en' ? 'Original price' : 'السعر السابق'}
             />
@@ -1804,7 +1804,7 @@ export default function PostCard({
         <div className="hai-mt-2 flex items-center flex-wrap gap-2">
           {post.isOffer && (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-[11px] font-bold px-2 py-0.5">
-              🏷️ {lang === 'en' ? 'Offer' : lang === 'ur' ? 'آفر' : 'عرض'}
+              🏷️ {lang === 'en' ? 'Discount' : lang === 'ur' ? 'رعایت' : 'خصم'}
             </span>
           )}
           {postData.price != null && (

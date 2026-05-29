@@ -49,6 +49,6 @@ export async function fetchFeed(f: FeedFilter) {
 /** Render-time helper — UI shows a small badge for REQUEST posts. */
 export function intentBadge(intent: 'OFFER' | 'REQUEST' | 'NORMAL'): string | null {
   if (intent === 'REQUEST') return 'طلب'
-  if (intent === 'OFFER')   return 'عرض'
+  if (intent === 'OFFER')   return 'خصم'
   return null
 }

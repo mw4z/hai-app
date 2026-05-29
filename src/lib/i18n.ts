@@ -11,7 +11,7 @@ export const translations = {
   feed_title:          { ar: 'حي',               en: 'Hai',              ur: 'حی'              },
   feed_all:            { ar: 'الكل',             en: 'All',              ur: 'سب'              },
   feed_requests:       { ar: 'طلبات',            en: 'Requests',         ur: 'درخواستیں'       },
-  feed_offers:         { ar: 'عروض',             en: 'Offers',           ur: 'آفرز'            },
+  feed_offers:         { ar: 'خصومات',           en: 'Discounts',        ur: 'رعایات'          },
   feed_new_post:       { ar: 'منشور جديد',       en: 'New Post',         ur: 'نئی پوسٹ'        },
   feed_quick_ask:      { ar: 'تبحث عن شيء؟',    en: 'Looking for something?' , ur: 'کچھ ڈھونڈ رہے ہیں؟' },
 
@@ -23,8 +23,8 @@ export const translations = {
   home_action_ask_help:     { ar: 'اسأل عن خدمة، محل، أو نصيحة',     en: 'Ask about a service, place, or advice',    ur: 'خدمت، جگہ یا مشورہ پوچھیں' },
   home_action_find_title:   { ar: 'أبحث عن خدمة أو محل',             en: 'Find a service or place',                  ur: 'خدمت یا جگہ تلاش کریں' },
   home_action_find_help:    { ar: 'سباك، كهربائي، صيدلية، مطعم',     en: 'Plumber, electrician, pharmacy, restaurant', ur: 'پلمبر، الیکٹریشن، فارمیسی، ریستوران' },
-  home_action_sell_title:   { ar: 'السوق والعروض',                   en: 'Market & offers',                          ur: 'بازار اور آفرز' },
-  home_action_sell_help:    { ar: 'تصفّح السوق وعروض الحي',           en: 'Browse the market and neighborhood offers', ur: 'بازار اور محلے کی آفرز دیکھیں' },
+  home_action_sell_title:   { ar: 'السوق والخصومات',                 en: 'Market & discounts',                          ur: 'بازار اور رعایات' },
+  home_action_sell_help:    { ar: 'تصفّح السوق وخصومات الحي',         en: 'Browse the market and neighborhood discounts', ur: 'بازار اور محلے کی رعایات دیکھیں' },
   home_action_report_title: { ar: 'أبلّغ عن مشكلة',                   en: 'Report a problem',                          ur: 'مسئلہ رپورٹ کریں' },
   home_action_report_help:  { ar: 'حفرة، إنارة، زحمة، نظافة',         en: 'Pothole, lighting, traffic, cleaning',      ur: 'سڑک، لائٹنگ، ٹریفک، صفائی' },
   feed_quick_ask_btn:  { ar: 'اسأل',             en: 'Ask'               , ur: 'پوچھیں' },
@@ -82,7 +82,7 @@ export const translations = {
   post_v2_COMPETITIONS:         { ar: 'مسابقات وجوائز',     en: 'Competitions',         ur: 'مقابلے' },
 
   post_intent_request:          { ar: 'طلب',                  en: 'Request',              ur: 'درخواست' },
-  post_intent_offer:            { ar: 'عرض',                  en: 'Offer',                ur: 'پیشکش' },
+  post_intent_offer:            { ar: 'خصم',                  en: 'Discount',             ur: 'رعایت' },
 
   // ── Highlights ─────────────────────────────────────────────────────────────
   highlights_title:             { ar: 'أهم ما في الحي',       en: 'Neighborhood Highlights', ur: 'محلے کی نمایاں خبریں' },

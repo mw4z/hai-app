@@ -1398,14 +1398,14 @@ export default function NewPostPage() {
                   />
                   <span className="flex-1">
                     <span className="block text-sm font-semibold text-amber-900 dark:text-amber-200">
-                      🏷️ {lang === 'en' ? 'Mark as an offer' : lang === 'ur' ? 'آفر کے طور پر نشان زد کریں' : 'علّمه كعرض'}
+                      🏷️ {lang === 'en' ? 'Mark as a discount' : lang === 'ur' ? 'رعایت کے طور پر نشان زد کریں' : 'علّمه كخصم'}
                     </span>
                     <span className="block text-[11px] text-amber-700/80 dark:text-amber-300/70 mt-0.5">
                       {lang === 'en'
-                        ? 'Shows in the Offers filter (feed + market)'
+                        ? 'Shows in the Discounts filter (feed + market)'
                         : lang === 'ur'
-                          ? 'آفرز فلٹر میں ظاہر ہوگا (فیڈ + بازار)'
-                          : 'يظهر في فلتر العروض (الرئيسية + السوق)'}
+                          ? 'رعایات فلٹر میں ظاہر ہوگا (فیڈ + بازار)'
+                          : 'يظهر في فلتر الخصومات (الرئيسية + السوق)'}
                     </span>
                   </span>
                 </label>

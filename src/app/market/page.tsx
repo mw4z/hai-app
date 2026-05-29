@@ -126,14 +126,14 @@ export default async function MarketPage({
   // do so through the main feed's REQUESTS chip.
   const tabs = [
     { key: 'ALL',      label: 'الكل',  labelEn: 'All',      icon: '🛍️' },
-    { key: 'OFFERS',   label: 'عروض',  labelEn: 'Offers',   icon: '🏷️' },
+    { key: 'OFFERS',   label: 'خصومات', labelEn: 'Discounts', icon: '🏷️' },
     { key: 'SELLING',  label: 'بيع',   labelEn: 'Selling',  icon: '🛒' },
     { key: 'SERVICES', label: 'خدمات', labelEn: 'Services', icon: '🔧' },
   ]
 
   const emptyStates: Record<string, { emoji: string; title: string; sub: string }> = {
     ALL:      { emoji: '🛍️', title: 'لا توجد إعلانات بعد',       sub: 'كن أول من يضيف في حيّك!' },
-    OFFERS:   { emoji: '🏷️', title: 'لا توجد عروض حالياً',       sub: 'علّم منشورك كعرض ليظهر هنا!' },
+    OFFERS:   { emoji: '🏷️', title: 'لا توجد خصومات حالياً',     sub: 'علّم منشورك كخصم ليظهر هنا!' },
     SELLING:  { emoji: '🛒', title: 'لا توجد منتجات للبيع',      sub: 'أضف منتجك الآن!' },
     SERVICES: { emoji: '🔧', title: 'لا توجد خدمات مسجّلة بعد',  sub: 'هل تقدم خدمة في الحي؟ أضفها!' },
   }
