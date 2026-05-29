@@ -19,8 +19,13 @@ import { useState, useEffect, useRef } from 'react'
  *   70–100 % parent: scale → 14, rotate → +110°, opacity → 0 (last 8 %)
  *            satellites: stack +160° (~+270° net), scale → 1.75
  *            core: counter-rotate −40°, scale → 0.82
- *            splash bg: iris-hole (mask radial-gradient) 0 % → 160 %
- *            from icon's center → reveals page content behind
+ *            splash bg: holds opaque through 92 %, then snap-fades
+ *            to 0 in the final 8 %. The previous iris-mask reveal
+ *            looked great on pre-signin pages but exposed the
+ *            busy /feed content mid-animation on signed-in users
+ *            (giant icon zoom + colored feed cards bleeding
+ *            through = chaotic). Single snap-fade at the very
+ *            end keeps every route looking clean.
  *
  * Native handoff: capacitor.config.ts has launchAutoHide:false.
  * AppSplash calls SplashScreen.hide() with zero fade duration on
@@ -156,16 +161,6 @@ export default function AppSplash() {
       </div>
 
       <style jsx>{`
-        /* @property registration so the radial-gradient mask can
-           tween smoothly between keyframes. Supported on WKWebView
-           since iOS 16.4 and Chrome 85; older WebViews will snap
-           rather than tween (still functional, just less polished). */
-        @property --iris-r {
-          syntax: '<percentage>';
-          inherits: false;
-          initial-value: 0%;
-        }
-
         ._sp {
           position: fixed;
           top: 0; right: 0; bottom: 0; left: 0;
@@ -175,24 +170,24 @@ export default function AppSplash() {
         }
         :global(.dark) ._sp { color: #ffffff; }
 
-        /* Solid bg + iris-hole mask. Once --iris-r exceeds the
-           screen's half-diagonal (~120 %), the bg is fully
-           transparent → page content behind AppSplash is visible. */
+        /* Solid bg holds opaque through the entire animation so the
+           page content underneath (which can be visually busy on
+           /feed and other signed-in routes) is NEVER exposed
+           mid-animation. Single snap-fade in the last 8 % of the
+           timeline reveals the app in one clean beat — no busy
+           feed bleeding through behind a zooming icon. */
         ._sp-bg {
           position: absolute;
           inset: 0;
           background: #ffffff;
           z-index: 1;
-          --iris-r: 0%;
-          -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent var(--iris-r), #000 calc(var(--iris-r) + 0.5%));
-          mask-image: radial-gradient(circle at 50% 50%, transparent var(--iris-r), #000 calc(var(--iris-r) + 0.5%));
-          animation: _sp-iris ${TOTAL_MS}ms cubic-bezier(0.55, 0, 0.1, 1) both;
-          will-change: --iris-r;
+          animation: _sp-bg ${TOTAL_MS}ms cubic-bezier(0.55, 0, 0.1, 1) both;
+          will-change: opacity;
         }
         :global(.dark) ._sp-bg { background: #000000; }
-        @keyframes _sp-iris {
-          0%, 70% { --iris-r: 0%; }
-          100%    { --iris-r: 160%; }
+        @keyframes _sp-bg {
+          0%, 92% { opacity: 1; }
+          100%    { opacity: 0; }
         }
 
         /* Faint ring telegraph — only visible during the wind-up. */
