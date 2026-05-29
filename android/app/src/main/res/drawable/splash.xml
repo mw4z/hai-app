@@ -1,4 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Capacitor SplashScreen drawable. Previously this was just the
+    background color — fine when AppSplash (the JS overlay) was the
+    layer that actually drew the icon. With AppSplash removed and
+    capacitor.config.ts holding this splash up until the WebView
+    is ready, this IS what the user sees during launch, so it has
+    to contain the brand mark too.
+
+    Layer order: background fill, then the brand icon centered at
+    a fixed 120dp box. Icon comes from ic_launcher_splash (the
+    same vector the Android 12+ system splash uses), so cold-start
+    transitions don't jump between two different mark designs.
+-->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/splash_bg"/>
+    <item
+        android:width="120dp"
+        android:height="120dp"
+        android:gravity="center"
+        android:drawable="@drawable/ic_launcher_splash"/>
 </layer-list>

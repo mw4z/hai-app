@@ -32,25 +32,18 @@
     </style>
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <!-- Android 12+ uses the SplashScreen API regardless of what
-             parent theme we pick. The previous attempt to dodge it by
-             extending Theme.AppCompat.DayNight.NoActionBar still got
-             the system-default centered launcher icon on newer phones
-             — what the user reported as "large app icon intro before
-             the splash".
-             Now we OPT IN to Theme.SplashScreen and:
-               * paint the splash_bg the JS AppSplash also uses, so
-                 the handoff is seamless;
-               * supply a 1x1 transparent drawable as the animated
-                 icon — Android requires a drawable, but transparent
-                 means nothing visible;
-               * postSplashScreenTheme = AppTheme.NoActionBar so once
-                 the system splash dismisses we land directly on the
-                 normal app theme without a flash. -->
+        <!-- Android 12+ system splash. With JS AppSplash removed, this
+             is now the ONLY layer that shows the brand mark on the
+             system-controlled portion of the launch (before Capacitor's
+             ImageView splash takes over). Previously the icon was a
+             1x1 transparent placeholder — that worked when AppSplash
+             showed the icon a few frames later, but with no AppSplash
+             the user saw a blank green screen with no brand at all.
+             Now points at ic_launcher_splash so the system splash IS
+             the branded splash. -->
         <item name="windowSplashScreenBackground">@color/splash_bg</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_transparent_icon</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_splash</item>
         <item name="windowSplashScreenIconBackgroundColor">@color/splash_bg</item>
-        <item name="windowSplashScreenAnimationDuration">100</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
         <item name="android:statusBarColor">@color/splash_bg</item>
         <item name="android:navigationBarColor">@color/splash_bg</item>

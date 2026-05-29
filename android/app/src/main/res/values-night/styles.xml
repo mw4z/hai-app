@@ -24,16 +24,14 @@
     </style>
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <!-- Dark variant — uses the SplashScreen API with the same
-             transparent-icon trick as values/styles.xml so Android 12+
-             doesn't render its centered launcher icon. splash_bg in
-             dark mode is true black via values-night/colors.xml so the
-             handoff to AppSplash (which also paints black in dark) is
-             seamless. -->
+        <!-- Dark variant. Same change as values/styles.xml: switched
+             windowSplashScreenAnimatedIcon from a 1x1 transparent
+             placeholder (paired with the now-deleted JS AppSplash) to
+             the real brand mark, so the system-controlled splash on
+             Android 12+ actually shows the icon. -->
         <item name="windowSplashScreenBackground">@color/splash_bg</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_transparent_icon</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_splash</item>
         <item name="windowSplashScreenIconBackgroundColor">@color/splash_bg</item>
-        <item name="windowSplashScreenAnimationDuration">100</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
         <item name="android:statusBarColor">@color/splash_bg</item>
         <item name="android:navigationBarColor">@color/splash_bg</item>
