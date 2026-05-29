@@ -146,23 +146,12 @@ export default function BottomNav({
   const showSquareTab = isSquareAdminRole(userRole)
   const NAV_ITEMS = showSquareTab ? NAV_ITEMS_ADMIN : NAV_ITEMS_DEFAULT
 
-  // "NEW" discovery pill on the Square tab — shows until the user
-  // visits /square at least once. localStorage flag clears it
-  // permanently after the first visit; same pattern Hai uses
-  // elsewhere (e.g. wallpaper-seen). Default true so existing users
-  // see the pill the next time the bottom nav mounts.
-  const [showSquareNewPill, setShowSquareNewPill] = useState(false)
-  useEffect(() => {
-    try {
-      setShowSquareNewPill(!localStorage.getItem('hai_square_seen'))
-    } catch { /* localStorage blocked — just hide the pill */ }
-  }, [])
-  useEffect(() => {
-    if (pathname.startsWith('/square')) {
-      try { localStorage.setItem('hai_square_seen', '1') } catch {}
-      setShowSquareNewPill(false)
-    }
-  }, [pathname])
+  // "NEW" pill on the Square tab — always rendered. Stays visible
+  // even after the user has tapped Square so the launch feels
+  // ongoing rather than something they can dismiss accidentally.
+  // Flip this to a stateful dismissal later if it starts to feel
+  // like noise.
+  const showSquareNewPill = true
   // Admins / mods skip the resident "suggest a poll" review flow
   // and post polls directly — the same tertiary entry-sheet link
   // routes them to /polls/new instead of /polls/request.
