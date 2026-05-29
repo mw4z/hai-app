@@ -182,14 +182,40 @@ export default function AppSplash() {
           />
         ))}
 
-        {/* Logo */}
+        {/* Logo — kept inline so it renders before any image fetch
+            resolves, but updated to match public/icon-192.svg (the
+            current brand mark). Previous inline SVG had stale dot
+            positions and no gradient → showed the OLD icon on the
+            splash even after the app icon had been refreshed. */}
         <div className="_sp-logo">
-          <svg viewBox="0 0 192 192" width="68" height="68">
-            <rect width="192" height="192" rx="42" fill="#006d57"/>
-            <circle cx="96" cy="106" r="17" fill="#fff"/>
-            <circle cx="96" cy="51" r="11" fill="#fff"/>
-            <circle cx="144" cy="134" r="11" fill="#fff"/>
-            <circle cx="48" cy="134" r="11" fill="#fff"/>
+          <svg viewBox="0 0 192 192" width="68" height="68" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="hai-brand" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#00b894" />
+                <stop offset="100%" stopColor="#005c48" />
+              </linearGradient>
+              <radialGradient id="hai-topGlow" cx="40%" cy="32%" r="58%">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
+                <stop offset="60%" stopColor="#ffffff" stopOpacity="0" />
+              </radialGradient>
+              <radialGradient id="hai-vignette" cx="82%" cy="92%" r="70%">
+                <stop offset="0%" stopColor="#000000" stopOpacity="0.22" />
+                <stop offset="80%" stopColor="#000000" stopOpacity="0" />
+              </radialGradient>
+              <radialGradient id="hai-dotShade" cx="35%" cy="32%" r="80%">
+                <stop offset="0%" stopColor="#ffffff" />
+                <stop offset="100%" stopColor="#eef9f4" />
+              </radialGradient>
+            </defs>
+            <rect width="192" height="192" rx="42" fill="url(#hai-brand)" />
+            <rect width="192" height="192" rx="42" fill="url(#hai-topGlow)" />
+            <rect width="192" height="192" rx="42" fill="url(#hai-vignette)" />
+            <circle cx="96" cy="96" r="73.5" fill="none" stroke="#ffffff" strokeOpacity="0.07" strokeWidth="0.8" />
+            <circle cx="96" cy="96" r="57" fill="none" stroke="#ffffff" strokeOpacity="0.24" strokeWidth="1.4" />
+            <circle cx="96" cy="96" r="19.5" fill="url(#hai-dotShade)" />
+            <circle cx="96" cy="39" r="11.25" fill="#ffffff" />
+            <circle cx="145.5" cy="124.5" r="11.25" fill="#ffffff" />
+            <circle cx="46.5" cy="124.5" r="11.25" fill="#ffffff" />
           </svg>
         </div>
       </div>
