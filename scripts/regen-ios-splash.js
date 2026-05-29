@@ -26,28 +26,29 @@ const ANDROID_DRAWABLE     = path.resolve(ROOT, 'android', 'app', 'src', 'main',
 const ANDROID_DRAWABLE_NIGHT = path.resolve(ROOT, 'android', 'app', 'src', 'main', 'res', 'drawable-night')
 
 const CANVAS = 2732
-// Icon at 9% of canvas — smaller per user request.
-const ICON_SIZE = Math.round(CANVAS * 0.09)
-// How much the icon shifts UP from the vertical center to make
-// room for the text block underneath while keeping the whole
-// composition (icon + gap + Arabic + gap + English) visually
-// centered on the screen.
-const ICON_Y_OFFSET = -Math.round(CANVAS * 0.11)
+// Layout matches the X-style preview the user pinned:
+//   - Icon at the visual CENTER of the canvas (vertically centered)
+//   - Brand text near the BOTTOM (~80 % down) with a deliberate
+//     gap so the composition reads as "icon in the middle, brand
+//     down at the foot" — NOT a single tightly-stacked block.
 
-// Font sizes calibrated against the 2732 canvas. Maps to roughly
-// 30 px ("حَيّ") and 12 px ("HAI") on a 393 px iPhone screen —
-// same proportions as the JS preview.
+// Icon ~12 % of canvas — visibly larger than the 9 % we had.
+const ICON_SIZE = Math.round(CANVAS * 0.12)
+// Icon vertically centered (no y-offset). The brand text is
+// pinned to the bottom region instead of being directly under
+// the icon, so we don't need to shift the icon up.
+const ICON_Y_OFFSET = 0
+
+// Font sizes calibrated against the 2732 canvas. Maps to ~30 px
+// for the Arabic and ~12 px for HAI on a 393 px iPhone screen.
 const AR_SIZE = Math.round(CANVAS * 0.075)
 const EN_SIZE = Math.round(CANVAS * 0.030)
-// Letter-spacing of "HAI" — wide, like the JS preview.
 const EN_TRACKING = Math.round(CANVAS * 0.012)
 
-// Gaps. The Arabic baseline needs to sit a full font-size-worth
-// BELOW the icon bottom because tashkeel (the ّ mark in حَيّ) and
-// the cap rise above the baseline; without that the Arabic
-// overlaps the icon. Calibrated by eye against the regen output.
-const GAP_ICON_TO_AR = Math.round(CANVAS * 0.030)
-const GAP_AR_TO_EN   = Math.round(CANVAS * 0.020)
+// Brand text positions (fractions of canvas height) — pin to
+// the bottom region instead of computed-from-icon spacing.
+const AR_BASELINE_FRAC = 0.80   // 80 % down — حَيّ baseline
+const EN_BASELINE_FRAC = 0.855  // 85.5 % down — HAI baseline
 
 // Use a font stack widely available on Windows (where this
 // script runs locally) AND macOS / Linux CI. Segoe UI and
@@ -79,16 +80,13 @@ function compositeSvg(inkColor, bgColor) {
   const cy = CANVAS / 2
   const iconX = cx - ICON_SIZE / 2
   const iconY = cy + ICON_Y_OFFSET - ICON_SIZE / 2
-  const iconBottom = iconY + ICON_SIZE
 
-  // Arabic text baseline = icon bottom + gap + Arabic ascender height.
-  // The ascender includes the cap PLUS the tashkeel mark on top of
-  // the يّ letter, which extends well above the cap. AR_SIZE * 1.0
-  // covers it with a small buffer.
-  const arBaselineY = iconBottom + GAP_ICON_TO_AR + AR_SIZE * 1.0
-  // English baseline = Arabic baseline + Arabic descender + gap +
-  // English ascender. AR_SIZE * 0.25 is roughly the descender drop.
-  const enBaselineY = arBaselineY + AR_SIZE * 0.25 + GAP_AR_TO_EN + EN_SIZE * 0.8
+  // Brand text positions pinned to a fraction of the canvas height
+  // (NOT computed from the icon), so the composition reads as
+  // "icon centered, brand text down at the foot" — same beat as
+  // the X-style preview.
+  const arBaselineY = Math.round(CANVAS * AR_BASELINE_FRAC)
+  const enBaselineY = Math.round(CANVAS * EN_BASELINE_FRAC)
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${CANVAS} ${CANVAS}" width="${CANVAS}" height="${CANVAS}">
