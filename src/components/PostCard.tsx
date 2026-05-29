@@ -2031,17 +2031,41 @@ export default function PostCard({
               // not /feed — browser visitors are bounced off /feed by the
               // middleware. Native-app users get redirected to the post.
               const url = `${window.location.origin}/s/post/${post.id}`
-              // For titleless posts use the body-excerpt headline so
-              // the share sheet / clipboard preview isn't blank.
-              const shareTitle = buildDisplayTitle(
-                { title: post.title, body: post.body, category: post.category as any },
-                lang as 'ar' | 'en' | 'ur',
-              )
-              const text = `${shareTitle}\n${post.body.slice(0, 100)}${post.body.length > 100 ? '...' : ''}`
+              const hasOwnTitle = !!post.title && post.title.trim().length > 0
+              // For TITLED posts: share sheet shows the title + a
+              // body excerpt + the URL. Receivers see three distinct
+              // pieces of info.
+              //
+              // For TITLELESS posts: buildDisplayTitle derives a
+              // headline FROM the body. Repeating the body underneath
+              // it (the previous behaviour) produces the visible
+              // "duplicated text" the user reported in WhatsApp /
+              // SMS share previews. So we share JUST the body
+              // excerpt + URL — receiving apps still render a clean
+              // 2-line preview from those.
+              const shareTitle = hasOwnTitle
+                ? post.title!.trim()
+                : buildDisplayTitle(
+                    { title: post.title, body: post.body, category: post.category as any },
+                    lang as 'ar' | 'en' | 'ur',
+                  )
+              const bodyExcerpt = post.body
+                ? `${post.body.slice(0, 180)}${post.body.length > 180 ? '…' : ''}`
+                : ''
+              const text = hasOwnTitle && bodyExcerpt
+                ? `${shareTitle}\n${bodyExcerpt}`
+                : (bodyExcerpt || shareTitle)
               if (navigator.share) {
-                try { await navigator.share({ title: shareTitle, text, url }) } catch { /* cancelled */ }
+                try {
+                  // Only pass `title` when it's the user's REAL
+                  // title — otherwise the receiving app stacks the
+                  // derived title above an excerpt that overlaps it.
+                  await navigator.share(
+                    hasOwnTitle ? { title: shareTitle, text, url } : { text, url },
+                  )
+                } catch { /* cancelled */ }
               } else {
-                await navigator.clipboard.writeText(`${shareTitle}\n${url}`)
+                await navigator.clipboard.writeText(`${text}\n${url}`)
                 toast.success(lang !== 'en' ? 'تم نسخ الرابط' : 'Link copied')
               }
             }}
