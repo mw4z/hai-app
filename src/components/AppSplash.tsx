@@ -3,37 +3,33 @@
 import { useState, useEffect, useRef } from 'react'
 
 /*
- * AppSplash — calm static splash
+ * AppSplash — flicker-free static splash
  *
- *  - Plain white (light) / plain black (dark) background
- *  - Centered outline icon (84 px, 12 px stroke), monochrome — ink
- *    color flips with the OS theme via CSS var, matching the
- *    native splash PNG so the native → JS handoff is invisible
- *  - "حَيّ / HAI" brand pair at the bottom, same ink color
- *  - Simple opacity fade-in on mount, simple opacity fade-out on
- *    dismiss. NO scaling, rotation, iris-open, parallax, or other
- *    animation theatrics.
+ * Composition:
+ *  - Plain white (light) / plain black (dark) bg
+ *  - Centered outline icon (84 px, 12 px stroke), monochrome
+ *  - "حَيّ / HAI" brand pair at the bottom
  *
- * Dismiss rules:
- *  - Min 600 ms visible so an instant-paint launch still reads as
- *    "the app launched" rather than a flicker.
- *  - Hard 8 s ceiling so a slow page can't pin the splash.
- *  - When a share-link / push deeplink is in flight
- *    (hai:deeplink-redirect set by PostShareView /
- *    CapacitorBridge), wait for FeedClient to clear the flag
- *    before dismissing — keeps the splash up across the
- *    intermediate /s/post → /feed?post hop.
- *
- * On native: capacitor.config.ts has launchAutoHide:false, so the
- * native splash sits in front of the WebView until we explicitly
- * call SplashScreen.hide(). We hide it the instant AppSplash mounts
- * because the native PNG already matches AppSplash's static
- * composition — the crossfade is invisible.
+ * Anti-flicker principles:
+ *  1. AppSplash renders at opacity 1 from frame 1 — NO fade-in.
+ *     Native splash PNG matches the composition exactly, so the
+ *     two layers are visually identical and the handoff doesn't
+ *     need a crossfade. Removing the fade kills the ~150 ms window
+ *     where both layers were semi-transparent and the underlying
+ *     WebView's loading state was bleeding through.
+ *  2. SplashScreen.hide() fires on rAF AFTER AppSplash's first
+ *     paint, with zero fade duration — guarantees AppSplash is
+ *     on screen before the native overlay disappears.
+ *  3. On a share-link / push deeplink, AppSplash STAYS rendered
+ *     on the destination mount (even when alreadyShown is true)
+ *     until FeedClient clears hai:deeplink-redirect — prevents
+ *     the brief uncovered moment between page hops.
+ *  4. Single 300 ms opacity fade-OUT on dismiss. No scale,
+ *     rotation, blur, iris, or other transitions.
  */
 
 const SESSION_KEY = 'hai_splash'
 const MIN_MS = 600
-const FADE_IN_MS = 300
 const FADE_OUT_MS = 300
 const HOLD_CEILING_MS = 8000
 
@@ -46,7 +42,16 @@ function deeplinkPending() {
 }
 
 export default function AppSplash() {
-  const [phase, setPhase] = useState<'show' | 'fade' | 'gone'>(() => alreadyShown() ? 'gone' : 'show')
+  // Initial phase:
+  //  - First mount of the session → 'show' (full splash plays)
+  //  - Subsequent mount but a deeplink is in flight → 'show' too,
+  //    so we bridge the page hop without exposing the WebView
+  //  - Otherwise → 'gone' (returns null, only hides native splash)
+  const [phase, setPhase] = useState<'show' | 'fade' | 'gone'>(() => {
+    if (!alreadyShown()) return 'show'
+    if (deeplinkPending()) return 'show'
+    return 'gone'
+  })
   const mountTime = useRef(Date.now())
 
   useEffect(() => {
@@ -56,20 +61,29 @@ export default function AppSplash() {
 
     const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform()
 
-    async function hideNativeSplash() {
+    async function hideNativeSplash(fadeMs: number) {
       if (!isNative) return
       try {
         const { SplashScreen } = await import('@capacitor/splash-screen')
-        await SplashScreen.hide({ fadeOutDuration: 250 })
+        await SplashScreen.hide({ fadeOutDuration: fadeMs })
       } catch {}
     }
 
-    // Native splash hides immediately. Its PNG matches our static
-    // composition so there's no visible jump — the user sees the
-    // same icon either way.
-    hideNativeSplash()
-
-    if (phase === 'gone') return
+    // Defer the native hide until AFTER AppSplash has been painted.
+    // rAF nested twice = "the frame after the next composite" —
+    // guarantees the AppSplash div is on the GPU before the native
+    // overlay disappears. Zero fade duration; the visuals match.
+    if (phase !== 'gone') {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => hideNativeSplash(0))
+      })
+    } else {
+      // Phase is already 'gone' — the splash is just here to ensure
+      // the native overlay is down on subsequent mounts. 250 ms fade
+      // matches the previous behaviour.
+      hideNativeSplash(250)
+      return
+    }
 
     let goneTimer: ReturnType<typeof setTimeout>
     let pollTimer: ReturnType<typeof setTimeout> | null = null
@@ -135,6 +149,8 @@ export default function AppSplash() {
       </div>
 
       <style jsx>{`
+        /* No fade-in animation — opacity is 1 from frame 1 so the
+           native overlay hides into an already-painted AppSplash. */
         ._sp {
           position: fixed;
           top: 0; right: 0; bottom: 0; left: 0;
@@ -144,8 +160,7 @@ export default function AppSplash() {
           display: flex;
           align-items: center;
           justify-content: center;
-          animation: _sp-in ${FADE_IN_MS}ms ease-out both;
-          will-change: opacity;
+          opacity: 1;
         }
         :global(.dark) ._sp {
           color: #ffffff;
@@ -154,10 +169,7 @@ export default function AppSplash() {
         ._sp-out {
           animation: _sp-out ${FADE_OUT_MS}ms ease-out forwards;
           pointer-events: none;
-        }
-        @keyframes _sp-in {
-          from { opacity: 0; }
-          to   { opacity: 1; }
+          will-change: opacity;
         }
         @keyframes _sp-out {
           from { opacity: 1; }
