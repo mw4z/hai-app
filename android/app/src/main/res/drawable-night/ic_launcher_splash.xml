@@ -1,16 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Brand mark for the Android system splash (Theme.SplashScreen
-    on Android 12+) AND Capacitor's SplashScreen plugin overlay.
-    Monochrome to match the new JS AppSplash: BLACK ink for light
-    mode, WHITE ink for dark mode (see drawable-night/ic_launcher_splash.xml).
-
-    Geometry mirrors the SVG in src/components/AppSplash.tsx —
-    outline rounded square (12px stroke at 192 viewBox), 2 light
-    inner rings, filled center dot, 3 satellite dots. Drawn in a
-    108dp / 108vp canvas so the system splash icon mask doesn't
-    crop it. Coordinates are scaled to fit (192 vp viewBox → 108
-    vp drawable: multiply each value by 108/192 = 0.5625).
+    Dark-mode variant of the brand mark for Android's system splash
+    + Capacitor SplashScreen plugin. Identical geometry to
+    drawable/ic_launcher_splash.xml — only the ink color changes
+    (#0a0a0a black → #ffffff white) so the icon reads on the
+    #000000 splash_bg from values-night/colors.xml.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -18,48 +12,39 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Rounded square outline (stroke 12 in 192 viewBox → 6.75 here).
-         x=6, y=6, w=180, h=180, rx=40 → x=3.375, y=3.375, w=101.25,
-         h=101.25, corner radius 22.5. -->
     <path
         android:fillColor="@android:color/transparent"
-        android:strokeColor="#0a0a0a"
+        android:strokeColor="#ffffff"
         android:strokeWidth="6.75"
         android:pathData="M 25.875,3.375 L 81.75,3.375 A 22.5,22.5 0 0 1 104.625,25.875 L 104.625,82.125 A 22.5,22.5 0 0 1 82.125,104.625 L 25.875,104.625 A 22.5,22.5 0 0 1 3.375,82.125 L 3.375,25.875 A 22.5,22.5 0 0 1 25.875,3.375 Z" />
 
-    <!-- Inner ring 1 (r=73.5 → 41.34) subtle. -->
     <path
         android:fillColor="@android:color/transparent"
-        android:strokeColor="#0a0a0a"
-        android:strokeAlpha="0.18"
+        android:strokeColor="#ffffff"
+        android:strokeAlpha="0.22"
         android:strokeWidth="0.675"
         android:pathData="M 54,54 m -41.34375,0 a 41.34375,41.34375 0 1,0 82.6875,0 a 41.34375,41.34375 0 1,0 -82.6875,0" />
 
-    <!-- Inner ring 2 (r=57 → 32.06) slightly stronger. -->
     <path
         android:fillColor="@android:color/transparent"
-        android:strokeColor="#0a0a0a"
-        android:strokeAlpha="0.34"
+        android:strokeColor="#ffffff"
+        android:strokeAlpha="0.40"
         android:strokeWidth="0.9"
         android:pathData="M 54,54 m -32.0625,0 a 32.0625,32.0625 0 1,0 64.125,0 a 32.0625,32.0625 0 1,0 -64.125,0" />
 
-    <!-- Center filled dot (r=19.5 → 10.97). -->
     <path
-        android:fillColor="#0a0a0a"
+        android:fillColor="#ffffff"
         android:pathData="M 54,54 m -10.96875,0 a 10.96875,10.96875 0 1,0 21.9375,0 a 10.96875,10.96875 0 1,0 -21.9375,0" />
 
-    <!-- Top satellite (96,39 → 54,21.94; r=9.5 → 5.34). -->
     <path
-        android:fillColor="#0a0a0a"
+        android:fillColor="#ffffff"
         android:pathData="M 54,21.9375 m -5.34375,0 a 5.34375,5.34375 0 1,0 10.6875,0 a 5.34375,5.34375 0 1,0 -10.6875,0" />
 
-    <!-- Bottom-right satellite (145.5,124.5 → 81.84,70.03). -->
     <path
-        android:fillColor="#0a0a0a"
+        android:fillColor="#ffffff"
         android:pathData="M 81.84375,70.03125 m -5.34375,0 a 5.34375,5.34375 0 1,0 10.6875,0 a 5.34375,5.34375 0 1,0 -10.6875,0" />
 
-    <!-- Bottom-left satellite (46.5,124.5 → 26.16,70.03). -->
     <path
-        android:fillColor="#0a0a0a"
+        android:fillColor="#ffffff"
         android:pathData="M 26.15625,70.03125 m -5.34375,0 a 5.34375,5.34375 0 1,0 10.6875,0 a 5.34375,5.34375 0 1,0 -10.6875,0" />
 </vector>

@@ -71,41 +71,40 @@ export default function AppSplash() {
       return
     }
 
+    // Hide the native splash IMMEDIATELY so the JS animation is
+    // actually visible. The Capacitor SplashScreen plugin renders
+    // a native UIView in front of the WKWebView — until we call
+    // hide() the user sees the static native splash overlay, not
+    // AppSplash. The native splash's PNG already matches AppSplash's
+    // settled state (monochrome icon on white/black), so the
+    // crossfade is invisible: the native overlay fades out as the
+    // JS AppSplash fades in with the same icon in the same spot.
+    hideNativeSplash()
+
     let unmountTimer: ReturnType<typeof setTimeout>
-    let nativeHideTimer: ReturnType<typeof setTimeout>
     let deeplinkTimer: ReturnType<typeof setTimeout> | null = null
 
-    // Wait for: (a) window.load, (b) any pending share-link / push
-    // deeplink to resolve (FeedClient clears hai:deeplink-redirect
-    // when the highlight effect lands). 8 s ceiling so a non-
-    // finding post can't pin the splash forever.
+    // 8 s ceiling so a non-finding post can't pin the splash forever.
     const HOLD_CEILING_MS = 8000
 
     function startExit() {
-      // Native splash hides synchronized with the climax — the
-      // 70 % mark of the JS animation is when the wind-up tightens
-      // and the explosion begins. Hide native at that moment so
-      // its 300 ms fade ends as the iris finishes opening.
-      const climaxAt = (TOTAL_MS * 70) / 100
-      nativeHideTimer = setTimeout(hideNativeSplash, climaxAt)
-      // Unmount after the full animation finishes.
+      // Unmount after the full animation finishes. The native
+      // splash is already long gone — only the JS overlay remains
+      // to play the climax + iris-open reveal.
       unmountTimer = setTimeout(() => setPhase('gone'), TOTAL_MS + 80)
     }
 
     function tryStart() {
       const elapsed = Date.now() - mountTime.current
-      // Hard ceiling — start exit no matter what.
       if (elapsed >= HOLD_CEILING_MS) {
         try { sessionStorage.removeItem('hai:deeplink-redirect') } catch {}
         startExit()
         return
       }
-      // If a deeplink is in flight, wait for it.
       if (deeplinkPending()) {
         deeplinkTimer = setTimeout(tryStart, 150)
         return
       }
-      // Minimum display so the entry + breath play even on instant loads.
       const MIN_MS = 600
       if (elapsed < MIN_MS) {
         deeplinkTimer = setTimeout(tryStart, MIN_MS - elapsed)
@@ -122,7 +121,6 @@ export default function AppSplash() {
 
     return () => {
       clearTimeout(unmountTimer)
-      clearTimeout(nativeHideTimer)
       if (deeplinkTimer) clearTimeout(deeplinkTimer)
       window.removeEventListener('load', tryStart)
     }

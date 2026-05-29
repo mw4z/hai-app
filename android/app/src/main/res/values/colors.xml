@@ -5,7 +5,10 @@
     <color name="colorPrimary">#00a884</color>
     <color name="colorPrimaryDark">#006d57</color>
     <color name="colorAccent">#00a884</color>
-    <color name="splash_bg">#e0f7f2</color>
+    <!-- Pure white in light mode — matches the new monochrome JS
+         AppSplash bg so the system splash → web app handoff has
+         no colour seam. Dark variant is #000000 in values-night. -->
+    <color name="splash_bg">#ffffff</color>
     <!-- Surface colors for system bars. Pre-API 29 Android applies a
          gray contrast scrim to translucent bars; setting an opaque
          brand-matching color avoids the scrim. Matches the JS-side
