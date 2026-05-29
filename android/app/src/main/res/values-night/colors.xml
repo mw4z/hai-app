@@ -6,7 +6,7 @@
     <color name="colorPrimary">#00a884</color>
     <color name="colorPrimaryDark">#000000</color>
     <color name="colorAccent">#00a884</color>
-    <!-- App dark-mode page bg (matches --hai-bg in design-tokens.css)
+    <!-- App dark-mode page bg (matches hai-bg CSS var in design-tokens.css)
          so the native splash seams into the WebView's #19232a page
          color instead of pure black. -->
     <color name="splash_bg">#19232a</color>
