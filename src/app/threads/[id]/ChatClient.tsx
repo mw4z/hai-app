@@ -397,7 +397,7 @@ export default function ChatClient({
   const messagesRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
-  const textInputRef = useRef<HTMLInputElement>(null)
+  const textInputRef = useRef<HTMLTextAreaElement>(null)
   const blobUrlsRef = useRef<Set<string>>(new Set())
 
   // Revoke any blob URLs created for sent-photo previews when the chat
@@ -2044,19 +2044,40 @@ export default function ChatClient({
             </button>
             {/* Voice note recorder — mic button + record/preview overlay. */}
             <VoiceComposer onSend={sendVoice} disabled={sendingImage || sendingLocation} />
-            <form onSubmit={sendText} className="flex-1 min-w-0 flex items-center gap-2">
+            <form onSubmit={sendText} className="flex-1 min-w-0 flex items-end gap-2">
               {/* min-w-0 on the input AND its parent form is required for the
                   flex-1 input to actually shrink below its content's min
                   intrinsic width. Without this, long placeholder/value would
                   push the send button off the visible edge of the screen on
                   some Android devices (Samsung curved screens reported it). */}
-              <input ref={textInputRef} type="text" value={text} onChange={e => setText(e.target.value)}
+              <textarea ref={textInputRef} value={text}
+                onChange={e => {
+                  setText(e.target.value)
+                  // Auto-grow on every change: reset height, then
+                  // expand to scrollHeight capped at 140px. Past
+                  // the cap the native overflow-y handles scroll.
+                  const el = e.currentTarget
+                  el.style.height = 'auto'
+                  el.style.height = Math.min(el.scrollHeight, 140) + 'px'
+                }}
+                onKeyDown={(e) => {
+                  // Enter sends, Shift+Enter inserts a newline.
+                  // Same convention WhatsApp/Telegram use.
+                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                    e.preventDefault()
+                    if (text.trim() && !sending) {
+                      ;(e.currentTarget.form as HTMLFormElement | null)?.requestSubmit()
+                    }
+                  }
+                }}
                 data-guide="chat-input"
                 placeholder={t('thread_placeholder')}
-                className="flex-1 min-w-0 bg-white/10 dark:bg-white/10 rounded-full px-4 py-2.5 text-[15px] text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-400/40 focus:border-primary-400/30 transition-shadow"
+                className="flex-1 min-w-0 bg-white/10 dark:bg-white/10 rounded-2xl px-4 py-2.5 text-[15px] text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-400/40 focus:border-primary-400/30 transition-shadow resize-none leading-relaxed"
+                rows={1}
+                style={{ maxHeight: 140, overflowY: 'auto' }}
                 maxLength={1000} />
               <button type="submit" disabled={sending || !text.trim()}
-                className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white disabled:opacity-30 flex-shrink-0 active:scale-90 transition-all shadow-sm hover:bg-primary-700 glow-primary">
+                className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white disabled:opacity-30 flex-shrink-0 active:scale-90 transition-all shadow-sm hover:bg-primary-700 glow-primary mb-0.5">
                 {/* No more onTouchEnd → requestSubmit. The previous handler
                     fired the form's onSubmit AND the synthesized click
                     fired it again — duplicated messages on every Android

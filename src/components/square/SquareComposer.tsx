@@ -74,7 +74,20 @@ export default function SquareComposer({
   const [showStickers, setShowStickers] = useState(false)
   // PDF input removed — Square no longer accepts PDF uploads.
 
-  const inputRef = useRef<HTMLInputElement | null>(null)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
+
+  // Auto-grow: re-measure scrollHeight every time `body` changes and
+  // resize the textarea to fit, capped at MAX_HEIGHT_PX. Past the
+  // cap the textarea keeps native vertical scroll. Single-line empty
+  // input stays the same height as the old single-line <input>.
+  const MAX_HEIGHT_PX = 140
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    const next = Math.min(el.scrollHeight, MAX_HEIGHT_PX)
+    el.style.height = next + 'px'
+  }, [body])
   const intent = useMemo(() => detectSquareIntent(body), [body])
 
   // Typing signal — POST every TYPING_PING_MS while the body has
@@ -342,20 +355,30 @@ export default function SquareComposer({
               VOICE message. */}
           <VoiceComposer onSend={sendVoice} disabled={sending} />
 
-          <form onSubmit={sendText} className="flex-1 min-w-0 flex items-center gap-2">
-            <input
+          <form onSubmit={sendText} className="flex-1 min-w-0 flex items-end gap-2">
+            <textarea
               ref={inputRef}
-              type="text"
               value={body}
               onChange={(e) => setBody(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter sends, Shift+Enter inserts a newline. Matches
+                // the universal chat convention. Native textarea behavior
+                // is "Enter = newline" so we have to suppress + submit.
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault()
+                  if (body.trim() && !sending) sendText(e as unknown as React.FormEvent)
+                }
+              }}
               placeholder={t('square_message_placeholder')}
               maxLength={900}
-              className="flex-1 min-w-0 bg-white/10 dark:bg-white/10 rounded-full px-4 py-2.5 text-[15px] text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-400/40 focus:border-primary-400/30 transition-shadow"
+              rows={1}
+              className="flex-1 min-w-0 bg-white/10 dark:bg-white/10 rounded-2xl px-4 py-2.5 text-[15px] text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary-400/40 focus:border-primary-400/30 transition-shadow resize-none leading-relaxed"
+              style={{ maxHeight: 140, overflowY: 'auto' }}
             />
             <button
               type="submit"
               disabled={sending || !body.trim()}
-              className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white disabled:opacity-30 flex-shrink-0 active:scale-90 transition-all shadow-sm hover:bg-primary-700 glow-primary"
+              className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white disabled:opacity-30 flex-shrink-0 active:scale-90 transition-all shadow-sm hover:bg-primary-700 glow-primary mb-0.5"
               aria-label={t('square_message_send')}
             >
               <FiSend
