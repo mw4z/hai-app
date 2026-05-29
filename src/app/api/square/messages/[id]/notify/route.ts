@@ -128,14 +128,15 @@ export async function POST(_req: NextRequest, { params }: Params) {
   const bodyAr = actorName ? `${actorName}: ${preview}` : preview
   const bodyEn = actorName ? `${actorName}: ${preview}` : preview
 
-  // Recipients = every OTHER admin user in the same neighborhood.
-  // Once Square opens to all residents, this can widen to all
-  // users; the gate then becomes a feature-flag flip.
+  // Recipients = every OTHER active user in the same neighborhood.
+  // Square went GA — a broadcast must reach every neighbor, not
+  // just the moderation team. The cron handler that fans out the
+  // push (processSquareNotify in /api/cron/process-notifs) has
+  // the matching wide query.
   const recipients = await db.user.findMany({
     where: {
       neighborhoodId: me.neighborhoodId,
       id: { not: me.id },
-      role: { in: ['NEIGHBORHOOD_MOD', 'PLATFORM_MOD', 'SUPER_ADMIN'] },
       status: 'ACTIVE',
     },
     select: { id: true },

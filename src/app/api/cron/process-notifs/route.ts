@@ -478,23 +478,26 @@ async function processSquareNotify(job: JobRow): Promise<JobOutcome> {
   if (msg.neighborhoodId !== job.targetRef) return 'dropped'
   if (msg.status !== 'ACTIVE' || msg.type === 'DELETED') return 'dropped'
 
-  // Recipients = other admin users in the same neighborhood. Pull
-  // their device tokens directly; we don't need the existing
-  // resolveNewPostTokens helper because Square has its own audience
-  // scope (admin-only) and its own pref-bypass (the action is
-  // explicitly user-initiated, so it ignores per-category mutes).
-  const admins = await db.user.findMany({
+  // Recipients = EVERY active user in the same neighborhood
+  // (excluding the actor). Square went GA — broadcasts are no
+  // longer admin-only, so a resident's نبّه الحي needs to reach
+  // every neighbor, not just the mod team.
+  // We pull tokens directly instead of going through the existing
+  // resolveNewPostTokens helper because Square's broadcast is an
+  // explicit user-initiated action — it bypasses per-category
+  // notification preferences (the user opted in by tapping the
+  // chip, the recipient opted in by joining the neighborhood).
+  const neighbors = await db.user.findMany({
     where: {
       neighborhoodId: job.targetRef,
       id: { not: actorId },
-      role: { in: ['NEIGHBORHOOD_MOD', 'PLATFORM_MOD', 'SUPER_ADMIN'] },
       status: 'ACTIVE',
     },
     select: { id: true, deviceTokens: { select: { token: true, platform: true } } },
   })
   const tokens: Array<{ token: string; platform: string }> = []
   let recipientUserCount = 0
-  for (const u of admins) {
+  for (const u of neighbors) {
     if (u.deviceTokens.length === 0) continue
     recipientUserCount++
     for (const dt of u.deviceTokens) tokens.push({ token: dt.token, platform: dt.platform || 'android' })
