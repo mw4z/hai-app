@@ -9,6 +9,9 @@ import { kickNotifCron } from '@/lib/kickNotifCron'
 import { fullName } from '@/lib/displayName'
 
 const RATE_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000
+/** Resident cap: how many distinct messages a non-mod can broadcast
+ *  inside the 24h window. Mods bypass entirely. */
+const RESIDENT_DAILY_LIMIT = 3
 
 interface Params { params: Promise<{ id: string }> }
 
@@ -91,21 +94,25 @@ export async function POST(_req: NextRequest, { params }: Params) {
     )
   }
 
-  // Per-user 24h rate limit — SUPER_ADMIN bypasses (and now all
-  // mods too, via the broader isMod check above).
+  // Per-user 24h rate limit — residents get RESIDENT_DAILY_LIMIT
+  // broadcasts per rolling 24h window. Mods (incl. super admin)
+  // bypass entirely via the isMod check above. Pre-broaden was a
+  // hard "one per 24h"; loosened to three so an active resident
+  // can flag a few separate items in a day without hitting the
+  // wall, while still bounding the spam ceiling for a neighborhood
+  // of size N at N×3 per day.
   if (!isMod && !isSuperAdminRole(me.role)) {
     const since = new Date(Date.now() - RATE_LIMIT_WINDOW_MS)
-    const recent = await db.squareMessage.findFirst({
+    const recentCount = await db.squareMessage.count({
       where: {
         authorId: me.id,
         notificationFiredAt: { gte: since },
       },
-      select: { id: true },
     })
-    if (recent) {
+    if (recentCount >= RESIDENT_DAILY_LIMIT) {
       return NextResponse.json(
         apiError(
-          'يمكنك إرسال تنبيه واحد فقط كل 24 ساعة في الساحة.',
+          `يمكنك إرسال ${RESIDENT_DAILY_LIMIT} تنبيهات كحدّ أقصى كل 24 ساعة في الساحة.`,
           429,
           'NOTIFY_RATE_LIMIT',
         ),
