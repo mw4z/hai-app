@@ -2363,7 +2363,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
           <div className="max-w-[85%]" data-msg-id={msg.id} {...longPress}>
             {replyQuote && <div className="mb-1">{replyQuote}</div>}
             <div className={`relative rounded-2xl px-3 py-2.5 shadow-sm ${
-              isMe ? `bg-primary-600 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white dark:bg-[#33424f] dark:ring-1 dark:ring-white/[0.08] ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
+              isMe ? `bg-primary-600 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white dark:bg-[#475569] dark:ring-1 dark:ring-white/[0.08] ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
             }`}>
               {/* Prefer the local blob (localPreview) as the playback
                   source so a just-sent note plays instantly and the swap
@@ -2402,7 +2402,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
               <div className={`max-w-[85%]`} data-msg-id={msg.id} {...longPress}>
                 {replyQuote && <div className="mb-1">{replyQuote}</div>}
                 <div className={`relative rounded-2xl px-2.5 py-2 shadow-sm ${
-                  isMe ? `bg-primary-600 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white dark:bg-[#33424f] dark:ring-1 dark:ring-white/[0.08] ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
+                  isMe ? `bg-primary-600 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white dark:bg-[#475569] dark:ring-1 dark:ring-white/[0.08] ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
                 } ${pending ? 'opacity-90' : ''}`}>
                   <PdfTile
                     url={safeUrl}
@@ -2496,7 +2496,7 @@ function MessageBubble({ msg, isMe, isLastInGroup, isFirstInGroup, showDate, dat
           </div>
         ) : msg.type === 'DELETED' ? (
           <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 ${
-            isMe ? `bg-primary-600/30 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white/30 dark:bg-[#33424f]/60 ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
+            isMe ? `bg-primary-600/30 ${isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''}` : `bg-white/30 dark:bg-[#475569]/60 ${isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''}`
           } border border-dashed ${isMe ? 'border-primary-400/40' : 'border-gray-300/40 dark:border-gray-600/30'}`}>
             <p className={`text-[13px] italic ${isMe ? 'text-primary-800/80 dark:text-primary-200/70' : 'text-gray-600 dark:text-gray-400'}`}>
               🚫 {isMe

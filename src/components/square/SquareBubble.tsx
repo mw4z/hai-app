@@ -250,7 +250,7 @@ export default function SquareBubble({
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); onQuickReply(message) }}
       aria-label={lang === 'en' ? 'Reply' : 'رد'}
       title={lang === 'en' ? 'Reply' : 'رد'}
-      className="flex-shrink-0 self-center inline-flex items-center justify-center w-9 h-9 rounded-full bg-white dark:bg-[#33424f] border border-gray-200 dark:border-gray-700 text-primary-600 dark:text-primary-400 shadow-sm hover:bg-primary-50 dark:hover:bg-primary-900/30 active:scale-90 transition-all"
+      className="flex-shrink-0 self-center inline-flex items-center justify-center w-9 h-9 rounded-full bg-white dark:bg-[#475569] border border-gray-200 dark:border-gray-700 text-primary-600 dark:text-primary-400 shadow-sm hover:bg-primary-50 dark:hover:bg-primary-900/30 active:scale-90 transition-all"
     >
       <FiCornerUpLeft className="w-4 h-4" strokeWidth={2.5} />
     </button>
@@ -425,7 +425,7 @@ export default function SquareBubble({
                     ? `bg-primary-600/30 border-primary-400/40 ${
                         isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
                       }`
-                    : `bg-white/30 dark:bg-[#33424f]/60 border-gray-300/40 dark:border-gray-600/30 ${
+                    : `bg-white/30 dark:bg-[#475569]/60 border-gray-300/40 dark:border-gray-600/30 ${
                         isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''
                       }`
                 }`}
@@ -464,7 +464,7 @@ export default function SquareBubble({
                     ? `bg-primary-600 ${
                         isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
                       }`
-                    : `bg-white dark:bg-[#33424f] dark:ring-1 dark:ring-white/[0.08] ${
+                    : `bg-white dark:bg-[#475569] dark:ring-1 dark:ring-white/[0.08] ${
                         isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''
                       }`
                 }`}
@@ -484,7 +484,7 @@ export default function SquareBubble({
                     ? `bg-primary-600 ${
                         isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
                       }`
-                    : `bg-white dark:bg-[#33424f] dark:ring-1 dark:ring-white/[0.08] ${
+                    : `bg-white dark:bg-[#475569] dark:ring-1 dark:ring-white/[0.08] ${
                         isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''
                       }`
                 }`}
@@ -514,7 +514,7 @@ export default function SquareBubble({
                     ? `bg-primary-600 text-white ${
                         isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
                       }`
-                    : `bg-white dark:bg-[#33424f] dark:ring-1 dark:ring-white/[0.08] text-gray-800 dark:text-gray-100 ${
+                    : `bg-white dark:bg-[#475569] dark:ring-1 dark:ring-white/[0.08] text-gray-800 dark:text-gray-100 ${
                         isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''
                       }`
                 }`}
@@ -563,7 +563,7 @@ export default function SquareBubble({
                     ? `bg-primary-600 text-white ${
                         isLastInGroup ? 'ltr:rounded-br-sm rtl:rounded-bl-sm' : ''
                       }`
-                    : `bg-white dark:bg-[#33424f] dark:ring-1 dark:ring-white/[0.08] text-gray-800 dark:text-gray-100 ${
+                    : `bg-white dark:bg-[#475569] dark:ring-1 dark:ring-white/[0.08] text-gray-800 dark:text-gray-100 ${
                         isLastInGroup ? 'ltr:rounded-bl-sm rtl:rounded-br-sm' : ''
                       }`
                 }`}
