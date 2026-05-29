@@ -106,9 +106,32 @@ export default function AppSplash() {
 
     let maxTimer: ReturnType<typeof setTimeout>
     let fadeTimer: ReturnType<typeof setTimeout>
+    let holdTimer: ReturnType<typeof setTimeout> | null = null
+
+    // Hard ceiling on how long we'll wait for a pending deeplink
+    // redirect to complete. Without this the splash could stay up
+    // forever if the destination page never clears the flag (e.g.
+    // FeedClient never finds the post). Generous enough to absorb
+    // the cold-start → deeplink-resolution chain on a slow device.
+    const DEEPLINK_HOLD_CEILING_MS = 8000
+
+    function deeplinkInFlight(): boolean {
+      try { return sessionStorage.getItem('hai:deeplink-redirect') === '1' } catch { return false }
+    }
 
     function dismiss() {
       if (dismissed.current) return
+      // If a deeplink redirect is still pending — i.e. the
+      // appUrlOpen handler set the flag and the destination page
+      // hasn't reached its target yet — defer the dismiss. The
+      // user perceives one continuous splash across both navs
+      // instead of "splash → blank flicker → splash."
+      const elapsed = Date.now() - mountTime.current
+      if (deeplinkInFlight() && elapsed < DEEPLINK_HOLD_CEILING_MS) {
+        if (holdTimer) clearTimeout(holdTimer)
+        holdTimer = setTimeout(dismiss, 200)
+        return
+      }
       dismissed.current = true
       try { sessionStorage.setItem(SESSION_KEY, '1') } catch {}
       setPhase('fade')
@@ -124,7 +147,9 @@ export default function AppSplash() {
       }
     }
 
-    // Hard cap
+    // Hard cap — also routes through dismiss() so the deeplink
+    // hold can defer it. The DEEPLINK_HOLD_CEILING_MS guarantees
+    // bounded total wait either way.
     maxTimer = setTimeout(dismiss, MAX_MS)
 
     // Dismiss when ready (after min time)
@@ -137,6 +162,7 @@ export default function AppSplash() {
     return () => {
       clearTimeout(maxTimer)
       clearTimeout(fadeTimer)
+      if (holdTimer) clearTimeout(holdTimer)
       window.removeEventListener('load', tryDismiss)
     }
   }, [])
