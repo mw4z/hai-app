@@ -89,6 +89,17 @@ export default function SquareFeedClient({
   // any admin action.
   const [lock, setLock] = useState<InitialLock>(initialLock)
   const [showLockSheet, setShowLockSheet] = useState(false)
+
+  // Composer-jump fix: when the keyboard rises on iOS, WKWebView
+  // does NOT resize the WebView's frame (server.url-hosted app on
+  // a native shell), so the bottom-anchored composer would sit
+  // covered under the keyboard for a couple hundred ms until our
+  // visualViewport handler caught up. Same fix DM uses (see
+  // ChatClient ~line 418): listen to Capacitor Keyboard's
+  // keyboardWillShow — it fires BEFORE the keyboard animates in
+  // and carries the exact final height, so we can snap the root
+  // to its target size immediately.
+  const rootRef = useRef<HTMLDivElement | null>(null)
   // Live "who's typing" list. Polled every 2s while the page is
   // visible; rendered as a small ellipsis row above the composer.
   const [typingUsers, setTypingUsers] = useState<Array<{ id: string; name: string | null; lastName: string | null }>>([])
@@ -374,6 +385,59 @@ export default function SquareFeedClient({
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('focus', onFocus)
       try { appHandle?.remove() } catch {}
+    }
+  }, [])
+
+  // ── Keyboard-aware viewport sizing ───────────────────────────────
+  // Mirrors the DM ChatClient handler. Three signal sources, in
+  // priority order:
+  //   1. Capacitor Keyboard willShow/Hide (iOS) — fires BEFORE the
+  //      animation, carries exact final keyboardHeight. Resizes the
+  //      root in the same frame, so the composer snaps to its
+  //      final spot without the visible "jump after keyboard rises"
+  //      lag the user reported.
+  //   2. visualViewport.resize — Android (resize mode: body) and
+  //      web fallback. Fires when the browser shrinks the visual
+  //      viewport for the keyboard.
+  //   3. Initial value from visualViewport.height.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const vv = window.visualViewport
+    const root = rootRef.current
+    if (!vv || !root) return
+
+    const platform = (window as any).Capacitor?.getPlatform?.() || 'web'
+    const isIos = platform === 'ios'
+
+    const setHeight = (visibleHeight: number) => {
+      root.style.height = `calc(${visibleHeight}px - env(safe-area-inset-top, 0px))`
+    }
+
+    setHeight(vv.height)
+    const onVV = () => setHeight(vv.height)
+    vv.addEventListener('resize', onVV)
+    vv.addEventListener('scroll', onVV)
+
+    let cleanupKb: (() => void) | null = null
+    if (isIos) {
+      import('@capacitor/keyboard').then(({ Keyboard }) => {
+        const h1 = Keyboard.addListener('keyboardWillShow', (info) => {
+          setHeight(window.innerHeight - info.keyboardHeight)
+        })
+        const h2 = Keyboard.addListener('keyboardWillHide', () => {
+          setHeight(window.innerHeight)
+        })
+        cleanupKb = () => {
+          h1.then((x) => x.remove())
+          h2.then((x) => x.remove())
+        }
+      }).catch(() => {})
+    }
+
+    return () => {
+      vv.removeEventListener('resize', onVV)
+      vv.removeEventListener('scroll', onVV)
+      cleanupKb?.()
     }
   }, [])
 
@@ -745,6 +809,7 @@ export default function SquareFeedClient({
 
   return (
     <div
+      ref={rootRef}
       className="flex flex-col bg-gray-100 dark:bg-gray-950"
       // EXACT DM container pattern (see ChatClient.tsx ~line 1424). The
       // chat is anchored to the viewport via position:fixed (top sits
@@ -753,6 +818,10 @@ export default function SquareFeedClient({
       // from the document scroll → iOS WKWebView's rubber-band bounce
       // can only fire INSIDE the messages list (which has its own
       // overscroll-y-contain), not on the header/composer chrome.
+      //
+      // The inline `height` is owned by the keyboard-aware effect
+      // above (setHeight). Don't add a height value here — it would
+      // win and the composer would lag behind keyboardWillShow.
       style={{
         position: 'fixed',
         top: 'env(safe-area-inset-top, 0px)',
