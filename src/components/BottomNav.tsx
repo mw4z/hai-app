@@ -7,7 +7,8 @@ import { pushBackHandler } from '@/lib/backHandler'
 import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { FiHome, FiMessageSquare, FiShoppingBag, FiUser, FiPlus, FiEdit3, FiSearch, FiCompass } from 'react-icons/fi'
-import { isSquareAdminRole } from '@/lib/square/isSquareAdmin'
+// isSquareAdminRole import removed — Square is GA, every signed-in
+// user sees the Square tab unconditionally now (see NAV_ITEMS_ADMIN).
 import { useLanguage } from '@/hooks/useLanguage'
 import { hapticMedium } from '@/lib/haptic'
 import { playTap } from '@/lib/sound'
@@ -140,11 +141,17 @@ export default function BottomNav({
   }, [])
 
   const isSuperAdmin = userRole === 'SUPER_ADMIN'
-  // Square (ساحة الحي) is staged behind admin roles — the bottom-nav
-  // entry swaps in for the Market slot for admins only. Regular users
-  // keep the unchanged 4-tab layout.
-  const showSquareTab = isSquareAdminRole(userRole)
-  const NAV_ITEMS = showSquareTab ? NAV_ITEMS_ADMIN : NAV_ITEMS_DEFAULT
+  // Square (ساحة الحي) is GA — open to all residents. Always render
+  // the Square-tab variant; the old Market fallback caused a visible
+  // flicker on cold-start when userRole was briefly undefined
+  // (السوق label → الساحة label). Dropping the conditional means
+  // every signed-in user sees the same five slots from the first
+  // paint, no swap, no label flicker.
+  const NAV_ITEMS = NAV_ITEMS_ADMIN
+  // Kept as a const so any downstream code reading showSquareTab
+  // stays green — Square is always shown now.
+  const showSquareTab = true
+  void showSquareTab
 
   // "NEW" pill on the Square tab — always rendered. Stays visible
   // even after the user has tapped Square so the launch feels
