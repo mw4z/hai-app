@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
         // Only real members — exclude incomplete signups (OTP-only rows
         // created with a phone but no name yet).
         where: { ...userNbhdFilter, name: { not: null } },
-        select: { id: true, name: true, lastName: true, phone: true, email: true, role: true, status: true, membership: true, addressVerified: true, avatarUrl: true, createdAt: true, neighborhoodId: true, reputation: true, accountType: true, providerStatus: true, neighborhood: { select: { name: true, nameEn: true, city: { select: { name: true, nameEn: true } } } } },
+        select: { id: true, name: true, lastName: true, phone: true, email: true, role: true, status: true, membership: true, addressVerified: true, avatarUrl: true, createdAt: true, deletedAt: true, neighborhoodId: true, reputation: true, accountType: true, providerStatus: true, neighborhood: { select: { name: true, nameEn: true, city: { select: { name: true, nameEn: true } } } } },
         orderBy: { createdAt: 'desc' },
         take: dbTake,
       })

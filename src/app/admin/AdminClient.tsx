@@ -76,6 +76,10 @@ export default function AdminClient({
   const [users, setUsers] = useState<any[]>([])
   const [logs, setLogs] = useState<any[]>(initialDashboard?.recentLogs ?? [])
   const [userSearch, setUserSearch] = useState('')
+  // Filter the users list by lifecycle state. 'all' = everyone,
+  // 'active' = no ban + no self-delete, 'banned' = admin-banned but
+  // NOT self-deleted, 'deleted' = self-deleted (deletedAt set).
+  const [userStateFilter, setUserStateFilter] = useState<'all' | 'active' | 'banned' | 'deleted'>('all')
 
   // Seed control (SUPER_ADMIN only)
   const [seedStats, setSeedStats] = useState<any>(null)
@@ -684,12 +688,61 @@ export default function AdminClient({
                 className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" />
               <button onClick={fetchUsers} className="bg-primary-600 text-white text-xs px-4 rounded-lg">{t('admin_search')}</button>
             </div>
+            {/* Lifecycle-state filter: distinguishes admin-banned
+                users from users who deleted their own accounts.
+                Self-deleted accounts set deletedAt + status=
+                BANNED_PERM (anonymized), so without this filter
+                they were indistinguishable from admin-bans. */}
+            {(() => {
+              const filterTabs: Array<{ key: typeof userStateFilter; ar: string; en: string }> = [
+                { key: 'all',     ar: 'الكل',          en: 'All' },
+                { key: 'active',  ar: 'نشطون',         en: 'Active' },
+                { key: 'banned',  ar: 'محظورون',       en: 'Banned by admin' },
+                { key: 'deleted', ar: 'حذفوا الحساب',  en: 'Self-deleted' },
+              ]
+              return (
+                <div className="flex gap-1.5 mb-3 overflow-x-auto">
+                  {filterTabs.map((f) => (
+                    <button
+                      key={f.key}
+                      type="button"
+                      onClick={() => setUserStateFilter(f.key)}
+                      className={`px-3 py-1.5 rounded-full text-[11.5px] font-semibold whitespace-nowrap transition-colors ${
+                        userStateFilter === f.key
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-white border border-gray-200 text-gray-600'
+                      }`}
+                    >
+                      {lang === 'en' ? f.en : f.ar}
+                    </button>
+                  ))}
+                </div>
+              )
+            })()}
             <div className="space-y-2">
-              {users.map((u: any) => {
+              {users
+                .filter((u: any) => {
+                  const isSelfDeleted = !!u.deletedAt
+                  const isAdminBanned = !isSelfDeleted && (u.status === 'BANNED_TEMP' || u.status === 'BANNED_PERM')
+                  if (userStateFilter === 'deleted') return isSelfDeleted
+                  if (userStateFilter === 'banned')  return isAdminBanned
+                  if (userStateFilter === 'active')  return !isSelfDeleted && !isAdminBanned
+                  return true
+                })
+                .map((u: any) => {
                 const fullName = [u.name, u.lastName].filter(Boolean).join(' ') || t('admin_no_name')
                 const wa = buildWhatsAppHref(u.phone)
+                const isSelfDeleted = !!u.deletedAt
+                const isAdminBanned = !isSelfDeleted && (u.status === 'BANNED_TEMP' || u.status === 'BANNED_PERM')
+                const cardCls = `bg-white rounded-xl p-3 border ${
+                  isSelfDeleted
+                    ? 'border-gray-300 bg-gray-50 opacity-75'
+                    : isAdminBanned
+                      ? 'border-red-200 bg-red-50/30'
+                      : 'border-gray-100'
+                }`
                 return (
-                <div key={u.id} className="bg-white rounded-xl p-3 border border-gray-100">
+                <div key={u.id} className={cardCls}>
                   {/* Header: avatar + name + status pills (membership/role) */}
                   <div className="flex items-start gap-3">
                     <button
@@ -703,8 +756,22 @@ export default function AdminClient({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="text-sm font-semibold text-gray-800 truncate">{fullName}</p>
-                        {u.status !== 'ACTIVE' && (
-                          <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full">{u.status}</span>
+                        {/* State pills are now context-aware:
+                            - self-deleted → gray "حذف الحساب"
+                            - admin-banned → red BANNED_*
+                            - other non-active (WARNED, PENDING_REVIEW) → amber status */}
+                        {isSelfDeleted && (
+                          <span className="text-[10px] bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-bold">
+                            🗑️ {lang === 'en' ? 'Self-deleted' : 'حذف الحساب'}
+                          </span>
+                        )}
+                        {isAdminBanned && (
+                          <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">
+                            🚫 {lang === 'en' ? (u.status === 'BANNED_TEMP' ? 'Banned (temp)' : 'Banned') : (u.status === 'BANNED_TEMP' ? 'محظور مؤقت' : 'محظور')}
+                          </span>
+                        )}
+                        {!isSelfDeleted && !isAdminBanned && u.status !== 'ACTIVE' && (
+                          <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{u.status}</span>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap mt-1">
