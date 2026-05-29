@@ -3,7 +3,12 @@ import { cookies } from 'next/headers'
 import { Toaster } from 'react-hot-toast'
 import RepToast from '@/components/RepToast'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import AppSplash from '@/components/AppSplash'
+// AppSplash removed — the native iOS storyboard + Capacitor
+// SplashScreen plugin are now the ONLY splash layer (see
+// capacitor.config.ts SplashScreen.launchAutoHide:false and
+// CapacitorBridge for the hide trigger). Running a second JS
+// splash on top was the source of the "show / hide / show /
+// hide" flicker on cold-start share-link deeplinks.
 import RouteTransition from '@/components/RouteTransition'
 import BottomNav from '@/components/BottomNav'
 import ArrivalAlert from '@/components/ArrivalAlert'
@@ -170,31 +175,11 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning>
-        {/* Bare-gradient cover. NO icon here — adding one was a
-            mistake (commit 55d60f6 then reverted): it rendered at
-            a different vertical position than AppSplash's icon
-            because they used different centering models, so every
-            preload → AppSplash → preload transition produced a
-            visible "icon shift" instead of a continuous hold. */}
-        <div id="__hai_preload" style={{
-          position: 'fixed',
-          top: 0, right: 0, bottom: 0, left: 0,
-          minWidth: '100%', minHeight: '100%',
-          zIndex: 99999,
-          background: serverIsDark
-            ? 'radial-gradient(ellipse at 50% 42%, #1c2832 0%, #1a262c 40%, #19232a 100%)'
-            : 'radial-gradient(ellipse at 50% 42%, #e8f5e9 0%, #e0f7f2 40%, #fff 100%)',
-        }} />
-        <script dangerouslySetInnerHTML={{ __html: `
-          (function(){
-            var d = document.documentElement.classList.contains('dark');
-            if (d) {
-              var el = document.getElementById('__hai_preload');
-              if (el) el.style.background = 'radial-gradient(ellipse at 50% 42%, #1c2832 0%, #1a262c 40%, #19232a 100%)';
-            }
-          })();
-        `}} />
-        <AppSplash />
+        {/* No HTML/CSS splash overlay here. On native, the iOS
+            storyboard + Capacitor SplashScreen plugin cover the
+            screen until CapacitorBridge hides them — there's no
+            uncovered moment where a gradient cover would matter.
+            On web there's no splash at all; the page just renders. */}
         <CapacitorBridge />
         <DebugOverlay />
         <PushRegistration />

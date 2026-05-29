@@ -220,9 +220,9 @@ export default function FeedClient({
       const el = document.getElementById(`post-${highlightPostId}`)
       if (el) {
         // Clear the deeplink-redirect flag now that we've located
-        // the target post. AppSplash watches this key — leaving it
-        // set would keep the splash up on the next navigation
-        // (e.g. tapping the BottomNav after the highlight lands).
+        // the target post — CapacitorBridge polls this key and is
+        // holding the native splash up until it clears. Leaving it
+        // set would keep the splash up until the 8s ceiling fires.
         try { sessionStorage.removeItem('hai:deeplink-redirect') } catch {}
         // Scroll the post into view, then trigger the triple-pulse
         // flash. We delay the class toggle by ~350ms so the smooth

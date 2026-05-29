@@ -28,14 +28,13 @@ export default function PostShareView({ post, postId }: { post: PublicPost; post
   useEffect(() => {
     const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : ''
     if (/HaiNativeApp/i.test(ua)) {
-      // Flag the deeplink redirect so AppSplash keeps rendering
-      // on the SECOND cold-start hop (the /feed?post=<id> mount).
-      // Without this flag, alreadyShown() returns true on the
-      // second mount → splash returns null → user sees a brief
-      // chrome-less /feed paint between the two redirects.
+      // Flag the deeplink redirect so CapacitorBridge keeps the
+      // native splash visible across the cold-start → /feed?post
+      // hop. Without this flag the bridge would hide the splash
+      // as soon as /s/post finishes loading, exposing the brief
+      // chrome-less interstitial before the redirect lands.
       // FeedClient clears the flag after the highlight effect
-      // fires so subsequent navigations don't keep re-rendering
-      // the splash.
+      // fires, which is the signal for the bridge to fade.
       try {
         sessionStorage.setItem('hai:deeplink-redirect', '1')
         sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))

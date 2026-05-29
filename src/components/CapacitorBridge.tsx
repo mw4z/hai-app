@@ -68,6 +68,65 @@ export default function CapacitorBridge() {
       document.documentElement.classList.toggle('dark', theme === 'dark')
     }
 
+    // ── Native splash hide trigger ──────────────────────────────
+    // capacitor.config.ts sets launchAutoHide:false, so the native
+    // splash (iOS storyboard handoff → Capacitor SplashScreen plugin
+    // overlay) STAYS UP until we explicitly call hide(). We hide it
+    // once the document has finished loading AND any pending share-
+    // link / push deeplink has resolved (FeedClient clears the
+    // hai:deeplink-redirect flag once the highlight effect lands).
+    //
+    // This is the single source of splash dismiss — there's no JS-
+    // side AppSplash overlay anymore, so the native splash → app
+    // handoff is one fade, not a chain of re-mounted layers.
+    let splashHideTimer: ReturnType<typeof setTimeout> | null = null
+    const splashStarted = Date.now()
+    const SPLASH_MIN_MS = 600        // minimum visible time, even if page is instant
+    const SPLASH_MAX_MS = 8000       // hard ceiling — always hide by this
+    const SPLASH_POLL_MS = 150       // deeplink-flag poll cadence
+    let splashHidden = false
+
+    async function hideNativeSplash() {
+      if (splashHidden) return
+      splashHidden = true
+      try {
+        const { SplashScreen } = await import('@capacitor/splash-screen')
+        await SplashScreen.hide({ fadeOutDuration: 300 })
+      } catch {}
+    }
+
+    function deeplinkPending(): boolean {
+      try { return sessionStorage.getItem('hai:deeplink-redirect') === '1' } catch { return false }
+    }
+
+    function trySplashHide() {
+      if (splashHidden) return
+      const elapsed = Date.now() - splashStarted
+      if (elapsed >= SPLASH_MAX_MS) {
+        try { sessionStorage.removeItem('hai:deeplink-redirect') } catch {}
+        hideNativeSplash()
+        return
+      }
+      if (deeplinkPending()) {
+        splashHideTimer = setTimeout(trySplashHide, SPLASH_POLL_MS)
+        return
+      }
+      if (elapsed < SPLASH_MIN_MS) {
+        splashHideTimer = setTimeout(trySplashHide, SPLASH_MIN_MS - elapsed)
+        return
+      }
+      hideNativeSplash()
+    }
+
+    function armSplashHide() {
+      if (document.readyState === 'complete') {
+        trySplashHide()
+      } else {
+        window.addEventListener('load', trySplashHide, { once: true })
+      }
+    }
+    armSplashHide()
+
     async function init() {
       try {
         const { StatusBar, Style } = await import('@capacitor/status-bar')
@@ -199,11 +258,13 @@ export default function CapacitorBridge() {
             const cur = window.location.pathname + window.location.search
             if (target && target !== cur) {
               // Set the deeplink-redirect flag BEFORE the assign so
-              // AppSplash on the destination page sees it and re-
-              // renders the splash, hiding the chrome-less flicker
-              // of the briefly-visible /feed mount we're navigating
-              // away from. Cleared by FeedClient once the highlight
-              // effect locates the target post.
+              // the splash-hide poll (above, trySplashHide) keeps
+              // the native splash up across the redirect. The
+              // destination page's FeedClient clears the flag once
+              // the highlight effect locates the target post,
+              // which lets the native splash fade exactly once at
+              // the end of the chain — no visible flicker of the
+              // /feed mount we're navigating away from.
               try {
                 sessionStorage.setItem('hai:deeplink-redirect', '1')
                 sessionStorage.setItem('hai:deeplink-landed-at', String(Date.now()))
@@ -219,6 +280,8 @@ export default function CapacitorBridge() {
       observer.disconnect()
       try { appListenerHandle?.remove() } catch {}
       try { urlListenerHandle?.remove() } catch {}
+      if (splashHideTimer) clearTimeout(splashHideTimer)
+      window.removeEventListener('load', trySplashHide)
     }
   }, [])
 
