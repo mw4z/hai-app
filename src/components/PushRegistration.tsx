@@ -151,7 +151,12 @@ export default function PushRegistration() {
     let watchdogTarget: string | null = null
     let watchdogDeadline = 0
     let watchdogDriftCount = 0
-    const STICKINESS_MS = 15_000
+    // 5 seconds is more than enough to cover the cold-start router
+    // rollback window (~180ms). 15 was overkill and let the watchdog
+    // keep poking at the URL during the next 14 seconds of normal
+    // browsing, occasionally yanking the user back if they tried to
+    // leave too soon.
+    const STICKINESS_MS = 5_000
     const startStickinessWatchdog = (target: string) => {
       if (watchdogTarget === target && watchdogInterval) return // idempotent
       watchdogTarget = target
@@ -167,7 +172,10 @@ export default function PushRegistration() {
       // click) and we must NOT fight them — fighting back-navigation
       // is the "I press back, the app loops me into the DM" symptom.
       let consecutiveOnTarget = 0
-      const SETTLED_TICKS = 5
+      // 3 ticks × 400ms = 1.2s of being on target before we release.
+      // Just long enough to absorb the React-#419 rollback (~180ms);
+      // short enough that a back-press at 1.5s isn't fought.
+      const SETTLED_TICKS = 3
       let settled = false
 
       const release = (reason: string) => {
@@ -205,24 +213,26 @@ export default function PushRegistration() {
         }
         consecutiveOnTarget = 0
         watchdogDriftCount++
-        console.warn('[PUSH] watchdog → drift #' + watchdogDriftCount + ' to', cur, '— forcing back to', watchdogTarget)
-        // First two drifts: try router.push (cheap, client-side).
-        // After that: escalate to window.location.assign.
-        if (watchdogDriftCount <= 2) {
-          try {
-            routerRef.current.push(watchdogTarget)
-          } catch (err) {
-            console.error('[PUSH] watchdog router.push threw:', err)
-          }
-        } else {
-          try {
-            console.log('[PUSH] watchdog → escalating to assign()')
-            window.location.assign(watchdogTarget)
-          } catch (err) {
-            console.error('[PUSH] watchdog assign threw:', err)
-          }
+        // Cap re-fires at 2 total. Each re-fire is a router.push, which
+        // is itself visible as a brief flash if something is fighting
+        // back (server redirect of `/` → /feed, React #419 rollback).
+        // Beyond two attempts we're just stacking flashes without
+        // winning — let the watchdog release and the user end up on
+        // /feed, which is recoverable. NEVER escalate to
+        // window.location.assign here; assign is a full reload, the
+        // single biggest visible flash on cold-start and the cause of
+        // the "app flashing a lot" report.
+        if (watchdogDriftCount > 2) {
+          release('drift cap reached')
+          return
         }
-      }, 200)
+        console.warn('[PUSH] watchdog → drift #' + watchdogDriftCount + ' to', cur, '— forcing back to', watchdogTarget)
+        try {
+          routerRef.current.push(watchdogTarget)
+        } catch (err) {
+          console.error('[PUSH] watchdog router.push threw:', err)
+        }
+      }, 400)
     }
     // Hook the watchdog into the landing branch of navigateToTarget
     // by listening on a custom event the helper dispatches when it
