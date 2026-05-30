@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { FiX, FiSearch, FiPhone } from 'react-icons/fi'
+import { FiX, FiSearch, FiPhone, FiChevronDown } from 'react-icons/fi'
 import { useLanguage } from '@/hooks/useLanguage'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { useDragToDismiss } from '@/hooks/useDragToDismiss'
@@ -10,6 +10,8 @@ import { getCategoryMeta, PLACE_CATEGORIES } from '@/lib/places/categories'
 import { getServiceCategoryMeta, SERVICE_CATEGORIES } from '@/lib/services/serviceCategories'
 import PlaceStatusBadge from '@/components/places/PlaceStatusBadge'
 import HaiLoader from '@/components/HaiLoader'
+import CategoryPickerSheet, { type CategoryOption } from '@/components/CategoryPickerSheet'
+import { hapticLight } from '@/lib/haptic'
 
 /**
  * Bottom sheet for attaching something from دليل الحي to a post, comment,
@@ -55,7 +57,7 @@ type Tab = 'places' | 'services'
 const SEARCH_DEBOUNCE_MS = 300
 
 export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
-  const { lang } = useLanguage()
+  const { lang, t } = useLanguage()
   const tr = (en: string, ar: string, ur: string) =>
     lang === 'en' ? en : lang === 'ur' ? ur : ar
 
@@ -67,6 +69,7 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
   const [category, setCategory] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useBodyScrollLock(open)
@@ -172,8 +175,33 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
   }
 
   const results = tab === 'services' ? services : places
-  const chipCls = (active: boolean) =>
-    `flex-shrink-0 px-3 py-1.5 rounded-full text-[11.5px] font-semibold whitespace-nowrap ${active ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'}`
+
+  // Options list for the category picker — driven by the active
+  // tab. Always starts with the "All / clear filter" entry.
+  const allLabel = t('categories_browse_all')
+  const categoryOptions = useMemo<CategoryOption[]>(() => {
+    const src = tab === 'services' ? SERVICE_CATEGORIES : PLACE_CATEGORIES
+    return [
+      { value: null, emoji: '🏘️', label: allLabel },
+      ...src.map<CategoryOption>((c) => ({
+        value: c.key,
+        emoji: c.emoji,
+        label: lang === 'en' ? c.labelEn : lang === 'ur' ? c.labelUr : c.labelAr,
+      })),
+    ]
+  }, [tab, lang, allLabel])
+
+  // Current selection's emoji + label, for the dropdown trigger.
+  const currentCategoryMeta = useMemo(() => {
+    if (!category) return { emoji: '🏘️', label: allLabel }
+    const found = (tab === 'services' ? SERVICE_CATEGORIES : PLACE_CATEGORIES)
+      .find((c) => c.key === category)
+    if (!found) return { emoji: '📍', label: allLabel }
+    return {
+      emoji: found.emoji,
+      label: lang === 'en' ? found.labelEn : lang === 'ur' ? found.labelUr : found.labelAr,
+    }
+  }, [category, tab, lang, allLabel])
   const tabBtn = (t: Tab, label: string) => (
     <button
       type="button"
@@ -239,18 +267,37 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
             />
           </div>
 
-          {/* Category filter — PlaceCategory on the Places tab,
-              ServiceCategory on the Services tab. */}
-          <div className="flex gap-1.5 mt-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
-            <button type="button" onClick={() => setCategory(null)} className={chipCls(category === null)}>
-              {tr('All', 'الكل', 'سب')}
-            </button>
-            {(tab === 'services' ? SERVICE_CATEGORIES : PLACE_CATEGORIES).map((c) => (
-              <button key={c.key} type="button" onClick={() => setCategory((cur) => (cur === c.key ? null : c.key))} className={chipCls(category === c.key)}>
-                {c.emoji} {lang === 'en' ? c.labelEn : lang === 'ur' ? c.labelUr : c.labelAr}
-              </button>
-            ))}
-          </div>
+          {/* Category filter — dropdown-button that opens a
+              vertical-list picker sheet, mirroring the
+              /directory page's CategoryChips pattern. The
+              previous horizontally-scrolling chip strip hid
+              options off-screen and required a swipe gesture
+              to discover, which our low-tech audience routinely
+              missed. Works for BOTH tabs because the options
+              list depends on the active tab. */}
+          <button
+            type="button"
+            onClick={() => { hapticLight(); setCategoryPickerOpen(true) }}
+            aria-haspopup="dialog"
+            aria-expanded={categoryPickerOpen}
+            className={`w-full mt-2 inline-flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl text-[14px] font-bold transition-colors active:scale-[0.98] ${
+              category !== null
+                ? 'bg-primary-100 dark:bg-primary-900/35 border-2 border-primary-500 dark:border-primary-500 text-primary-900 dark:text-primary-100'
+                : 'bg-primary-50 dark:bg-primary-900/20 border-2 border-primary-300 dark:border-primary-700/60 text-gray-900 dark:text-white'
+            }`}
+          >
+            <span className="inline-flex items-center gap-2.5 min-w-0">
+              <span className="text-lg flex-shrink-0" aria-hidden>
+                {currentCategoryMeta.emoji}
+              </span>
+              <span className="truncate">{currentCategoryMeta.label}</span>
+            </span>
+            <FiChevronDown
+              className={`w-5 h-5 flex-shrink-0 text-primary-600 dark:text-primary-300 transition-transform ${
+                categoryPickerOpen ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-3">
@@ -333,6 +380,22 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
           )}
         </div>
       </div>
+
+      {/* Category picker — same vertical-list sheet the /directory
+          page uses (CategoryChips → CategoryPickerSheet). Mounted
+          here, INSIDE the picker's root, so it stacks above the
+          picker sheet's content. Options come from the active tab
+          (places vs services). */}
+      <CategoryPickerSheet
+        open={categoryPickerOpen}
+        onClose={() => setCategoryPickerOpen(false)}
+        selected={category}
+        onSelect={(v) => setCategory(v)}
+        title={tab === 'services'
+          ? tr('Pick a service category', 'اختر تصنيف الخدمة', 'خدمت کا زمرہ منتخب کریں')
+          : t('categories_pick_dir')}
+        options={categoryOptions}
+      />
     </div>,
     document.body,
   )
