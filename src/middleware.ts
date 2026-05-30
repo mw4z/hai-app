@@ -39,7 +39,21 @@ interface JWTPayloadLite {
   iat?: number
 }
 
+// Auth-cookie-writing routes that the middleware must NEVER touch:
+// each one of these owns the hai_token cookie for the duration of
+// its response and will set its own Set-Cookie. If we appended a
+// refreshed cookie alongside, the response would carry TWO
+// Set-Cookie headers for hai_token and the browser-side precedence
+// would depend on header order — too fragile to reason about.
+// Skip them entirely.
+const AUTH_SKIP_PATHS = new Set([
+  '/api/auth/logout',
+  '/api/auth/verify-otp',
+  '/api/auth/send-otp',
+])
+
 async function maybeRefreshSession(req: NextRequest, res: NextResponse): Promise<NextResponse> {
+  if (AUTH_SKIP_PATHS.has(req.nextUrl.pathname)) return res
   const token = req.cookies.get('hai_token')?.value
   if (!token) return res                            // (req 9) Unauthenticated → no refresh.
 
