@@ -162,6 +162,33 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
+  // ⚠ All hooks MUST run before any conditional return — moved
+  // the useMemo calls above the open/null early-returns. With them
+  // below, opening the sheet (open: false → true) changed the
+  // hook count between renders and crashed React.
+  const allLabel = t('categories_browse_all')
+  const categoryOptions = useMemo<CategoryOption[]>(() => {
+    const src = tab === 'services' ? SERVICE_CATEGORIES : PLACE_CATEGORIES
+    return [
+      { value: null, emoji: '🏘️', label: allLabel },
+      ...src.map<CategoryOption>((c) => ({
+        value: c.key,
+        emoji: c.emoji,
+        label: lang === 'en' ? c.labelEn : lang === 'ur' ? c.labelUr : c.labelAr,
+      })),
+    ]
+  }, [tab, lang, allLabel])
+  const currentCategoryMeta = useMemo(() => {
+    if (!category) return { emoji: '🏘️', label: allLabel }
+    const found = (tab === 'services' ? SERVICE_CATEGORIES : PLACE_CATEGORIES)
+      .find((c) => c.key === category)
+    if (!found) return { emoji: '📍', label: allLabel }
+    return {
+      emoji: found.emoji,
+      label: lang === 'en' ? found.labelEn : lang === 'ur' ? found.labelUr : found.labelAr,
+    }
+  }, [category, tab, lang, allLabel])
+
   if (!open) return null
   if (typeof document === 'undefined' || !document.body) return null
 
@@ -175,38 +202,11 @@ export default function PlacePickerSheet({ open, onClose, onSelect }: Props) {
   }
 
   const results = tab === 'services' ? services : places
-
-  // Options list for the category picker — driven by the active
-  // tab. Always starts with the "All / clear filter" entry.
-  const allLabel = t('categories_browse_all')
-  const categoryOptions = useMemo<CategoryOption[]>(() => {
-    const src = tab === 'services' ? SERVICE_CATEGORIES : PLACE_CATEGORIES
-    return [
-      { value: null, emoji: '🏘️', label: allLabel },
-      ...src.map<CategoryOption>((c) => ({
-        value: c.key,
-        emoji: c.emoji,
-        label: lang === 'en' ? c.labelEn : lang === 'ur' ? c.labelUr : c.labelAr,
-      })),
-    ]
-  }, [tab, lang, allLabel])
-
-  // Current selection's emoji + label, for the dropdown trigger.
-  const currentCategoryMeta = useMemo(() => {
-    if (!category) return { emoji: '🏘️', label: allLabel }
-    const found = (tab === 'services' ? SERVICE_CATEGORIES : PLACE_CATEGORIES)
-      .find((c) => c.key === category)
-    if (!found) return { emoji: '📍', label: allLabel }
-    return {
-      emoji: found.emoji,
-      label: lang === 'en' ? found.labelEn : lang === 'ur' ? found.labelUr : found.labelAr,
-    }
-  }, [category, tab, lang, allLabel])
-  const tabBtn = (t: Tab, label: string) => (
+  const tabBtn = (which: Tab, label: string) => (
     <button
       type="button"
-      onClick={() => { setTab(t); setQ(''); setCategory(null); setHasMore(false) }}
-      className={`flex-1 py-2 rounded-xl text-[13px] font-bold transition-colors ${tab === t ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
+      onClick={() => { setTab(which); setQ(''); setCategory(null); setHasMore(false) }}
+      className={`flex-1 py-2 rounded-xl text-[13px] font-bold transition-colors ${tab === which ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
     >
       {label}
     </button>
