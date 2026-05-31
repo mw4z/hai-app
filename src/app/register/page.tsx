@@ -86,12 +86,20 @@ export default function RegisterPage() {
           {loading ? t('auth_sending') : t('auth_send_otp')}
         </button>
 
+        {/* Consent text used to pre-state "you confirm you are 13+",
+            which Google Play's Families Policy flagged on May 31 2026
+            as a non-neutral age verification gate (it pre-states the
+            answer the user is asked to confirm, with no actual
+            verification step). Removed the age claim entirely —
+            Hai is a neighbourhood services platform for residents,
+            not age-restricted content. Just the Terms / Privacy
+            agreement remains. */}
         <p className="hai-meta hai-text-center">
           {lang === 'en'
-            ? 'By continuing, you confirm you are 13+ and agree to our Terms & Privacy Policy'
+            ? 'By continuing, you agree to our Terms & Privacy Policy'
             : lang === 'ur'
-            ? 'جاری رکھ کر، آپ تصدیق کرتے ہیں کہ آپ کی عمر 13+ ہے'
-            : 'بالمتابعة، تؤكد أن عمرك 13 سنة أو أكثر وتوافق على الشروط وسياسة الخصوصية'}
+            ? 'جاری رکھ کر، آپ ہماری شرائط اور رازداری کی پالیسی سے اتفاق کرتے ہیں'
+            : 'بالمتابعة، توافق على الشروط وسياسة الخصوصية'}
         </p>
       </form>
 

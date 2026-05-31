@@ -86,12 +86,15 @@ export default function LoginPage() {
           {loading ? t('auth_sending') : t('auth_send_otp')}
         </button>
 
+        {/* See matching comment in src/app/register/page.tsx — same
+            change here to remove the non-neutral 13+ pre-statement
+            from the consent text. */}
         <p className="hai-meta hai-text-center">
           {lang === 'en'
-            ? 'By continuing, you confirm you are 13+ and agree to our Terms & Privacy Policy'
+            ? 'By continuing, you agree to our Terms & Privacy Policy'
             : lang === 'ur'
-            ? 'جاری رکھ کر، آپ تصدیق کرتے ہیں کہ آپ کی عمر 13+ ہے'
-            : 'بالمتابعة، تؤكد أن عمرك 13 سنة أو أكثر وتوافق على الشروط وسياسة الخصوصية'}
+            ? 'جاری رکھ کر، آپ ہماری شرائط اور رازداری کی پالیسی سے اتفاق کرتے ہیں'
+            : 'بالمتابعة، توافق على الشروط وسياسة الخصوصية'}
         </p>
       </form>
 
