@@ -89,8 +89,16 @@ export default function SquareReplyQuote({
       >
         {authorLabel}
       </p>
+      {/* line-clamp-1 instead of truncate: 'truncate' sets
+          white-space: nowrap, which pinned the parent bubble's
+          min-content to the FULL text width of the preview line.
+          On long quotes that pushed the bubble past max-w-[85%] of
+          the viewport and clipped off-screen. line-clamp-1 still
+          clips to one visible line but lets the text break at word
+          boundaries internally, so the bubble's min-content stays
+          at "longest single word" and respects the row's 85 % cap. */}
       <p
-        className={`text-[11px] truncate ${
+        className={`text-[11px] line-clamp-1 break-words ${
           isMe ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'
         }`}
       >

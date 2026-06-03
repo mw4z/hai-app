@@ -370,13 +370,23 @@ export default function SquareBubble({
               (avatar on the left). Always opposite the avatar. */}
           {isMe && replyArrowButton}
 
-          {/* Bubble column. Content-sized (no flex-1, no min-w-0 —
-              min-w-0 was letting break-words shred single Arabic
-              words like "تجربة" into one-char-per-line slivers).
-              Children align to the bubble's anchor side using the
-              same DM ltr:/rtl: pattern. */}
+          {/* Bubble column. Content-sized (no flex-1) but min-w-0
+              so the outer row's max-w-[85%] can actually shrink
+              this when a child (e.g. a reply quote) would otherwise
+              push it past 85 %. Without min-w-0 the column's
+              min-content wins over the row's max-w because flex
+              items default to min-width: auto.
+
+              History note: an earlier comment said "no min-w-0 —
+              it shredded Arabic words like تجربة". That bug was
+              actually triggered by adding a percentage max-w on
+              the INNER wrapper (which resolved to 0 because the
+              column had no definite width). min-w-0 here on the
+              column is safe because the row's max-w-[85%] gives
+              the column a non-zero upper bound; break-words inside
+              will still respect word boundaries first. */}
           <div
-            className={`flex flex-col ${
+            className={`flex flex-col min-w-0 ${
               // Children align to the "end" side for own bubbles in
               // BOTH directions (end = right in LTR, end = left in
               // RTL — both correct now that Arabic own sits on the
