@@ -255,19 +255,9 @@ export default function SquareBubble({
       <FiCornerUpLeft className="w-4 h-4" strokeWidth={2.5} />
     </button>
   ) : null
-  // metaFooter now renders OUTSIDE the bubble (as a sibling below
-  // it inside the column), so its content width no longer
-  // contributes to the bubble's intrinsic width. The bubble is
-  // free to size to max(senderHeader, body, replyQuote). Removed
-  // w-full because the row is no longer the bubble's child — it
-  // sits in the column and hugs its content. ms-auto on the
-  // trailing cluster still works as a "push right" hint when the
-  // row eventually has slack, but without w-full it's a no-op in
-  // most cases; that's fine — bell/views/time/check just sit
-  // adjacent now, same as the rest of the chat-row chrome.
   const metaFooter = isLastInGroup ? (
     <p
-      className={`text-[10.5px] mt-1 flex items-center gap-1.5 ${footerTone}`}
+      className={`text-[10.5px] mt-1.5 flex w-full items-center gap-1.5 ${footerTone}`}
     >
       {message.notificationFiredAt && (
         <span
@@ -462,6 +452,7 @@ export default function SquareBubble({
                     ? (lang === 'en' ? 'You deleted this message' : 'حذفت هذه الرسالة')
                     : (lang === 'en' ? 'This message was deleted' : 'تم حذف هذه الرسالة')}
                 </p>
+                {metaFooter}
               </div>
             ) : message.type === 'STICKER' ? (() => {
               const stickerId = parseStickerRef(message.imageUrl || '')
@@ -473,6 +464,7 @@ export default function SquareBubble({
                 <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                   {senderHeader}
                   <Sticker id={stickerId} size={120} />
+                  {metaFooter}
                 </div>
               )
             })() : message.type === 'VOICE' && message.audioUrl ? (
@@ -493,6 +485,7 @@ export default function SquareBubble({
                   durationMs={message.audioDurationMs ?? undefined}
                   isMe={isMe}
                 />
+                {metaFooter}
               </div>
             ) : message.type === 'PDF' && message.pdfUrl ? (
               <div
@@ -522,6 +515,7 @@ export default function SquareBubble({
                     {message.body}
                   </p>
                 )}
+                {metaFooter}
               </div>
             ) : message.type === 'LOCATION' && message.lat != null && message.lng != null ? (
               <div
@@ -570,6 +564,7 @@ export default function SquareBubble({
                     {message.body}
                   </p>
                 )}
+                {metaFooter}
               </div>
             ) : (
               <div
@@ -590,17 +585,10 @@ export default function SquareBubble({
                     variant={isMe ? 'onGreen' : 'light'}
                   />
                 </div>
+                {metaFooter}
               </div>
             )}
           </div>
-
-          {/* metaFooter — now a sibling BELOW the data-msg-id wrapper
-              instead of a child of each bubble variant. Bubble width
-              is now determined only by senderHeader + body + reply
-              quote; the time / views / bell row hugs its own content
-              and aligns with the bubble's anchor side via the column's
-              items-end / items-start (no extra alignment needed). */}
-          {metaFooter}
 
           {/* Inline quick-action chips — own messages only, last in
               group, not a tombstone. The same two actions that live
