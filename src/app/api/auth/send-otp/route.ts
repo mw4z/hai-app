@@ -54,18 +54,10 @@ export async function POST(req: NextRequest) {
       user = await db.user.create({ data: { phone: formattedPhone } })
     }
 
-    // Track in DB for rate limiting
-    await db.otpCode.create({
-      data: {
-        phone: formattedPhone,
-        code: '------',
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-        userId: user.id,
-      },
-    })
-
-    // Send via Twilio Verify
-    const sent = await sendOTP(formattedPhone)
+    // sendOTP now owns OtpCode row creation (generates the 4-digit
+    // code itself so the WhatsApp template can deliver it). The
+    // rate-limit check above still counts those rows.
+    const sent = await sendOTP(formattedPhone, { userId: user.id })
     if (!sent) {
       return NextResponse.json({ error: 'فشل إرسال الرمز' }, { status: 500 })
     }

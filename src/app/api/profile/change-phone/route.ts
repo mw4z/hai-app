@@ -3,8 +3,6 @@ import { db } from '@/lib/db'
 import { getSession, formatSaudiPhone, isValidSaudiPhone } from '@/lib/auth'
 import { sendOTP, verifyOTP } from '@/lib/sms'
 
-const OTP_EXPIRY_MS = 5 * 60 * 1000
-
 // POST /api/profile/change-phone — two-step: send OTP, then verify
 export async function POST(req: NextRequest) {
   const session = await getSession()
@@ -32,16 +30,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'هذا رقمك الحالي' }, { status: 400 })
     }
 
-    await db.otpCode.create({
-      data: {
-        phone: formatted,
-        code: '------',
-        expiresAt: new Date(Date.now() + OTP_EXPIRY_MS),
-        userId: session.userId,
-      },
-    })
-
-    const sent = await sendOTP(formatted)
+    // sendOTP owns OtpCode row creation now — generates the 4-digit
+    // code internally so WhatsApp can deliver it directly.
+    const sent = await sendOTP(formatted, { userId: session.userId })
     if (!sent) return NextResponse.json({ error: 'فشل إرسال الرمز' }, { status: 500 })
 
     return NextResponse.json({ success: true, formatted })

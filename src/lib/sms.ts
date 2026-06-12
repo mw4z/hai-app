@@ -1,32 +1,41 @@
 /**
- * SMS / OTP Service — Authentica.
+ * SMS / OTP Service.
  *
- * Migrated from Twilio Verify (commit replaces /lib/sms.ts wholesale).
- * Authentica (https://authentica.sa) is a Saudi-based OTP provider with
- * better delivery rates on Saudi mobile carriers (STC, Mobily, Zain)
- * than Twilio.
+ * Two-channel OTP delivery:
+ *   1. PRIMARY — WhatsApp via Meta Business Cloud API (see
+ *      src/lib/whatsapp.ts). We generate the code, store it in the
+ *      OtpCode table, and pass it directly into the WhatsApp template.
+ *   2. FALLBACK — Authentica SMS (https://authentica.sa). Triggered
+ *      when WhatsApp send returns a hard failure (recipient not on
+ *      WhatsApp → Meta error 131026, bad template/token, throttled).
+ *      Authentica generates and verifies its OWN code on the SMS path,
+ *      so verifyOTP() below tries the DB code first and then falls
+ *      back to Authentica's verify endpoint for SMS-fallback users.
  *
- * Public API of this module is unchanged: sendOTP / verifyOTP. The
- * three existing call sites in /api/auth/send-otp,
- * /api/auth/verify-otp, and /api/profile/change-phone keep working
- * with no caller changes.
+ * Public API stays the same: sendOTP(phone) / verifyOTP(phone, code).
+ * Routes do NOT need to insert OtpCode rows manually — sendOTP owns
+ * row creation now (previously routes inserted a placeholder
+ * code: '------' row because Authentica owned the real code).
  *
- * Required env vars (replace the old TWILIO_* in .env):
- *   AUTHENTICA_API_KEY      — your Authentica X-Authorization token
- *   AUTHENTICA_SENDER       — see note below; NOT honored by the API
- *   AUTHENTICA_API_BASE     — override base URL (optional, default below)
+ * Required env vars:
+ *   WhatsApp (primary):
+ *     WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_ACCESS_TOKEN,
+ *     WHATSAPP_OTP_TEMPLATE_NAME, WHATSAPP_OTP_TEMPLATE_LANG
+ *   Authentica (SMS fallback):
+ *     AUTHENTICA_API_KEY, AUTHENTICA_SENDER, AUTHENTICA_API_BASE
  *
- * ⚠️ SENDER NAME: Authentica's /send-otp body only accepts `method`,
- * `phone`/`email`, and `template_id` — there is NO request parameter for
- * the SMS sender name. The "from" shown on the SMS is set in the
- * Authentica DASHBOARD (Application settings) and must be a sender ID
- * registered + approved with Authentica/CITC; an unregistered account
- * falls back to Authentica's default sender ("Authentica"). The `sender`
- * field we send below is therefore best-effort / ignored — to brand the
- * sender as the app name you must register it in the dashboard.
+ * ⚠️ SENDER NAME (Authentica side): the /send-otp body has NO request
+ * parameter for the SMS sender — Authentica reads it from the dashboard
+ * Application settings. To brand the sender as the app name you must
+ * register it in the Authentica dashboard.
  *
- * Reference: https://docs.authentica.sa
+ * References:
+ *   - Authentica: https://docs.authentica.sa
+ *   - Meta WhatsApp Cloud API: https://developers.facebook.com/docs/whatsapp/cloud-api
  */
+
+import { db } from '@/lib/db'
+import { sendWhatsAppOTP } from '@/lib/whatsapp'
 
 const API_BASE = process.env.AUTHENTICA_API_BASE || 'https://api.authentica.sa/api/v1'
 // Authentica's email OTP endpoints live under /api/v2 per the public
@@ -101,10 +110,65 @@ async function authenticaPost(
   }
 }
 
-/** Send OTP via Authentica. */
-export async function sendOTP(phone: string): Promise<boolean> {
+// 4-digit OTP, 5-minute expiry — matches the existing UI input
+// (4 boxes) and Authentica's default OTP lifetime, so the WhatsApp
+// path and the Authentica SMS-fallback path feel identical to users.
+const OTP_LENGTH = 4
+const OTP_EXPIRY_MS = 5 * 60 * 1000
+
+function generateOTP(): string {
+  // Crypto-strong randomness — Math.random() would be predictable
+  // when many sends fire in the same second. Web Crypto is available
+  // on Vercel's Node 22 runtime as a global.
+  const buf = new Uint32Array(1)
+  crypto.getRandomValues(buf)
+  const max = 10 ** OTP_LENGTH
+  return String(buf[0] % max).padStart(OTP_LENGTH, '0')
+}
+
+/**
+ * Send an OTP. WhatsApp first, SMS fallback. The OtpCode row is
+ * created here (replaces the old in-route `code: '------'` inserts)
+ * so callers can stay simple.
+ *
+ * Returns true if EITHER channel accepted the message for delivery.
+ */
+export async function sendOTP(
+  phone: string,
+  opts: { userId?: string } = {},
+): Promise<boolean> {
   if (TEST_PHONES[phone]) return true
 
+  // Generate the code WE control + persist it BEFORE sending so a
+  // crash mid-flight doesn't leave the user without a verifiable code.
+  // For the SMS fallback path this row is unused (Authentica owns
+  // its own code) but verifyOTP() handles both cases.
+  const code = generateOTP()
+  await db.otpCode.create({
+    data: {
+      phone,
+      code,
+      expiresAt: new Date(Date.now() + OTP_EXPIRY_MS),
+      userId: opts.userId,
+    },
+  })
+
+  // Primary: WhatsApp via Meta Cloud API.
+  if (await sendWhatsAppOTP(phone, code)) {
+    return true
+  }
+
+  // Fallback: Authentica SMS (only triggered when WhatsApp hard-rejects
+  // — e.g. recipient not on WhatsApp). Authentica generates its own
+  // code; the DB row we just wrote becomes irrelevant for THIS request,
+  // but verifyOTP() falls back to Authentica's verify endpoint when
+  // user input doesn't match the DB row.
+  console.warn(`[OTP] WhatsApp failed for ${phone} — falling back to SMS`)
+  return sendAuthenticaSMS(phone)
+}
+
+/** Authentica SMS send — internal, used as fallback when WhatsApp fails. */
+async function sendAuthenticaSMS(phone: string): Promise<boolean> {
   if (!isConfigured()) {
     console.log(`\n📱 DEV MODE — OTP requested for ${phone}\n`)
     return true
@@ -146,10 +210,42 @@ export async function sendOTP(phone: string): Promise<boolean> {
   return true
 }
 
-/** Verify OTP via Authentica. */
+/**
+ * Verify an OTP. Tries the DB code first (WhatsApp path: we own the
+ * code), then falls back to Authentica's verify endpoint (SMS-fallback
+ * path: Authentica owns the code).
+ *
+ * Marks the matching DB row as verified on a successful DB match so
+ * the same code can't be replayed. For the Authentica path, callers
+ * still own the "mark latest unverified row as verified" pattern in
+ * verify-otp/route.ts so brute-force rate limiting based on the
+ * `verified` flag keeps working unchanged.
+ */
 export async function verifyOTP(phone: string, code: string): Promise<boolean> {
   if (TEST_PHONES[phone]) return code === TEST_PHONES[phone]
 
+  // ── Path A: DB code match (WhatsApp). ──────────────────────────────
+  // Find the latest unexpired, unverified row for this phone and
+  // compare codes. We don't filter by `code: code` in the WHERE so
+  // a wrong attempt still consumes a brute-force slot via the route's
+  // existing rate-limit check (which counts unverified rows).
+  const row = await db.otpCode.findFirst({
+    where: {
+      phone,
+      verified: false,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+  if (row && row.code === code) {
+    await db.otpCode.update({
+      where: { id: row.id },
+      data: { verified: true },
+    })
+    return true
+  }
+
+  // ── Path B: Authentica verify (SMS fallback). ──────────────────────
   if (!isConfigured()) {
     return code === '1234'
   }
