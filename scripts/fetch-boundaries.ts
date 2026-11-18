@@ -32,7 +32,11 @@ function loadEnvFile(filePath: string) {
 loadEnvFile(path.resolve('.env.local'))
 loadEnvFile(path.resolve('.env'))
 
-const DATABASE_URL = process.env.DIRECT_URL || process.env.DATABASE_URL || 'postgresql://postgres:1999**@localhost:5432/hai_db'
+const DATABASE_URL = process.env.DIRECT_URL || process.env.DATABASE_URL
+if (!DATABASE_URL) {
+  console.error('Set DIRECT_URL or DATABASE_URL (in .env.local or .env) before running this script.')
+  process.exit(1)
+}
 const adapter = new PrismaPg({ connectionString: DATABASE_URL })
 const db = new PrismaClient({ adapter } as any)
 
