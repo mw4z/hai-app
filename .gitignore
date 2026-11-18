@@ -77,3 +77,7 @@ _enable_wa.cjs
 
 # iOS distribution signing private key (NEVER commit)
 _dist_cert_key.pem
+
+# User uploads (local storage fallback): never commit real users' images
+public/uploads/*
+!public/uploads/.gitkeep
